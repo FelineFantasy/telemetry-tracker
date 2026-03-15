@@ -1,0 +1,28 @@
+# Deploy dashboard to Fly.io when relevant files change on main
+name: Deploy dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/dashboard/**'
+      - 'packages/telemetry-core/**'
+      - 'packages/telemetry-next/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'fly.toml'
+      - 'apps/dashboard/Dockerfile'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy dashboard to Fly.io
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

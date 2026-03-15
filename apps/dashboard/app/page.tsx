@@ -1,13 +1,30 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 async function getOverview() {
-  const res = await fetch(`${API_BASE}/api/overview`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch overview");
+  const url = `${API_BASE}/api/overview`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
+  }
   return res.json();
 }
 
 export default async function OverviewPage() {
-  const data = await getOverview();
+  let data;
+  try {
+    data = await getOverview();
+  } catch (e) {
+    return (
+      <div>
+        <h1>Overview</h1>
+        <p style={{ color: "crimson" }}>
+          Could not load data from API. Check that <code>API_URL</code> is set correctly and the API is reachable.
+        </p>
+        <pre style={{ fontSize: 12, overflow: "auto" }}>{String(e instanceof Error ? e.message : e)}</pre>
+      </div>
+    );
+  }
   return (
     <div>
       <h1>Overview</h1>
