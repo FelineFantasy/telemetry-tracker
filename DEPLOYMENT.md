@@ -173,15 +173,3 @@ You can containerize the API and the dashboard and keep Postgres in Docker too.
 | Migrate (deploy)  | `pnpm --filter api exec prisma migrate deploy` |
 
 Use `migrate deploy` (not `migrate dev`) in production so you don’t create new migration files on the server.
-
----
-
-## 6. API on Fly.io (if Railway keeps 502)
-
-If the API on Railway always returns 502 even though deploy logs show the server listening, run the API on Fly.io and keep Postgres on Railway:
-
-1. **Deploy** from repo root: `fly deploy ./apps/api --config fly.api.toml`
-2. **Set DB** (Railway Postgres **public** URL): `fly secrets set DATABASE_URL="postgresql://..."`
-3. **Point dashboard** at this API: set dashboard `API_URL` to `https://telemetry-api-fly.fly.dev` (or your custom domain).
-
-The API image runs `prisma migrate deploy` on start, then starts the server.
