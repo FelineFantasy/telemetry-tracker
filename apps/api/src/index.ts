@@ -25,6 +25,12 @@ try {
   await app.register(apiRoutes, { prefix: "/api" });
 
   await app.listen({ port, host: "0.0.0.0" });
+  // Railway proxy: Node’s default timeouts are too low and can cause 502 “connection refused”
+  const nodeServer = app.server as { keepAliveTimeout?: number; headersTimeout?: number } | undefined;
+  if (nodeServer) {
+    nodeServer.keepAliveTimeout = 65000;
+    nodeServer.headersTimeout = 66000;
+  }
   console.log("[api] Listening on", port);
 } catch (err) {
   console.error("[api] Startup failed:", err);
