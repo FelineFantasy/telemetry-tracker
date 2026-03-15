@@ -5,7 +5,9 @@ import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
 
 const port = Number(process.env.PORT) || 3001;
-console.log("[api] PORT from env:", process.env.PORT, "-> using port", port);
+// Bind to :: (IPv6 all) so Railway’s proxy can connect; dual-stack accepts IPv4 too
+const host = "::";
+console.log("[api] PORT from env:", process.env.PORT, "-> listening on", host, "port", port);
 
 const PAYLOAD_LIMIT = 200 * 1024; // 200 KB
 const app = Fastify({ logger: true, bodyLimit: PAYLOAD_LIMIT });
@@ -24,7 +26,7 @@ try {
   await app.register(ingestRoutes, { prefix: "/ingest" });
   await app.register(apiRoutes, { prefix: "/api" });
 
-  await app.listen({ port, host: "0.0.0.0" });
+  await app.listen({ port, host });
   // Railway proxy: Node’s default timeouts are too low and can cause 502 “connection refused”
   const nodeServer = app.server as { keepAliveTimeout?: number; headersTimeout?: number } | undefined;
   if (nodeServer) {
