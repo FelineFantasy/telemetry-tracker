@@ -16,6 +16,11 @@ try {
     timeWindow: "1 minute",
   });
   await app.register(cors, { origin: true });
+
+  // No DB – use to confirm the process is reachable (e.g. before /api/overview)
+  app.get("/health", async (_req, reply) => reply.code(200).send({ ok: true }));
+  app.get("/", async (_req, reply) => reply.code(200).send({ service: "telemetry-api", ok: true }));
+
   await app.register(ingestRoutes, { prefix: "/ingest" });
   await app.register(apiRoutes, { prefix: "/api" });
 
