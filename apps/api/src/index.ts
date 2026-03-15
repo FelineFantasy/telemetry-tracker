@@ -5,9 +5,8 @@ import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
 
 const port = Number(process.env.PORT) || 3001;
-// Bind to :: (IPv6 all) so Railway’s proxy can connect; dual-stack accepts IPv4 too
-const host = "::";
-console.log("[api] PORT from env:", process.env.PORT, "-> listening on", host, "port", port);
+const host = process.env.HOST ?? "::";
+console.log("[api] PORT from env:", process.env.PORT, "HOST:", host, "-> listening on port", port);
 
 const PAYLOAD_LIMIT = 200 * 1024; // 200 KB
 const app = Fastify({ logger: true, bodyLimit: PAYLOAD_LIMIT });
