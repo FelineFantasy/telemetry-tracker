@@ -2,7 +2,11 @@ const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 async function getErrorGroup(id: string) {
   const res = await fetch(`${API_BASE}/api/errors/${id}`, { cache: "no-store" });
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
+  }
   return res.json();
 }
 
@@ -12,7 +16,18 @@ export default async function ErrorDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const group = await getErrorGroup(id);
+  let group: Awaited<ReturnType<typeof getErrorGroup>>;
+  try {
+    group = await getErrorGroup(id);
+  } catch (e) {
+    return (
+      <div>
+        <h1>Error detail</h1>
+        <p style={{ color: "crimson" }}>Could not load this error. Check that the API is reachable.</p>
+        <pre style={{ fontSize: 12, overflow: "auto" }}>{String(e instanceof Error ? e.message : e)}</pre>
+      </div>
+    );
+  }
   if (!group) return <div><h1>Error not found</h1></div>;
   return (
     <div>
