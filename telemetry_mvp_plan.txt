@@ -1,0 +1,236 @@
+TELEMETRY TRACKER MVP – BUILD PLAN (7–10 DAYS)
+
+Goal
+
+Build a simple internal telemetry system that tracks: - Errors -
+Events - Sessions
+
+and displays them in a simple dashboard.
+
+The system should work with: - React Native apps - Next.js apps -
+Node.js backends
+
+Later it can evolve into an open‑source project and possibly a hosted
+service.
+
+------------------------------------------------------------------------
+
+FINAL RESULT
+
+SDK API (used inside apps):
+
+telemetry.init() telemetry.trackEvent() telemetry.trackError()
+telemetry.screen() telemetry.identify()
+
+API endpoints:
+
+POST /ingest/event POST /ingest/error POST /ingest/session
+
+Dashboard pages: - Overview - Errors list - Error detail - Events list
+
+------------------------------------------------------------------------
+
+PROJECT STRUCTURE
+
+telemetry/
+
+apps/ api/ dashboard/
+
+packages/ telemetry-core/ telemetry-next/ telemetry-react-native/
+telemetry-node/
+
+infra/ docker/
+
+Technology choices:
+
+API: Node.js (Fastify or NestJS) Database: PostgreSQL Dashboard: Next.js
+SDK: TypeScript ORM: Prisma or Drizzle
+
+------------------------------------------------------------------------
+
+DAY 1 – REPOSITORY SETUP
+
+Create monorepo using pnpm workspaces.
+
+Folders:
+
+apps/api apps/dashboard packages/telemetry-core packages/telemetry-next
+packages/telemetry-react-native packages/telemetry-node
+
+Set up PostgreSQL using Docker.
+
+Example docker-compose:
+
+version: “3”
+
+services: postgres: image: postgres:16 ports: - “5432:5432” environment:
+POSTGRES_PASSWORD: postgres POSTGRES_DB: telemetry
+
+------------------------------------------------------------------------
+
+DATABASE SCHEMA
+
+events
+
+id (uuid) app platform environment release name user_id session_id
+properties (json) created_at
+
+error_groups
+
+id fingerprint message top_stack app occurrences first_seen last_seen
+
+error_occurrences
+
+id error_group_id stack context (json) session_id user_id created_at
+
+sessions
+
+id session_id app platform user_id started_at ended_at
+
+------------------------------------------------------------------------
+
+DAY 2 – INGEST API
+
+Create API endpoints:
+
+POST /ingest/event POST /ingest/error POST /ingest/session
+
+Example event handler:
+
+-   Receive JSON payload
+-   Validate data
+-   Insert record into events table
+
+------------------------------------------------------------------------
+
+DAY 3 – ERROR GROUPING
+
+Implement fingerprint logic:
+
+fingerprint = error.message + first line of stack trace
+
+Workflow:
+
+1.  Calculate fingerprint
+2.  Check if group exists
+3.  If not → create group
+4.  If yes → increment occurrence count
+5.  Insert error occurrence
+
+------------------------------------------------------------------------
+
+DAY 4 – CORE SDK
+
+Create telemetry-core package.
+
+API example:
+
+telemetry.init(config) telemetry.trackEvent(name, properties)
+telemetry.trackError(error, context) telemetry.screen(name)
+telemetry.identify(userId)
+
+Events are sent to the ingest API using fetch.
+
+------------------------------------------------------------------------
+
+DAY 5 – NEXT.JS INTEGRATION
+
+Create telemetry-next package.
+
+Features: - automatic page tracking - React error boundary - client
+initialization
+
+Track route changes as screen/page events.
+
+------------------------------------------------------------------------
+
+DAY 6 – REACT NATIVE INTEGRATION
+
+Create telemetry-react-native package.
+
+Features: - global error handler - screen tracking with React
+Navigation - session tracking
+
+------------------------------------------------------------------------
+
+DAY 7 – NODE.JS INTEGRATION
+
+Create telemetry-node package.
+
+Capture:
+
+uncaughtException unhandledRejection
+
+Add optional middleware for tracking API requests.
+
+------------------------------------------------------------------------
+
+DAY 8 – DASHBOARD
+
+Create Next.js dashboard.
+
+Pages:
+
+/ /errors /errors/[id] /events
+
+Overview page shows:
+
+-   errors in last 24h
+-   events in last 24h
+-   top error groups
+-   top events
+
+------------------------------------------------------------------------
+
+DAY 9 – ERROR DETAIL PAGE
+
+Display:
+
+-   error message
+-   stack trace
+-   occurrences
+-   first seen
+-   last seen
+-   context payload
+
+------------------------------------------------------------------------
+
+DAY 10 – POLISH
+
+Add improvements:
+
+Event batching: SDK queues events and sends them every few seconds.
+
+Rate limiting: API limits requests per minute.
+
+Payload limits: Maximum request size (for example 200 KB).
+
+------------------------------------------------------------------------
+
+FUTURE FEATURES (NOT FOR MVP)
+
+-   source map support
+-   performance traces
+-   ClickHouse event storage
+-   alert notifications
+-   real‑time dashboards
+-   user authentication
+-   projects and public keys
+-   multi‑tenant architecture
+
+------------------------------------------------------------------------
+
+PROJECT VISION
+
+Phase 1: Internal telemetry tracker for personal projects.
+
+Phase 2: Clean architecture and release as open source.
+
+Phase 3: Add multi‑tenant architecture and optional hosted version.
+
+------------------------------------------------------------------------
+
+Positioning:
+
+Lightweight developer telemetry platform for small apps and indie
+developers.

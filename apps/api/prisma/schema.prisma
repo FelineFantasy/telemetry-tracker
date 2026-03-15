@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  app         String
+  platform    String?
+  environment String?
+  release     String?
+  name        String
+  user_id     String?
+  session_id  String?
+  properties  Json?
+  created_at  DateTime @default(now())
+}
+
+model ErrorGroup {
+  id           String   @id @default(uuid())
+  fingerprint  String   @unique
+  message      String
+  top_stack    String?
+  app          String
+  occurrences  Int      @default(1)
+  first_seen   DateTime @default(now())
+  last_seen    DateTime @default(now())
+  occurrences_list ErrorOccurrence[]
+}
+
+model ErrorOccurrence {
+  id            String     @id @default(uuid())
+  error_group_id String
+  error_group   ErrorGroup @relation(fields: [error_group_id], references: [id], onDelete: Cascade)
+  stack         String?
+  context       Json?
+  session_id    String?
+  user_id       String?
+  created_at    DateTime   @default(now())
+}
+
+model Session {
+  id         String    @id @default(uuid())
+  session_id String
+  app        String
+  platform   String?
+  user_id    String?
+  started_at DateTime  @default(now())
+  ended_at   DateTime?
+}
