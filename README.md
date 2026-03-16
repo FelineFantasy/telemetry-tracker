@@ -44,6 +44,10 @@ Lightweight internal telemetry: errors, events, sessions, and a simple dashboard
 
 Override `API_URL` in `apps/dashboard/.env` if the dashboard runs against a different API host (server-side only; not exposed to the browser).
 
+## Deployment (Railway)
+
+The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard (root Dockerfile at repo root). See [DEPLOYMENT.md](DEPLOYMENT.md) for env vars, Root Directory settings, and migrations.
+
 ## Project layout
 
 - `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`

@@ -87,22 +87,25 @@ Use HTTPS and strong `POSTGRES_PASSWORD`; restrict Postgres port (e.g. only loca
 
 ---
 
-### Option B: PaaS (Railway, Render, Fly.io)
+### Option B: PaaS (Railway, Render, etc.)
 
-Use a managed PostgreSQL and deploy the API and dashboard as two services.
+Use a managed PostgreSQL and deploy the API and dashboard as separate services.
 
 #### Railway (API + DB + Dashboard)
 
-- **API service**
-  - Set **Root Directory** to `apps/api` so install/build/start run from that folder (and npm/pnpm uses that `package.json`).
-  - **Build**: `npm install` (or `pnpm install` if you configure pnpm), then `npm run build` (or `pnpm run build`). **Start**: `npm run start` (or `node dist/index.js`).
-  - **Env**: `DATABASE_URL` = Railway Postgres URL. Prefer the **internal** URL (e.g. `postgres.railway.internal:5432`) when the API and DB are in the same project so traffic stays private. Expose `PORT` only if Railway doesn’t set it (Railway usually injects `PORT`).
 - **Database**
-  - You don’t need to create a database named `telemetry`. Use the URL Railway gives you (often database name `railway`). Prisma migrations will create the tables in that database.
-  - Run migrations **once** after the first deploy: in the API service run a one-off command, e.g. `npx prisma migrate deploy` (from `apps/api`), or add a deploy script that runs it before start.
+  - Create a PostgreSQL service. Use the URL Railway gives you (often database name `railway`). Prisma migrations will create the tables.
+  - Run migrations **once** after the first API deploy: one-off `npx prisma migrate deploy` from the API service (or add it to the API start script).
+- **API service**
+  - **Root Directory**: `apps/api`.
+  - **Build**: `npm install` then `npm run build` (Railway uses the API’s `package.json`; `build` runs `prisma generate && tsc`).
+  - **Start**: `npm run start` (`node dist/index.js`).
+  - **Env**: `DATABASE_URL` = Railway Postgres URL; use the **internal** URL when API and DB are in the same project. `PORT` is set by Railway.
 - **Dashboard service**
-  - Set **Root Directory** to `apps/dashboard`. **Build**: `npm install` / `npm run build` (or pnpm). Set `API_URL` to your API URL (e.g. `https://telemetry-api.tacko.io`) **before** building. **Start**: `npm run start` (or `pnpm start`).
-  - Custom domain: e.g. `telemetry.tacko.io` → dashboard service.
+  - **Root Directory**: leave **empty** (repo root) so the build context includes `packages/` and `apps/`.
+  - **Build**: Use **Docker** (not Nixpacks). Railway will use the repo’s root `Dockerfile`, which builds the dashboard and its workspace deps. No custom build command needed.
+  - **Start**: handled by the Dockerfile (`pnpm start` in `apps/dashboard`).
+  - **Env**: `API_URL` = your API’s public URL (e.g. `https://your-api.up.railway.app`). Add a custom domain in the dashboard service if you want (e.g. `telemetry.yourdomain.com`).
 
 1. **Database**
    - Create a PostgreSQL database (Railway / Render / Neon / Supabase etc.).

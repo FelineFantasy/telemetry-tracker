@@ -1,3 +1,5 @@
+# Dashboard image – build context must be repo root (so packages/ and apps/ exist).
+# Railway: set dashboard service Root Directory to repo root so this file is used.
 # syntax = docker/dockerfile:1
 
 ARG NODE_VERSION=20
@@ -10,12 +12,10 @@ RUN corepack enable
 
 FROM base AS build
 
-# Optional build tools
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y python-is-python3 build-essential pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy workspace manifests first for better cache
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/dashboard/package.json apps/dashboard/package.json
 COPY packages/telemetry-core/package.json packages/telemetry-core/package.json
@@ -23,11 +23,9 @@ COPY packages/telemetry-next/package.json packages/telemetry-next/package.json
 
 RUN pnpm install --frozen-lockfile
 
-# Copy full monorepo content needed for build
 COPY apps apps
 COPY packages packages
 
-# Build only dashboard workspace
 RUN pnpm --filter dashboard build
 
 FROM base AS runner
