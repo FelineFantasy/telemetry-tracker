@@ -102,8 +102,8 @@ Use a managed PostgreSQL and deploy the API and dashboard as separate services.
   - **Start**: `npm run start` (`node dist/index.js`).
   - **Env**: `DATABASE_URL` = Railway Postgres URL; use the **internal** URL when API and DB are in the same project. `PORT` is set by Railway.
 - **Dashboard service**
-  - **Root Directory**: leave **empty** (repo root) so the build context includes `packages/` and `apps/`.
-  - **Build**: Use **Docker** (not Nixpacks). Railway will use the repo’s root `Dockerfile`, which builds the dashboard and its workspace deps. No custom build command needed.
+  - **Root Directory**: leave **empty** (repo root). The root `railway.toml` forces **Docker** (see below); the root `Dockerfile` then builds the dashboard with pnpm and workspace deps.
+  - **Build**: Handled by the root `Dockerfile` (pnpm, monorepo). Do **not** set Root Directory to `apps/dashboard` or Railway will use Nixpacks/npm and fail with `Unsupported URL Type "workspace:"`.
   - **Start**: handled by the Dockerfile (`pnpm start` in `apps/dashboard`).
   - **Env**: `API_URL` = your API’s public URL (e.g. `https://your-api.up.railway.app`). Add a custom domain in the dashboard service if you want (e.g. `telemetry.yourdomain.com`).
 
@@ -153,7 +153,20 @@ You can containerize the API and the dashboard and keep Postgres in Docker too.
 
 ---
 
-## 4. Checklist before going live
+## 4. Troubleshooting (Railway dashboard)
+
+**Error:** `EUNSUPPORTEDPROTOCOL` / `Unsupported URL Type "workspace:"` when building the dashboard.
+
+Railway is using **Nixpacks** (npm) instead of Docker. The monorepo uses **pnpm** and `workspace:*` in `package.json`, which npm does not support.
+
+**Fix:**
+
+1. Set the dashboard service **Root Directory** to **empty** (repo root), not `apps/dashboard`.
+2. Ensure the repo root has **`railway.toml`** with `builder = "DOCKERFILE"` so Railway uses the root `Dockerfile` (pnpm build). If Nixpacks still runs, in the dashboard service **Settings → Build** choose Dockerfile as the builder if the option is available.
+
+---
+
+## 5. Checklist before going live
 
 - [ ] `DATABASE_URL` uses a strong password and (if public) TLS (e.g. `?sslmode=require` for cloud Postgres).
 - [ ] API and dashboard are served over HTTPS in production.
@@ -164,7 +177,7 @@ You can containerize the API and the dashboard and keep Postgres in Docker too.
 
 ---
 
-## 5. Quick reference commands
+## 6. Quick reference commands
 
 | Task              | Command (from repo root)        |
 |-------------------|----------------------------------|
