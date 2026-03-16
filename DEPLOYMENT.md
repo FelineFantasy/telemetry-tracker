@@ -171,6 +171,15 @@ Railway is using **Nixpacks** (npm) instead of Docker because the dashboard serv
 3. **Watch Paths** can stay `apps/dashboard/**` (relative to repo root when Root Directory is empty).
 4. Redeploy. The root `railway.toml` and `Dockerfile` will be used; build will use Docker + pnpm. If Nixpacks still runs, in **Settings → Build** choose Dockerfile as the builder if available.
 
+**API 502 "Application failed to respond" / "connection refused" (Railway):**
+
+The proxy cannot reach the API process. The API now defaults to binding on `0.0.0.0` (all interfaces) so Railway’s proxy can connect.
+
+1. **Check API runtime logs** in Railway for the API service. You should see `[api] Listening on 0.0.0.0:PORT`. If you see "Startup failed" or no "Listening" line, the process is crashing (e.g. missing `DATABASE_URL`, Prisma error, or port in use).
+2. **Env**: Ensure `DATABASE_URL` is set (API will start without it but routes like `/api/overview` will fail at runtime). Railway sets `PORT` automatically.
+3. If 502 persists and logs show the app listening, try setting **HOST=0.0.0.0** explicitly in the API service variables (redundant with the new default but can help if an older image is cached).
+4. Redeploy the API after any code or env change.
+
 ---
 
 ## 5. Checklist before going live
