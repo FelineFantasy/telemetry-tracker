@@ -8,6 +8,8 @@ You have three pieces to deploy:
 
 The dashboard talks to the API via `API_URL` (server-side only; not exposed to the browser). The API talks to Postgres via `DATABASE_URL`.
 
+**Repo layout (deployment):** `Dockerfile`, `railway.toml`, `.dockerignore`, and `docker-compose.yml` live at the **repo root**. The single Dockerfile builds the dashboard (context = repo root, for workspace deps). The API has no Dockerfile in the repo (Railway uses Nixpacks for it).
+
 ---
 
 ## 1. Environment variables
@@ -93,18 +95,25 @@ Use a managed PostgreSQL and deploy the API and dashboard as separate services.
 
 #### Railway (API + DB + Dashboard)
 
+Use these settings so only the dashboard uses the root Dockerfile; API and DB are unchanged.
+
+| Service    | Root Directory | Watch Paths (optional)     | Builder / Build |
+|------------|----------------|----------------------------|------------------|
+| **Database** | *(none – Postgres service)* | — | — |
+| **API**      | `apps/api`     | e.g. `apps/api/**`         | Nixpacks → `npm install` / `npm run build` / `npm run start` |
+| **Dashboard**| **empty** (repo root) | e.g. `apps/dashboard/**` | Docker (root `Dockerfile` + `railway.toml`) |
+
 - **Database**
   - Create a PostgreSQL service. Use the URL Railway gives you (often database name `railway`). Prisma migrations will create the tables.
   - Run migrations **once** after the first API deploy: one-off `npx prisma migrate deploy` from the API service (or add it to the API start script).
-- **API service**
+- **API service** — leave as-is
   - **Root Directory**: `apps/api`.
-  - **Build**: `npm install` then `npm run build` (Railway uses the API’s `package.json`; `build` runs `prisma generate && tsc`).
-  - **Start**: `npm run start` (`node dist/index.js`).
-  - **Env**: `DATABASE_URL` = Railway Postgres URL; use the **internal** URL when API and DB are in the same project. `PORT` is set by Railway.
-- **Dashboard service**
-  - **Root Directory**: leave **empty** (repo root). The root `railway.toml` forces **Docker** (see below); the root `Dockerfile` then builds the dashboard with pnpm and workspace deps.
-  - **Build**: Handled by the root `Dockerfile` (pnpm, monorepo). Do **not** set Root Directory to `apps/dashboard` or Railway will use Nixpacks/npm and fail with `Unsupported URL Type "workspace:"`.
-  - **Start**: handled by the Dockerfile (`pnpm start` in `apps/dashboard`).
+  - **Build**: `npm install` then `npm run build`; **Start**: `npm run start` (`node dist/index.js`).
+  - **Env**: `DATABASE_URL` = Railway Postgres URL (prefer **internal** when API and DB are in the same project). `PORT` is set by Railway.
+- **Dashboard service** — fix only this one
+  - **Root Directory**: set to **empty** (clear the field so the service uses the repo root). Do **not** use `apps/dashboard` or Railway will use Nixpacks/npm and fail with `Unsupported URL Type "workspace:"`.
+  - **Watch Paths**: you can keep `apps/dashboard/**` so only dashboard changes trigger redeploys (path is relative to repo root when Root Directory is empty).
+  - **Build**: With root as Root Directory, the root `railway.toml` forces Docker; the root `Dockerfile` builds the dashboard with pnpm. **Start**: handled by the Dockerfile (`pnpm start` in `apps/dashboard`).
   - **Env**: `API_URL` = your API’s public URL (e.g. `https://your-api.up.railway.app`). Add a custom domain in the dashboard service if you want (e.g. `telemetry.yourdomain.com`).
 
 1. **Database**
@@ -132,21 +141,17 @@ If the PaaS doesn’t support pnpm monorepo builds, you can build in CI and depl
 
 ### Option C: Docker (all-in-one or per service)
 
-You can containerize the API and the dashboard and keep Postgres in Docker too.
+You can containerize the API and the dashboard and keep Postgres in Docker too. The repo already has one **Dockerfile at repo root** (dashboard image) and **docker-compose.yml at repo root** (Postgres for local dev).
 
 1. **Postgres**  
-   Use the same `docker-compose.yml` you have, or run Postgres as a separate container with a volume and set `DATABASE_URL` to that container’s host (e.g. service name in compose).
+   Use the same `docker-compose.yml` at repo root, or run Postgres as a separate container with a volume and set `DATABASE_URL` to that container’s host (e.g. service name in compose).
 
-2. **API Dockerfile** (example, from repo root)
-   - Build context: monorepo root so `packages/telemetry-*` and Prisma are available.
-   - Install deps, generate Prisma client, build API, run `node apps/api/dist/index.js` (or run from `apps/api` with correct paths).
-   - Env: `DATABASE_URL`, `PORT`.
-   - Run migrations in an init container or entrypoint before starting the server.
+2. **Dashboard** (included in repo)
+   - The root **Dockerfile** builds the dashboard; build context must be repo root (for `packages/` and pnpm workspace). Run from repo root: `docker build -t dashboard .` then run the container with `API_URL` set.
+   - See the Dockerfile and `railway.toml` at root for the exact build/start steps.
 
-3. **Dashboard Dockerfile** (example)
-   - Build: set `API_URL` if needed, then `pnpm build` for the dashboard.
-   - Run: `pnpm start` in the dashboard app (or `next start`).
-   - Env at runtime: only if you use server-side env; for this MVP the API URL is baked in at build time.
+3. **API container** (not in repo; example if you want Docker for API too)
+   - Build context: monorepo root (or `apps/api` with a custom Dockerfile that copies Prisma from root). Install deps, `prisma generate`, build, run `node dist/index.js`. Env: `DATABASE_URL`, `PORT`. Run migrations in an init container or entrypoint.
 
 4. **Orchestration**
    - Use `docker-compose` with three services: `postgres`, `api`, `dashboard`, and set `DATABASE_URL` for `api` to the Postgres service name and port. Expose only the API and dashboard (and optionally put Nginx/Caddy in front for HTTPS).
@@ -157,12 +162,14 @@ You can containerize the API and the dashboard and keep Postgres in Docker too.
 
 **Error:** `EUNSUPPORTEDPROTOCOL` / `Unsupported URL Type "workspace:"` when building the dashboard.
 
-Railway is using **Nixpacks** (npm) instead of Docker. The monorepo uses **pnpm** and `workspace:*` in `package.json`, which npm does not support.
+Railway is using **Nixpacks** (npm) instead of Docker because the dashboard service has **Root Directory** set to `apps/dashboard`. The monorepo uses **pnpm** and `workspace:*`, which npm does not support.
 
-**Fix:**
+**Fix (dashboard service only; do not change API or Database):**
 
-1. Set the dashboard service **Root Directory** to **empty** (repo root), not `apps/dashboard`.
-2. Ensure the repo root has **`railway.toml`** with `builder = "DOCKERFILE"` so Railway uses the root `Dockerfile` (pnpm build). If Nixpacks still runs, in the dashboard service **Settings → Build** choose Dockerfile as the builder if the option is available.
+1. Open the **dashboard** service in Railway → **Settings**.
+2. Set **Root Directory** to **empty** (clear the field so it uses the repo root). See the [Railway table](#railway-api--db--dashboard) above.
+3. **Watch Paths** can stay `apps/dashboard/**` (relative to repo root when Root Directory is empty).
+4. Redeploy. The root `railway.toml` and `Dockerfile` will be used; build will use Docker + pnpm. If Nixpacks still runs, in **Settings → Build** choose Dockerfile as the builder if available.
 
 ---
 
