@@ -109,7 +109,8 @@ Use these settings so only the dashboard uses the root Dockerfile; API and DB ar
 - **API service** — leave as-is
   - **Root Directory**: `apps/api`.
   - **Build**: `npm install` then `npm run build`; **Start**: `npm run start` (`node dist/index.js`).
-  - **Env**: `DATABASE_URL` = Railway Postgres URL (prefer **internal** when API and DB are in the same project). `PORT` is set by Railway.
+  - **Env**: `DATABASE_URL` = Railway Postgres URL (prefer **internal** when API and DB are in the same project). `PORT` is set by Railway (usually 8080).
+  - **Public domain port**: When you add a domain (e.g. `telemetry-api.tacko.io`) or use the generated `*.up.railway.app` URL, set the **target port** to **8080** in the service’s **Settings → Networking** (or the domain’s port setting). If the domain points at a different port, the proxy gets “connection refused” and you see 502 even though the app is listening.
 - **Dashboard service** — fix only this one
   - **Root Directory**: set to **empty** (clear the field so the service uses the repo root). Do **not** use `apps/dashboard` or Railway will use Nixpacks/npm and fail with `Unsupported URL Type "workspace:"`.
   - **Watch Paths**: you can keep `apps/dashboard/**` so only dashboard changes trigger redeploys (path is relative to repo root when Root Directory is empty).
@@ -173,12 +174,13 @@ Railway is using **Nixpacks** (npm) instead of Docker because the dashboard serv
 
 **API 502 "Application failed to respond" / "connection refused" (Railway):**
 
-The proxy cannot reach the API process. The API now defaults to binding on `0.0.0.0` (all interfaces) so Railway’s proxy can connect.
+The proxy cannot reach the API process. Even when deploy logs show “Listening on 0.0.0.0:8080”, 502 often means the **domain’s target port** does not match the app.
 
-1. **Check API runtime logs** in Railway for the API service. You should see `[api] Listening on 0.0.0.0:PORT`. If you see "Startup failed" or no "Listening" line, the process is crashing (e.g. missing `DATABASE_URL`, Prisma error, or port in use).
-2. **Env**: Ensure `DATABASE_URL` is set (API will start without it but routes like `/api/overview` will fail at runtime). Railway sets `PORT` automatically.
-3. If 502 persists and logs show the app listening, try setting **HOST=0.0.0.0** explicitly in the API service variables (redundant with the new default but can help if an older image is cached).
-4. Redeploy the API after any code or env change.
+1. **Set the public port to 8080**  
+   In Railway: **API service → Settings → Networking** (or **Variables** / domain settings). Find the setting for the **port** used when routing public/custom domain traffic to this service. Set it to **8080** (Railway’s default `PORT`). If it’s blank or another value (e.g. 3000), the proxy will hit the wrong port and you get “connection refused”. Save and retry (no redeploy needed).
+2. **Check API runtime logs** for the API service. You should see `[api] Listening on 0.0.0.0:8080`. If you see "Startup failed" or no "Listening" line, the process is crashing (e.g. missing `DATABASE_URL`, Prisma error).
+3. **Env**: Ensure `DATABASE_URL` is set. Railway sets `PORT` (usually 8080) automatically.
+4. If 502 persists, set **HOST=0.0.0.0** in the API service variables and redeploy.
 
 ---
 
