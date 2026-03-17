@@ -26,6 +26,15 @@ function run(cmd, cwd = root) {
   execSync(cmd, { cwd, stdio: "inherit" });
 }
 
+function runOptional(cmd, cwd = root) {
+  try {
+    execSync(cmd, { cwd, stdio: "inherit" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const dryRun = process.argv.includes("--dry-run");
 
 // 1. Get core version
@@ -33,13 +42,16 @@ const corePkgPath = join(packagesDir, coreName, "package.json");
 const coreVersion = readJson(corePkgPath).version;
 console.log(`\n${coreName} version: ${coreVersion}\n`);
 
-// 2. Publish telemetry-core
+// 2. Publish telemetry-core (continue if already published)
 const publishFlags = [
   "--access public",
   dryRun ? "--dry-run" : "",
-  dryRun ? "--no-git-checks" : "",
+  "--no-git-checks",
 ].filter(Boolean).join(" ");
-run(`pnpm publish ${publishFlags}`, join(packagesDir, coreName));
+const corePublished = runOptional(`pnpm publish ${publishFlags}`, join(packagesDir, coreName));
+if (!corePublished) {
+  console.log(`\n(${coreName} publish failed or skipped, continuing with dependents…)\n`);
+}
 
 // 3. Publish dependents (patch deps, publish, restore)
 for (const name of dependents) {
