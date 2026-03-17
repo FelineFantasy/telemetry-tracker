@@ -36,6 +36,8 @@ function runOptional(cmd, cwd = root) {
 }
 
 const dryRun = process.argv.includes("--dry-run");
+const otpArg = process.argv.find((a) => a.startsWith("--otp="));
+const otpFlag = otpArg ? ` ${otpArg}` : "";
 
 // 1. Get core version
 const corePkgPath = join(packagesDir, coreName, "package.json");
@@ -47,7 +49,7 @@ const publishFlags = [
   "--access public",
   dryRun ? "--dry-run" : "",
   "--no-git-checks",
-].filter(Boolean).join(" ");
+].filter(Boolean).join(" ") + otpFlag;
 const corePublished = runOptional(`pnpm publish ${publishFlags}`, join(packagesDir, coreName));
 if (!corePublished) {
   console.log(`\n(${coreName} publish failed or skipped, continuing with dependents…)\n`);
@@ -58,7 +60,7 @@ for (const name of dependents) {
   const pkgPath = join(packagesDir, name, "package.json");
   const pkg = readJson(pkgPath);
   const original = { ...pkg, dependencies: { ...pkg.dependencies } };
-  if (pkg.dependencies && pkg.dependencies[coreDep] === "workspace:*") {
+  if (pkg.dependencies && typeof pkg.dependencies[coreDep] === "string") {
     pkg.dependencies[coreDep] = `^${coreVersion}`;
     writeJson(pkgPath, pkg);
   }

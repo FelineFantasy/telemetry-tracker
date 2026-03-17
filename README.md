@@ -82,7 +82,7 @@ The SDK packages are published under the `@tacko` scope (`@tacko/telemetry-core`
 1. **Log in to npm** (one-time): `npm login`
 2. **Update repository URLs** in each `packages/*/package.json` if your GitHub org/username is not `unjica`.
 3. **Dry run** (no publish): `pnpm publish:dry`
-4. **Publish**: `pnpm publish:packages`
+4. **Publish**: `pnpm publish:packages` (if your npm account uses 2FA, append your one-time password: `pnpm publish:packages -- --otp=123456`)
 
 **Versioning:** Each new publish must use a version greater than what’s already on npm for that package (e.g. bump `version` in `packages/telemetry-core/package.json` and the other three before running `publish:packages`). Dry-run may fail if you’re not logged in or if the local version is lower than the published one.
 
