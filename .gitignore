@@ -3,3 +3,5 @@ node_modules
 # pnpm monorepo; ignore npm lockfiles so Next doesn't see multiple roots
 package-lock.json
 **/package-lock.json
+.next
+/apps/dashboard/.next

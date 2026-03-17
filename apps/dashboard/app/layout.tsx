@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import "./globals.css";
+import { NavLinks } from "./components/NavLinks";
 
 export const metadata: Metadata = {
   title: "Telemetry Tracker",
@@ -12,13 +14,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: "system-ui, sans-serif", margin: 0, padding: 16 }}>
-        <nav style={{ marginBottom: 24, borderBottom: "1px solid #ccc", paddingBottom: 8 }}>
-          <a href="/" style={{ marginRight: 16 }}>Overview</a>
-          <a href="/errors" style={{ marginRight: 16 }}>Errors</a>
-          <a href="/events">Events</a>
-        </nav>
-        {children}
+      <body>
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        <header className="header">
+          <nav className="nav" aria-label="Main">
+            <NavLinks />
+          </nav>
+          <p className="page-context" style={{ padding: "0 var(--space-md) var(--space-sm)", margin: 0 }}>
+            Internal telemetry: errors, events, and sessions.
+          </p>
+        </header>
+        <main className="main" id="main-content">{children}</main>
       </body>
     </html>
   );

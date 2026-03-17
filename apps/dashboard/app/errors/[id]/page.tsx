@@ -1,6 +1,32 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-async function getErrorGroup(id: string) {
+import { PageTitle } from "../../components/PageTitle";
+import { Badge } from "../../components/Badge";
+import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
+import Link from "next/link";
+
+type Occurrence = {
+  id: string;
+  created_at: string;
+  stack?: string;
+  context?: unknown;
+  user_id?: string | null;
+  session_id?: string | null;
+};
+
+type ErrorGroup = {
+  id: string;
+  message: string;
+  app: string;
+  top_stack?: string | null;
+  occurrences: number;
+  first_seen: string;
+  last_seen: string;
+  occurrences_list?: Occurrence[];
+};
+
+async function getErrorGroup(id: string): Promise<ErrorGroup | null> {
   const res = await fetch(`${API_BASE}/api/errors/${id}`, { cache: "no-store" });
   if (res.status === 404) return null;
   if (!res.ok) {
@@ -16,48 +42,91 @@ export default async function ErrorDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  let group: Awaited<ReturnType<typeof getErrorGroup>>;
+  let group: ErrorGroup | null;
   try {
     group = await getErrorGroup(id);
   } catch (e) {
     return (
-      <div>
-        <h1>Error detail</h1>
-        <p style={{ color: "crimson" }}>Could not load this error. Check that the API is reachable.</p>
-        <pre style={{ fontSize: 12, overflow: "auto" }}>{String(e instanceof Error ? e.message : e)}</pre>
-      </div>
+      <>
+        <PageTitle title="Error detail" />
+        <ErrorState message={String(e instanceof Error ? e.message : e)} />
+      </>
     );
   }
-  if (!group) return <div><h1>Error not found</h1></div>;
+  if (!group) {
+    return (
+      <>
+        <PageTitle title="Error not found" />
+        <EmptyState message="This error group could not be found." />
+      </>
+    );
+  }
+
+  const title =
+    group.message.length > 80
+      ? group.message.slice(0, 80) + "\u2026"
+      : group.message;
+  const context = [
+    group.app,
+    `${group.occurrences} occurrences`,
+    `First seen: ${new Date(group.first_seen).toLocaleString()}`,
+    `Last seen: ${new Date(group.last_seen).toLocaleString()}`,
+  ].join(" · ");
+
   return (
-    <div>
-      <h1>Error detail</h1>
-      <p><strong>Message:</strong> {group.message}</p>
+    <>
+      <nav style={{ marginBottom: 16 }}>
+        <Link href="/errors">← Errors</Link>
+      </nav>
+      <PageTitle title={title} context={context} />
+      <p>
+        <Badge>{group.app}</Badge>
+      </p>
       {group.top_stack && (
-        <div>
-          <strong>Top stack:</strong>
-          <pre style={{ background: "#f5f5f5", padding: 12, overflow: "auto" }}>{group.top_stack}</pre>
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card__label">Top stack</div>
+          <pre style={{ margin: 0 }}>
+            {group.top_stack}
+          </pre>
         </div>
       )}
-      <p>Occurrences: <strong>{group.occurrences}</strong></p>
-      <p>First seen: {new Date(group.first_seen).toLocaleString()}</p>
-      <p>Last seen: {new Date(group.last_seen).toLocaleString()}</p>
-      <h2>Recent occurrences</h2>
+
+      <h2 className="section-title">Recent occurrences</h2>
       {group.occurrences_list?.length ? (
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {group.occurrences_list.map((o: { id: string; created_at: string; stack?: string; context?: unknown }) => (
-            <li key={o.id} style={{ marginBottom: 16, padding: 12, background: "#f9f9f9", borderRadius: 4 }}>
-              <div>{new Date(o.created_at).toLocaleString()}</div>
-              {o.stack && <pre style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{o.stack}</pre>}
-              {o.context != null && typeof o.context === "object" && Object.keys(o.context).length > 0
-                ? <pre style={{ fontSize: 12 }}>{JSON.stringify(o.context, null, 2)}</pre>
-                : null}
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {group.occurrences_list.map((o: Occurrence) => (
+            <li key={o.id} className="occurrence-card">
+              <div className="occurrence-card__meta">
+                <strong>Time:</strong> {new Date(o.created_at).toLocaleString()}
+                {o.user_id != null && o.user_id !== "" && (
+                  <> · <strong>User:</strong> {o.user_id}</>
+                )}
+                {o.session_id != null && o.session_id !== "" && (
+                  <> · <strong>Session:</strong> {o.session_id}</>
+                )}
+              </div>
+              {o.stack && (
+                <>
+                  <div className="card__label">Stack</div>
+                  <pre className="occurrence-card pre">{o.stack}</pre>
+                </>
+              )}
+              {o.context != null &&
+                typeof o.context === "object" &&
+                Object.keys(o.context).length > 0 && (
+                  <>
+                    <div className="card__label">Context</div>
+                    <pre className="properties-json">
+                      {JSON.stringify(o.context, null, 2)}
+                    </pre>
+                  </>
+                )}
             </li>
           ))}
         </ul>
       ) : (
-        <p>No occurrences listed.</p>
+        <EmptyState message="No occurrences listed for this error group." />
       )}
-    </div>
+    </>
   );
 }

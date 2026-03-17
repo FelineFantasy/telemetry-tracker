@@ -1,16 +1,41 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
+import { PageTitle } from "../components/PageTitle";
+import { Badge } from "../components/Badge";
+import { EmptyState } from "../components/EmptyState";
+import { ErrorState } from "../components/ErrorState";
+import { EventsFilter } from "./EventsFilter";
+
 type EventRow = {
   id: string;
   name: string;
   app: string;
-  user_id?: string;
-  session_id?: string;
+  platform?: string | null;
+  environment?: string | null;
+  release?: string | null;
+  user_id?: string | null;
+  session_id?: string | null;
+  properties?: unknown;
   created_at: string;
 };
 
-async function getEvents(): Promise<{ items: EventRow[] }> {
-  const res = await fetch(`${API_BASE}/api/events`, { cache: "no-store" });
+async function getApps(): Promise<{ apps: string[] }> {
+  const res = await fetch(`${API_BASE}/api/apps`, { cache: "no-store" });
+  if (!res.ok) return { apps: [] };
+  return res.json();
+}
+
+async function getEvents(
+  app?: string,
+  name?: string
+): Promise<{ items: EventRow[] }> {
+  const params = new URLSearchParams();
+  if (app) params.set("app", app);
+  if (name) params.set("name", name);
+  const q = params.toString();
+  const res = await fetch(`${API_BASE}/api/events${q ? `?${q}` : ""}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
@@ -18,53 +43,105 @@ async function getEvents(): Promise<{ items: EventRow[] }> {
   return res.json();
 }
 
-function ApiError({ message }: { message: string }) {
-  return (
-    <div>
-      <h1>Events</h1>
-      <p style={{ color: "crimson" }}>Could not load events. Check that the API is reachable.</p>
-      <pre style={{ fontSize: 12, overflow: "auto" }}>{message}</pre>
-    </div>
-  );
-}
+export default async function EventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ app?: string; name?: string }>;
+}) {
+  const params = await searchParams;
+  const appFilter = params.app ?? "";
+  const nameFilter = params.name ?? "";
 
-export default async function EventsPage() {
-  let items: EventRow[];
+  let apps: string[] = [];
+  let items: EventRow[] = [];
   try {
-    const data = await getEvents();
-    items = data.items ?? [];
+    const [appsData, eventsData] = await Promise.all([
+      getApps(),
+      getEvents(appFilter || undefined, nameFilter || undefined),
+    ]);
+    apps = appsData.apps ?? [];
+    items = eventsData.items ?? [];
   } catch (e) {
-    return <ApiError message={String(e instanceof Error ? e.message : e)} />;
+    return (
+      <>
+        <PageTitle title="Events" />
+        <ErrorState message={String(e instanceof Error ? e.message : e)} />
+      </>
+    );
   }
+
+  const contextParts = [];
+  if (appFilter) contextParts.push(`app: ${appFilter}`);
+  if (nameFilter) contextParts.push(`name: ${nameFilter}`);
+  const context =
+    contextParts.length > 0 ? `Filtered by ${contextParts.join(", ")}` : "All events";
+
   return (
-    <div>
-      <h1>Events</h1>
+    <>
+      <PageTitle title="Events" context={context} />
+      <EventsFilter
+        apps={apps}
+        appFilter={appFilter}
+        nameFilter={nameFilter}
+      />
+
       {items.length ? (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "2px solid #ccc" }}>
-              <th style={{ padding: 8 }}>Name</th>
-              <th style={{ padding: 8 }}>App</th>
-              <th style={{ padding: 8 }}>User ID</th>
-              <th style={{ padding: 8 }}>Session ID</th>
-              <th style={{ padding: 8 }}>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((e) => (
-              <tr key={e.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: 8 }}>{e.name}</td>
-                <td style={{ padding: 8 }}>{e.app}</td>
-                <td style={{ padding: 8 }}>{e.user_id ?? "—"}</td>
-                <td style={{ padding: 8 }}>{e.session_id ?? "—"}</td>
-                <td style={{ padding: 8 }}>{new Date(e.created_at).toLocaleString()}</td>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>App</th>
+                <th>Platform</th>
+                <th>Environment</th>
+                <th>Release</th>
+                <th>User ID</th>
+                <th>Session ID</th>
+                <th>Properties</th>
+                <th>Created</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((e) => (
+                <tr key={e.id}>
+                  <td>{e.name}</td>
+                  <td>
+                    <Badge>{e.app}</Badge>
+                  </td>
+                  <td>{e.platform ?? "—"}</td>
+                  <td>{e.environment ?? "—"}</td>
+                  <td>{e.release ?? "—"}</td>
+                  <td>{e.user_id ?? "—"}</td>
+                  <td>{e.session_id ?? "—"}</td>
+                  <td>
+                    {e.properties != null &&
+                    typeof e.properties === "object" &&
+                    Object.keys(e.properties).length > 0 ? (
+                      <details>
+                        <summary>View</summary>
+                        <pre className="properties-json">
+                          {JSON.stringify(e.properties, null, 2)}
+                        </pre>
+                      </details>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>{new Date(e.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <p>No events yet.</p>
+        <EmptyState
+          message={
+            appFilter || nameFilter
+              ? `No events for this filter.`
+              : "No events yet."
+          }
+        />
       )}
-    </div>
+    </>
   );
 }
