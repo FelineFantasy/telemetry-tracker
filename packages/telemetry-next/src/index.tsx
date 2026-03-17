@@ -4,6 +4,7 @@ import React from "react";
 import {
   init as coreInit,
   identify,
+  trackEvent as coreTrackEvent,
   trackError as coreTrackError,
   screen as coreScreen,
   type TelemetryConfig,
@@ -21,7 +22,7 @@ export function init(config: TelemetryNextConfig): void {
   }
 }
 
-export { identify };
+export { identify, coreTrackEvent as trackEvent, coreScreen as screen };
 
 export function trackError(error: Error, context?: Record<string, unknown>): void {
   coreTrackError(error, context);

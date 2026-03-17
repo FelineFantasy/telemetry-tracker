@@ -70,7 +70,9 @@ If you don’t pass `fallback`, the boundary renders nothing when it catches an 
 |--------|-------------|
 | `init(config)` | Call `@tacko/telemetry-core`’s `init` (usually done via `TelemetryProvider`). |
 | `identify(userId)` | Set current user id. |
+| `trackEvent(name, properties?)` | Send a named event (re-exported from core). |
 | `trackError(error, context?)` | Report an error with optional context. |
+| `screen(name)` | Record a screen/view (re-exported from core). |
 | `TelemetryProvider({ config, children })` | Client component that calls `init(config)` on mount. |
 | `useTrackPage(pathname)` | Sends `screen(pathname)` when pathname changes (client-only). |
 | `TelemetryErrorBoundary` | Class component that reports errors in `componentDidCatch` and optionally renders a fallback. |
@@ -97,3 +99,15 @@ export function Navigation() {
 ```
 
 Ensure `init` runs only on the client (e.g. inside a `"use client"` component or `useEffect`).
+
+## Custom events and identify
+
+Import `trackEvent`, `screen`, and `identify` from `@tacko/telemetry-next`:
+
+```tsx
+import { trackEvent, identify } from "@tacko/telemetry-next";
+
+trackEvent("signup_clicked", { source: "hero" });
+identify(user.id);  // after login
+identify(null);     // on logout
+```

@@ -71,7 +71,7 @@ screen("/home");
 identify("user-123");
 ```
 
-**Next.js:** Use `TelemetryProvider` with config and `useTrackPage(pathname)` in a layout or page.
+**Next.js:** Use `TelemetryProvider` with config and `useTrackPage(pathname)` in a layout or page; import `trackEvent`, `screen`, and `identify` from `@tacko/telemetry-next` when needed.
 
 **Node:** `init(config)` then use `trackEvent` / `trackError`; optional `middleware()` for request tracking.
 
