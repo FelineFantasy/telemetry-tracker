@@ -1,6 +1,13 @@
 {
   "name": "telemetry-node",
-  "version": "0.0.1",
+  "version": "0.2.0",
+  "description": "Telemetry Tracker SDK for Node.js: global error handlers, request middleware.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unjica/telemetry-tracker.git",
+    "directory": "packages/telemetry-node"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,8 +20,10 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "pnpm run build"
   },
+  "keywords": ["telemetry", "node", "server", "errors", "middleware"],
   "dependencies": {
     "telemetry-core": "workspace:*"
   },

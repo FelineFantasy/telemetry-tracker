@@ -74,3 +74,16 @@ identify("user-123");
 **Next.js:** Use `TelemetryProvider` with config and `useTrackPage(pathname)` in a layout or page.
 
 **Node:** `init(config)` then use `trackEvent` / `trackError`; optional `middleware()` for request tracking.
+
+## Publishing SDK packages to npm
+
+The SDK packages (`telemetry-core`, `telemetry-next`, `telemetry-node`, `telemetry-react-native`) can be published to the public npm registry so others can `npm install` them.
+
+1. **Log in to npm** (one-time): `npm login`
+2. **Update repository URLs** in each `packages/*/package.json` if your GitHub org/username is not `unjica`.
+3. **Dry run** (no publish): `pnpm publish:dry`
+4. **Publish**: `pnpm publish:packages`
+
+**Versioning:** Each new publish must use a version greater than what’s already on npm for that package (e.g. bump `version` in `packages/telemetry-core/package.json` and the other three before running `publish:packages`). Dry-run may fail if you’re not logged in or if the local version is lower than the published one.
+
+Publishing order is automatic: `telemetry-core` first, then the others. The script temporarily rewrites `workspace:*` to `^<version>` for the core dependency so the published tarball resolves from npm. If a package name is already taken, use a scoped name (e.g. `@your-org/telemetry-core`) in that package’s `package.json`.

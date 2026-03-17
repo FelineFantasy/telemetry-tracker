@@ -7,7 +7,9 @@
     "build": "pnpm -r run build",
     "db:generate": "pnpm --filter api exec prisma generate",
     "db:migrate": "pnpm --filter api exec prisma migrate dev",
-    "db:studio": "pnpm --filter api exec prisma studio"
+    "db:studio": "pnpm --filter api exec prisma studio",
+    "publish:packages": "pnpm run build && node scripts/publish-packages.mjs",
+    "publish:dry": "pnpm run build && node scripts/publish-packages.mjs --dry-run"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

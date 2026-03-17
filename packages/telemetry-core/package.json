@@ -1,6 +1,13 @@
 {
   "name": "telemetry-core",
-  "version": "0.0.1",
+  "version": "0.2.0",
+  "description": "Lightweight telemetry client: events, errors, sessions. Framework-agnostic core.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unjica/telemetry-tracker.git",
+    "directory": "packages/telemetry-core"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,8 +20,10 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "pnpm run build"
   },
+  "keywords": ["telemetry", "analytics", "events", "errors", "tracking"],
   "devDependencies": {
     "typescript": "^5.6.3"
   }
