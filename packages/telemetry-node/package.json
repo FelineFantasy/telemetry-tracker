@@ -1,6 +1,6 @@
 {
   "name": "telemetry-node",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Telemetry Tracker SDK for Node.js: global error handlers, request middleware.",
   "license": "MIT",
   "repository": {
@@ -17,13 +17,21 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "pnpm run build"
   },
-  "keywords": ["telemetry", "node", "server", "errors", "middleware"],
+  "keywords": [
+    "telemetry",
+    "node",
+    "server",
+    "errors",
+    "middleware"
+  ],
   "dependencies": {
     "telemetry-core": "workspace:*"
   },

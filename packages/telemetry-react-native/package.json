@@ -1,6 +1,6 @@
 {
   "name": "telemetry-react-native",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Telemetry Tracker SDK for React Native: global error handler, session and screen tracking.",
   "license": "MIT",
   "repository": {

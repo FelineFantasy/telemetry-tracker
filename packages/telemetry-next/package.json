@@ -1,6 +1,6 @@
 {
   "name": "telemetry-next",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Telemetry Tracker SDK for Next.js: provider, error boundary, page tracking.",
   "license": "MIT",
   "repository": {
@@ -17,13 +17,21 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "pnpm run build"
   },
-  "keywords": ["telemetry", "next.js", "react", "analytics", "error-boundary"],
+  "keywords": [
+    "telemetry",
+    "next.js",
+    "react",
+    "analytics",
+    "error-boundary"
+  ],
   "peerDependencies": {
     "next": ">=14",
     "react": ">=18"
