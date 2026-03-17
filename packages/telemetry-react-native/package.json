@@ -17,13 +17,21 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "pnpm run build"
   },
-  "keywords": ["telemetry", "react-native", "mobile", "errors", "sessions"],
+  "keywords": [
+    "telemetry",
+    "react-native",
+    "mobile",
+    "errors",
+    "sessions"
+  ],
   "peerDependencies": {
     "react-native": "*"
   },
