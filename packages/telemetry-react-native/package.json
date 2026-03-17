@@ -36,7 +36,7 @@
     "react-native": "*"
   },
   "dependencies": {
-    "@tacko/telemetry-core": "workspace:*"
+    "@tacko/telemetry-core": "^1.1.0"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
