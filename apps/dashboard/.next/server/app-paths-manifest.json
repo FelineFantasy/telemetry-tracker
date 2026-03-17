@@ -1,6 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/events/page": "app/events/page.js",
-  "/sessions/page": "app/sessions/page.js",
-  "/errors/page": "app/errors/page.js"
-}
