@@ -59,6 +59,8 @@ try {
 }
 ```
 
+**In the browser:** After `init()` is called, the core SDK registers global handlers so uncaught errors and unhandled promise rejections are reported automatically: `window.onerror` (sync errors and script load errors) and `window.addEventListener("unhandledrejection", ...)`. You can still call `trackError()` manually for caught errors; the same error is only sent once (deduplicated by a flag on the error object).
+
 ### `screen(name)`
 
 Record a screen/view (sent as an event with name `$screen` and property `name`).

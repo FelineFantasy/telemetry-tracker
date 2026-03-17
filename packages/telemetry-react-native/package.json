@@ -1,6 +1,6 @@
 {
   "name": "@tacko/telemetry-react-native",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Telemetry Tracker SDK for React Native: global error handler, session and screen tracking.",
   "license": "MIT",
   "repository": {

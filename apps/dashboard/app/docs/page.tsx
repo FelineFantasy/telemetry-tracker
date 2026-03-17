@@ -35,8 +35,7 @@ export default function DocsPage() {
       <h2>Quick start (any platform)</h2>
       <p>
         Install <code>@tacko/telemetry-core</code> (or the platform package), then call{" "}
-        <code>init()</code> with your ingest URL and app name. Data appears in
-        the dashboard under that app name.
+        <code>init()</code> with your ingest URL and app name. In the browser, uncaught errors and unhandled promise rejections are reported automatically after <code>init()</code>. Data appears in the dashboard under that app name.
       </p>
       <CodeBlock
         code={`import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
@@ -55,7 +54,7 @@ identify("user-123");`}
       <h2>Platforms</h2>
       <ul>
         <li>
-          <a href="/docs/nextjs" className="anchor">Next.js</a> — Provider, error boundary, page tracking.
+          <a href="/docs/nextjs" className="anchor">Next.js</a> — Provider, error boundary, page tracking, and (via core) global browser error/rejection handlers.
         </li>
         <li>
           <a href="/docs/nuxt" className="anchor">Nuxt</a> — Plugin + middleware using <code>@tacko/telemetry-core</code>.

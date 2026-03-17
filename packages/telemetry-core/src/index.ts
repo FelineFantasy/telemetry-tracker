@@ -1,3 +1,5 @@
+const REPORTED = Symbol.for("telemetry.reported");
+
 export type TelemetryConfig = {
   ingestUrl: string;
   app: string;
@@ -12,6 +14,7 @@ export type TelemetryConfig = {
 
 let config: TelemetryConfig | null = null;
 let userId: string | null = null;
+let browserHandlersInstalled = false;
 
 const DEFAULT_BATCH_INTERVAL = 5000;
 const DEFAULT_BATCH_SIZE = 10;
@@ -25,6 +28,42 @@ type QueuedEvent = {
 const eventQueue: QueuedEvent[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 
+function installBrowserErrorHandlers(): void {
+  if (browserHandlersInstalled || typeof window === "undefined") return;
+  browserHandlersInstalled = true;
+
+  window.onerror = (
+    message: string | Event,
+    source?: string,
+    lineno?: number,
+    colno?: number,
+    error?: Error
+  ): boolean => {
+    const cfg = getConfigOrNull();
+    if (!cfg) return false;
+    const err =
+      error && error instanceof Error
+        ? error
+        : new Error(typeof message === "string" ? message : String(message));
+    trackError(err, {
+      source: "window.onerror",
+      filename: source,
+      lineno,
+      colno,
+    });
+    return false; // let other handlers run
+  };
+
+  window.addEventListener("unhandledrejection", (event: PromiseRejectionEvent): void => {
+    const cfg = getConfigOrNull();
+    if (!cfg) return;
+    const reason = event.reason;
+    const err =
+      reason instanceof Error ? reason : new Error(reason != null ? String(reason) : "Unhandled rejection");
+    trackError(err, { source: "unhandledrejection" });
+  });
+}
+
 export function init(c: TelemetryConfig): void {
   config = { ...c };
   const interval = c.batchInterval ?? DEFAULT_BATCH_INTERVAL;
@@ -33,6 +72,7 @@ export function init(c: TelemetryConfig): void {
     const t = flushTimer as unknown as { unref?: () => void };
     if (typeof t.unref === "function") t.unref();
   }
+  installBrowserErrorHandlers();
 }
 
 export function identify(id: string | null): void {
@@ -123,8 +163,12 @@ export function trackError(
   error: Error | { message: string; stack?: string },
   context?: Record<string, unknown>
 ): void {
-  const message = error instanceof Error ? error.message : error.message;
-  const stack = error instanceof Error ? error.stack : error.stack;
+  if (!getConfigOrNull()) return;
+  const err = error instanceof Error ? error : { message: error.message, stack: error.stack };
+  if (err && typeof err === "object" && (err as unknown as Record<symbol, boolean>)[REPORTED]) return;
+  const message = err instanceof Error ? err.message : err.message;
+  const stack = err instanceof Error ? err.stack : err.stack;
+  if (err instanceof Error) (err as unknown as Record<symbol, boolean>)[REPORTED] = true;
   send("/ingest/error", {
     message,
     stack: stack ?? undefined,

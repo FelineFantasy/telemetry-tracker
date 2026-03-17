@@ -1,6 +1,6 @@
 {
   "name": "@tacko/telemetry-next",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Telemetry Tracker SDK for Next.js: provider, error boundary, page tracking.",
   "license": "MIT",
   "repository": {

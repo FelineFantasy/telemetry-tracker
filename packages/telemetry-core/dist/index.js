@@ -1,9 +1,39 @@
+const REPORTED = Symbol.for("telemetry.reported");
 let config = null;
 let userId = null;
+let browserHandlersInstalled = false;
 const DEFAULT_BATCH_INTERVAL = 5000;
 const DEFAULT_BATCH_SIZE = 10;
 const eventQueue = [];
 let flushTimer = null;
+function installBrowserErrorHandlers() {
+    if (browserHandlersInstalled || typeof window === "undefined")
+        return;
+    browserHandlersInstalled = true;
+    window.onerror = (message, source, lineno, colno, error) => {
+        const cfg = getConfigOrNull();
+        if (!cfg)
+            return false;
+        const err = error && error instanceof Error
+            ? error
+            : new Error(typeof message === "string" ? message : String(message));
+        trackError(err, {
+            source: "window.onerror",
+            filename: source,
+            lineno,
+            colno,
+        });
+        return false; // let other handlers run
+    };
+    window.addEventListener("unhandledrejection", (event) => {
+        const cfg = getConfigOrNull();
+        if (!cfg)
+            return;
+        const reason = event.reason;
+        const err = reason instanceof Error ? reason : new Error(reason != null ? String(reason) : "Unhandled rejection");
+        trackError(err, { source: "unhandledrejection" });
+    });
+}
 export function init(c) {
     config = { ...c };
     const interval = c.batchInterval ?? DEFAULT_BATCH_INTERVAL;
@@ -13,6 +43,7 @@ export function init(c) {
         if (typeof t.unref === "function")
             t.unref();
     }
+    installBrowserErrorHandlers();
 }
 export function identify(id) {
     userId = id;
@@ -95,8 +126,15 @@ export function trackEvent(name, properties) {
     }
 }
 export function trackError(error, context) {
-    const message = error instanceof Error ? error.message : error.message;
-    const stack = error instanceof Error ? error.stack : error.stack;
+    if (!getConfigOrNull())
+        return;
+    const err = error instanceof Error ? error : { message: error.message, stack: error.stack };
+    if (err && typeof err === "object" && err[REPORTED])
+        return;
+    const message = err instanceof Error ? err.message : err.message;
+    const stack = err instanceof Error ? err.stack : err.stack;
+    if (err instanceof Error)
+        err[REPORTED] = true;
     send("/ingest/error", {
         message,
         stack: stack ?? undefined,

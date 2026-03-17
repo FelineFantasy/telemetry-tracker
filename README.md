@@ -52,7 +52,7 @@ The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard
 
 - `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`
 - `apps/dashboard` – Next.js app: Overview, Errors list/detail, Events list
-- `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching
+- `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching; in the browser, global `window.onerror` and `unhandledrejection` after `init()`
 - `packages/telemetry-next` – Next.js: provider, error boundary, `useTrackPage()`
 - `packages/telemetry-react-native` – React Native: global error handler, session, `trackScreen()`
 - `packages/telemetry-node` – Node: `uncaughtException` / `unhandledRejection`, optional middleware

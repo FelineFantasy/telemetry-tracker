@@ -11,7 +11,7 @@ export default function DocsNextJsPage() {
       <h1>Next.js</h1>
       <p>
         Use the <code>@tacko/telemetry-next</code> package for Next.js apps. It
-        provides a provider, error boundary, and a hook to track page views.
+        provides a provider, error boundary, and a hook to track page views. In the browser, uncaught errors and unhandled promise rejections are also reported automatically (via core’s global handlers after <code>init()</code>).
       </p>
 
       <h2>Install</h2>
@@ -59,10 +59,9 @@ export default function RootLayout({ children }) {
         it to <code>useTrackPage(pathname)</code>.
       </p>
 
-      <h2>Error boundary</h2>
+      <h2>Errors</h2>
       <p>
-        Wrap parts of your tree with <code>TelemetryErrorBoundary</code> to
-        automatically send React errors to the ingest API.
+        After <code>TelemetryProvider</code> calls <code>init()</code>, uncaught sync errors and unhandled promise rejections in the browser are sent automatically. For React render errors, wrap parts of your tree with <code>TelemetryErrorBoundary</code> to report them (and optionally show a fallback).
       </p>
       <CodeBlock
         code={`import { TelemetryErrorBoundary } from "@tacko/telemetry-next";

@@ -12,7 +12,7 @@ export default function DocsNuxtPage() {
       <p>
         Nuxt is Vue-based, so use <code>@tacko/telemetry-core</code> directly (there is
         no telemetry-nuxt package). Add a client plugin to init and a global
-        middleware to track page views.
+        middleware to track page views. After <code>init()</code>, uncaught errors and unhandled promise rejections in the browser are reported automatically.
       </p>
 
       <h2>Install</h2>
