@@ -7,7 +7,7 @@ import {
   trackError as coreTrackError,
   screen as coreScreen,
   type TelemetryConfig,
-} from "telemetry-core";
+} from "@tacko/telemetry-core";
 
 let initialized = false;
 

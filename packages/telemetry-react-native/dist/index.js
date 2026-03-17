@@ -1,4 +1,4 @@
-import { init as coreInit, identify, trackEvent, trackError as coreTrackError, screen as coreScreen, getConfigOrNull, } from "telemetry-core";
+import { init as coreInit, identify, trackEvent, trackError as coreTrackError, screen as coreScreen, getConfigOrNull, } from "@tacko/telemetry-core";
 const g = typeof globalThis !== "undefined" ? globalThis : undefined;
 const ErrorUtils = g != null && typeof g.ErrorUtils !== "undefined"
     ? g.ErrorUtils

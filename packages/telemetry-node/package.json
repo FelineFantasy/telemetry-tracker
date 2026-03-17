@@ -1,5 +1,5 @@
 {
-  "name": "telemetry-node",
+  "name": "@tacko/telemetry-node",
   "version": "1.0.0",
   "description": "Telemetry Tracker SDK for Node.js: global error handlers, request middleware.",
   "license": "MIT",
@@ -33,7 +33,7 @@
     "middleware"
   ],
   "dependencies": {
-    "telemetry-core": "workspace:*"
+    "@tacko/telemetry-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

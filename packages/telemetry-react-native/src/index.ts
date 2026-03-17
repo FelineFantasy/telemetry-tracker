@@ -6,7 +6,7 @@ import {
   screen as coreScreen,
   getConfigOrNull,
   type TelemetryConfig,
-} from "telemetry-core";
+} from "@tacko/telemetry-core";
 
 const g = typeof globalThis !== "undefined" ? globalThis : undefined;
 const ErrorUtils =

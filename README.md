@@ -62,7 +62,7 @@ The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard
 **Core (any app):**
 
 ```ts
-import { init, trackEvent, trackError, screen, identify } from "telemetry-core";
+import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
 
 init({ ingestUrl: "http://localhost:3001", app: "my-app" });
 trackEvent("click", { button: "submit" });
@@ -77,7 +77,7 @@ identify("user-123");
 
 ## Publishing SDK packages to npm
 
-The SDK packages (`telemetry-core`, `telemetry-next`, `telemetry-node`, `telemetry-react-native`) can be published to the public npm registry so others can `npm install` them.
+The SDK packages are published under the `@tacko` scope (`@tacko/telemetry-core`, `@tacko/telemetry-next`, `@tacko/telemetry-node`, `@tacko/telemetry-react-native`) so others can install them from the public npm registry.
 
 1. **Log in to npm** (one-time): `npm login`
 2. **Update repository URLs** in each `packages/*/package.json` if your GitHub org/username is not `unjica`.
@@ -86,4 +86,4 @@ The SDK packages (`telemetry-core`, `telemetry-next`, `telemetry-node`, `telemet
 
 **Versioning:** Each new publish must use a version greater than what’s already on npm for that package (e.g. bump `version` in `packages/telemetry-core/package.json` and the other three before running `publish:packages`). Dry-run may fail if you’re not logged in or if the local version is lower than the published one.
 
-Publishing order is automatic: `telemetry-core` first, then the others. The script temporarily rewrites `workspace:*` to `^<version>` for the core dependency so the published tarball resolves from npm. If a package name is already taken, use a scoped name (e.g. `@your-org/telemetry-core`) in that package’s `package.json`.
+Publishing order is automatic: `@tacko/telemetry-core` first, then the others. The script temporarily rewrites `workspace:*` to `^<version>` for the core dependency so the published tarball resolves from npm.

@@ -1,5 +1,5 @@
 {
-  "name": "telemetry-next",
+  "name": "@tacko/telemetry-next",
   "version": "1.0.0",
   "description": "Telemetry Tracker SDK for Next.js: provider, error boundary, page tracking.",
   "license": "MIT",
@@ -37,7 +37,7 @@
     "react": ">=18"
   },
   "dependencies": {
-    "telemetry-core": "workspace:*"
+    "@tacko/telemetry-core": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.1",

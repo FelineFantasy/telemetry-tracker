@@ -10,21 +10,21 @@ export default function DocsReactNativePage() {
     <>
       <h1>React Native</h1>
       <p>
-        Use the <code>telemetry-react-native</code> package for React Native
+        Use the <code>@tacko/telemetry-react-native</code> package for React Native
         apps. It starts a session on init, registers a global error handler with
         ErrorUtils, and re-exports <code>trackEvent</code>, <code>trackError</code>,{" "}
         <code>screen</code>, and <code>identify</code>.
       </p>
 
       <h2>Install</h2>
-      <CodeBlock code={`pnpm add telemetry-react-native
+      <CodeBlock code={`pnpm add @tacko/telemetry-react-native
 # or
-npm install telemetry-react-native`} />
+npm install @tacko/telemetry-react-native`} />
 
       <h2>Setup</h2>
       <p>Call <code>init()</code> once at app startup (e.g. in your root component or entry file):</p>
       <CodeBlock
-        code={`import { init } from "telemetry-react-native";
+        code={`import { init } from "@tacko/telemetry-react-native";
 
 init({
   ingestUrl: "https://your-api.example.com",
@@ -48,7 +48,7 @@ init({
         useFocusEffect).
       </p>
       <CodeBlock
-        code={`import { screen } from "telemetry-react-native";
+        code={`import { screen } from "@tacko/telemetry-react-native";
 
 screen("Home");
 screen("Profile");`}
@@ -56,7 +56,7 @@ screen("Profile");`}
 
       <h2>Events and errors</h2>
       <CodeBlock
-        code={`import { trackEvent, trackError, identify } from "telemetry-react-native";
+        code={`import { trackEvent, trackError, identify } from "@tacko/telemetry-react-native";
 
 trackEvent("button_press", { screen: "Home", id: "submit" });
 trackError(new Error("Something broke"), { screen: "Checkout" });

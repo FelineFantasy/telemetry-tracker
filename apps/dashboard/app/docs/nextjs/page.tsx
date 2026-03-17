@@ -10,14 +10,14 @@ export default function DocsNextJsPage() {
     <>
       <h1>Next.js</h1>
       <p>
-        Use the <code>telemetry-next</code> package for Next.js apps. It
+        Use the <code>@tacko/telemetry-next</code> package for Next.js apps. It
         provides a provider, error boundary, and a hook to track page views.
       </p>
 
       <h2>Install</h2>
-      <CodeBlock code={`pnpm add telemetry-next
+      <CodeBlock code={`pnpm add @tacko/telemetry-next
 # or
-npm install telemetry-next`} />
+npm install @tacko/telemetry-next`} />
 
       <h2>Setup</h2>
       <p>
@@ -27,7 +27,7 @@ npm install telemetry-next`} />
       </p>
       <CodeBlock
         code={`// app/layout.tsx
-import { TelemetryProvider, useTrackPage } from "telemetry-next";
+import { TelemetryProvider, useTrackPage } from "@tacko/telemetry-next";
 
 function TrackPageView({ pathname }: { pathname: string }) {
   useTrackPage(pathname);
@@ -65,7 +65,7 @@ export default function RootLayout({ children }) {
         automatically send React errors to the ingest API.
       </p>
       <CodeBlock
-        code={`import { TelemetryErrorBoundary } from "telemetry-next";
+        code={`import { TelemetryErrorBoundary } from "@tacko/telemetry-next";
 
 <TelemetryErrorBoundary fallback={<div>Something went wrong</div>}>
   <YourComponent />
@@ -74,7 +74,7 @@ export default function RootLayout({ children }) {
 
       <h2>Custom events and identify</h2>
       <CodeBlock
-        code={`import { trackEvent, identify } from "telemetry-next";
+        code={`import { trackEvent, identify } from "@tacko/telemetry-next";
 
 trackEvent("signup_clicked", { source: "hero" });
 identify(user.id);  // after login

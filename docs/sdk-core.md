@@ -1,4 +1,4 @@
-# telemetry-core
+# @tacko/telemetry-core
 
 Shared SDK used by all platform packages. Use it directly in any JavaScript/TypeScript app (browser, Node, React Native) when you don’t need framework-specific helpers.
 
@@ -7,10 +7,10 @@ Shared SDK used by all platform packages. Use it directly in any JavaScript/Type
 In a monorepo workspace:
 
 ```bash
-pnpm add telemetry-core
+pnpm add @tacko/telemetry-core
 ```
 
-Or link via workspace: depend on `"telemetry-core": "workspace:*"` in your app’s `package.json`.
+Or link via workspace: depend on `"@tacko/telemetry-core": "workspace:*"` in your app’s `package.json`.
 
 ## API
 
@@ -19,7 +19,7 @@ Or link via workspace: depend on `"telemetry-core": "workspace:*"` in your app�
 Call once at app startup.
 
 ```ts
-import { init } from "telemetry-core";
+import { init } from "@tacko/telemetry-core";
 
 init({
   ingestUrl: "https://your-api.example.com",  // base URL of the ingest API (no trailing slash)
@@ -37,7 +37,7 @@ init({
 Send a named event with optional properties.
 
 ```ts
-import { trackEvent } from "telemetry-core";
+import { trackEvent } from "@tacko/telemetry-core";
 
 trackEvent("button_click", { button: "submit", page: "/checkout" });
 ```
@@ -49,7 +49,7 @@ Events are either sent immediately or queued and sent in batches (see `batchInte
 Send an error and optional context. The server groups errors by message + first stack line.
 
 ```ts
-import { trackError } from "telemetry-core";
+import { trackError } from "@tacko/telemetry-core";
 
 try {
   await doSomething();
@@ -64,7 +64,7 @@ try {
 Record a screen/view (sent as an event with name `$screen` and property `name`).
 
 ```ts
-import { screen } from "telemetry-core";
+import { screen } from "@tacko/telemetry-core";
 
 screen("/home");
 screen("Settings");
@@ -75,7 +75,7 @@ screen("Settings");
 Set the current user id for subsequent events and errors.
 
 ```ts
-import { identify } from "telemetry-core";
+import { identify } from "@tacko/telemetry-core";
 
 identify("user-123");
 identify(null);  // clear
@@ -93,7 +93,7 @@ When `batchInterval > 0` (default), `trackEvent` and `screen` are queued and sen
 ## Usage without a framework package
 
 ```ts
-import { init, trackEvent, trackError, screen, identify } from "telemetry-core";
+import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
 
 init({ ingestUrl: "http://localhost:3001", app: "my-app" });
 

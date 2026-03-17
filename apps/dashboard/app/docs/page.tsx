@@ -22,9 +22,9 @@ export default function DocsPage() {
           sessions to the API (e.g. <code>POST /ingest/event</code>).
         </li>
         <li>
-          <strong>SDKs</strong> — Platform-specific packages (<code>telemetry-next</code>,{" "}
-          <code>telemetry-node</code>, etc.) or the core library (
-          <code>telemetry-core</code>) handle init, batching, and sending.
+          <strong>SDKs</strong> — Platform-specific packages (<code>@tacko/telemetry-next</code>,{" "}
+          <code>@tacko/telemetry-node</code>, etc.) or the core library (
+          <code>@tacko/telemetry-core</code>) handle init, batching, and sending.
         </li>
         <li>
           <strong>Dashboard</strong> — Overview, errors, events, and sessions
@@ -34,12 +34,12 @@ export default function DocsPage() {
 
       <h2>Quick start (any platform)</h2>
       <p>
-        Install <code>telemetry-core</code> (or the platform package), then call{" "}
+        Install <code>@tacko/telemetry-core</code> (or the platform package), then call{" "}
         <code>init()</code> with your ingest URL and app name. Data appears in
         the dashboard under that app name.
       </p>
       <CodeBlock
-        code={`import { init, trackEvent, trackError, screen, identify } from "telemetry-core";
+        code={`import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
 
 init({
   ingestUrl: "https://your-api.example.com",
@@ -58,7 +58,7 @@ identify("user-123");`}
           <a href="/docs/nextjs" className="anchor">Next.js</a> — Provider, error boundary, page tracking.
         </li>
         <li>
-          <a href="/docs/nuxt" className="anchor">Nuxt</a> — Plugin + middleware using <code>telemetry-core</code>.
+          <a href="/docs/nuxt" className="anchor">Nuxt</a> — Plugin + middleware using <code>@tacko/telemetry-core</code>.
         </li>
         <li>
           <a href="/docs/node" className="anchor">Node.js</a> — Global error handlers, optional request middleware.

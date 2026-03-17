@@ -10,15 +10,15 @@ export default function DocsNuxtPage() {
     <>
       <h1>Nuxt</h1>
       <p>
-        Nuxt is Vue-based, so use <code>telemetry-core</code> directly (there is
+        Nuxt is Vue-based, so use <code>@tacko/telemetry-core</code> directly (there is
         no telemetry-nuxt package). Add a client plugin to init and a global
         middleware to track page views.
       </p>
 
       <h2>Install</h2>
-      <CodeBlock code={`pnpm add telemetry-core
+      <CodeBlock code={`pnpm add @tacko/telemetry-core
 # or
-npm install telemetry-core`} />
+npm install @tacko/telemetry-core`} />
 
       <h2>Runtime config</h2>
       <p>In <code>nuxt.config.ts</code> expose the ingest URL and app name:</p>
@@ -36,7 +36,7 @@ npm install telemetry-core`} />
       <h2>Plugin (client-only)</h2>
       <p>Create <code>plugins/telemetry.client.ts</code>:</p>
       <CodeBlock
-        code={`import { init } from "telemetry-core";
+        code={`import { init } from "@tacko/telemetry-core";
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig();
@@ -52,7 +52,7 @@ export default defineNuxtPlugin(() => {
       <h2>Page tracking</h2>
       <p>Create <code>middleware/telemetry.global.ts</code> to send a screen event on each route:</p>
       <CodeBlock
-        code={`import { screen } from "telemetry-core";
+        code={`import { screen } from "@tacko/telemetry-core";
 
 export default defineNuxtRouteMiddleware((to) => {
   if (import.meta.client) {
@@ -63,7 +63,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
       <h2>Custom events and errors</h2>
       <CodeBlock
-        code={`import { trackEvent, trackError } from "telemetry-core";
+        code={`import { trackEvent, trackError } from "@tacko/telemetry-core";
 
 trackEvent("button_click", { id: "submit" });
 trackError(new Error("Something broke"), { page: "/checkout" });`}
@@ -77,7 +77,7 @@ trackError(new Error("Something broke"), { page: "/checkout" });`}
 
       <h2>Optional: identify user</h2>
       <CodeBlock
-        code={`import { identify } from "telemetry-core";
+        code={`import { identify } from "@tacko/telemetry-core";
 
 identify(user.id);  // after login
 identify(null);     // on logout`}

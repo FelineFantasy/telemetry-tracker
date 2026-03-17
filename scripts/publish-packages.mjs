@@ -11,7 +11,8 @@ import { execSync } from "child_process";
 const root = join(fileURLToPath(import.meta.url), "..", "..");
 const packagesDir = join(root, "packages");
 
-const coreName = "telemetry-core";
+const coreName = "telemetry-core"; // folder name
+const coreDep = "@tacko/telemetry-core"; // package name for dependency
 const dependents = ["telemetry-next", "telemetry-node", "telemetry-react-native"];
 
 function readJson(path) {
@@ -45,8 +46,8 @@ for (const name of dependents) {
   const pkgPath = join(packagesDir, name, "package.json");
   const pkg = readJson(pkgPath);
   const original = { ...pkg, dependencies: { ...pkg.dependencies } };
-  if (pkg.dependencies && pkg.dependencies[coreName] === "workspace:*") {
-    pkg.dependencies[coreName] = `^${coreVersion}`;
+  if (pkg.dependencies && pkg.dependencies[coreDep] === "workspace:*") {
+    pkg.dependencies[coreDep] = `^${coreVersion}`;
     writeJson(pkgPath, pkg);
   }
   try {

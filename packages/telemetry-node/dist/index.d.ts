@@ -1,4 +1,4 @@
-import { identify, trackEvent, trackError as coreTrackError, type TelemetryConfig } from "telemetry-core";
+import { identify, trackEvent, trackError as coreTrackError, type TelemetryConfig } from "@tacko/telemetry-core";
 export type TelemetryNodeConfig = TelemetryConfig & {
     app: string;
     platform?: string;

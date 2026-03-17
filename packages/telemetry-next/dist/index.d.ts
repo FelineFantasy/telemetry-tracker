@@ -1,5 +1,5 @@
 import React from "react";
-import { identify, type TelemetryConfig } from "telemetry-core";
+import { identify, type TelemetryConfig } from "@tacko/telemetry-core";
 export type TelemetryNextConfig = TelemetryConfig;
 export declare function init(config: TelemetryNextConfig): void;
 export { identify };

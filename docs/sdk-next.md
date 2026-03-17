@@ -1,13 +1,13 @@
-# telemetry-next
+# @tacko/telemetry-next
 
-Next.js integration: provider, page tracking, and error boundary. Uses `telemetry-core` under the hood.
+Next.js integration: provider, page tracking, and error boundary. Uses `@tacko/telemetry-core` under the hood.
 
 ## Install
 
 In a monorepo workspace:
 
 ```bash
-pnpm add telemetry-next
+pnpm add @tacko/telemetry-next
 ```
 
 Peer dependencies: `next` (≥14), `react` (≥18).
@@ -25,7 +25,7 @@ Peer dependencies: `next` (≥14), `react` (≥18).
 ```tsx
 "use client";
 
-import { TelemetryProvider, useTrackPage } from "telemetry-next";
+import { TelemetryProvider, useTrackPage } from "@tacko/telemetry-next";
 import { usePathname } from "next/navigation";
 
 const config = {
@@ -55,7 +55,7 @@ function TrackPage() {
 Wrap a section of the tree to report React errors and optionally show a fallback:
 
 ```tsx
-import { TelemetryErrorBoundary } from "telemetry-next";
+import { TelemetryErrorBoundary } from "@tacko/telemetry-next";
 
 <TelemetryErrorBoundary fallback={<div>Something went wrong.</div>}>
   <MyComponent />
@@ -68,7 +68,7 @@ If you don’t pass `fallback`, the boundary renders nothing when it catches an 
 
 | Export | Description |
 |--------|-------------|
-| `init(config)` | Call `telemetry-core`’s `init` (usually done via `TelemetryProvider`). |
+| `init(config)` | Call `@tacko/telemetry-core`’s `init` (usually done via `TelemetryProvider`). |
 | `identify(userId)` | Set current user id. |
 | `trackError(error, context?)` | Report an error with optional context. |
 | `TelemetryProvider({ config, children })` | Client component that calls `init(config)` on mount. |
@@ -84,7 +84,7 @@ If you prefer not to use the provider:
 ```tsx
 "use client";
 
-import { init, useTrackPage } from "telemetry-next";
+import { init, useTrackPage } from "@tacko/telemetry-next";
 import { usePathname } from "next/navigation";
 
 init({ ingestUrl: "http://localhost:3001", app: "my-app" });

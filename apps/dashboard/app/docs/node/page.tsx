@@ -10,21 +10,21 @@ export default function DocsNodePage() {
     <>
       <h1>Node.js</h1>
       <p>
-        Use the <code>telemetry-node</code> package for Node.js servers. It
-        wraps <code>telemetry-core</code> and installs global handlers for{" "}
+        Use the <code>@tacko/telemetry-node</code> package for Node.js servers. It
+        wraps <code>@tacko/telemetry-core</code> and installs global handlers for{" "}
         <code>uncaughtException</code> and <code>unhandledRejection</code>. You
         can also attach a request middleware to track HTTP requests.
       </p>
 
       <h2>Install</h2>
-      <CodeBlock code={`pnpm add telemetry-node
+      <CodeBlock code={`pnpm add @tacko/telemetry-node
 # or
-npm install telemetry-node`} />
+npm install @tacko/telemetry-node`} />
 
       <h2>Setup</h2>
       <p>Call <code>init()</code> as early as possible (e.g. at the top of your entry file):</p>
       <CodeBlock
-        code={`import { init, trackEvent, trackError } from "telemetry-node";
+        code={`import { init, trackEvent, trackError } from "@tacko/telemetry-node";
 
 init({
   ingestUrl: process.env.TELEMETRY_INGEST_URL || "https://your-api.example.com",
@@ -51,7 +51,7 @@ trackError(new Error("DB connection failed"), { db: "primary" });`}
         (Express, Fastify, etc.) so it runs for each request.
       </p>
       <CodeBlock
-        code={`import { middleware } from "telemetry-node";
+        code={`import { middleware } from "@tacko/telemetry-node";
 
 const telemetryMiddleware = middleware({ trackRequestBody: false });
 

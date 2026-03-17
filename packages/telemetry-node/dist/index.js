@@ -1,4 +1,4 @@
-import { init as coreInit, identify, trackEvent, trackError as coreTrackError, getConfigOrNull, } from "telemetry-core";
+import { init as coreInit, identify, trackEvent, trackError as coreTrackError, getConfigOrNull, } from "@tacko/telemetry-core";
 let installed = false;
 function installGlobalHandlers() {
     if (installed)
