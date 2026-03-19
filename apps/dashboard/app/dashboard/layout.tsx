@@ -1,5 +1,4 @@
-import { AppSidebar } from "../components/AppSidebar";
-import { TopNav } from "../components/TopNav";
+import { DashboardShell } from "../components/DashboardShell";
 
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
@@ -17,15 +16,5 @@ export default async function DashboardLayout({
 }) {
   const apps = await getApps();
 
-  return (
-    <div className="dashboard-layout">
-      <AppSidebar apps={apps} />
-      <div className="dashboard-right">
-        <TopNav />
-        <main className="main" id="main-content">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+  return <DashboardShell apps={apps}>{children}</DashboardShell>;
 }
