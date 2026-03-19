@@ -67,6 +67,11 @@ identify("user-123");`}
         </li>
       </ul>
 
+      <h2>Identity and anonymous ID</h2>
+      <p>
+        The SDK generates a stable anonymous device id on first <code>init()</code> and sends it (and the SDK version) with every event, error, and session. When you call <code>identify(userId)</code>, the same anonymous id is still sent so the backend can link pre-login activity to the user. In the dashboard, a single <strong>Identity</strong> column shows the user id when set, otherwise the anonymous id.
+      </p>
+
       <h2>App name</h2>
       <p>
         The <code>app</code> value is a string that identifies your application

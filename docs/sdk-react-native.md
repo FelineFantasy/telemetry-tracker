@@ -1,6 +1,6 @@
 # @tacko/telemetry-react-native
 
-React Native integration: global error handler, session tracking, and screen helpers. Uses `@tacko/telemetry-core` under the hood.
+React Native integration: global error handler, session tracking, and screen helpers. Uses `@tacko/telemetry-core` under the hood; sessions and events include anonymous id and SDK version (see [telemetry-core](sdk-core.md)).
 
 ## Install
 

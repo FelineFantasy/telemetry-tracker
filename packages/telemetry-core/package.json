@@ -19,7 +19,7 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/inject-version.cjs && tsc",
     "dev": "tsc --watch",
     "prepublishOnly": "pnpm run build"
   },

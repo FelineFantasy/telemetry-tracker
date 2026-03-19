@@ -13,6 +13,8 @@ type Occurrence = {
   context?: unknown;
   user_id?: string | null;
   session_id?: string | null;
+  anonymous_id?: string | null;
+  sdk_version?: string | null;
 };
 
 type ErrorGroup = {
@@ -75,7 +77,7 @@ export default async function ErrorDetailPage({
 
   return (
     <>
-      <nav style={{ marginBottom: 16 }}>
+      <nav className="nav-back">
         <Link href="/errors">← Errors</Link>
       </nav>
       <PageTitle title={title} context={context} />
@@ -83,9 +85,9 @@ export default async function ErrorDetailPage({
         <Badge>{group.app}</Badge>
       </p>
       {group.top_stack && (
-        <div className="card" style={{ marginTop: 16 }}>
+        <div className="card mt-md">
           <div className="card__label">Top stack</div>
-          <pre style={{ margin: 0 }}>
+          <pre>
             {group.top_stack}
           </pre>
         </div>
@@ -93,16 +95,22 @@ export default async function ErrorDetailPage({
 
       <h2 className="section-title">Recent occurrences</h2>
       {group.occurrences_list?.length ? (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ul className="unstyled-list">
           {group.occurrences_list.map((o: Occurrence) => (
             <li key={o.id} className="occurrence-card">
               <div className="occurrence-card__meta">
                 <strong>Time:</strong> {new Date(o.created_at).toLocaleString()}
-                {o.user_id != null && o.user_id !== "" && (
-                  <> · <strong>User:</strong> {o.user_id}</>
-                )}
+                {(() => {
+                  const id = o.user_id ?? o.anonymous_id;
+                  return id != null && id !== "" ? (
+                    <> · <strong>Identity:</strong> {id.length > 16 ? id.slice(0, 16) + "\u2026" : id}</>
+                  ) : null;
+                })()}
                 {o.session_id != null && o.session_id !== "" && (
                   <> · <strong>Session:</strong> {o.session_id}</>
+                )}
+                {o.sdk_version != null && o.sdk_version !== "" && (
+                  <> · <strong>SDK:</strong> {o.sdk_version}</>
                 )}
               </div>
               {o.stack && (

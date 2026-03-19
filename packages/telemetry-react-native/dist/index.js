@@ -1,4 +1,4 @@
-import { init as coreInit, identify, trackEvent, trackError as coreTrackError, screen as coreScreen, getConfigOrNull, } from "@tacko/telemetry-core";
+import { init as coreInit, identify, trackEvent, trackError as coreTrackError, screen as coreScreen, getConfigOrNull, getAnonymousId, getUserId, SDK_VERSION, } from "@tacko/telemetry-core";
 const g = typeof globalThis !== "undefined" ? globalThis : undefined;
 const ErrorUtils = g != null && typeof g.ErrorUtils !== "undefined"
     ? g.ErrorUtils
@@ -20,7 +20,9 @@ async function sendSession(endedAt) {
                 session_id: sessionId,
                 app: cfg.app,
                 platform: cfg.platform ?? "react-native",
-                user_id: undefined,
+                user_id: getUserId() ?? undefined,
+                anonymous_id: getAnonymousId(),
+                sdk_version: SDK_VERSION,
                 started_at: new Date().toISOString(),
                 ended_at: endedAt?.toISOString() ?? undefined,
             }),

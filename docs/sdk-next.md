@@ -1,6 +1,6 @@
 # @tacko/telemetry-next
 
-Next.js integration: provider, page tracking, and error boundary. Uses `@tacko/telemetry-core` under the hood.
+Next.js integration: provider, page tracking, and error boundary. Uses `@tacko/telemetry-core` under the hood; all events include anonymous device id and SDK version (see [telemetry-core](sdk-core.md)).
 
 ## Install
 

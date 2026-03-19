@@ -12,8 +12,7 @@ export default function DocsNodePage() {
       <p>
         Use the <code>@tacko/telemetry-node</code> package for Node.js servers. It
         wraps <code>@tacko/telemetry-core</code> and installs global handlers for{" "}
-        <code>uncaughtException</code> and <code>unhandledRejection</code>. You
-        can also attach a request middleware to track HTTP requests.
+        <code>uncaughtException</code> and <code>unhandledRejection</code>. All payloads include anonymous id and SDK version. You can also attach a request middleware to track HTTP requests.
       </p>
 
       <h2>Install</h2>

@@ -15,6 +15,8 @@ type EventRow = {
   release?: string | null;
   user_id?: string | null;
   session_id?: string | null;
+  anonymous_id?: string | null;
+  sdk_version?: string | null;
   properties?: unknown;
   created_at: string;
 };
@@ -95,8 +97,9 @@ export default async function EventsPage({
                 <th>Platform</th>
                 <th>Environment</th>
                 <th>Release</th>
-                <th>User ID</th>
+                <th>Identity</th>
                 <th>Session ID</th>
+                <th>SDK</th>
                 <th>Properties</th>
                 <th>Created</th>
               </tr>
@@ -111,8 +114,15 @@ export default async function EventsPage({
                   <td>{e.platform ?? "—"}</td>
                   <td>{e.environment ?? "—"}</td>
                   <td>{e.release ?? "—"}</td>
-                  <td>{e.user_id ?? "—"}</td>
+                  <td title={e.user_id ?? e.anonymous_id ?? undefined}>
+                    {(e.user_id ?? e.anonymous_id)
+                      ? ((e.user_id ?? e.anonymous_id)!.length > 14
+                          ? (e.user_id ?? e.anonymous_id)!.slice(0, 14) + "\u2026"
+                          : e.user_id ?? e.anonymous_id)
+                      : "—"}
+                  </td>
                   <td>{e.session_id ?? "—"}</td>
+                  <td>{e.sdk_version ?? "—"}</td>
                   <td>
                     {e.properties != null &&
                     typeof e.properties === "object" &&

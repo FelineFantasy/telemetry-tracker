@@ -72,10 +72,14 @@ export default function RootLayout({ children }) {
       />
 
       <h2>Custom events and identify</h2>
+      <p>
+        Import <code>trackEvent</code>, <code>screen</code>, and <code>identify</code> from <code>@tacko/telemetry-next</code> when needed.
+      </p>
       <CodeBlock
-        code={`import { trackEvent, identify } from "@tacko/telemetry-next";
+        code={`import { trackEvent, screen, identify } from "@tacko/telemetry-next";
 
 trackEvent("signup_clicked", { source: "hero" });
+screen("/settings");
 identify(user.id);  // after login
 identify(null);     // on logout`}
       />

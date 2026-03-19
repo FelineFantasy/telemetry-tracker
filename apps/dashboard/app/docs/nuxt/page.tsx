@@ -70,9 +70,7 @@ trackError(new Error("Something broke"), { page: "/checkout" });`}
       />
 
       <p>
-        For global errors, in your plugin you can set{" "}
-        <code>window.onerror</code> and call <code>trackError()</code> with the
-        error and context.
+        Core registers <code>window.onerror</code> and <code>unhandledrejection</code> after <code>init()</code>, so uncaught errors and promise rejections are reported automatically. Use <code>trackError()</code> in try/catch for extra context.
       </p>
 
       <h2>Optional: identify user</h2>

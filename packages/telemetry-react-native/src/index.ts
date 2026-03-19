@@ -5,6 +5,9 @@ import {
   trackError as coreTrackError,
   screen as coreScreen,
   getConfigOrNull,
+  getAnonymousId,
+  getUserId,
+  SDK_VERSION,
   type TelemetryConfig,
 } from "@tacko/telemetry-core";
 
@@ -37,7 +40,9 @@ async function sendSession(endedAt?: Date): Promise<void> {
         session_id: sessionId,
         app: cfg.app,
         platform: cfg.platform ?? "react-native",
-        user_id: undefined,
+        user_id: getUserId() ?? undefined,
+        anonymous_id: getAnonymousId(),
+        sdk_version: SDK_VERSION,
         started_at: new Date().toISOString(),
         ended_at: endedAt?.toISOString() ?? undefined,
       }),

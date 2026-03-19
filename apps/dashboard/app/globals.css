@@ -240,6 +240,34 @@ a:focus-visible {
   background: var(--color-surface);
 }
 
+.filter-row a {
+  text-decoration: none;
+  margin-right: var(--space-sm);
+}
+
+.filter-row a[aria-current="page"] {
+  font-weight: 600;
+}
+
+.nav-back {
+  margin-bottom: var(--space-md);
+}
+
+.card.mt-md {
+  margin-top: var(--space-md);
+}
+
+.card pre,
+.occurrence-card pre {
+  margin: 0;
+}
+
+.unstyled-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
 .occurrence-card {
   padding: var(--space-md);
   background: var(--color-bg);

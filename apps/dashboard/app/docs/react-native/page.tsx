@@ -13,7 +13,7 @@ export default function DocsReactNativePage() {
         Use the <code>@tacko/telemetry-react-native</code> package for React Native
         apps. It starts a session on init, registers a global error handler with
         ErrorUtils, and re-exports <code>trackEvent</code>, <code>trackError</code>,{" "}
-        <code>screen</code>, and <code>identify</code>.
+        <code>screen</code>, and <code>identify</code>. Sessions and events include anonymous id and SDK version (from core).
       </p>
 
       <h2>Install</h2>
@@ -67,7 +67,7 @@ identify(user.id);`}
       <p>
         After <code>init()</code>, the package sets{" "}
         <code>ErrorUtils.setGlobalHandler</code> so unhandled JavaScript errors
-        are sent to the ingest API. Your existing handler is still invoked.
+        are sent to the ingest API. The previous handler is not re-invoked (to avoid duplicate reports).
       </p>
     </>
   );

@@ -10,6 +10,8 @@ const eventSchema = z.object({
     name: z.string().min(1),
     user_id: z.string().optional(),
     session_id: z.string().optional(),
+    anonymous_id: z.string().optional(),
+    sdk_version: z.string().optional(),
     properties: z.record(z.unknown()).optional(),
 });
 const sessionSchema = z.object({
@@ -17,6 +19,8 @@ const sessionSchema = z.object({
     app: z.string().min(1),
     platform: z.string().optional(),
     user_id: z.string().optional(),
+    anonymous_id: z.string().optional(),
+    sdk_version: z.string().optional(),
     started_at: z.string().datetime().optional(),
     ended_at: z.string().datetime().optional().nullable(),
 });
@@ -28,6 +32,8 @@ const errorSchema = z.object({
     context: z.record(z.unknown()).optional(),
     session_id: z.string().optional(),
     user_id: z.string().optional(),
+    anonymous_id: z.string().optional(),
+    sdk_version: z.string().optional(),
 });
 const batchSchema = z.object({
     events: z.array(eventSchema).max(100),
@@ -48,6 +54,8 @@ export async function ingestRoutes(app, _opts) {
                 name: body.name,
                 user_id: body.user_id ?? null,
                 session_id: body.session_id ?? null,
+                anonymous_id: body.anonymous_id ?? null,
+                sdk_version: body.sdk_version ?? null,
                 properties: (body.properties ?? undefined),
             },
         });
@@ -76,6 +84,8 @@ export async function ingestRoutes(app, _opts) {
                     app: body.app,
                     platform: body.platform ?? null,
                     user_id: body.user_id ?? null,
+                    anonymous_id: body.anonymous_id ?? null,
+                    sdk_version: body.sdk_version ?? null,
                     started_at: body.started_at ? new Date(body.started_at) : undefined,
                 },
             });
@@ -97,6 +107,8 @@ export async function ingestRoutes(app, _opts) {
                     name: body.name,
                     user_id: body.user_id ?? null,
                     session_id: body.session_id ?? null,
+                    anonymous_id: body.anonymous_id ?? null,
+                    sdk_version: body.sdk_version ?? null,
                     properties: (body.properties ?? undefined),
                 },
             });
@@ -123,6 +135,8 @@ export async function ingestRoutes(app, _opts) {
                 context: (body.context ?? undefined),
                 session_id: body.session_id ?? null,
                 user_id: body.user_id ?? null,
+                anonymous_id: body.anonymous_id ?? null,
+                sdk_version: body.sdk_version ?? null,
             },
         });
         return reply.status(204).send();

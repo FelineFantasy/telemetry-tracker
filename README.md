@@ -52,7 +52,7 @@ The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard
 
 - `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`
 - `apps/dashboard` – Next.js app: Overview, Errors list/detail, Events list
-- `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching; in the browser, global `window.onerror` and `unhandledrejection` after `init()`
+- `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching; anonymous device id and SDK version on every payload; in the browser, global `window.onerror` and `unhandledrejection` after `init()`
 - `packages/telemetry-next` – Next.js: provider, error boundary, `useTrackPage()`
 - `packages/telemetry-react-native` – React Native: global error handler, session, `trackScreen()`
 - `packages/telemetry-node` – Node: `uncaughtException` / `unhandledRejection`, optional middleware
@@ -86,4 +86,4 @@ The SDK packages are published under the `@tacko` scope (`@tacko/telemetry-core`
 
 **Versioning:** Each new publish must use a version greater than what’s already on npm for that package (e.g. bump `version` in `packages/telemetry-core/package.json` and the other three before running `publish:packages`). Dry-run may fail if you’re not logged in or if the local version is lower than the published one.
 
-Publishing order is automatic: `@tacko/telemetry-core` first, then the others. The script temporarily rewrites `workspace:*` to `^<version>` for the core dependency so the published tarball resolves from npm.
+Publishing order is automatic: `@tacko/telemetry-core` first, then the others. The script temporarily sets each dependent’s core dependency to `^<coreVersion>` for the published tarball, then restores.

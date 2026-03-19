@@ -1,6 +1,6 @@
 # @tacko/telemetry-node
 
-Node.js integration: automatic reporting of `uncaughtException` and `unhandledRejection`, plus optional request middleware. Uses `@tacko/telemetry-core` under the hood.
+Node.js integration: automatic reporting of `uncaughtException` and `unhandledRejection`, plus optional request middleware. Uses `@tacko/telemetry-core` under the hood; all payloads include anonymous id and SDK version (see [telemetry-core](sdk-core.md)).
 
 ## Install
 

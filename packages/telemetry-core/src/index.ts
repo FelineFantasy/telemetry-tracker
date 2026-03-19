@@ -1,5 +1,44 @@
 const REPORTED = Symbol.for("telemetry.reported");
 
+import { SDK_VERSION } from "./version.js";
+
+export { SDK_VERSION };
+
+const ANON_STORAGE_KEY = "tacko_telemetry_anon_id";
+
+let anonymousId: string | null = null;
+
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export function getAnonymousId(): string {
+  if (anonymousId) return anonymousId;
+  if (typeof localStorage !== "undefined") {
+    try {
+      const stored = localStorage.getItem(ANON_STORAGE_KEY);
+      if (stored) {
+        anonymousId = stored;
+        return anonymousId;
+      }
+    } catch (_) {}
+  }
+  anonymousId = generateUUID();
+  if (typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem(ANON_STORAGE_KEY, anonymousId);
+    } catch (_) {}
+  }
+  return anonymousId;
+}
+
 export type TelemetryConfig = {
   ingestUrl: string;
   app: string;
@@ -66,6 +105,7 @@ function installBrowserErrorHandlers(): void {
 
 export function init(c: TelemetryConfig): void {
   config = { ...c };
+  getAnonymousId(); // ensure anonymous id exists and is persisted (browser) or set in memory (Node)
   const interval = c.batchInterval ?? DEFAULT_BATCH_INTERVAL;
   if (interval > 0 && typeof setInterval !== "undefined") {
     flushTimer = setInterval(flushEvents, interval);
@@ -101,6 +141,8 @@ async function send(path: string, body: Record<string, unknown>): Promise<void> 
         platform: cfg.platform ?? undefined,
         environment: cfg.environment ?? undefined,
         release: cfg.release ?? undefined,
+        anonymous_id: getAnonymousId(),
+        sdk_version: SDK_VERSION,
       }),
     });
     if (!res.ok) {
@@ -116,6 +158,7 @@ function flushEvents(): void {
   if (!cfg || eventQueue.length === 0) return;
   const batch = eventQueue.splice(0, eventQueue.length);
   const base = cfg.ingestUrl.replace(/\/$/, "");
+  const anonId = getAnonymousId();
   const events = batch.map((e) => ({
     app: cfg.app,
     platform: cfg.platform,
@@ -124,6 +167,8 @@ function flushEvents(): void {
     name: e.name,
     user_id: e.user_id ?? undefined,
     session_id: e.session_id,
+    anonymous_id: anonId,
+    sdk_version: SDK_VERSION,
     properties: e.properties,
   }));
   fetch(`${base}/ingest/batch`, {

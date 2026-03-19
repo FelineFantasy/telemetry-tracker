@@ -1,3 +1,6 @@
+import { SDK_VERSION } from "./version.js";
+export { SDK_VERSION };
+export declare function getAnonymousId(): string;
 export type TelemetryConfig = {
     ingestUrl: string;
     app: string;

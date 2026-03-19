@@ -12,6 +12,8 @@ type SessionRow = {
   app: string;
   platform?: string | null;
   user_id?: string | null;
+  anonymous_id?: string | null;
+  sdk_version?: string | null;
   started_at: string;
   ended_at?: string | null;
 };
@@ -80,7 +82,7 @@ export default async function SessionsPage({
   return (
     <>
       <PageTitle title="Sessions" context={context} />
-      <div className="range-tabs" role="tablist" aria-label="Time range">
+      <div className="range-tabs" aria-label="Time range">
         <Link
           href={appFilter ? `/sessions?app=${encodeURIComponent(appFilter)}` : "/sessions"}
           role="tab"
@@ -100,18 +102,13 @@ export default async function SessionsPage({
           Last 7 days
         </Link>
       </div>
-      <div className="filter-row" style={{ marginBottom: 16 }}>
-        <span className="card__label" style={{ marginRight: 8 }}>
+      <div className="filter-row">
+        <span className="card__label">
           Filter by app:
         </span>
         <Link
           href={`/sessions${range === "7d" ? "?range=7d" : ""}`}
           className="badge"
-          style={{
-            textDecoration: "none",
-            marginRight: 4,
-            ...(appFilter === "" ? { fontWeight: 600 } : {}),
-          }}
           aria-current={appFilter === "" ? "page" : undefined}
         >
           All
@@ -121,11 +118,6 @@ export default async function SessionsPage({
             key={a}
             href={`/sessions?app=${encodeURIComponent(a)}${range === "7d" ? "&range=7d" : ""}`}
             className="badge"
-            style={{
-              textDecoration: "none",
-              marginRight: 4,
-              ...(appFilter === a ? { fontWeight: 600 } : {}),
-            }}
             aria-current={appFilter === a ? "page" : undefined}
           >
             {a}
@@ -141,7 +133,8 @@ export default async function SessionsPage({
                 <th>Session ID</th>
                 <th>App</th>
                 <th>Platform</th>
-                <th>User ID</th>
+                <th>Identity</th>
+                <th>SDK</th>
                 <th>Started</th>
                 <th>Ended</th>
               </tr>
@@ -154,7 +147,12 @@ export default async function SessionsPage({
                     <Badge>{s.app}</Badge>
                   </td>
                   <td>{s.platform ?? "—"}</td>
-                  <td>{s.user_id ?? "—"}</td>
+                  <td title={s.user_id ?? s.anonymous_id ?? undefined}>
+                    {(s.user_id ?? s.anonymous_id)
+                      ? truncate(s.user_id ?? s.anonymous_id ?? "", 14)
+                      : "—"}
+                  </td>
+                  <td>{s.sdk_version ?? "—"}</td>
                   <td>{new Date(s.started_at).toLocaleString()}</td>
                   <td>
                     {s.ended_at
