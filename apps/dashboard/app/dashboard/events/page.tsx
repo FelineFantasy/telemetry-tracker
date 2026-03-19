@@ -79,7 +79,7 @@ export default async function EventsPage({
               {items.map((e) => (
                 <tr key={e.id}>
                   <td>
-                    <Link href={appFilter ? `/events/${e.id}?app=${encodeURIComponent(appFilter)}` : `/events/${e.id}`} className="list-link">
+                    <Link href={appFilter ? `/dashboard/events/${e.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/events/${e.id}`} className="list-link">
                       {e.name}
                     </Link>
                   </td>
@@ -96,7 +96,7 @@ export default async function EventsPage({
                   </td>
                   <td>{new Date(e.created_at).toLocaleString()}</td>
                   <td className="table-cell-view">
-                    <Link href={appFilter ? `/events/${e.id}?app=${encodeURIComponent(appFilter)}` : `/events/${e.id}`}>
+                    <Link href={appFilter ? `/dashboard/events/${e.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/events/${e.id}`}>
                       View
                     </Link>
                   </td>

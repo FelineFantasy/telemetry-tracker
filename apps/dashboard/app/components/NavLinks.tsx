@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
+const DASHBOARD_BASE = "/dashboard";
 const dashboardLinks = [
-  { href: "/overview", label: "Overview" },
-  { href: "/errors", label: "Errors" },
-  { href: "/events", label: "Events" },
-  { href: "/sessions", label: "Sessions" },
+  { href: `${DASHBOARD_BASE}/overview`, label: "Overview" },
+  { href: `${DASHBOARD_BASE}/errors`, label: "Errors" },
+  { href: `${DASHBOARD_BASE}/events`, label: "Events" },
+  { href: `${DASHBOARD_BASE}/sessions`, label: "Sessions" },
 ];
 
 function isNavCurrent(href: string, pathname: string): boolean {
-  if (href === "/overview") {
-    return pathname === "/overview" || pathname === "/";
+  if (href === `${DASHBOARD_BASE}/overview`) {
+    return pathname === `${DASHBOARD_BASE}/overview` || pathname === "/dashboard" || pathname === "/dashboard/";
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

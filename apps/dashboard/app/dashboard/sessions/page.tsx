@@ -62,7 +62,7 @@ export default async function SessionsPage({
 
   const context = appFilter ? `${rangeLabel} · App: ${appFilter}` : rangeLabel;
 
-  const sessionsBase = "/sessions";
+  const sessionsBase = "/dashboard/sessions";
   const href24h = appFilter
     ? `${sessionsBase}?app=${encodeURIComponent(appFilter)}`
     : sessionsBase;
@@ -105,7 +105,7 @@ export default async function SessionsPage({
                 <tr key={s.id}>
                   <td title={s.session_id}>
                     <Link
-                      href={appFilter ? `/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/sessions/${s.id}`}
+                      href={appFilter ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/sessions/${s.id}`}
                       className="list-link"
                     >
                       {truncate(s.session_id, 24)}
@@ -124,7 +124,7 @@ export default async function SessionsPage({
                   </td>
                   <td className="table-cell-view">
                     <Link
-                      href={appFilter ? `/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/sessions/${s.id}`}
+                      href={appFilter ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/sessions/${s.id}`}
                     >
                       View
                     </Link>

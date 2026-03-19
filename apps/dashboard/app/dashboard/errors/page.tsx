@@ -60,8 +60,8 @@ export default async function ErrorsListPage({
               <Link
                 href={
                   appFilter
-                    ? `/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
-                    : `/errors/${g.id}`
+                    ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
+                    : `/dashboard/errors/${g.id}`
                 }
                 className="list-link"
               >

@@ -4,7 +4,7 @@ export function DocsTopBar() {
   return (
     <header className="top-nav docs-top-bar" role="banner">
       <nav className="nav" aria-label="Docs navigation">
-        <Link href="/overview" className="nav-link--dashboard">
+        <Link href="/dashboard/overview" className="nav-link--dashboard">
           Go to dashboard
         </Link>
       </nav>

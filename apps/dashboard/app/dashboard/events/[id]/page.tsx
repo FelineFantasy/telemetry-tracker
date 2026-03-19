@@ -87,7 +87,7 @@ export default async function EventDetailPage({
   return (
     <>
       <nav className="nav-back">
-        <Link href={`/events${appQuery}`}>← Events</Link>
+        <Link href={`/dashboard/events${appQuery}`}>← Events</Link>
       </nav>
       <PageTitle title={event.name} context={context} />
 

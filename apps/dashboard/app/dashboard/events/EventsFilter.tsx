@@ -10,7 +10,7 @@ export function EventsFilter({
       <p className="filter-hint">
         Narrow by event name. App is selected in the sidebar.
       </p>
-      <form method="get" action="/events" className="filter-form">
+      <form method="get" action="/dashboard/events" className="filter-form">
         {appFilter ? (
           <input type="hidden" name="app" value={appFilter} />
         ) : null}

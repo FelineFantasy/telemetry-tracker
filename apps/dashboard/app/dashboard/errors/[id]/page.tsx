@@ -83,7 +83,7 @@ export default async function ErrorDetailPage({
   return (
     <>
       <nav className="nav-back">
-        <Link href={`/errors${appQuery}`}>← Errors</Link>
+        <Link href={`/dashboard/errors${appQuery}`}>← Errors</Link>
       </nav>
       <PageTitle title={title} context={context} />
       <p>

@@ -3,21 +3,20 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
-const DASHBOARD_PATHS = ["/", "/overview", "/errors", "/events", "/sessions"] as const;
+const DASHBOARD_BASE = "/dashboard";
 
 function buildHref(path: string, app: string | null, otherParams: URLSearchParams): string {
   const params = new URLSearchParams(otherParams);
   if (app) params.set("app", app);
   else params.delete("app");
   const q = params.toString();
-  const base = path || "/overview";
+  const base = path || `${DASHBOARD_BASE}/overview`;
   return q ? `${base}?${q}` : base;
 }
 
-/** `/` redirects to `/overview`; use `/overview` in links so `?app=` is applied on the real overview route. */
 function sidebarPath(pathname: string): string {
-  if (pathname === "/") return "/overview";
-  return pathname || "/overview";
+  if (pathname === "/dashboard" || pathname === "/dashboard/") return `${DASHBOARD_BASE}/overview`;
+  return pathname?.startsWith(DASHBOARD_BASE) ? pathname : `${DASHBOARD_BASE}/overview`;
 }
 
 export function AppSidebar({ apps }: { apps: string[] }) {
@@ -26,9 +25,7 @@ export function AppSidebar({ apps }: { apps: string[] }) {
   const searchParams = useSearchParams();
   const currentApp = searchParams.get("app") ?? "";
 
-  const isDashboard = DASHBOARD_PATHS.some(
-    (p) => pathname === p || (p !== "/" && pathname.startsWith(p + "/"))
-  );
+  const isDashboard = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   if (!isDashboard) return null;
 
   return (

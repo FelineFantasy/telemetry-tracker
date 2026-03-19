@@ -78,7 +78,7 @@ export default async function SessionDetailPage({
   return (
     <>
       <nav className="nav-back">
-        <Link href={`/sessions${appQuery}`}>← Sessions</Link>
+        <Link href={`/dashboard/sessions${appQuery}`}>← Sessions</Link>
       </nav>
       <PageTitle title={session.session_id} context={context} />
 

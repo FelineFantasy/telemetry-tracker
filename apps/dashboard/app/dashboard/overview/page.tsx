@@ -8,10 +8,9 @@ import { ErrorState } from "../../components/ErrorState";
 import { firstQueryValue } from "../../../lib/search-params";
 import Link from "next/link";
 
-/** Overview lives at `/overview` so `searchParams` (e.g. `app`) are reliably applied; `/` redirects here. */
 export const dynamic = "force-dynamic";
 
-const OVERVIEW_PATH = "/overview";
+const OVERVIEW_PATH = "/dashboard/overview";
 
 async function getOverview(range: string, compare: boolean, app?: string) {
   const params = new URLSearchParams();
@@ -180,7 +179,7 @@ export default async function OverviewPage({
                 <li key={g.id}>
                   <Badge>{g.app}</Badge>{" "}
                   <Link
-                    href={app ? `/errors/${g.id}?app=${encodeURIComponent(app)}` : `/errors/${g.id}`}
+                    href={app ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(app)}` : `/dashboard/errors/${g.id}`}
                     className="list-link"
                   >
                     {g.message}
