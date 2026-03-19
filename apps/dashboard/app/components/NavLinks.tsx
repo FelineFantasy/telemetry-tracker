@@ -1,29 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
-const links = [
-  { href: "/", label: "Overview" },
+const dashboardLinks = [
+  { href: "/overview", label: "Overview" },
   { href: "/errors", label: "Errors" },
   { href: "/events", label: "Events" },
   { href: "/sessions", label: "Sessions" },
-  { href: "/docs", label: "Docs" },
 ];
+
+function isNavCurrent(href: string, pathname: string): boolean {
+  if (href === "/overview") {
+    return pathname === "/overview" || pathname === "/";
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function NavLinks() {
   const pathname = usePathname() ?? "";
+  const searchParams = useSearchParams();
+  const app = searchParams.get("app");
+
+  function hrefWithApp(href: string): string {
+    if (!app) return href;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("app", app);
+    return `${href}?${params.toString()}`;
+  }
+
   return (
     <>
-      {links.map(({ href, label }) => (
+      {dashboardLinks.map(({ href, label }) => (
         <Link
           key={href}
-          href={href}
-          aria-current={
-            pathname === href || (href !== "/" && pathname.startsWith(href))
-              ? "page"
-              : undefined
-          }
+          href={hrefWithApp(href)}
+          aria-current={isNavCurrent(href, pathname) ? "page" : undefined}
         >
           {label}
         </Link>

@@ -1,9 +1,9 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../../components/PageTitle";
-import { Badge } from "../../components/Badge";
-import { EmptyState } from "../../components/EmptyState";
-import { ErrorState } from "../../components/ErrorState";
+import { PageTitle } from "../../../components/PageTitle";
+import { Badge } from "../../../components/Badge";
+import { EmptyState } from "../../../components/EmptyState";
+import { ErrorState } from "../../../components/ErrorState";
 import Link from "next/link";
 
 type Occurrence = {
@@ -40,10 +40,15 @@ async function getErrorGroup(id: string): Promise<ErrorGroup | null> {
 
 export default async function ErrorDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ app?: string }>;
 }) {
   const { id } = await params;
+  const { app } = await searchParams;
+  const appQuery = app?.trim() ? `?app=${encodeURIComponent(app)}` : "";
+
   let group: ErrorGroup | null;
   try {
     group = await getErrorGroup(id);
@@ -78,7 +83,7 @@ export default async function ErrorDetailPage({
   return (
     <>
       <nav className="nav-back">
-        <Link href="/errors">← Errors</Link>
+        <Link href={`/errors${appQuery}`}>← Errors</Link>
       </nav>
       <PageTitle title={title} context={context} />
       <p>
@@ -87,7 +92,7 @@ export default async function ErrorDetailPage({
       {group.top_stack && (
         <div className="card mt-md">
           <div className="card__label">Top stack</div>
-          <pre>
+          <pre className="occurrence-card__meta">
             {group.top_stack}
           </pre>
         </div>
@@ -101,9 +106,9 @@ export default async function ErrorDetailPage({
               <div className="occurrence-card__meta">
                 <strong>Time:</strong> {new Date(o.created_at).toLocaleString()}
                 {(() => {
-                  const id = o.user_id ?? o.anonymous_id;
-                  return id != null && id !== "" ? (
-                    <> · <strong>Identity:</strong> {id.length > 16 ? id.slice(0, 16) + "\u2026" : id}</>
+                  const uid = o.user_id ?? o.anonymous_id;
+                  return uid != null && uid !== "" ? (
+                    <> · <strong>Identity:</strong> {uid.length > 16 ? uid.slice(0, 16) + "\u2026" : uid}</>
                   ) : null;
                 })()}
                 {o.session_id != null && o.session_id !== "" && (

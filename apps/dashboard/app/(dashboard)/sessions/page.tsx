@@ -1,27 +1,21 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../components/PageTitle";
-import { Badge } from "../components/Badge";
-import { EmptyState } from "../components/EmptyState";
-import { ErrorState } from "../components/ErrorState";
+import { PageTitle } from "../../components/PageTitle";
+import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
 import Link from "next/link";
 
 type SessionRow = {
   id: string;
   session_id: string;
-  app: string;
-  platform?: string | null;
   user_id?: string | null;
   anonymous_id?: string | null;
-  sdk_version?: string | null;
   started_at: string;
   ended_at?: string | null;
 };
 
-async function getApps(): Promise<{ apps: string[] }> {
-  const res = await fetch(`${API_BASE}/api/apps`, { cache: "no-store" });
-  if (!res.ok) return { apps: [] };
-  return res.json();
+function truncate(s: string, len: number) {
+  return s.length <= len ? s : s.slice(0, len) + "\u2026";
 }
 
 async function getSessions(
@@ -42,10 +36,6 @@ async function getSessions(
   return res.json();
 }
 
-function truncate(s: string, len: number) {
-  return s.length <= len ? s : s.slice(0, len) + "\u2026";
-}
-
 export default async function SessionsPage({
   searchParams,
 }: {
@@ -57,15 +47,10 @@ export default async function SessionsPage({
   const since = range;
   const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
 
-  let apps: string[] = [];
   let items: SessionRow[] = [];
   try {
-    const [appsData, sessionsData] = await Promise.all([
-      getApps(),
-      getSessions(appFilter || undefined, since),
-    ]);
-    apps = appsData.apps ?? [];
-    items = sessionsData.items ?? [];
+    const data = await getSessions(appFilter || undefined, since);
+    items = data.items ?? [];
   } catch (e) {
     return (
       <>
@@ -75,55 +60,33 @@ export default async function SessionsPage({
     );
   }
 
-  const context = appFilter
-    ? `${rangeLabel} · Filtered by app: ${appFilter}`
-    : rangeLabel;
+  const context = appFilter ? `${rangeLabel} · App: ${appFilter}` : rangeLabel;
+
+  const sessionsBase = "/sessions";
+  const href24h = appFilter
+    ? `${sessionsBase}?app=${encodeURIComponent(appFilter)}`
+    : sessionsBase;
+  const href7d = appFilter
+    ? `${sessionsBase}?range=7d&app=${encodeURIComponent(appFilter)}`
+    : `${sessionsBase}?range=7d`;
 
   return (
     <>
       <PageTitle title="Sessions" context={context} />
-      <div className="range-tabs" aria-label="Time range">
+      <nav className="range-tabs" aria-label="Time range">
         <Link
-          href={appFilter ? `/sessions?app=${encodeURIComponent(appFilter)}` : "/sessions"}
-          role="tab"
+          href={href24h}
           aria-current={range === "24h" ? "page" : undefined}
         >
           Last 24 hours
         </Link>
         <Link
-          href={
-            appFilter
-              ? `/sessions?range=7d&app=${encodeURIComponent(appFilter)}`
-              : "/sessions?range=7d"
-          }
-          role="tab"
+          href={href7d}
           aria-current={range === "7d" ? "page" : undefined}
         >
           Last 7 days
         </Link>
-      </div>
-      <div className="filter-row">
-        <span className="card__label">
-          Filter by app:
-        </span>
-        <Link
-          href={`/sessions${range === "7d" ? "?range=7d" : ""}`}
-          className="badge"
-          aria-current={appFilter === "" ? "page" : undefined}
-        >
-          All
-        </Link>
-        {apps.map((a) => (
-          <Link
-            key={a}
-            href={`/sessions?app=${encodeURIComponent(a)}${range === "7d" ? "&range=7d" : ""}`}
-            className="badge"
-            aria-current={appFilter === a ? "page" : undefined}
-          >
-            {a}
-          </Link>
-        ))}
-      </div>
+      </nav>
 
       {items.length ? (
         <div className="table-wrap">
@@ -131,33 +94,40 @@ export default async function SessionsPage({
             <thead>
               <tr>
                 <th>Session ID</th>
-                <th>App</th>
-                <th>Platform</th>
                 <th>Identity</th>
-                <th>SDK</th>
                 <th>Started</th>
                 <th>Ended</th>
+                <th aria-hidden>View</th>
               </tr>
             </thead>
             <tbody>
               {items.map((s) => (
                 <tr key={s.id}>
-                  <td title={s.session_id}>{truncate(s.session_id, 24)}</td>
-                  <td>
-                    <Badge>{s.app}</Badge>
+                  <td title={s.session_id}>
+                    <Link
+                      href={appFilter ? `/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/sessions/${s.id}`}
+                      className="list-link"
+                    >
+                      {truncate(s.session_id, 24)}
+                    </Link>
                   </td>
-                  <td>{s.platform ?? "—"}</td>
                   <td title={s.user_id ?? s.anonymous_id ?? undefined}>
                     {(s.user_id ?? s.anonymous_id)
-                      ? truncate(s.user_id ?? s.anonymous_id ?? "", 14)
+                      ? truncate(s.user_id ?? s.anonymous_id ?? "", 20)
                       : "—"}
                   </td>
-                  <td>{s.sdk_version ?? "—"}</td>
                   <td>{new Date(s.started_at).toLocaleString()}</td>
                   <td>
                     {s.ended_at
                       ? new Date(s.ended_at).toLocaleString()
                       : "—"}
+                  </td>
+                  <td className="table-cell-view">
+                    <Link
+                      href={appFilter ? `/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/sessions/${s.id}`}
+                    >
+                      View
+                    </Link>
                   </td>
                 </tr>
               ))}

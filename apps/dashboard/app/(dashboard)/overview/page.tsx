@@ -1,16 +1,23 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "./components/PageTitle";
-import { Card } from "./components/Card";
-import { Badge } from "./components/Badge";
-import { EmptyState } from "./components/EmptyState";
-import { ErrorState } from "./components/ErrorState";
+import { PageTitle } from "../../components/PageTitle";
+import { Card } from "../../components/Card";
+import { Badge } from "../../components/Badge";
+import { EmptyState } from "../../components/EmptyState";
+import { ErrorState } from "../../components/ErrorState";
+import { firstQueryValue } from "../../../lib/search-params";
 import Link from "next/link";
 
-async function getOverview(range: string, compare: boolean) {
+/** Overview lives at `/overview` so `searchParams` (e.g. `app`) are reliably applied; `/` redirects here. */
+export const dynamic = "force-dynamic";
+
+const OVERVIEW_PATH = "/overview";
+
+async function getOverview(range: string, compare: boolean, app?: string) {
   const params = new URLSearchParams();
   if (range) params.set("range", range);
   if (compare) params.set("compare", "true");
+  if (app) params.set("app", app);
   const url = `${API_BASE}/api/overview?${params.toString()}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
@@ -20,37 +27,57 @@ async function getOverview(range: string, compare: boolean) {
   return res.json();
 }
 
-function RangeTabs({ current, compare }: { current: string; compare: boolean }) {
+function rangeHref(path: string, range: string, compare: boolean, app: string | null): string {
+  const params = new URLSearchParams();
+  if (range === "7d") params.set("range", "7d");
+  if (compare) params.set("compare", "true");
+  if (app) params.set("app", app);
+  const q = params.toString();
+  return q ? `${path}?${q}` : path;
+}
+
+function RangeTabs({
+  current,
+  compare,
+  app,
+}: {
+  current: string;
+  compare: boolean;
+  app: string | null;
+}) {
   return (
-    <div className="range-tabs" role="tablist" aria-label="Time range">
+    <nav className="range-tabs" aria-label="Time range">
       <Link
-        href={compare ? "/?compare=true" : "/"}
-        role="tab"
-        aria-selected={current === "24h"}
+        href={rangeHref(OVERVIEW_PATH, "24h", compare, app)}
         aria-current={current === "24h" ? "page" : undefined}
       >
         Last 24 hours
       </Link>
       <Link
-        href={compare ? "/?range=7d&compare=true" : "/?range=7d"}
-        role="tab"
-        aria-selected={current === "7d"}
+        href={rangeHref(OVERVIEW_PATH, "7d", compare, app)}
         aria-current={current === "7d" ? "page" : undefined}
       >
         Last 7 days
       </Link>
-    </div>
+    </nav>
   );
 }
 
 export default async function OverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; compare?: string }>;
+  searchParams: Promise<{
+    range?: string | string[];
+    compare?: string | string[];
+    app?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
-  const range = params.range === "7d" ? "7d" : "24h";
-  const compare = params.compare === "true" || params.compare === "1";
+  const rangeRaw = firstQueryValue(params.range);
+  const range = rangeRaw === "7d" ? "7d" : "24h";
+  const compareRaw = firstQueryValue(params.compare);
+  const compare = compareRaw === "true" || compareRaw === "1";
+  const app = firstQueryValue(params.app)?.trim() || null;
   const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
 
   let data: {
@@ -69,7 +96,7 @@ export default async function OverviewPage({
     topEvents?: Array<{ name: string; count: number }>;
   };
   try {
-    data = await getOverview(range, compare);
+    data = await getOverview(range, compare, app ?? undefined);
   } catch (e) {
     return (
       <>
@@ -81,24 +108,21 @@ export default async function OverviewPage({
 
   const errorsPrev = data.errorsPrevious;
   const eventsPrev = data.eventsPrevious;
+  const contextParts = [rangeLabel];
+  if (app) contextParts.push(`App: ${app}`);
+  const context = contextParts.join(" · ");
 
   return (
     <>
-      <PageTitle title="Overview" context={rangeLabel} />
-      <RangeTabs current={range} compare={compare} />
-      <p className="page-context" style={{ marginTop: -8, marginBottom: 16 }}>
+      <PageTitle title="Overview" context={context} />
+      <RangeTabs current={range} compare={compare} app={app} />
+      <p className="page-context overview-compare">
         {compare ? (
-          <Link href={range === "7d" ? "/?range=7d" : "/"}>
+          <Link href={rangeHref(OVERVIEW_PATH, range, false, app)}>
             Hide comparison with previous period
           </Link>
         ) : (
-          <Link
-            href={
-              range === "7d"
-                ? "/?range=7d&compare=true"
-                : "/?compare=true"
-            }
-          >
+          <Link href={rangeHref(OVERVIEW_PATH, range, true, app)}>
             Compare with previous period
           </Link>
         )}
@@ -144,7 +168,7 @@ export default async function OverviewPage({
       <section>
         <h2 className="section-title">Top error groups in {rangeLabel}</h2>
         {data.topErrorGroups?.length ? (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          <ul className="unstyled-list cards-list">
             {data.topErrorGroups.map(
               (g: {
                 id: string;
@@ -153,9 +177,12 @@ export default async function OverviewPage({
                 occurrences: number;
                 last_seen: string;
               }) => (
-                <li key={g.id} style={{ marginBottom: 8 }}>
+                <li key={g.id}>
                   <Badge>{g.app}</Badge>{" "}
-                  <Link href={`/errors/${g.id}`} className="list-link">
+                  <Link
+                    href={app ? `/errors/${g.id}?app=${encodeURIComponent(app)}` : `/errors/${g.id}`}
+                    className="list-link"
+                  >
                     {g.message}
                   </Link>{" "}
                   — {g.occurrences} occurrences (last:{" "}
@@ -172,9 +199,9 @@ export default async function OverviewPage({
       <section>
         <h2 className="section-title">Top events in {rangeLabel}</h2>
         {data.topEvents?.length ? (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          <ul className="unstyled-list cards-list">
             {data.topEvents.map((e: { name: string; count: number }) => (
-              <li key={e.name} style={{ marginBottom: 8 }}>
+              <li key={e.name}>
                 {e.name}: {e.count}
               </li>
             ))}

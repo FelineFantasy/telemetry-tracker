@@ -1,3 +1,4 @@
+import { DocsTopBar } from "../components/DocsTopBar";
 import { DocSidebar } from "./components/DocSidebar";
 
 export default function DocsLayout({
@@ -6,9 +7,14 @@ export default function DocsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="docs-wrap">
-      <DocSidebar />
-      <div className="docs-content">{children}</div>
-    </div>
+    <>
+      <DocsTopBar />
+      <main className="main" id="main-content">
+        <div className="docs-wrap">
+          <DocSidebar />
+          <div className="docs-content">{children}</div>
+        </div>
+      </main>
+    </>
   );
 }

@@ -3,6 +3,14 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+/** Fastify can expose repeated query keys as `string[]`; normalize to a single trimmed app id. */
+function queryApp(value: string | string[] | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const raw = Array.isArray(value) ? value[0] : value;
+  const t = typeof raw === "string" ? raw.trim() : "";
+  return t || undefined;
+}
+
 function parseRange(range?: string): { since: Date; previousSince: Date; label: string } {
   const hours = range === "7d" ? 7 * 24 : 24;
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -16,10 +24,38 @@ export async function apiRoutes(
   _opts: FastifyPluginOptions
 ) {
   app.get("/overview", async (request, reply) => {
-    const query = request.query as { range?: string; compare?: string };
+    const query = request.query as { range?: string; compare?: string; app?: string | string[] };
     const range = query.range === "7d" ? "7d" : "24h";
     const compare = query.compare === "true" || query.compare === "1";
+    const appFilter = queryApp(query.app);
     const { since, previousSince, label } = parseRange(range);
+
+    const baseWhere = { created_at: { gte: since } };
+    const eventWhere = appFilter
+      ? { ...baseWhere, app: appFilter }
+      : baseWhere;
+    const errorGroupWhere = appFilter
+      ? { last_seen: { gte: since }, app: appFilter }
+      : { last_seen: { gte: since } };
+    const errorOccurrenceWhere = appFilter
+      ? { created_at: { gte: since }, error_group: { app: appFilter } }
+      : { created_at: { gte: since } };
+    const previousErrorWhere = compare
+      ? appFilter
+        ? {
+            created_at: { gte: previousSince, lt: since },
+            error_group: { app: appFilter },
+          }
+        : { created_at: { gte: previousSince, lt: since } }
+      : undefined;
+    const previousEventWhere = compare
+      ? appFilter
+        ? {
+            created_at: { gte: previousSince, lt: since },
+            app: appFilter,
+          }
+        : { created_at: { gte: previousSince, lt: since } }
+      : undefined;
 
     const [
       errorsCount,
@@ -29,34 +65,26 @@ export async function apiRoutes(
       errorsPrevious,
       eventsPrevious,
     ] = await Promise.all([
-      prisma.errorOccurrence.count({ where: { created_at: { gte: since } } }),
-      prisma.event.count({ where: { created_at: { gte: since } } }),
+      prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
+      prisma.event.count({ where: eventWhere }),
       prisma.errorGroup.findMany({
-        where: { last_seen: { gte: since } },
+        where: errorGroupWhere,
         take: 10,
         orderBy: { occurrences: "desc" },
         include: { _count: { select: { occurrences_list: true } } },
       }),
       prisma.event.groupBy({
         by: ["name"],
-        where: { created_at: { gte: since } },
+        where: eventWhere,
         _count: { name: true },
         orderBy: { _count: { name: "desc" } },
         take: 10,
       }),
-      compare
-        ? prisma.errorOccurrence.count({
-            where: {
-              created_at: { gte: previousSince, lt: since },
-            },
-          })
+      previousErrorWhere
+        ? prisma.errorOccurrence.count({ where: previousErrorWhere })
         : Promise.resolve(null),
-      compare
-        ? prisma.event.count({
-            where: {
-              created_at: { gte: previousSince, lt: since },
-            },
-          })
+      previousEventWhere
+        ? prisma.event.count({ where: previousEventWhere })
         : Promise.resolve(null),
     ]);
 
@@ -76,9 +104,10 @@ export async function apiRoutes(
   });
 
   app.get("/errors", async (request, reply) => {
-    const query = request.query as { app?: string; limit?: string };
+    const query = request.query as { app?: string | string[]; limit?: string };
     const limit = Math.min(Number(query.limit) || 50, 100);
-    const where = query.app ? { app: query.app } : {};
+    const appId = queryApp(query.app);
+    const where = appId ? { app: appId } : {};
     const list = await prisma.errorGroup.findMany({
       where,
       take: limit,
@@ -104,10 +133,11 @@ export async function apiRoutes(
   });
 
   app.get("/events", async (request, reply) => {
-    const query = request.query as { app?: string; limit?: string; name?: string };
+    const query = request.query as { app?: string | string[]; limit?: string; name?: string };
     const limit = Math.min(Number(query.limit) || 50, 100);
     const where: { app?: string; name?: string } = {};
-    if (query.app) where.app = query.app;
+    const appId = queryApp(query.app);
+    if (appId) where.app = appId;
     if (query.name) where.name = query.name;
     const list = await prisma.event.findMany({
       where,
@@ -115,6 +145,13 @@ export async function apiRoutes(
       orderBy: { created_at: "desc" },
     });
     return reply.send({ items: list });
+  });
+
+  app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
+    const { id } = request.params;
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) return reply.status(404).send({ error: "Not found" });
+    return reply.send(event);
   });
 
   function parseSince(since?: string): Date | null {
@@ -126,11 +163,12 @@ export async function apiRoutes(
   }
 
   app.get("/sessions", async (request, reply) => {
-    const query = request.query as { app?: string; limit?: string; since?: string };
+    const query = request.query as { app?: string | string[]; limit?: string; since?: string };
     const limit = Math.min(Number(query.limit) || 50, 100);
     const sinceDate = parseSince(query.since);
     const where: { app?: string; started_at?: { gte: Date } } = {};
-    if (query.app) where.app = query.app;
+    const appId = queryApp(query.app);
+    if (appId) where.app = appId;
     if (sinceDate) where.started_at = { gte: sinceDate };
     const list = await prisma.session.findMany({
       where,
@@ -138,6 +176,13 @@ export async function apiRoutes(
       orderBy: { started_at: "desc" },
     });
     return reply.send({ items: list });
+  });
+
+  app.get<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {
+    const { id } = request.params;
+    const session = await prisma.session.findUnique({ where: { id } });
+    if (!session) return reply.status(404).send({ error: "Not found" });
+    return reply.send(session);
   });
 
   app.get("/apps", async (_request, reply) => {
