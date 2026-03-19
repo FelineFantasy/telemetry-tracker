@@ -55,7 +55,7 @@ if (!corePublished) {
   console.log(`\n(${coreName} publish failed or skipped, continuing with dependents…)\n`);
 }
 
-// 3. Publish dependents (patch deps, publish, restore)
+// 3. Publish dependents (patch deps, publish, restore); continue on failure (e.g. already published)
 for (const name of dependents) {
   const pkgPath = join(packagesDir, name, "package.json");
   const pkg = readJson(pkgPath);
@@ -65,7 +65,8 @@ for (const name of dependents) {
     writeJson(pkgPath, pkg);
   }
   try {
-    run(`pnpm publish ${publishFlags}`, join(packagesDir, name));
+    const ok = runOptional(`pnpm publish ${publishFlags}`, join(packagesDir, name));
+    if (!ok) console.log(`(${name} publish failed or skipped.)\n`);
   } finally {
     writeJson(pkgPath, original);
   }

@@ -163,6 +163,13 @@ export async function apiRoutes(app, _opts) {
         });
         return reply.send({ items: list });
     });
+    app.get("/sessions/:id", async (request, reply) => {
+        const { id } = request.params;
+        const session = await prisma.session.findUnique({ where: { id } });
+        if (!session)
+            return reply.status(404).send({ error: "Not found" });
+        return reply.send(session);
+    });
     app.get("/apps", async (_request, reply) => {
         const [eventsApps, errorsApps, sessionsApps] = await Promise.all([
             prisma.event.groupBy({ by: ["app"] }),

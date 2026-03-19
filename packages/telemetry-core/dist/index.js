@@ -42,8 +42,12 @@ const DEFAULT_BATCH_INTERVAL = 5000;
 const DEFAULT_BATCH_SIZE = 10;
 const eventQueue = [];
 let flushTimer = null;
+/** Only install in real browser environments; skip in React Native / Node even if `window` is polyfilled. */
 function installBrowserErrorHandlers() {
-    if (browserHandlersInstalled || typeof window === "undefined")
+    if (browserHandlersInstalled)
+        return;
+    if (typeof window === "undefined" ||
+        typeof window.addEventListener !== "function")
         return;
     browserHandlersInstalled = true;
     window.onerror = (message, source, lineno, colno, error) => {
