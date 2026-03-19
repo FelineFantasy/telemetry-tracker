@@ -509,23 +509,69 @@ a:focus-visible {
   border-radius: 999px;
 }
 
+/* Hero: highlighted positioning lines */
+.landing-hero__highlight-strap {
+  margin: 0;
+  padding: 0.65rem 1.2rem;
+  max-width: min(100%, 28rem);
+  font-size: clamp(0.9375rem, 1.65vw, 1.0625rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  text-align: center;
+  color: #ecfdf5;
+  background: linear-gradient(
+    135deg,
+    rgba(45, 212, 191, 0.18) 0%,
+    rgba(99, 102, 241, 0.14) 55%,
+    rgba(45, 212, 191, 0.1) 100%
+  );
+  border: 1px solid rgba(45, 212, 191, 0.38);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.35),
+    0 14px 44px rgba(13, 148, 136, 0.18);
+}
+
 .landing-hero__title {
   margin: 0;
-  font-size: clamp(1.875rem, 4.8vw, 2.75rem);
+  font-size: clamp(1.75rem, 4.2vw, 2.65rem);
   font-weight: 700;
   letter-spacing: -0.035em;
-  line-height: 1.15;
-  color: #f8fafc;
+  line-height: 1.18;
+}
+
+.landing-hero__title-line {
   background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
+.landing-hero__title-sdk {
+  font-weight: 700;
+  white-space: nowrap;
+  background: linear-gradient(105deg, #5eead4 0%, #a5b4fc 55%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 @supports not (background-clip: text) {
-  .landing-hero__title {
+  .landing-hero__title-line {
     color: #f8fafc;
     background: none;
+  }
+
+  .landing-hero__title-sdk {
+    color: #5eead4;
+    background: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .landing-hero__title-sdk {
+    white-space: normal;
   }
 }
 

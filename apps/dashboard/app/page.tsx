@@ -118,9 +118,14 @@ export default function LandingPage() {
           <div className="landing-hero__glow landing-hero__glow--teal" aria-hidden />
           <div className="landing-hero__glow landing-hero__glow--violet" aria-hidden />
           <div className="landing-hero__inner">
-            <p className="landing-eyebrow">Developer telemetry</p>
+            <p className="landing-hero__highlight-strap">
+              Lightweight telemetry for modern apps
+            </p>
             <h1 id="landing-hero-title" className="landing-hero__title">
-              One place for errors, events, and sessions
+              <span className="landing-hero__title-line">
+                Track errors, events and sessions across all your apps
+              </span>{" "}
+              <span className="landing-hero__title-sdk">— with one SDK</span>
             </h1>
             <p className="landing-hero__lede">
               Stop juggling ad-hoc logs and one-off dashboards. Telemetry Tracker gives your team a
