@@ -14,11 +14,13 @@ Peer dependency: `react-native`.
 
 ## Setup
 
-Call **`init(config)`** once at app startup (e.g. in your root component or entry file). This will:
+Call **`init(config)`** once at app startup (e.g. in your root component or entry file), on both iOS and Android. This will:
 
-- Initialize the core SDK.
+- Initialize the core SDK (safe on native; browser-only error handlers are not installed).
 - Start a session and send it to `POST /ingest/session`.
 - Register a global error handler via `ErrorUtils.setGlobalHandler` (when available) so unhandled errors are reported.
+
+Calling `init()` on native enables `screen()`, `endSession()`, and all other APIs; you do not need to guard `init()` for web only.
 
 ```tsx
 import { init } from "@tacko/telemetry-react-native";

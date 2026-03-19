@@ -67,8 +67,14 @@ type QueuedEvent = {
 const eventQueue: QueuedEvent[] = [];
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 
+/** Only install in real browser environments; skip in React Native / Node even if `window` is polyfilled. */
 function installBrowserErrorHandlers(): void {
-  if (browserHandlersInstalled || typeof window === "undefined") return;
+  if (browserHandlersInstalled) return;
+  if (
+    typeof window === "undefined" ||
+    typeof window.addEventListener !== "function"
+  )
+    return;
   browserHandlersInstalled = true;
 
   window.onerror = (

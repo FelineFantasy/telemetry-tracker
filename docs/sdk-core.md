@@ -59,7 +59,7 @@ try {
 }
 ```
 
-**In the browser:** After `init()` is called, the core SDK registers global handlers so uncaught errors and unhandled promise rejections are reported automatically: `window.onerror` (sync errors and script load errors) and `window.addEventListener("unhandledrejection", ...)`. You can still call `trackError()` manually for caught errors; the same error is only sent once (deduplicated by a flag on the error object).
+**In the browser:** After `init()` is called, the core SDK registers global handlers so uncaught errors and unhandled promise rejections are reported automatically: `window.onerror` (sync errors and script load errors) and `window.addEventListener("unhandledrejection", ...)`. These handlers are only installed when running in a real browser environment (they are skipped in React Native and Node, so `init()` is safe to call on all platforms). You can still call `trackError()` manually for caught errors; the same error is only sent once (deduplicated by a flag on the error object).
 
 ### `screen(name)`
 

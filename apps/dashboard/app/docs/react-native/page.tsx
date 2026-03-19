@@ -22,7 +22,11 @@ export default function DocsReactNativePage() {
 npm install @tacko/telemetry-react-native`} />
 
       <h2>Setup</h2>
-      <p>Call <code>init()</code> once at app startup (e.g. in your root component or entry file):</p>
+      <p>
+        Call <code>init()</code> once at app startup (e.g. in your root component or entry file), on both iOS and Android.
+        The core SDK only installs browser error handlers in a real browser, so <code>init()</code> is safe on native and enables{" "}
+        <code>screen()</code>, <code>endSession()</code>, and all other APIs—you do not need to guard it for web only.
+      </p>
       <CodeBlock
         code={`import { init } from "@tacko/telemetry-react-native";
 
