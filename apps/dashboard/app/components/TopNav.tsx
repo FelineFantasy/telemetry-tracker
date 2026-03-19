@@ -5,10 +5,18 @@ import { NavLinks } from "./NavLinks";
 function NavLinksFallback() {
   return (
     <>
-      <Link href="/dashboard/overview">Overview</Link>
-      <Link href="/dashboard/errors">Errors</Link>
-      <Link href="/dashboard/events">Events</Link>
-      <Link href="/dashboard/sessions">Sessions</Link>
+      <Link href="/dashboard/overview" className="nav-link">
+        Overview
+      </Link>
+      <Link href="/dashboard/errors" className="nav-link">
+        Errors
+      </Link>
+      <Link href="/dashboard/events" className="nav-link">
+        Events
+      </Link>
+      <Link href="/dashboard/sessions" className="nav-link">
+        Sessions
+      </Link>
     </>
   );
 }

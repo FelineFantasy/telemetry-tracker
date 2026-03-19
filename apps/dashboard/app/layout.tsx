@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
-      <body>
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>

@@ -63,7 +63,7 @@ export default async function ErrorsListPage({
                     ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
                     : `/dashboard/errors/${g.id}`
                 }
-                className="list-link"
+                className="list-link !text-danger"
               >
                 {g.message}
               </Link>

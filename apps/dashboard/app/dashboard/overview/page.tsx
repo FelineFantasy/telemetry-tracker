@@ -117,11 +117,11 @@ export default async function OverviewPage({
       <RangeTabs current={range} compare={compare} app={app} />
       <p className="page-context overview-compare">
         {compare ? (
-          <Link href={rangeHref(OVERVIEW_PATH, range, false, app)}>
+          <Link className="text-link" href={rangeHref(OVERVIEW_PATH, range, false, app)}>
             Hide comparison with previous period
           </Link>
         ) : (
-          <Link href={rangeHref(OVERVIEW_PATH, range, true, app)}>
+          <Link className="text-link" href={rangeHref(OVERVIEW_PATH, range, true, app)}>
             Compare with previous period
           </Link>
         )}
@@ -180,12 +180,14 @@ export default async function OverviewPage({
                   <Badge>{g.app}</Badge>{" "}
                   <Link
                     href={app ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(app)}` : `/dashboard/errors/${g.id}`}
-                    className="list-link"
+                    className="list-link !text-danger"
                   >
                     {g.message}
                   </Link>{" "}
-                  — {g.occurrences} occurrences (last:{" "}
-                  {new Date(g.last_seen).toLocaleString()})
+                  <span className="text-gray-600 text-sm">
+                    — {g.occurrences} occurrences (last:{" "}
+                    {new Date(g.last_seen).toLocaleString()})
+                  </span>
                 </li>
               )
             )}
@@ -195,7 +197,7 @@ export default async function OverviewPage({
         )}
       </section>
 
-      <section>
+      <section className="mt-10">
         <h2 className="section-title">Top events in {rangeLabel}</h2>
         {data.topEvents?.length ? (
           <ul className="unstyled-list cards-list">

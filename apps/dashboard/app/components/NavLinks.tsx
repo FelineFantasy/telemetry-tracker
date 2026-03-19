@@ -36,6 +36,7 @@ export function NavLinks() {
         <Link
           key={href}
           href={hrefWithApp(href)}
+          className="nav-link"
           aria-current={isNavCurrent(href, pathname) ? "page" : undefined}
         >
           {label}
