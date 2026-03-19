@@ -1861,8 +1861,3 @@
   border-top: 1px solid var(--color-border);
   margin: var(--space-xl) 0;
 }
-
-.docs-content a.anchor {
-  color: var(--color-link);
-  font-weight: 500;
-}

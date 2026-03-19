@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock } from "./components/CodeBlock";
+import { DocsArticle } from "./components/DocsArticle";
 
 export const metadata: Metadata = {
   title: "Docs — Telemetry Tracker",
@@ -33,18 +34,15 @@ const platforms = [
 
 export default function DocsPage() {
   return (
-    <article className="mx-auto max-w-3xl">
-      <header className="mb-10 border-b border-border pb-8">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-          Documentation
+    <DocsArticle
+      title="Introduction"
+      lede={
+        <p>
+          Telemetry Tracker is a lightweight telemetry backend for errors, events, and sessions.
+          Send data from your apps via SDKs, then explore it in the dashboard.
         </p>
-        <h1>Introduction</h1>
-        <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-          Telemetry Tracker is a lightweight telemetry backend for errors, events, and sessions. Send
-          data from your apps via SDKs, then explore it in the dashboard.
-        </p>
-      </header>
-
+      }
+    >
       <section className="mb-12" aria-labelledby="how-it-works-heading">
         <h2 id="how-it-works-heading">How it works</h2>
         <ul className="mt-6 !list-none !pl-0 space-y-3">
@@ -134,6 +132,6 @@ identify("user-123");`}
           name, it appears in the dashboard filters and data.
         </p>
       </section>
-    </article>
+    </DocsArticle>
   );
 }

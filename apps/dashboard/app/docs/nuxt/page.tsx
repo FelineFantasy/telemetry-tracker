@@ -1,27 +1,36 @@
+import type { Metadata } from "next";
 import { CodeBlock } from "../components/CodeBlock";
+import { DocsArticle } from "../components/DocsArticle";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Nuxt — Docs — Telemetry Tracker",
   description: "Integrate Telemetry Tracker with Nuxt",
 };
 
 export default function DocsNuxtPage() {
   return (
-    <>
-      <h1>Nuxt</h1>
-      <p>
-        Nuxt is Vue-based, so use <code>@tacko/telemetry-core</code> directly (there is
-        no telemetry-nuxt package). Add a client plugin to init and a global
-        middleware to track page views. After <code>init()</code>, uncaught errors and unhandled promise rejections in the browser are reported automatically.
-      </p>
-
+    <DocsArticle
+      title="Nuxt"
+      lede={
+        <p>
+          Nuxt is Vue-based, so use <code>@tacko/telemetry-core</code> directly (there is no
+          telemetry-nuxt package). Add a client plugin to init and a global middleware to track page
+          views. After <code>init()</code>, uncaught errors and unhandled promise rejections in the
+          browser are reported automatically.
+        </p>
+      }
+    >
       <h2>Install</h2>
-      <CodeBlock code={`pnpm add @tacko/telemetry-core
+      <CodeBlock
+        code={`pnpm add @tacko/telemetry-core
 # or
-npm install @tacko/telemetry-core`} />
+npm install @tacko/telemetry-core`}
+      />
 
       <h2>Runtime config</h2>
-      <p>In <code>nuxt.config.ts</code> expose the ingest URL and app name:</p>
+      <p>
+        In <code>nuxt.config.ts</code> expose the ingest URL and app name:
+      </p>
       <CodeBlock
         code={`export default defineNuxtConfig({
   runtimeConfig: {
@@ -34,7 +43,9 @@ npm install @tacko/telemetry-core`} />
       />
 
       <h2>Plugin (client-only)</h2>
-      <p>Create <code>plugins/telemetry.client.ts</code>:</p>
+      <p>
+        Create <code>plugins/telemetry.client.ts</code>:
+      </p>
       <CodeBlock
         code={`import { init } from "@tacko/telemetry-core";
 
@@ -50,7 +61,9 @@ export default defineNuxtPlugin(() => {
       />
 
       <h2>Page tracking</h2>
-      <p>Create <code>middleware/telemetry.global.ts</code> to send a screen event on each route:</p>
+      <p>
+        Create <code>middleware/telemetry.global.ts</code> to send a screen event on each route:
+      </p>
       <CodeBlock
         code={`import { screen } from "@tacko/telemetry-core";
 
@@ -70,7 +83,9 @@ trackError(new Error("Something broke"), { page: "/checkout" });`}
       />
 
       <p>
-        Core registers <code>window.onerror</code> and <code>unhandledrejection</code> after <code>init()</code>, so uncaught errors and promise rejections are reported automatically. Use <code>trackError()</code> in try/catch for extra context.
+        Core registers <code>window.onerror</code> and <code>unhandledrejection</code> after{" "}
+        <code>init()</code>, so uncaught errors and promise rejections are reported automatically.
+        Use <code>trackError()</code> in try/catch for extra context.
       </p>
 
       <h2>Optional: identify user</h2>
@@ -80,6 +95,6 @@ trackError(new Error("Something broke"), { page: "/checkout" });`}
 identify(user.id);  // after login
 identify(null);     // on logout`}
       />
-    </>
+    </DocsArticle>
   );
 }

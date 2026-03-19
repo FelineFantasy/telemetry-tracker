@@ -1,31 +1,39 @@
+import type { Metadata } from "next";
 import { CodeBlock } from "../components/CodeBlock";
+import { DocsArticle } from "../components/DocsArticle";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "React Native — Docs — Telemetry Tracker",
   description: "Integrate Telemetry Tracker with React Native",
 };
 
 export default function DocsReactNativePage() {
   return (
-    <>
-      <h1>React Native</h1>
-      <p>
-        Use the <code>@tacko/telemetry-react-native</code> package for React Native
-        apps. It starts a session on init, registers a global error handler with
-        ErrorUtils, and re-exports <code>trackEvent</code>, <code>trackError</code>,{" "}
-        <code>screen</code>, and <code>identify</code>. Sessions and events include anonymous id and SDK version (from core).
-      </p>
-
+    <DocsArticle
+      title="React Native"
+      lede={
+        <p>
+          Use the <code>@tacko/telemetry-react-native</code> package for React Native apps. It
+          starts a session on init, registers a global error handler with ErrorUtils, and re-exports{" "}
+          <code>trackEvent</code>, <code>trackError</code>, <code>screen</code>, and{" "}
+          <code>identify</code>. Sessions and events include anonymous id and SDK version (from
+          core).
+        </p>
+      }
+    >
       <h2>Install</h2>
-      <CodeBlock code={`pnpm add @tacko/telemetry-react-native
+      <CodeBlock
+        code={`pnpm add @tacko/telemetry-react-native
 # or
-npm install @tacko/telemetry-react-native`} />
+npm install @tacko/telemetry-react-native`}
+      />
 
       <h2>Setup</h2>
       <p>
-        Call <code>init()</code> once at app startup (e.g. in your root component or entry file), on both iOS and Android.
-        The core SDK only installs browser error handlers in a real browser, so <code>init()</code> is safe on native and enables{" "}
-        <code>screen()</code>, <code>endSession()</code>, and all other APIs—you do not need to guard it for web only.
+        Call <code>init()</code> once at app startup (e.g. in your root component or entry file),
+        on both iOS and Android. The core SDK only installs browser error handlers in a real
+        browser, so <code>init()</code> is safe on native and enables <code>screen()</code>,{" "}
+        <code>endSession()</code>, and all other APIs—you do not need to guard it for web only.
       </p>
       <CodeBlock
         code={`import { init } from "@tacko/telemetry-react-native";
@@ -39,17 +47,15 @@ init({
 
       <h2>Session tracking</h2>
       <p>
-        The package automatically creates a session when you call{" "}
-        <code>init()</code> and sends it to <code>POST /ingest/session</code>.
-        You can call <code>endSession()</code> when the app goes to background
-        if you want to close the session (e.g. in an app state listener).
+        The package automatically creates a session when you call <code>init()</code> and sends it
+        to <code>POST /ingest/session</code>. You can call <code>endSession()</code> when the app
+        goes to background if you want to close the session (e.g. in an app state listener).
       </p>
 
       <h2>Screen tracking</h2>
       <p>
-        Call <code>screen(screenName)</code> when the user navigates to a
-        screen (e.g. in your navigator’s screen listener or in a
-        useFocusEffect).
+        Call <code>screen(screenName)</code> when the user navigates to a screen (e.g. in your
+        navigator’s screen listener or in a useFocusEffect).
       </p>
       <CodeBlock
         code={`import { screen } from "@tacko/telemetry-react-native";
@@ -69,10 +75,10 @@ identify(user.id);`}
 
       <h2>Global error handler</h2>
       <p>
-        After <code>init()</code>, the package sets{" "}
-        <code>ErrorUtils.setGlobalHandler</code> so unhandled JavaScript errors
-        are sent to the ingest API. The previous handler is not re-invoked (to avoid duplicate reports).
+        After <code>init()</code>, the package sets <code>ErrorUtils.setGlobalHandler</code> so
+        unhandled JavaScript errors are sent to the ingest API. The previous handler is not
+        re-invoked (to avoid duplicate reports).
       </p>
-    </>
+    </DocsArticle>
   );
 }

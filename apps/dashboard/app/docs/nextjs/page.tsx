@@ -1,29 +1,37 @@
+import type { Metadata } from "next";
 import { CodeBlock } from "../components/CodeBlock";
+import { DocsArticle } from "../components/DocsArticle";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Next.js — Docs — Telemetry Tracker",
   description: "Integrate Telemetry Tracker with Next.js",
 };
 
 export default function DocsNextJsPage() {
   return (
-    <>
-      <h1>Next.js</h1>
-      <p>
-        Use the <code>@tacko/telemetry-next</code> package for Next.js apps. It
-        provides a provider, error boundary, and a hook to track page views. In the browser, uncaught errors and unhandled promise rejections are also reported automatically (via core’s global handlers after <code>init()</code>).
-      </p>
-
+    <DocsArticle
+      title="Next.js"
+      lede={
+        <p>
+          Use the <code>@tacko/telemetry-next</code> package for Next.js apps. It provides a
+          provider, error boundary, and a hook to track page views. In the browser, uncaught errors
+          and unhandled promise rejections are also reported automatically (via core’s global
+          handlers after <code>init()</code>).
+        </p>
+      }
+    >
       <h2>Install</h2>
-      <CodeBlock code={`pnpm add @tacko/telemetry-next
+      <CodeBlock
+        code={`pnpm add @tacko/telemetry-next
 # or
-npm install @tacko/telemetry-next`} />
+npm install @tacko/telemetry-next`}
+      />
 
       <h2>Setup</h2>
       <p>
-        Wrap your app with <code>TelemetryProvider</code> and pass the config.
-        Call <code>useTrackPage(pathname)</code> in your root layout so each
-        route change sends a screen event.
+        Wrap your app with <code>TelemetryProvider</code> and pass the config. Call{" "}
+        <code>useTrackPage(pathname)</code> in your root layout so each route change sends a screen
+        event.
       </p>
       <CodeBlock
         code={`// app/layout.tsx
@@ -54,14 +62,16 @@ export default function RootLayout({ children }) {
       />
 
       <p>
-        For the pathname you need a client component that uses{" "}
-        <code>usePathname()</code> from <code>next/navigation</code> and passes
-        it to <code>useTrackPage(pathname)</code>.
+        For the pathname you need a client component that uses <code>usePathname()</code> from{" "}
+        <code>next/navigation</code> and passes it to <code>useTrackPage(pathname)</code>.
       </p>
 
       <h2>Errors</h2>
       <p>
-        After <code>TelemetryProvider</code> calls <code>init()</code>, uncaught sync errors and unhandled promise rejections in the browser are sent automatically. For React render errors, wrap parts of your tree with <code>TelemetryErrorBoundary</code> to report them (and optionally show a fallback).
+        After <code>TelemetryProvider</code> calls <code>init()</code>, uncaught sync errors and
+        unhandled promise rejections in the browser are sent automatically. For React render errors,
+        wrap parts of your tree with <code>TelemetryErrorBoundary</code> to report them (and
+        optionally show a fallback).
       </p>
       <CodeBlock
         code={`import { TelemetryErrorBoundary } from "@tacko/telemetry-next";
@@ -73,7 +83,8 @@ export default function RootLayout({ children }) {
 
       <h2>Custom events and identify</h2>
       <p>
-        Import <code>trackEvent</code>, <code>screen</code>, and <code>identify</code> from <code>@tacko/telemetry-next</code> when needed.
+        Import <code>trackEvent</code>, <code>screen</code>, and <code>identify</code> from{" "}
+        <code>@tacko/telemetry-next</code> when needed.
       </p>
       <CodeBlock
         code={`import { trackEvent, screen, identify } from "@tacko/telemetry-next";
@@ -83,6 +94,6 @@ screen("/settings");
 identify(user.id);  // after login
 identify(null);     // on logout`}
       />
-    </>
+    </DocsArticle>
   );
 }
