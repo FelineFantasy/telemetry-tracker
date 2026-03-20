@@ -35,20 +35,21 @@ const config: Config = {
         "inner-soft": "inset 0 1px 0 0 rgb(255 255 255 / 0.04)",
       },
       colors: {
-        background: "#09090b",
-        foreground: "#fafafa",
+        /* Soft slate canvas — avoids harsh pure black */
+        background: "#12161f",
+        foreground: "#f4f4f5",
         surface: {
-          DEFAULT: "#18181b",
-          alt: "#1c1c1f",
-          raised: "#222226",
+          DEFAULT: "#1a1f2c",
+          alt: "#1e2433",
+          raised: "#232a3a",
         },
         muted: {
-          DEFAULT: "#27272a",
-          foreground: "#a1a1aa",
+          DEFAULT: "#2a3142",
+          foreground: "#a1a8b8",
         },
         border: {
-          DEFAULT: "#27272a",
-          subtle: "#3f3f46",
+          DEFAULT: "#2f3748",
+          subtle: "#3d4659",
         },
         primary: {
           DEFAULT: "#14b8a6",

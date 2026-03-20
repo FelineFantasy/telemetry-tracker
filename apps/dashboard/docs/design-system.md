@@ -23,7 +23,7 @@ Dark-first UI tokens live in **`tailwind.config.ts`**. Prefer Tailwind utilities
 ## Components
 
 - **`app/components/ui/Button.tsx`** — `Button` / `ButtonLink` with `primary` | `secondary` | `ghost` | `outline` variants (`buttonClass` export for composing with `Link`).
-- **Navigation** — Dashboard/docs top bars use **`nav-link`**; inline actions use **`text-link`**.
+- **Navigation** — Docs top bar uses **`nav-link`**. The dashboard uses the **sidebar** (`app-sidebar__link`) for views (Overview, Errors, …) and app filter; inline actions use **`text-link`**.
 - **Docs** — **`app/docs/components/DocsArticle.tsx`** wraps each docs page (`max-w-3xl`, “Documentation” kicker, `h1`, muted lede). **`CodeBlock`** renders fenced samples inside `.docs-content pre` styles.
 
 ## Fonts

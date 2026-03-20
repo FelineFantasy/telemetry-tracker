@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useLayoutEffect, useState } from "react";
+import { DashboardViewLinks } from "./DashboardViewLinks";
 
 const DASHBOARD_BASE = "/dashboard";
 
@@ -138,6 +139,20 @@ export function AppSidebar({
             T
           </span>
         </Link>
+      </div>
+
+      <div className="app-sidebar__section app-sidebar__section--views">
+        <div className="app-sidebar__head">
+          <h2 className="app-sidebar__title">
+            <span className="app-sidebar__title-full">Views</span>
+            <span className="app-sidebar__title-short" aria-hidden>
+              V
+            </span>
+          </h2>
+        </div>
+        <nav className="app-sidebar__nav" aria-label="Telemetry views">
+          <DashboardViewLinks onNavigate={handleNav} />
+        </nav>
       </div>
 
       <div className="app-sidebar__head">

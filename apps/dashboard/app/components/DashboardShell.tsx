@@ -2,7 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AppSidebar } from "./AppSidebar";
-import { TopNav } from "./TopNav";
+
+function MenuIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
 
 const SIDEBAR_COLLAPSED_KEY = "telemetry-dashboard-sidebar-collapsed";
 
@@ -83,7 +100,16 @@ export function DashboardShell({
         onToggleDesktopCollapse={toggleDesktopSidebar}
       />
       <div className="dashboard-right">
-        <TopNav onOpenAppMenu={openSidebar} />
+        {!sidebarOpen ? (
+          <button
+            type="button"
+            className="dashboard-mobile-menu-btn"
+            onClick={openSidebar}
+            aria-label="Open menu"
+          >
+            <MenuIcon />
+          </button>
+        ) : null}
         <main className="main" id="main-content">
           {children}
         </main>
