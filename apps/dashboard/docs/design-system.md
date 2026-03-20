@@ -27,8 +27,10 @@ See **`app/components/README.md`** for the folder layout.
 - **`app/components/ui/Button.tsx`** — `Button` / `ButtonLink` (`primary` | `secondary` | `ghost` | `outline`).
 - **`app/components/ui/Table.tsx`** — `TableWrap`, `Table`, `TableListLink` (dashboard tables; styles map to `.table`, `.table-wrap`, `.list-link` in `globals.css`).
 - **`app/components/dashboard/`** — `DashboardShell`, `AppSidebar`, `SidebarLink`, `DashboardViewLinks`, `RangeTabs`, `NavBack`.
-- **`app/components/docs/`** — `DocsTopBar`, `DocSidebar`, `DocsArticle`, `CodeBlock`.
-- **Navigation** — Docs top bar uses **`nav-link`**. The dashboard uses **`SidebarLink`** / sidebar classes for views + app filter; inline actions use **`text-link`**.
+- **`app/components/sidebar/`** — `SidebarBrand` (Telemetry Tracker + mobile drawer close), `SidebarCloseIcon`, `MenuIcon`; shared by dashboard and docs rails.
+- **`lib/useMobileDrawer.ts`** — `useMobileDrawer()` hook; matches the `max-width: 767px` drawer breakpoint.
+- **`app/components/docs/`** — `DocsShell`, `DocSidebar`, `DocsArticle`, `CodeBlock`.
+- **Navigation** — **`SidebarLink`** + sidebar classes; **`text-link`** for inline actions where needed.
 
 ## Fonts
 

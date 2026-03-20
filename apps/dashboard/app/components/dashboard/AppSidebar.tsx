@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useLayoutEffect, useState } from "react";
+import { SidebarBrand } from "@/app/components/sidebar/SidebarBrand";
+import { useMobileDrawer } from "@/lib/useMobileDrawer";
 import { DashboardViewLinks } from "./DashboardViewLinks";
 import { SidebarLink } from "./SidebarLink";
 
@@ -26,32 +26,6 @@ function appMonogram(app: string): string {
   const t = app.trim();
   if (t.length <= 2) return t.toUpperCase();
   return t.slice(0, 2).toUpperCase();
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M6 6l12 12"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M18 6L6 18"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 function ChevronCollapseIcon() {
@@ -97,17 +71,9 @@ export function AppSidebar({
   const pathForLinks = sidebarPath(pathname);
   const searchParams = useSearchParams();
   const currentApp = searchParams.get("app") ?? "";
+  const isMobileDrawer = useMobileDrawer();
 
   const isDashboard = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
-  const [isMobileDrawer, setIsMobileDrawer] = useState(false);
-
-  useLayoutEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const sync = () => setIsMobileDrawer(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
 
   if (!isDashboard) return null;
 
@@ -128,19 +94,12 @@ export function AppSidebar({
 
   return (
     <aside className={asideClass} aria-label="Dashboard" inert={inertOffCanvas ? true : undefined}>
-      <div className="app-sidebar__brand">
-        <Link
-          href="/"
-          className="app-sidebar__brand-link"
-          onClick={handleNav}
-          title="Telemetry Tracker — Home"
-        >
-          <span className="app-sidebar__brand-full">Telemetry Tracker</span>
-          <span className="app-sidebar__brand-short" aria-hidden>
-            T
-          </span>
-        </Link>
-      </div>
+      <SidebarBrand
+        onNavigate={handleNav}
+        onClose={onClose}
+        showDrawerClose={isMobileDrawer}
+        closeAriaLabel="Close application menu"
+      />
 
       <div className="app-sidebar__section app-sidebar__section--views">
         <div className="app-sidebar__head">
@@ -163,16 +122,6 @@ export function AppSidebar({
             A
           </span>
         </h2>
-        {isMobileDrawer ? (
-          <button
-            type="button"
-            className="app-sidebar__close"
-            onClick={onClose}
-            aria-label="Close application menu"
-          >
-            <CloseIcon />
-          </button>
-        ) : null}
       </div>
 
       <div className="app-sidebar__body">

@@ -1,5 +1,4 @@
-import { DocsTopBar } from "@/app/components/docs/DocsTopBar";
-import { DocSidebar } from "@/app/components/docs/DocSidebar";
+import { DocsShell } from "@/app/components/docs/DocsShell";
 
 export default function DocsLayout({
   children,
@@ -7,14 +6,10 @@ export default function DocsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <DocsTopBar />
-      <main className="main" id="main-content">
-        <div className="docs-wrap">
-          <DocSidebar />
-          <div className="docs-content">{children}</div>
-        </div>
-      </main>
-    </>
+    <div className="docs-layout-root">
+      <DocsShell>
+        <div className="docs-content">{children}</div>
+      </DocsShell>
+    </div>
   );
 }
