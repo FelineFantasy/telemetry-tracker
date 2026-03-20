@@ -1,8 +1,10 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../../components/PageTitle";
-import { EmptyState } from "../../components/EmptyState";
-import { ErrorState } from "../../components/ErrorState";
+import { PageTitle } from "@/app/components/PageTitle";
+import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
+import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
 import Link from "next/link";
 
 type SessionRow = {
@@ -73,24 +75,16 @@ export default async function SessionsPage({
   return (
     <>
       <PageTitle title="Sessions" context={context} />
-      <nav className="range-tabs" aria-label="Time range">
-        <Link
-          href={href24h}
-          aria-current={range === "24h" ? "page" : undefined}
-        >
-          Last 24 hours
-        </Link>
-        <Link
-          href={href7d}
-          aria-current={range === "7d" ? "page" : undefined}
-        >
-          Last 7 days
-        </Link>
-      </nav>
+      <RangeTabs
+        tabs={[
+          { href: href24h, label: "Last 24 hours", current: range === "24h" },
+          { href: href7d, label: "Last 7 days", current: range === "7d" },
+        ]}
+      />
 
       {items.length ? (
-        <div className="table-wrap">
-          <table className="table">
+        <TableWrap>
+          <Table>
             <thead>
               <tr>
                 <th>Session ID</th>
@@ -104,12 +98,11 @@ export default async function SessionsPage({
               {items.map((s) => (
                 <tr key={s.id}>
                   <td title={s.session_id}>
-                    <Link
+                    <TableListLink
                       href={appFilter ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/sessions/${s.id}`}
-                      className="list-link"
                     >
                       {truncate(s.session_id, 24)}
-                    </Link>
+                    </TableListLink>
                   </td>
                   <td title={s.user_id ?? s.anonymous_id ?? undefined}>
                     {(s.user_id ?? s.anonymous_id)
@@ -132,8 +125,8 @@ export default async function SessionsPage({
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </TableWrap>
       ) : (
         <EmptyState
           message={

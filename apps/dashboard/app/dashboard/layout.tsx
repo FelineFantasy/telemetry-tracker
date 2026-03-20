@@ -1,4 +1,4 @@
-import { DashboardShell } from "../components/DashboardShell";
+import { DashboardShell } from "@/app/components/dashboard/DashboardShell";
 
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 

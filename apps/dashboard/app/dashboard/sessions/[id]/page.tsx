@@ -1,9 +1,9 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../../../components/PageTitle";
-import { EmptyState } from "../../../components/EmptyState";
-import { ErrorState } from "../../../components/ErrorState";
-import Link from "next/link";
+import { PageTitle } from "@/app/components/PageTitle";
+import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { NavBack } from "@/app/components/dashboard/NavBack";
 
 type SessionDetail = {
   id: string;
@@ -77,9 +77,7 @@ export default async function SessionDetailPage({
 
   return (
     <>
-      <nav className="nav-back">
-        <Link href={`/dashboard/sessions${appQuery}`}>← Sessions</Link>
-      </nav>
+      <NavBack href={`/dashboard/sessions${appQuery}`}>← Sessions</NavBack>
       <PageTitle title={session.session_id} context={context} />
 
       <div className="card event-detail__meta">

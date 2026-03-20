@@ -19,7 +19,6 @@ export async function apiRoutes(app, _opts) {
     app.get("/overview", async (request, reply) => {
         const query = request.query;
         const range = query.range === "7d" ? "7d" : "24h";
-        const compare = query.compare === "true" || query.compare === "1";
         const appFilter = queryApp(query.app);
         const { since, previousSince, label } = parseRange(range);
         const baseWhere = { created_at: { gte: since } };
@@ -32,22 +31,18 @@ export async function apiRoutes(app, _opts) {
         const errorOccurrenceWhere = appFilter
             ? { created_at: { gte: since }, error_group: { app: appFilter } }
             : { created_at: { gte: since } };
-        const previousErrorWhere = compare
-            ? appFilter
-                ? {
-                    created_at: { gte: previousSince, lt: since },
-                    error_group: { app: appFilter },
-                }
-                : { created_at: { gte: previousSince, lt: since } }
-            : undefined;
-        const previousEventWhere = compare
-            ? appFilter
-                ? {
-                    created_at: { gte: previousSince, lt: since },
-                    app: appFilter,
-                }
-                : { created_at: { gte: previousSince, lt: since } }
-            : undefined;
+        const previousErrorWhere = appFilter
+            ? {
+                created_at: { gte: previousSince, lt: since },
+                error_group: { app: appFilter },
+            }
+            : { created_at: { gte: previousSince, lt: since } };
+        const previousEventWhere = appFilter
+            ? {
+                created_at: { gte: previousSince, lt: since },
+                app: appFilter,
+            }
+            : { created_at: { gte: previousSince, lt: since } };
         const [errorsCount, eventsCount, errorGroups, eventCounts, errorsPrevious, eventsPrevious,] = await Promise.all([
             prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
             prisma.event.count({ where: eventWhere }),
@@ -64,26 +59,19 @@ export async function apiRoutes(app, _opts) {
                 orderBy: { _count: { name: "desc" } },
                 take: 10,
             }),
-            previousErrorWhere
-                ? prisma.errorOccurrence.count({ where: previousErrorWhere })
-                : Promise.resolve(null),
-            previousEventWhere
-                ? prisma.event.count({ where: previousEventWhere })
-                : Promise.resolve(null),
+            prisma.errorOccurrence.count({ where: previousErrorWhere }),
+            prisma.event.count({ where: previousEventWhere }),
         ]);
-        const body = {
+        return reply.send({
             range: label,
             since: since.toISOString(),
             errorsLast24h: errorsCount,
             eventsLast24h: eventsCount,
+            errorsPrevious,
+            eventsPrevious,
             topErrorGroups: errorGroups,
             topEvents: eventCounts.map((e) => ({ name: e.name, count: e._count.name })),
-        };
-        if (compare) {
-            body.errorsPrevious = errorsPrevious;
-            body.eventsPrevious = eventsPrevious;
-        }
-        return reply.send(body);
+        });
     });
     app.get("/errors", async (request, reply) => {
         const query = request.query;

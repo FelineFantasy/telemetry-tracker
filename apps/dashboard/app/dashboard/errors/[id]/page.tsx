@@ -1,10 +1,10 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../../../components/PageTitle";
-import { Badge } from "../../../components/Badge";
-import { EmptyState } from "../../../components/EmptyState";
-import { ErrorState } from "../../../components/ErrorState";
-import Link from "next/link";
+import { PageTitle } from "@/app/components/PageTitle";
+import { Badge } from "@/app/components/Badge";
+import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { NavBack } from "@/app/components/dashboard/NavBack";
 
 type Occurrence = {
   id: string;
@@ -82,9 +82,7 @@ export default async function ErrorDetailPage({
 
   return (
     <>
-      <nav className="nav-back">
-        <Link href={`/dashboard/errors${appQuery}`}>← Errors</Link>
-      </nav>
+      <NavBack href={`/dashboard/errors${appQuery}`}>← Errors</NavBack>
       <PageTitle title={title} context={context} />
       <p>
         <Badge>{group.app}</Badge>

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { SidebarLink } from "./SidebarLink";
 
 const DASHBOARD_BASE = "/dashboard";
 
@@ -38,19 +38,15 @@ export function DashboardViewLinks({ onNavigate }: { onNavigate?: () => void }) 
   return (
     <>
       {dashboardViewLinks.map(({ href, label, mono }) => (
-        <Link
+        <SidebarLink
           key={href}
           href={hrefWithApp(href, searchParams)}
-          className="app-sidebar__link"
-          aria-current={isViewCurrent(href, pathname) ? "page" : undefined}
-          onClick={onNavigate}
+          label={label}
+          mono={mono}
+          current={isViewCurrent(href, pathname)}
+          onNavigate={onNavigate}
           title={label}
-        >
-          <span className="app-sidebar__link-mono" aria-hidden>
-            {mono}
-          </span>
-          <span className="app-sidebar__link-label">{label}</span>
-        </Link>
+        />
       ))}
     </>
   );

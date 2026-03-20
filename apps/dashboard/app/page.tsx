@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { LandingHeader } from "./components/LandingHeader";
+import { LandingHeader } from "@/app/components/LandingHeader";
 
 function IconErrors() {
   return (

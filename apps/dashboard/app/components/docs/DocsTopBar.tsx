@@ -8,9 +8,7 @@ export function DocsTopBar() {
           Go to dashboard
         </Link>
       </nav>
-      <p className="top-nav__tagline">
-        SDK and integration docs.
-      </p>
+      <p className="top-nav__tagline">SDK and integration docs.</p>
     </header>
   );
 }

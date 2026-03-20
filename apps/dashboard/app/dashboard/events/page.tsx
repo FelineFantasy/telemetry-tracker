@@ -1,8 +1,9 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../../components/PageTitle";
-import { EmptyState } from "../../components/EmptyState";
-import { ErrorState } from "../../components/ErrorState";
+import { PageTitle } from "@/app/components/PageTitle";
+import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
 import { EventsFilter } from "./EventsFilter";
 import Link from "next/link";
 
@@ -65,8 +66,8 @@ export default async function EventsPage({
       <EventsFilter appFilter={appFilter} nameFilter={nameFilter} />
 
       {items.length ? (
-        <div className="table-wrap">
-          <table className="table">
+        <TableWrap>
+          <Table>
             <thead>
               <tr>
                 <th>Name</th>
@@ -79,9 +80,9 @@ export default async function EventsPage({
               {items.map((e) => (
                 <tr key={e.id}>
                   <td>
-                    <Link href={appFilter ? `/dashboard/events/${e.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/events/${e.id}`} className="list-link">
+                    <TableListLink href={appFilter ? `/dashboard/events/${e.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/events/${e.id}`}>
                       {e.name}
-                    </Link>
+                    </TableListLink>
                   </td>
                   <td className="table-cell-properties">
                     {e.properties != null &&
@@ -103,8 +104,8 @@ export default async function EventsPage({
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </Table>
+        </TableWrap>
       ) : (
         <EmptyState
           message={

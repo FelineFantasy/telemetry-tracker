@@ -1,21 +1,21 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../../components/PageTitle";
-import { Card } from "../../components/Card";
-import { Badge } from "../../components/Badge";
-import { EmptyState } from "../../components/EmptyState";
-import { ErrorState } from "../../components/ErrorState";
-import { firstQueryValue } from "../../../lib/search-params";
+import { PageTitle } from "@/app/components/PageTitle";
+import { Card } from "@/app/components/Card";
+import { Badge } from "@/app/components/Badge";
+import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
+import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 const OVERVIEW_PATH = "/dashboard/overview";
 
-async function getOverview(range: string, compare: boolean, app?: string) {
+async function getOverview(range: string, app?: string) {
   const params = new URLSearchParams();
   if (range) params.set("range", range);
-  if (compare) params.set("compare", "true");
   if (app) params.set("app", app);
   const url = `${API_BASE}/api/overview?${params.toString()}`;
   const res = await fetch(url, { cache: "no-store" });
@@ -26,40 +26,12 @@ async function getOverview(range: string, compare: boolean, app?: string) {
   return res.json();
 }
 
-function rangeHref(path: string, range: string, compare: boolean, app: string | null): string {
+function rangeHref(path: string, range: string, app: string | null): string {
   const params = new URLSearchParams();
   if (range === "7d") params.set("range", "7d");
-  if (compare) params.set("compare", "true");
   if (app) params.set("app", app);
   const q = params.toString();
   return q ? `${path}?${q}` : path;
-}
-
-function RangeTabs({
-  current,
-  compare,
-  app,
-}: {
-  current: string;
-  compare: boolean;
-  app: string | null;
-}) {
-  return (
-    <nav className="range-tabs" aria-label="Time range">
-      <Link
-        href={rangeHref(OVERVIEW_PATH, "24h", compare, app)}
-        aria-current={current === "24h" ? "page" : undefined}
-      >
-        Last 24 hours
-      </Link>
-      <Link
-        href={rangeHref(OVERVIEW_PATH, "7d", compare, app)}
-        aria-current={current === "7d" ? "page" : undefined}
-      >
-        Last 7 days
-      </Link>
-    </nav>
-  );
 }
 
 export default async function OverviewPage({
@@ -67,15 +39,12 @@ export default async function OverviewPage({
 }: {
   searchParams: Promise<{
     range?: string | string[];
-    compare?: string | string[];
     app?: string | string[];
   }>;
 }) {
   const params = await searchParams;
   const rangeRaw = firstQueryValue(params.range);
   const range = rangeRaw === "7d" ? "7d" : "24h";
-  const compareRaw = firstQueryValue(params.compare);
-  const compare = compareRaw === "true" || compareRaw === "1";
   const app = firstQueryValue(params.app)?.trim() || null;
   const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
 
@@ -83,8 +52,8 @@ export default async function OverviewPage({
     range?: string;
     errorsLast24h: number;
     eventsLast24h: number;
-    errorsPrevious?: number | null;
-    eventsPrevious?: number | null;
+    errorsPrevious: number;
+    eventsPrevious: number;
     topErrorGroups?: Array<{
       id: string;
       message: string;
@@ -95,7 +64,7 @@ export default async function OverviewPage({
     topEvents?: Array<{ name: string; count: number }>;
   };
   try {
-    data = await getOverview(range, compare, app ?? undefined);
+    data = await getOverview(range, app ?? undefined);
   } catch (e) {
     return (
       <>
@@ -105,8 +74,8 @@ export default async function OverviewPage({
     );
   }
 
-  const errorsPrev = data.errorsPrevious;
-  const eventsPrev = data.eventsPrevious;
+  const errorsDelta = data.errorsLast24h - data.errorsPrevious;
+  const eventsDelta = data.eventsLast24h - data.eventsPrevious;
   const contextParts = [rangeLabel];
   if (app) contextParts.push(`App: ${app}`);
   const context = contextParts.join(" · ");
@@ -114,51 +83,53 @@ export default async function OverviewPage({
   return (
     <>
       <PageTitle title="Overview" context={context} />
-      <RangeTabs current={range} compare={compare} app={app} />
-      <p className="page-context overview-compare">
-        {compare ? (
-          <Link className="text-link" href={rangeHref(OVERVIEW_PATH, range, false, app)}>
-            Hide comparison with previous period
-          </Link>
-        ) : (
-          <Link className="text-link" href={rangeHref(OVERVIEW_PATH, range, true, app)}>
-            Compare with previous period
-          </Link>
-        )}
-      </p>
+      <RangeTabs
+        tabs={[
+          {
+            href: rangeHref(OVERVIEW_PATH, "24h", app),
+            label: "Last 24 hours",
+            current: range === "24h",
+          },
+          {
+            href: rangeHref(OVERVIEW_PATH, "7d", app),
+            label: "Last 7 days",
+            current: range === "7d",
+          },
+        ]}
+      />
 
       <div className="stat-grid">
         <Card label={`Errors in ${rangeLabel}`}>
           {data.errorsLast24h}
-          {compare && typeof errorsPrev === "number" && (
+          {typeof errorsDelta === "number" && !isNaN(errorsDelta) && (
             <span
               className={
-                data.errorsLast24h > errorsPrev
+                errorsDelta > 0
                   ? "vs-previous positive"
-                  : data.errorsLast24h < errorsPrev
+                  : errorsDelta < 0
                     ? "vs-previous negative"
                     : "vs-previous"
               }
             >
-              {data.errorsLast24h > errorsPrev && "+"}
-              {data.errorsLast24h - errorsPrev} vs previous period
+              {errorsDelta > 0 && "+"}
+              {errorsDelta} vs previous period
             </span>
           )}
         </Card>
         <Card label={`Events in ${rangeLabel}`}>
           {data.eventsLast24h}
-          {compare && typeof eventsPrev === "number" && (
+          {typeof eventsDelta === "number" && !isNaN(eventsDelta) && (
             <span
               className={
-                data.eventsLast24h > eventsPrev
-                  ? "vs-previous positive"
-                  : data.eventsLast24h < eventsPrev
-                    ? "vs-previous negative"
+                eventsDelta > 0
+                  ? "vs-previous negative"
+                  : eventsDelta < 0
+                    ? "vs-previous positive"
                     : "vs-previous"
               }
             >
-              {data.eventsLast24h > eventsPrev && "+"}
-              {data.eventsLast24h - eventsPrev} vs previous period
+              {eventsDelta > 0 && "+"}
+              {eventsDelta} vs previous period
             </span>
           )}
         </Card>

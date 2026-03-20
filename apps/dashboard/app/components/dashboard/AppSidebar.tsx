@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useLayoutEffect, useState } from "react";
 import { DashboardViewLinks } from "./DashboardViewLinks";
+import { SidebarLink } from "./SidebarLink";
 
 const DASHBOARD_BASE = "/dashboard";
 
@@ -176,49 +177,38 @@ export function AppSidebar({
 
       <div className="app-sidebar__body">
         <nav className="app-sidebar__nav" aria-label="Select application">
-          <Link
+          <SidebarLink
             href={buildHref(pathForLinks, null, searchParams)}
-            className="app-sidebar__link"
-            aria-current={!currentApp ? "page" : undefined}
-            onClick={handleNav}
+            label="All apps"
+            mono="∞"
+            current={!currentApp}
+            onNavigate={handleNav}
             title="All apps"
-          >
-            <span className="app-sidebar__link-mono" aria-hidden>
-              ∞
-            </span>
-            <span className="app-sidebar__link-label">All apps</span>
-          </Link>
+          />
           {apps.map((app) => (
-            <Link
+            <SidebarLink
               key={app}
               href={buildHref(pathForLinks, app, searchParams)}
-              className="app-sidebar__link"
-              aria-current={currentApp === app ? "page" : undefined}
-              onClick={handleNav}
+              label={app}
+              mono={appMonogram(app)}
+              current={currentApp === app}
+              onNavigate={handleNav}
               title={app}
-            >
-              <span className="app-sidebar__link-mono" aria-hidden>
-                {appMonogram(app)}
-              </span>
-              <span className="app-sidebar__link-label">{app}</span>
-            </Link>
+            />
           ))}
         </nav>
       </div>
 
       <div className="app-sidebar__rail-footer">
         <nav className="app-sidebar__footer" aria-label="Other">
-          <Link
+          <SidebarLink
             href="/docs"
-            className="app-sidebar__link app-sidebar__link--footer"
-            onClick={handleNav}
+            label="Docs"
+            mono="D"
+            onNavigate={handleNav}
             title="Documentation"
-          >
-            <span className="app-sidebar__link-mono" aria-hidden>
-              D
-            </span>
-            <span className="app-sidebar__link-label">Docs</span>
-          </Link>
+            className="app-sidebar__link--footer"
+          />
         </nav>
       </div>
 

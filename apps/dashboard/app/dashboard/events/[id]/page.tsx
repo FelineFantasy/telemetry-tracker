@@ -1,10 +1,10 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
-import { PageTitle } from "../../../components/PageTitle";
-import { Badge } from "../../../components/Badge";
-import { EmptyState } from "../../../components/EmptyState";
-import { ErrorState } from "../../../components/ErrorState";
-import Link from "next/link";
+import { PageTitle } from "@/app/components/PageTitle";
+import { Badge } from "@/app/components/Badge";
+import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
+import { NavBack } from "@/app/components/dashboard/NavBack";
 
 type EventDetail = {
   id: string;
@@ -86,9 +86,7 @@ export default async function EventDetailPage({
 
   return (
     <>
-      <nav className="nav-back">
-        <Link href={`/dashboard/events${appQuery}`}>← Events</Link>
-      </nav>
+      <NavBack href={`/dashboard/events${appQuery}`}>← Events</NavBack>
       <PageTitle title={event.name} context={context} />
 
       <div className="card event-detail__meta">

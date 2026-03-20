@@ -1499,6 +1499,13 @@
   font-weight: 500;
 }
 
+.top-nav__tagline {
+  margin: 0;
+  padding: 0 var(--space-md) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
 .app-sidebar__head .app-sidebar__title {
   margin: 0;
 }
@@ -2134,7 +2141,7 @@
 }
 
 .vs-previous {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   margin-left: var(--space-sm);
 }

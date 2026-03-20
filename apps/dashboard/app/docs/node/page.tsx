@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { CodeBlock } from "../components/CodeBlock";
-import { DocsArticle } from "../components/DocsArticle";
+import { CodeBlock } from "@/app/components/docs/CodeBlock";
+import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
   title: "Node.js — Docs — Telemetry Tracker",
