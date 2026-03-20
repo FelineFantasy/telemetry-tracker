@@ -111,8 +111,9 @@ export default async function OverviewPage({
                     : "vs-previous"
               }
             >
+              {errorsDelta === 0 && 'same as previous period'}
               {errorsDelta > 0 && "+"}
-              {errorsDelta} vs previous period
+              {errorsDelta !== 0 && `${errorsDelta} vs previous period`}
             </span>
           )}
         </Card>
@@ -128,8 +129,9 @@ export default async function OverviewPage({
                     : "vs-previous"
               }
             >
+              {eventsDelta === 0 && 'same as previous period'}
               {eventsDelta > 0 && "+"}
-              {eventsDelta} vs previous period
+              {eventsDelta !== 0 && `${eventsDelta} vs previous period`}
             </span>
           )}
         </Card>
