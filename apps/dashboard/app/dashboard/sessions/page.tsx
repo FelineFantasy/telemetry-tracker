@@ -10,6 +10,7 @@ import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
   parsePageSizeParam,
+  resolveApiListTotal,
 } from "@/lib/pagination";
 import Link from "next/link";
 
@@ -98,7 +99,7 @@ export default async function SessionsPage({
       pageSize
     );
     items = data.items ?? [];
-    total = data.total ?? items.length;
+    total = resolveApiListTotal(data.total, items.length);
   } catch (e) {
     return (
       <>

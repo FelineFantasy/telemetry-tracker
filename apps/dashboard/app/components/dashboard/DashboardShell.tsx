@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { MenuIcon } from "@/app/components/sidebar/MenuIcon";
 import { AppSidebar } from "./AppSidebar";
+import { DashboardAppContext } from "./DashboardAppContext";
 
 const SIDEBAR_COLLAPSED_KEY = "telemetry-dashboard-sidebar-collapsed";
 
@@ -76,7 +77,6 @@ export function DashboardShell({
         aria-hidden
       />
       <AppSidebar
-        apps={apps}
         isOpen={sidebarOpen}
         onClose={closeSidebar}
         desktopCollapsed={desktopCollapsed}
@@ -94,6 +94,7 @@ export function DashboardShell({
           </button>
         ) : null}
         <main className="main" id="main-content">
+          <DashboardAppContext apps={apps} />
           {children}
         </main>
       </div>

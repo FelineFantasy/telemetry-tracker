@@ -9,6 +9,7 @@ import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
   parsePageSizeParam,
+  resolveApiListTotal,
 } from "@/lib/pagination";
 import { EventsFilter } from "./EventsFilter";
 import Link from "next/link";
@@ -90,7 +91,7 @@ export default async function EventsPage({
       pageSize
     );
     items = data.items ?? [];
-    total = data.total ?? items.length;
+    total = resolveApiListTotal(data.total, items.length);
   } catch (e) {
     return (
       <>

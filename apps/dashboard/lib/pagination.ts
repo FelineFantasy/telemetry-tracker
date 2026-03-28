@@ -17,6 +17,21 @@ export function parseOverviewListPageSize(
   return Math.min(MAX_OVERVIEW_LIST_PAGE_SIZE, Math.max(1, v));
 }
 
+/** Prefer API `total`; coerce numbers; fall back to current page `items.length` when total is absent. */
+export function resolveApiListTotal(
+  totalFromApi: unknown,
+  itemsLength: number
+): number {
+  if (typeof totalFromApi === "number" && Number.isFinite(totalFromApi)) {
+    return Math.max(0, Math.floor(totalFromApi));
+  }
+  if (totalFromApi != null && totalFromApi !== "") {
+    const n = Number(totalFromApi);
+    if (Number.isFinite(n)) return Math.max(0, Math.floor(n));
+  }
+  return itemsLength;
+}
+
 export function parsePageParam(value: string | string[] | undefined, fallback = 1): number {
   const raw = Array.isArray(value) ? value[0] : value;
   const n = Math.floor(Number(raw));
