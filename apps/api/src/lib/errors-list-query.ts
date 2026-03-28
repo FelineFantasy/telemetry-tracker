@@ -79,9 +79,10 @@ export function trendWindowDurationMs(w: TrendWindow): number {
 }
 
 export function buildErrorGroupWhereInput(
-  f: ErrorListFilterInput
+  f: ErrorListFilterInput,
+  projectId: string
 ): Prisma.ErrorGroupWhereInput {
-  const where: Prisma.ErrorGroupWhereInput = {};
+  const where: Prisma.ErrorGroupWhereInput = { project_id: projectId };
   if (f.appId) where.app = f.appId;
   if (f.environment) where.environment = f.environment;
   if (f.q) where.message = { contains: f.q, mode: "insensitive" };
@@ -165,8 +166,8 @@ function mapRawRow(r: Record<string, unknown>): ErrorGroupListRow {
   };
 }
 
-function buildWhereSql(f: ErrorListFilterInput): Prisma.Sql {
-  const parts: Prisma.Sql[] = [Prisma.sql`TRUE`];
+function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
+  const parts: Prisma.Sql[] = [Prisma.sql`eg.project_id = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`eg.app = ${f.appId}`);
   if (f.environment) parts.push(Prisma.sql`eg.environment = ${f.environment}`);
   if (f.q) {
@@ -223,6 +224,7 @@ function orderByAggregateSql(
 export async function listErrorGroupsAggregated(
   prisma: PrismaClient,
   f: ErrorListFilterInput,
+  projectId: string,
   sort: ErrorListSort,
   order: ErrorListOrder,
   trendW: TrendWindow,
@@ -235,7 +237,7 @@ export async function listErrorGroupsAggregated(
   const recentStart = new Date(end.getTime() - W);
   const prevStart = new Date(end.getTime() - 2 * W);
 
-  const whereSql = buildWhereSql(f);
+  const whereSql = buildWhereSql(f, projectId);
   const joinSql = aggregateJoinSql(recentStart, prevStart, end);
   const orderSql = orderByAggregateSql(sort, order);
 
@@ -335,6 +337,7 @@ export async function fetchMetricsForGroupIds(
 export async function listErrorGroupsPrisma(
   prisma: PrismaClient,
   f: ErrorListFilterInput,
+  projectId: string,
   sort: ScalarErrorListSort,
   order: ErrorListOrder,
   skip: number,
@@ -345,7 +348,7 @@ export async function listErrorGroupsPrisma(
     include: { _count: { select: { occurrences_list: true } } };
   }>)[];
 }> {
-  const where = buildErrorGroupWhereInput(f);
+  const where = buildErrorGroupWhereInput(f, projectId);
   const orderBy = prismaOrderBy(sort, order);
   const [total, groups] = await Promise.all([
     prisma.errorGroup.count({ where }),

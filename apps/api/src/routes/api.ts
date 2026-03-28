@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/db.js";
 import {
   fetchMetricsForGroupIds,
   isAggregateSort,
@@ -14,6 +15,7 @@ import {
 } from "../lib/errors-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
+import { readProjectIdFromEnv } from "../lib/project-scope.js";
 import {
   EVENT_SORT_SQL,
   eventListOrderBy,
@@ -26,7 +28,8 @@ import {
   sessionListOrderBy,
 } from "../lib/list-sort-params.js";
 
-const prisma = new PrismaClient();
+/** Dashboard read API is scoped to this project until per-user auth passes a project id. */
+const READ_PROJECT_ID = readProjectIdFromEnv();
 
 const DEFAULT_LIST_PAGE_SIZE = 20;
 const MAX_LIST_PAGE_SIZE = 100;
@@ -51,12 +54,13 @@ function parseListPageSize(
 
 async function countDistinctEventNames(
   since: Date,
-  appFilter: string | undefined
+  appFilter: string | undefined,
+  projectId: string
 ): Promise<number> {
   if (appFilter) {
     const r = await prisma.$queryRaw<[{ c: bigint }]>(
       Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
-        SELECT name FROM "Event" WHERE created_at >= ${since} AND app = ${appFilter}
+        SELECT name FROM "Event" WHERE project_id = ${projectId} AND created_at >= ${since} AND app = ${appFilter}
         GROUP BY name
       ) t`
     );
@@ -64,7 +68,7 @@ async function countDistinctEventNames(
   }
   const r = await prisma.$queryRaw<[{ c: bigint }]>(
     Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
-      SELECT name FROM "Event" WHERE created_at >= ${since}
+      SELECT name FROM "Event" WHERE project_id = ${projectId} AND created_at >= ${since}
       GROUP BY name
     ) t`
   );
@@ -150,28 +154,38 @@ export async function apiRoutes(
         ? { _count: { name: topEvOrderParsed.order } }
         : { name: topEvOrderParsed.order };
 
-    const baseWhere = { created_at: { gte: since } };
+    const baseWhere = { project_id: READ_PROJECT_ID, created_at: { gte: since } };
     const eventWhere = appFilter
       ? { ...baseWhere, app: appFilter }
       : baseWhere;
     const errorGroupWhere = appFilter
-      ? { last_seen: { gte: since }, app: appFilter }
-      : { last_seen: { gte: since } };
+      ? { project_id: READ_PROJECT_ID, last_seen: { gte: since }, app: appFilter }
+      : { project_id: READ_PROJECT_ID, last_seen: { gte: since } };
     const errorOccurrenceWhere = appFilter
-      ? { created_at: { gte: since }, error_group: { app: appFilter } }
-      : { created_at: { gte: since } };
+      ? {
+          created_at: { gte: since },
+          error_group: { project_id: READ_PROJECT_ID, app: appFilter },
+        }
+      : { created_at: { gte: since }, error_group: { project_id: READ_PROJECT_ID } };
     const previousErrorWhere = appFilter
       ? {
           created_at: { gte: previousSince, lt: since },
-          error_group: { app: appFilter },
+          error_group: { project_id: READ_PROJECT_ID, app: appFilter },
         }
-      : { created_at: { gte: previousSince, lt: since } };
+      : {
+          created_at: { gte: previousSince, lt: since },
+          error_group: { project_id: READ_PROJECT_ID },
+        };
     const previousEventWhere = appFilter
       ? {
+          project_id: READ_PROJECT_ID,
           created_at: { gte: previousSince, lt: since },
           app: appFilter,
         }
-      : { created_at: { gte: previousSince, lt: since } };
+      : {
+          project_id: READ_PROJECT_ID,
+          created_at: { gte: previousSince, lt: since },
+        };
 
     const [
       errorsCount,
@@ -186,7 +200,7 @@ export async function apiRoutes(
       prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
       prisma.event.count({ where: eventWhere }),
       prisma.errorGroup.count({ where: errorGroupWhere }),
-      countDistinctEventNames(since, appFilter),
+      countDistinctEventNames(since, appFilter, READ_PROJECT_ID),
       prisma.errorGroup.findMany({
         where: errorGroupWhere,
         skip: errorsSkip,
@@ -305,6 +319,7 @@ export async function apiRoutes(
       const { total, rows } = await listErrorGroupsAggregated(
         prisma,
         filter,
+        READ_PROJECT_ID,
         sortParsed.sort,
         orderParsed.order,
         trendWindowParsed.trendWindow,
@@ -320,6 +335,7 @@ export async function apiRoutes(
     const { total, groups } = await listErrorGroupsPrisma(
       prisma,
       filter,
+      READ_PROJECT_ID,
       scalarSort,
       orderParsed.order,
       skip,
@@ -351,8 +367,12 @@ export async function apiRoutes(
       return reply.status(400).send({ error: "Body must be JSON with resolved: boolean" });
     }
     try {
+      const existing = await prisma.errorGroup.findFirst({
+        where: { id: request.params.id, project_id: READ_PROJECT_ID },
+      });
+      if (!existing) return reply.status(404).send({ error: "Not found" });
       const group = await prisma.errorGroup.update({
-        where: { id: request.params.id },
+        where: { id: existing.id },
         data: { resolved_at: body.resolved ? new Date() : null },
       });
       return reply.send(group);
@@ -363,8 +383,8 @@ export async function apiRoutes(
 
   app.get<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
     const { id } = request.params;
-    const group = await prisma.errorGroup.findUnique({
-      where: { id },
+    const group = await prisma.errorGroup.findFirst({
+      where: { id, project_id: READ_PROJECT_ID },
       include: {
         occurrences_list: {
           orderBy: { created_at: "desc" },
@@ -418,6 +438,7 @@ export async function apiRoutes(
     const props = propertiesContains?.trim();
     if (props) {
       const whereSql = buildEventWhereSql({
+        projectId: READ_PROJECT_ID,
         appId,
         name,
         environment,
@@ -440,7 +461,7 @@ export async function apiRoutes(
       return reply.send({ items: rows, total, page, pageSize });
     }
 
-    const where: Prisma.EventWhereInput = {};
+    const where: Prisma.EventWhereInput = { project_id: READ_PROJECT_ID };
     if (appId) where.app = appId;
     if (name) where.name = name;
     if (environment) where.environment = environment;
@@ -465,7 +486,7 @@ export async function apiRoutes(
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
     const { id } = request.params;
-    const event = await prisma.event.findUnique({ where: { id } });
+    const event = await prisma.event.findFirst({ where: { id, project_id: READ_PROJECT_ID } });
     if (!event) return reply.status(404).send({ error: "Not found" });
     return reply.send(event);
   });
@@ -499,7 +520,7 @@ export async function apiRoutes(
     }
     const sessionOrderBy = sessionListOrderBy(sortParsed.sort, orderParsed.order);
 
-    const where: Prisma.SessionWhereInput = {};
+    const where: Prisma.SessionWhereInput = { project_id: READ_PROJECT_ID };
     if (appId) where.app = appId;
     if (platform) where.platform = platform;
     if (range.gte || range.lte) {
@@ -521,16 +542,22 @@ export async function apiRoutes(
 
   app.get<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {
     const { id } = request.params;
-    const session = await prisma.session.findUnique({ where: { id } });
+    const session = await prisma.session.findFirst({ where: { id, project_id: READ_PROJECT_ID } });
     if (!session) return reply.status(404).send({ error: "Not found" });
     return reply.send(session);
   });
 
   app.get("/filter-options", async (request, reply) => {
     const appFilter = queryApp((request.query as { app?: string | string[] }).app);
-    const baseEvent: Prisma.EventWhereInput = appFilter ? { app: appFilter } : {};
-    const baseSession: Prisma.SessionWhereInput = appFilter ? { app: appFilter } : {};
-    const baseError: Prisma.ErrorGroupWhereInput = appFilter ? { app: appFilter } : {};
+    const baseEvent: Prisma.EventWhereInput = appFilter
+      ? { project_id: READ_PROJECT_ID, app: appFilter }
+      : { project_id: READ_PROJECT_ID };
+    const baseSession: Prisma.SessionWhereInput = appFilter
+      ? { project_id: READ_PROJECT_ID, app: appFilter }
+      : { project_id: READ_PROJECT_ID };
+    const baseError: Prisma.ErrorGroupWhereInput = appFilter
+      ? { project_id: READ_PROJECT_ID, app: appFilter }
+      : { project_id: READ_PROJECT_ID };
 
     const [
       envEvents,

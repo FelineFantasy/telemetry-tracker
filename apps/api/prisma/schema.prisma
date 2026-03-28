@@ -1,3 +1,6 @@
+// Implementation order for multi-tenant ingest (see apps/api/src/routes/ingest.ts):
+// 1. Organization  2. Project  3. ApiKey (lifecycle)  4. ingest auth middleware  5. project_id on telemetry rows  6. UsageMonthly metering
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,8 +10,94 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Billing / ownership. Stripe ids optional until billing is wired.
+/// Soft-delete: set `deleted_at` instead of removing rows (telemetry/billing history).
+model Organization {
+  id                   String    @id @default(uuid())
+  name                 String
+  plan_tier            PlanTier    @default(FREE)
+  stripe_customer_id   String?     @unique @map("stripe_customer_id")
+  stripe_subscription_id String? @map("stripe_subscription_id")
+  created_at           DateTime    @default(now()) @map("created_at")
+  updated_at           DateTime    @updatedAt @map("updated_at")
+  deleted_at           DateTime?   @map("deleted_at")
+  projects             Project[]
+
+  @@index([deleted_at])
+}
+
+/// Telemetry namespace: keys, quotas, and usage rollups attach here.
+/// Soft-delete: set `deleted_at` instead of removing rows.
+model Project {
+  id              String         @id @default(uuid())
+  organization_id String         @map("organization_id")
+  organization    Organization   @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  name            String
+  slug            String
+  created_at      DateTime       @default(now()) @map("created_at")
+  updated_at      DateTime       @updatedAt @map("updated_at")
+  deleted_at      DateTime?      @map("deleted_at")
+  api_keys        ApiKey[]
+  usage_monthly   UsageMonthly[]
+  events          Event[]
+  sessions        Session[]
+  error_groups    ErrorGroup[]
+
+  @@unique([organization_id, slug])
+  @@index([organization_id])
+  @@index([deleted_at])
+}
+
+/// Ingest credential (manageable object, not only a secret).
+/// Key format: `tt_live_<publicId>_<secret>` (see docs/ENTITLEMENTS.md).
+model ApiKey {
+  id           String    @id @default(uuid())
+  project_id   String    @map("project_id")
+  project      Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  /// User-visible label (e.g. "CI", "Production web").
+  name         String?
+  /// Random id embedded in the key (lookup before constant-time secret verify).
+  public_id    String    @unique @map("public_id")
+  /// SHA-256 hex of `publicId + ":" + secret` (secret is the suffix after the last `_`).
+  secret_hash  String    @map("secret_hash")
+  created_at   DateTime  @default(now()) @map("created_at")
+  /// Explicit invalidation; prefer this over soft-delete when rotating secrets.
+  revoked_at   DateTime? @map("revoked_at")
+  /// Updated on successful ingest auth (optional; rate-limit updates if high traffic).
+  last_used_at DateTime? @map("last_used_at")
+  /// Optional future expiry; null means no expiry. Ingest rejects after this instant.
+  expires_at   DateTime? @map("expires_at")
+  /// Soft-delete: hide from UI and reject ingest; keeps audit/history.
+  deleted_at   DateTime? @map("deleted_at")
+
+  @@index([project_id])
+  @@index([deleted_at])
+}
+
+/// Monthly meter for quota enforcement (ingest units).
+model UsageMonthly {
+  id            String   @id @default(uuid())
+  project_id    String   @map("project_id")
+  project       Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  /// Calendar month `YYYY-MM` (UTC).
+  year_month    String   @map("year_month")
+  ingest_units  Int      @default(0) @map("ingest_units")
+  updated_at    DateTime @updatedAt @map("updated_at")
+
+  @@unique([project_id, year_month])
+  @@index([year_month])
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  BUSINESS
+}
+
 model Event {
   id           String   @id @default(uuid())
+  project_id   String   @map("project_id")
+  project      Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
   app          String
   platform     String?
   environment  String?
@@ -19,26 +108,34 @@ model Event {
   anonymous_id String?
   sdk_version  String?
   properties   Json?
-  created_at   DateTime @default(now())
+  created_at   DateTime @default(now()) @map("created_at")
+
+  @@index([project_id, created_at])
+  @@index([project_id, app])
 }
 
 model ErrorGroup {
   id           String    @id @default(uuid())
-  fingerprint  String    @unique
+  project_id   String    @map("project_id")
+  project      Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  fingerprint  String
   message      String
   top_stack    String?
   app          String
   environment  String?
   occurrences  Int       @default(1)
-  first_seen   DateTime  @default(now())
-  last_seen    DateTime  @default(now())
-  resolved_at  DateTime?
+  first_seen   DateTime  @default(now()) @map("first_seen")
+  last_seen    DateTime  @default(now()) @map("last_seen")
+  resolved_at  DateTime? @map("resolved_at")
   occurrences_list ErrorOccurrence[]
+
+  @@unique([project_id, fingerprint])
+  @@index([project_id, last_seen])
 }
 
 model ErrorOccurrence {
   id             String     @id @default(uuid())
-  error_group_id String
+  error_group_id String     @map("error_group_id")
   error_group    ErrorGroup @relation(fields: [error_group_id], references: [id], onDelete: Cascade)
   stack          String?
   context        Json?
@@ -46,19 +143,23 @@ model ErrorOccurrence {
   user_id        String?
   anonymous_id   String?
   sdk_version    String?
-  created_at     DateTime   @default(now())
+  created_at     DateTime   @default(now()) @map("created_at")
 
   @@index([error_group_id, created_at])
 }
 
 model Session {
   id           String    @id @default(uuid())
-  session_id   String
+  project_id   String    @map("project_id")
+  project      Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  session_id   String    @map("session_id")
   app          String
   platform     String?
   user_id      String?
   anonymous_id String?
   sdk_version  String?
-  started_at   DateTime  @default(now())
-  ended_at     DateTime?
+  started_at   DateTime  @default(now()) @map("started_at")
+  ended_at     DateTime? @map("ended_at")
+
+  @@index([project_id, started_at])
 }

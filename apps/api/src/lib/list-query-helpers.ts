@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
 
 export function buildEventWhereSql(params: {
+  projectId: string;
   appId?: string;
   name?: string;
   environment?: string;
@@ -11,7 +12,7 @@ export function buildEventWhereSql(params: {
   lte?: Date;
   propertiesContains?: string;
 }): Prisma.Sql {
-  const parts: Prisma.Sql[] = [Prisma.sql`TRUE`];
+  const parts: Prisma.Sql[] = [Prisma.sql`project_id = ${params.projectId}`];
   if (params.appId) parts.push(Prisma.sql`app = ${params.appId}`);
   if (params.name) parts.push(Prisma.sql`name = ${params.name}`);
   if (params.environment) parts.push(Prisma.sql`environment = ${params.environment}`);
