@@ -5,19 +5,15 @@ import { SidebarBrand } from "@/app/components/sidebar/SidebarBrand";
 import { useMobileDrawer } from "@/lib/useMobileDrawer";
 import { SidebarLink } from "@/app/components/dashboard/SidebarLink";
 
-const docLinks = [
-  { href: "/docs", label: "Introduction", mono: "In" },
-  { href: "/docs/nextjs", label: "Next.js", mono: "Nx" },
-  { href: "/docs/nuxt", label: "Nuxt", mono: "Nu" },
-  { href: "/docs/node", label: "Node.js", mono: "No" },
-  { href: "/docs/react-native", label: "React Native", mono: "RN" },
-] as const;
-
 function isDocCurrent(href: string, pathname: string): boolean {
   if (href === "/docs") {
     return pathname === "/docs" || pathname === "/docs/";
   }
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function GroupLabel({ children }: { children: string }) {
+  return <p className="docs-sidebar__group-label">{children}</p>;
 }
 
 export function DocSidebar({
@@ -54,26 +50,70 @@ export function DocSidebar({
       />
 
       <div className="app-sidebar__section app-sidebar__section--views">
-        <div className="app-sidebar__head">
-          <h2 className="app-sidebar__title">
-            <span className="app-sidebar__title-full">Guides</span>
-            <span className="app-sidebar__title-short" aria-hidden>
-              G
-            </span>
-          </h2>
-        </div>
-        <nav className="app-sidebar__nav" aria-label="Documentation pages">
-          {docLinks.map(({ href, label, mono }) => (
-            <SidebarLink
-              key={href}
-              href={href}
-              label={label}
-              mono={mono}
-              current={isDocCurrent(href, pathname)}
-              onNavigate={handleNav}
-              title={label}
-            />
-          ))}
+        <nav className="app-sidebar__nav docs-sidebar__nav" aria-label="Documentation pages">
+          <GroupLabel>Getting Started</GroupLabel>
+          <SidebarLink
+            href="/docs"
+            label="Getting Started"
+            mono="GS"
+            current={isDocCurrent("/docs", pathname)}
+            onNavigate={handleNav}
+            title="Getting started"
+          />
+
+          <GroupLabel>SDK</GroupLabel>
+          <SidebarLink
+            href="/docs/sdk"
+            label="SDK"
+            mono="Sdk"
+            current={isDocCurrent("/docs/sdk", pathname)}
+            onNavigate={handleNav}
+            title="SDK reference"
+          />
+
+          <GroupLabel>Platforms</GroupLabel>
+          <SidebarLink
+            href="/docs/nextjs"
+            label="Next.js"
+            mono="Nx"
+            current={isDocCurrent("/docs/nextjs", pathname)}
+            onNavigate={handleNav}
+            title="Next.js"
+          />
+          <SidebarLink
+            href="/docs/nuxt"
+            label="Nuxt"
+            mono="Nu"
+            current={isDocCurrent("/docs/nuxt", pathname)}
+            onNavigate={handleNav}
+            title="Nuxt"
+          />
+          <SidebarLink
+            href="/docs/node"
+            label="Node.js"
+            mono="No"
+            current={isDocCurrent("/docs/node", pathname)}
+            onNavigate={handleNav}
+            title="Node.js"
+          />
+          <SidebarLink
+            href="/docs/react-native"
+            label="React Native"
+            mono="RN"
+            current={isDocCurrent("/docs/react-native", pathname)}
+            onNavigate={handleNav}
+            title="React Native"
+          />
+
+          <GroupLabel>Dashboard</GroupLabel>
+          <SidebarLink
+            href="/docs/dashboard"
+            label="Using the dashboard"
+            mono="Ui"
+            current={isDocCurrent("/docs/dashboard", pathname)}
+            onNavigate={handleNav}
+            title="Using the dashboard"
+          />
         </nav>
       </div>
 
@@ -81,10 +121,10 @@ export function DocSidebar({
         <nav className="app-sidebar__footer" aria-label="Application">
           <SidebarLink
             href="/dashboard/overview"
-            label="Dashboard"
+            label="Open app"
             mono="Db"
             onNavigate={handleNav}
-            title="Open dashboard"
+            title="Open Telemetry Tracker dashboard"
             className="app-sidebar__link--footer"
           />
         </nav>

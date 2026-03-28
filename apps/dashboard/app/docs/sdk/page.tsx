@@ -1,0 +1,85 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { CodeBlock } from "@/app/components/docs/CodeBlock";
+import { DocsArticle } from "@/app/components/docs/DocsArticle";
+
+export const metadata: Metadata = {
+  title: "SDK — Docs — Telemetry Tracker",
+  description: "init(), events, identity, and app naming for Telemetry Tracker SDKs",
+};
+
+const FULL_EXAMPLE = `import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
+
+init({
+  ingestUrl: "https://your-api.example.com",
+  app: "my-app",
+});
+
+trackEvent("button_click", { id: "submit" });
+trackError(new Error("Something broke"), { page: "/checkout" });
+screen("/home");
+identify("user-123");`;
+
+export default function DocsSdkPage() {
+  return (
+    <DocsArticle
+      title="SDK"
+      lede={
+        <p>
+          The core library (<code>@tacko/telemetry-core</code>) exposes <code>init</code>, event and
+          error helpers, screen/session tracking, and identity. Platform packages wrap the same
+          config for Next.js, Nuxt, Node, and React Native.
+        </p>
+      }
+    >
+      <section className="mb-10" aria-labelledby="sdk-init-heading">
+        <h2 id="sdk-init-heading">init(config)</h2>
+        <p>
+          Required: <code>ingestUrl</code> (your API base URL) and <code>app</code> (a string that
+          groups data in the dashboard). Optional: <code>platform</code>, <code>environment</code>,{" "}
+          <code>release</code>, <code>batchInterval</code>, <code>batchSize</code>.
+        </p>
+        <CodeBlock
+          caption="Full example (after init)"
+          code={FULL_EXAMPLE}
+          lang="typescript"
+        />
+      </section>
+
+      <section className="mb-10" aria-labelledby="sdk-identity-heading">
+        <h2 id="sdk-identity-heading">Identity and anonymous ID</h2>
+        <p>
+          The SDK generates a stable anonymous device id on first <code>init()</code> and sends it
+          (and the SDK version) with every payload. When you call <code>identify(userId)</code>, the
+          same anonymous id is still sent so the backend can link pre-login activity to the user. In
+          the dashboard, <strong>Identity</strong> shows the user id when set, otherwise the
+          anonymous id.
+        </p>
+      </section>
+
+      <section className="mb-10" aria-labelledby="sdk-app-heading">
+        <h2 id="sdk-app-heading">App name</h2>
+        <p>
+          The <code>app</code> value identifies your application in filters and lists. You do not
+          register apps in the UI—once you send at least one event or error with a name, it appears
+          everywhere that supports app filtering.
+        </p>
+      </section>
+
+      <section aria-labelledby="sdk-next-heading">
+        <h2 id="sdk-next-heading">Next steps</h2>
+        <p>
+          Follow a{" "}
+          <Link href="/docs" className="text-link font-medium">
+            platform guide
+          </Link>{" "}
+          for install steps, or open the{" "}
+          <Link href="/docs/dashboard" className="text-link font-medium">
+            dashboard
+          </Link>{" "}
+          docs to learn how data appears in the UI.
+        </p>
+      </section>
+    </DocsArticle>
+  );
+}
