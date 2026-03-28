@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LandingHeader } from "@/app/components/LandingHeader";
 import { LandingHeroBrand } from "@/app/components/LandingHeroBrand";
 import { LandingProductPreview } from "@/app/components/LandingProductPreview";
+import { LandingWhySection } from "@/app/components/LandingWhySection";
 
 function IconErrors() {
   return (
@@ -155,6 +156,8 @@ export default function LandingPage() {
 
         <LandingProductPreview />
 
+        <LandingWhySection />
+
         <section
           id="features"
           className="landing-features landing-animate-section"
@@ -287,6 +290,9 @@ export default function LandingPage() {
               <ul className="landing-footer__list">
                 <li>
                   <a href="#preview">Product</a>
+                </li>
+                <li>
+                  <a href="#why">Why us</a>
                 </li>
                 <li>
                   <a href="#features">Features</a>

@@ -199,6 +199,7 @@
   .landing-hero__glow--violet,
   .landing-animate-section,
   .landing-feature,
+  .landing-why__card,
   .landing-step {
     animation: none !important;
   }
@@ -289,7 +290,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md) var(--space-xl);
-  max-width: 1120px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: var(--space-md) clamp(var(--space-lg), 4vw, 2rem);
 }
@@ -531,6 +532,10 @@
 
 .landing-kicker--dark {
   color: #674fdc;
+}
+
+.landing-kicker--why {
+  color: #c4b8f0;
 }
 
 .landing-eyebrow {
@@ -1174,6 +1179,151 @@
   line-height: 1.5;
   color: #64748b;
   padding: 0 0.25rem;
+}
+
+/* Why Telemetry Tracker — high-contrast positioning */
+.landing-why {
+  padding: clamp(3.5rem, 8vw, 5.5rem) var(--space-lg);
+  background: linear-gradient(165deg, #161222 0%, #0c0a14 48%, #100e18 100%);
+  border-top: 1px solid rgba(103, 79, 220, 0.22);
+  border-bottom: 1px solid rgba(103, 79, 220, 0.12);
+  color: #f8fafc;
+}
+
+.landing-why__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.landing-why__header {
+  text-align: center;
+  max-width: 44rem;
+  margin: 0 auto clamp(2.25rem, 4.5vw, 3.25rem);
+}
+
+.landing-why__title {
+  margin: 0 0 1rem;
+  font-size: clamp(1.85rem, 4.2vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  color: #ffffff;
+}
+
+.landing-why__lede {
+  margin: 0 0 1.35rem;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: #cbd5e1;
+}
+
+@media (min-width: 640px) {
+  .landing-why__lede {
+    font-size: 1.125rem;
+  }
+}
+
+.landing-why__lede-strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.landing-why__lede-rest {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+@media (max-width: 639px) {
+  .landing-why__lede-dot {
+    display: none;
+  }
+}
+
+.landing-why__themes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 0.65rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.landing-why__theme-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e8e4ff;
+  background: rgba(103, 79, 220, 0.28);
+  border: 1px solid rgba(182, 171, 235, 0.45);
+  border-radius: 999px;
+}
+
+.landing-why__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .landing-why__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .landing-why__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.landing-why__card {
+  padding: 1.35rem 1.2rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(138, 125, 228, 0.28);
+  background: linear-gradient(160deg, rgba(61, 55, 88, 0.55) 0%, rgba(26, 22, 40, 0.85) 100%);
+  box-shadow:
+    0 12px 36px -20px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.landing-why__card-title {
+  margin: 0 0 0.55rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.landing-why__card-body {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.62;
+  color: #cbd5e1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-why__card {
+    animation: landing-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(0.08s + (var(--landing-i, 0) * 0.07s));
+  }
+
+  @supports (animation-timeline: view()) {
+    .landing-why__card {
+      animation: landing-card-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 48%;
+      animation-delay: calc(var(--landing-i, 0) * 0.05s);
+    }
+  }
 }
 
 .landing-workflow {

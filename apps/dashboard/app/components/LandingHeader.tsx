@@ -2,8 +2,8 @@ import Link from "next/link";
 import { BrandLogo } from "@/app/components/BrandLogo";
 
 const navItems = [
-  { href: "#hero", label: "Home" },
   { href: "#preview", label: "Product" },
+  { href: "#why", label: "Why us" },
   { href: "#features", label: "Features" },
   { href: "#workflow", label: "How it works" },
   { href: "#contact", label: "Contact" },
