@@ -1,5 +1,3 @@
-const API_BASE = process.env.API_URL || "http://localhost:3001";
-
 import { PageTitle } from "@/app/components/PageTitle";
 import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
@@ -9,6 +7,8 @@ import { NavBack } from "@/app/components/dashboard/NavBack";
 import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
 import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { ErrorResolveButton } from "../ErrorResolveButton";
+import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { getDashboardProjectId } from "@/lib/dashboard-project";
 import type { ReactNode } from "react";
 
 type Occurrence = {
@@ -36,7 +36,7 @@ type ErrorGroup = {
 };
 
 async function getErrorGroup(id: string): Promise<ErrorGroup | null> {
-  const res = await fetch(`${API_BASE}/api/errors/${id}`, { cache: "no-store" });
+  const res = await dashboardApiFetch(`/api/errors/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) {
     const text = await res.text();
@@ -64,6 +64,7 @@ export default async function ErrorDetailPage({
   const { id } = await params;
   const { app } = await searchParams;
   const appQuery = app?.trim() ? `?app=${encodeURIComponent(app)}` : "";
+  const projectId = await getDashboardProjectId();
 
   let group: ErrorGroup | null;
   try {
@@ -103,7 +104,11 @@ export default async function ErrorDetailPage({
       <div className="error-detail__head">
         <PageTitle title={title} context={contextLine} />
         <div className="error-detail__actions">
-          <ErrorResolveButton errorGroupId={group.id} resolved={resolved} apiBase={API_BASE} />
+          <ErrorResolveButton
+            errorGroupId={group.id}
+            resolved={resolved}
+            projectId={projectId}
+          />
         </div>
       </div>
 

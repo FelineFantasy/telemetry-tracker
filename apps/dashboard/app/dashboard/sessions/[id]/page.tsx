@@ -1,11 +1,10 @@
-const API_BASE = process.env.API_URL || "http://localhost:3001";
-
 import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
+import { dashboardApiFetch } from "@/lib/dashboard-api";
 import type { ReactNode } from "react";
 
 type SessionDetail = {
@@ -21,7 +20,7 @@ type SessionDetail = {
 };
 
 async function getSession(id: string): Promise<SessionDetail | null> {
-  const res = await fetch(`${API_BASE}/api/sessions/${id}`, { cache: "no-store" });
+  const res = await dashboardApiFetch(`/api/sessions/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) {
     const text = await res.text();

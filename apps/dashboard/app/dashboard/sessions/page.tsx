@@ -1,5 +1,3 @@
-const API_BASE = process.env.API_URL || "http://localhost:3001";
-
 import { PageTitle } from "@/app/components/PageTitle";
 import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListToolbar";
 import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
@@ -17,6 +15,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { dashboardApiFetch } from "@/lib/dashboard-api";
 import Link from "next/link";
 
 const SESSIONS_PATH = "/dashboard/sessions";
@@ -35,9 +34,7 @@ function truncate(s: string, len: number) {
 }
 
 async function getSessions(search: URLSearchParams) {
-  const res = await fetch(`${API_BASE}/api/sessions?${search.toString()}`, {
-    cache: "no-store",
-  });
+  const res = await dashboardApiFetch(`/api/sessions?${search.toString()}`);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
@@ -53,9 +50,7 @@ async function getSessions(search: URLSearchParams) {
 async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
-  const res = await fetch(`${API_BASE}/api/filter-options?${p.toString()}`, {
-    cache: "no-store",
-  });
+  const res = await dashboardApiFetch(`/api/filter-options?${p.toString()}`);
   if (!res.ok) return { platforms: [] as string[] };
   const data = (await res.json()) as { platforms?: string[] };
   return { platforms: data.platforms ?? [] };

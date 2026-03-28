@@ -1,5 +1,3 @@
-const API_BASE = process.env.API_URL || "http://localhost:3001";
-
 import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -7,6 +5,7 @@ import { NavBack } from "@/app/components/dashboard/NavBack";
 import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
+import { dashboardApiFetch } from "@/lib/dashboard-api";
 import type { ReactNode } from "react";
 
 type EventDetail = {
@@ -25,7 +24,7 @@ type EventDetail = {
 };
 
 async function getEvent(id: string): Promise<EventDetail | null> {
-  const res = await fetch(`${API_BASE}/api/events/${id}`, { cache: "no-store" });
+  const res = await dashboardApiFetch(`/api/events/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) {
     const text = await res.text();

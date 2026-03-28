@@ -79,6 +79,7 @@ function mergeBuckets(
 
 async function queryEventBucketsHourly(
   prisma: PrismaClient,
+  projectId: string,
   since: Date,
   appFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
@@ -88,7 +89,8 @@ async function queryEventBucketsHourly(
         (date_trunc('hour', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
         COUNT(*)::bigint AS c
       FROM "Event" e
-      WHERE e."created_at" >= ${since}
+      WHERE e."project_id" = ${projectId}
+        AND e."created_at" >= ${since}
         AND e."app" = ${appFilter}
       GROUP BY 1
       ORDER BY 1
@@ -99,7 +101,8 @@ async function queryEventBucketsHourly(
       (date_trunc('hour', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS c
     FROM "Event" e
-    WHERE e."created_at" >= ${since}
+    WHERE e."project_id" = ${projectId}
+      AND e."created_at" >= ${since}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -107,6 +110,7 @@ async function queryEventBucketsHourly(
 
 async function queryEventBucketsDaily(
   prisma: PrismaClient,
+  projectId: string,
   since: Date,
   appFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
@@ -116,7 +120,8 @@ async function queryEventBucketsDaily(
         (date_trunc('day', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
         COUNT(*)::bigint AS c
       FROM "Event" e
-      WHERE e."created_at" >= ${since}
+      WHERE e."project_id" = ${projectId}
+        AND e."created_at" >= ${since}
         AND e."app" = ${appFilter}
       GROUP BY 1
       ORDER BY 1
@@ -127,7 +132,8 @@ async function queryEventBucketsDaily(
       (date_trunc('day', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS c
     FROM "Event" e
-    WHERE e."created_at" >= ${since}
+    WHERE e."project_id" = ${projectId}
+      AND e."created_at" >= ${since}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -135,6 +141,7 @@ async function queryEventBucketsDaily(
 
 async function queryErrorBucketsHourly(
   prisma: PrismaClient,
+  projectId: string,
   since: Date,
   appFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
@@ -145,7 +152,8 @@ async function queryErrorBucketsHourly(
         COUNT(*)::bigint AS c
       FROM "ErrorOccurrence" eo
       INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
-      WHERE eo."created_at" >= ${since}
+      WHERE eg."project_id" = ${projectId}
+        AND eo."created_at" >= ${since}
         AND eg."app" = ${appFilter}
       GROUP BY 1
       ORDER BY 1
@@ -156,7 +164,9 @@ async function queryErrorBucketsHourly(
       (date_trunc('hour', eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS c
     FROM "ErrorOccurrence" eo
-    WHERE eo."created_at" >= ${since}
+    INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
+    WHERE eg."project_id" = ${projectId}
+      AND eo."created_at" >= ${since}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -164,6 +174,7 @@ async function queryErrorBucketsHourly(
 
 async function queryErrorBucketsDaily(
   prisma: PrismaClient,
+  projectId: string,
   since: Date,
   appFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
@@ -174,7 +185,8 @@ async function queryErrorBucketsDaily(
         COUNT(*)::bigint AS c
       FROM "ErrorOccurrence" eo
       INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
-      WHERE eo."created_at" >= ${since}
+      WHERE eg."project_id" = ${projectId}
+        AND eo."created_at" >= ${since}
         AND eg."app" = ${appFilter}
       GROUP BY 1
       ORDER BY 1
@@ -185,7 +197,9 @@ async function queryErrorBucketsDaily(
       (date_trunc('day', eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS c
     FROM "ErrorOccurrence" eo
-    WHERE eo."created_at" >= ${since}
+    INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
+    WHERE eg."project_id" = ${projectId}
+      AND eo."created_at" >= ${since}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -197,6 +211,7 @@ async function queryErrorBucketsDaily(
  */
 export async function getOverviewTimeSeries(
   prisma: PrismaClient,
+  projectId: string,
   rangeLabel: "24h" | "7d",
   since: Date,
   appFilter: string | undefined
@@ -207,12 +222,12 @@ export async function getOverviewTimeSeries(
 
   const [eventRows, errorRows] = is7d
     ? await Promise.all([
-        queryEventBucketsDaily(prisma, since, appFilter),
-        queryErrorBucketsDaily(prisma, since, appFilter),
+        queryEventBucketsDaily(prisma, projectId, since, appFilter),
+        queryErrorBucketsDaily(prisma, projectId, since, appFilter),
       ])
     : await Promise.all([
-        queryEventBucketsHourly(prisma, since, appFilter),
-        queryErrorBucketsHourly(prisma, since, appFilter),
+        queryEventBucketsHourly(prisma, projectId, since, appFilter),
+        queryErrorBucketsHourly(prisma, projectId, since, appFilter),
       ]);
 
   return {

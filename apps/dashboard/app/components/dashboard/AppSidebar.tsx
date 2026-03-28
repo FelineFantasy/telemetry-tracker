@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { SidebarBrand } from "@/app/components/sidebar/SidebarBrand";
 import { useMobileDrawer } from "@/lib/useMobileDrawer";
+import { ProjectSwitcher, type ProjectOption } from "./ProjectSwitcher";
 import { DashboardViewLinks } from "./DashboardViewLinks";
 import { SidebarLink } from "./SidebarLink";
 import { DocsNavIcon } from "./sidebarNavIcons";
@@ -38,11 +39,15 @@ export function AppSidebar({
   onClose,
   desktopCollapsed = false,
   onToggleDesktopCollapse,
+  projects = [],
+  currentProjectId = "",
 }: {
   isOpen?: boolean;
   onClose?: () => void;
   desktopCollapsed?: boolean;
   onToggleDesktopCollapse?: () => void;
+  projects?: ProjectOption[];
+  currentProjectId?: string;
 }) {
   const pathname = usePathname() ?? "/";
   const isMobileDrawer = useMobileDrawer();
@@ -74,6 +79,12 @@ export function AppSidebar({
         showDrawerClose={isMobileDrawer}
         closeAriaLabel="Close application menu"
       />
+
+      {projects.length > 0 && currentProjectId ? (
+        <div className="app-sidebar__project">
+          <ProjectSwitcher projects={projects} currentProjectId={currentProjectId} />
+        </div>
+      ) : null}
 
       <nav className="app-sidebar__nav app-sidebar__nav--stack" aria-label="Telemetry views">
         <DashboardViewLinks onNavigate={handleNav} />

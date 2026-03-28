@@ -2,24 +2,28 @@
 
 import { useState } from "react";
 import { Button } from "@/app/components/ui/Button";
+import { API_BASE_URL } from "@/lib/api-url";
 
 export function ErrorResolveButton({
   errorGroupId,
   resolved,
-  apiBase,
+  projectId,
 }: {
   errorGroupId: string;
   resolved: boolean;
-  apiBase: string;
+  projectId: string;
 }) {
   const [pending, setPending] = useState(false);
 
   async function onClick() {
     setPending(true);
     try {
-      const res = await fetch(`${apiBase}/api/errors/${errorGroupId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/errors/${errorGroupId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Project-Id": projectId,
+        },
         body: JSON.stringify({ resolved: !resolved }),
       });
       if (!res.ok) {

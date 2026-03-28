@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
+import { projectDashboardRoutes } from "./routes/project-dashboard.js";
 
 const port = Number(process.env.PORT) || 3001;
 // Railway proxy often connects via IPv4; 0.0.0.0 avoids "connection refused" 502. Override with HOST=:: if needed.
@@ -26,6 +27,7 @@ try {
   // Ingest first: resolves project via API key + writes UsageMonthly; read API uses env-scoped project.
   await app.register(ingestRoutes, { prefix: "/ingest" });
   await app.register(apiRoutes, { prefix: "/api" });
+  await app.register(projectDashboardRoutes, { prefix: "/api" });
 
   await app.listen({ port, host });
   // Railway proxy: Node’s default timeouts are too low and can cause 502 “connection refused”
