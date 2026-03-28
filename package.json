@@ -5,6 +5,7 @@
     "dev:api": "pnpm --filter api dev",
     "dev:dashboard": "pnpm --filter dashboard dev",
     "build": "pnpm -r run build",
+    "lint": "eslint apps packages --max-warnings 0",
     "db:generate": "pnpm --filter api exec prisma generate",
     "db:migrate": "pnpm --filter api exec prisma migrate dev",
     "db:studio": "pnpm --filter api exec prisma studio",
@@ -12,7 +13,12 @@
     "publish:dry": "pnpm run build && node scripts/publish-packages.mjs --dry-run"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.14",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.57.2"
   },
   "engines": {
     "node": ">=18"
