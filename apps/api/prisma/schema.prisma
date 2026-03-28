@@ -23,14 +23,16 @@ model Event {
 }
 
 model ErrorGroup {
-  id           String   @id @default(uuid())
-  fingerprint  String   @unique
+  id           String    @id @default(uuid())
+  fingerprint  String    @unique
   message      String
   top_stack    String?
   app          String
-  occurrences  Int      @default(1)
-  first_seen   DateTime @default(now())
-  last_seen    DateTime @default(now())
+  environment  String?
+  occurrences  Int       @default(1)
+  first_seen   DateTime  @default(now())
+  last_seen    DateTime  @default(now())
+  resolved_at  DateTime?
   occurrences_list ErrorOccurrence[]
 }
 

@@ -1,18 +1,24 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
+import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
+import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
+import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
-import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
+import { mergeListQuery } from "@/lib/list-filters-url";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
   parsePageSizeParam,
   resolveApiListTotal,
 } from "@/lib/pagination";
+import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
+
+const SESSIONS_PATH = "/dashboard/sessions";
 
 type SessionRow = {
   id: string;
@@ -27,79 +33,97 @@ function truncate(s: string, len: number) {
   return s.length <= len ? s : s.slice(0, len) + "\u2026";
 }
 
-async function getSessions(
-  app: string | undefined,
-  since: string | undefined,
-  page: number,
-  pageSize: number
-): Promise<{
-  items: SessionRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-}> {
-  const params = new URLSearchParams();
-  if (app) params.set("app", app);
-  if (since) params.set("since", since);
-  params.set("page", String(page));
-  params.set("pageSize", String(pageSize));
-  const res = await fetch(`${API_BASE}/api/sessions?${params.toString()}`, {
+async function getSessions(search: URLSearchParams) {
+  const res = await fetch(`${API_BASE}/api/sessions?${search.toString()}`, {
     cache: "no-store",
   });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
   }
-  return res.json();
+  return res.json() as Promise<{
+    items: SessionRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>;
 }
 
-function sessionsListHref(opts: {
-  app: string;
-  range: string;
-  page: number;
-  pageSize: number;
-}) {
-  const params = new URLSearchParams();
-  if (opts.app) params.set("app", opts.app);
-  if (opts.range === "7d") params.set("range", "7d");
-  if (opts.page > 1) params.set("page", String(opts.page));
-  if (opts.pageSize !== DEFAULT_LIST_PAGE_SIZE) {
-    params.set("pageSize", String(opts.pageSize));
+async function getFilterOptions(app?: string) {
+  const p = new URLSearchParams();
+  if (app) p.set("app", app);
+  const res = await fetch(`${API_BASE}/api/filter-options?${p.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return { platforms: [] as string[] };
+  const data = (await res.json()) as { platforms?: string[] };
+  return { platforms: data.platforms ?? [] };
+}
+
+function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefined>) {
+  const keys = [
+    "app",
+    "page",
+    "pageSize",
+    "limit",
+    "range",
+    "from",
+    "to",
+    "platform",
+  ] as const;
+  const out: Record<string, string> = {};
+  for (const k of keys) {
+    const v = firstQueryValue(sp[k]);
+    if (v !== undefined && v !== "") out[k] = v;
   }
-  const q = params.toString();
-  return q ? `/dashboard/sessions?${q}` : "/dashboard/sessions";
+  return out;
 }
 
 export default async function SessionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    app?: string;
-    range?: string;
-    page?: string;
-    pageSize?: string;
-    limit?: string;
-  }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const params = await searchParams;
-  const appFilter = params.app ?? "";
-  const range = params.range === "7d" ? "7d" : "24h";
-  const since = range;
-  const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
-  const page = parsePageParam(params.page);
-  const pageSize = parsePageSizeParam(params.pageSize, params.limit);
+  const sp = await searchParams;
+  const appFilter = firstQueryValue(sp.app) ?? "";
+  const page = parsePageParam(firstQueryValue(sp.page));
+  const pageSize = parsePageSizeParam(
+    firstQueryValue(sp.pageSize),
+    firstQueryValue(sp.limit)
+  );
+  const rangeEff = effectiveListRange(
+    {
+      range: firstQueryValue(sp.range),
+      from: firstQueryValue(sp.from),
+      to: firstQueryValue(sp.to),
+    },
+    "24h"
+  );
+
+  const apiQuery = new URLSearchParams();
+  if (appFilter) apiQuery.set("app", appFilter);
+  apiQuery.set("page", String(page));
+  apiQuery.set("pageSize", String(pageSize));
+  const r = firstQueryValue(sp.range);
+  const from = firstQueryValue(sp.from);
+  const to = firstQueryValue(sp.to);
+  const platform = firstQueryValue(sp.platform);
+  if (r) apiQuery.set("range", r);
+  if (from) apiQuery.set("from", from);
+  if (to) apiQuery.set("to", to);
+  if (platform) apiQuery.set("platform", platform);
 
   let items: SessionRow[] = [];
   let total = 0;
+  let platforms: string[] = [];
   try {
-    const data = await getSessions(
-      appFilter || undefined,
-      since,
-      page,
-      pageSize
-    );
+    const [data, opts] = await Promise.all([
+      getSessions(apiQuery),
+      getFilterOptions(appFilter || undefined),
+    ]);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
+    platforms = opts.platforms;
   } catch (e) {
     return (
       <>
@@ -109,25 +133,86 @@ export default async function SessionsPage({
     );
   }
 
-  const context = appFilter ? `${rangeLabel} · App: ${appFilter}` : rangeLabel;
+  const currentParams = buildSessionsParamsRecord(sp);
+  const hrefForPage = (p: number) =>
+    mergeListQuery(SESSIONS_PATH, currentParams, { page: String(p) });
 
-  const sessionsBase = "/dashboard/sessions";
-  const href24h = appFilter
-    ? `${sessionsBase}?app=${encodeURIComponent(appFilter)}`
-    : sessionsBase;
-  const href7d = appFilter
-    ? `${sessionsBase}?range=7d&app=${encodeURIComponent(appFilter)}`
-    : `${sessionsBase}?range=7d`;
+  const hiddenForCustomDates: Record<string, string> = { ...currentParams };
+  delete hiddenForCustomDates.from;
+  delete hiddenForCustomDates.to;
+  delete hiddenForCustomDates.page;
+  delete hiddenForCustomDates.range;
+
+  const rangeLabel =
+    rangeEff.customRange || firstQueryValue(sp.from) || firstQueryValue(sp.to)
+      ? "Custom range"
+      : firstQueryValue(sp.range) === "all"
+        ? "All time"
+        : firstQueryValue(sp.range) === "7d"
+          ? "Last 7 days"
+          : firstQueryValue(sp.range) === "30d"
+            ? "Last 30 days"
+            : firstQueryValue(sp.range) === "90d"
+              ? "Last 90 days"
+              : "Last 24 hours";
+
+  const context = appFilter ? `${rangeLabel} · App: ${appFilter}` : rangeLabel;
 
   return (
     <>
       <PageTitle title="Sessions" context={context} />
-      <RangeTabs
-        tabs={[
-          { href: href24h, label: "Last 24 hours", current: range === "24h" },
-          { href: href7d, label: "Last 7 days", current: range === "7d" },
-        ]}
-      />
+
+      <div className="filter-toolbar">
+        <DateRangeShortcuts
+          path={SESSIONS_PATH}
+          currentParams={currentParams}
+          activePreset={rangeEff.activePreset}
+          customRange={rangeEff.customRange}
+        />
+        <CustomDateRangeForm
+          path={SESSIONS_PATH}
+          hiddenParams={hiddenForCustomDates}
+          from={firstQueryValue(sp.from) ?? ""}
+          to={firstQueryValue(sp.to) ?? ""}
+        />
+      </div>
+
+      <form method="get" action={SESSIONS_PATH} className="filter-form filter-form--row">
+        {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
+        {firstQueryValue(sp.range) ? (
+          <input type="hidden" name="range" value={firstQueryValue(sp.range) ?? ""} />
+        ) : null}
+        {firstQueryValue(sp.from) ? (
+          <input type="hidden" name="from" value={firstQueryValue(sp.from) ?? ""} />
+        ) : null}
+        {firstQueryValue(sp.to) ? (
+          <input type="hidden" name="to" value={firstQueryValue(sp.to) ?? ""} />
+        ) : null}
+        {pageSize !== DEFAULT_LIST_PAGE_SIZE ? (
+          <input type="hidden" name="pageSize" value={String(pageSize)} />
+        ) : null}
+        <label className="filter-label" htmlFor="sess-plat">
+          Platform
+        </label>
+        <select
+          id="sess-plat"
+          name="platform"
+          className="filter-input"
+          defaultValue={firstQueryValue(sp.platform) ?? ""}
+        >
+          <option value="">Any</option>
+          {platforms.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="filter-btn">
+          Apply filters
+        </button>
+      </form>
+
+      <ListResultCount total={total} noun={total === 1 ? "session" : "sessions"} />
 
       {items.length ? (
         <TableWrap>
@@ -146,7 +231,11 @@ export default async function SessionsPage({
                 <tr key={s.id}>
                   <td title={s.session_id}>
                     <TableListLink
-                      href={appFilter ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/sessions/${s.id}`}
+                      href={
+                        appFilter
+                          ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}`
+                          : `/dashboard/sessions/${s.id}`
+                      }
                     >
                       {truncate(s.session_id, 24)}
                     </TableListLink>
@@ -158,13 +247,15 @@ export default async function SessionsPage({
                   </td>
                   <td>{new Date(s.started_at).toLocaleString()}</td>
                   <td>
-                    {s.ended_at
-                      ? new Date(s.ended_at).toLocaleString()
-                      : "—"}
+                    {s.ended_at ? new Date(s.ended_at).toLocaleString() : "—"}
                   </td>
                   <td className="table-cell-view">
                     <Link
-                      href={appFilter ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}` : `/dashboard/sessions/${s.id}`}
+                      href={
+                        appFilter
+                          ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}`
+                          : `/dashboard/sessions/${s.id}`
+                      }
                     >
                       View
                     </Link>
@@ -178,24 +269,12 @@ export default async function SessionsPage({
         <EmptyState
           message={
             appFilter
-              ? `No sessions in this period for app "${appFilter}".`
-              : `No sessions in this period (${rangeLabel}).`
+              ? `No sessions for these filters (app "${appFilter}").`
+              : `No sessions for these filters (${rangeLabel}).`
           }
         />
       )}
-      <Pagination
-        total={total}
-        page={page}
-        pageSize={pageSize}
-        hrefForPage={(p) =>
-          sessionsListHref({
-            app: appFilter,
-            range,
-            page: p,
-            pageSize,
-          })
-        }
-      />
+      <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
     </>
   );
 }

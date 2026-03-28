@@ -12,6 +12,9 @@ export async function findOrCreateErrorGroup(prisma, data) {
             data: {
                 occurrences: { increment: 1 },
                 last_seen: new Date(),
+                ...(data.environment != null && data.environment !== ""
+                    ? { environment: data.environment }
+                    : {}),
             },
         });
         return existing;
@@ -22,6 +25,7 @@ export async function findOrCreateErrorGroup(prisma, data) {
             message: data.message,
             top_stack: data.top_stack,
             app: data.app,
+            environment: data.environment ?? null,
             occurrences: 1,
         },
     });

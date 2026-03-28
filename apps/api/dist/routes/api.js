@@ -1,4 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { parseCreatedRange } from "../lib/list-query.js";
+import { buildEventWhereSql } from "../lib/list-query-helpers.js";
 const prisma = new PrismaClient();
 const DEFAULT_LIST_PAGE_SIZE = 20;
 const MAX_LIST_PAGE_SIZE = 100;
@@ -30,6 +32,13 @@ async function countDistinctEventNames(since, appFilter) {
 }
 /** Fastify can expose repeated query keys as `string[]`; normalize to a single trimmed app id. */
 function queryApp(value) {
+    if (value === undefined)
+        return undefined;
+    const raw = Array.isArray(value) ? value[0] : value;
+    const t = typeof raw === "string" ? raw.trim() : "";
+    return t || undefined;
+}
+function queryString(value) {
     if (value === undefined)
         return undefined;
     const raw = Array.isArray(value) ? value[0] : value;
@@ -143,7 +152,29 @@ export async function apiRoutes(app, _opts) {
         const page = parsePositivePage(query.page, 1);
         const skip = (page - 1) * pageSize;
         const appId = queryApp(query.app);
-        const where = appId ? { app: appId } : {};
+        const environment = queryString(query.environment);
+        const q = queryString(query.q);
+        const status = queryString(query.status) ?? "all";
+        const range = parseCreatedRange(query, "all");
+        const where = {};
+        if (appId)
+            where.app = appId;
+        if (environment)
+            where.environment = environment;
+        if (q) {
+            where.message = { contains: q, mode: "insensitive" };
+        }
+        if (range.gte || range.lte) {
+            where.last_seen = {};
+            if (range.gte)
+                where.last_seen.gte = range.gte;
+            if (range.lte)
+                where.last_seen.lte = range.lte;
+        }
+        if (status === "unresolved")
+            where.resolved_at = null;
+        if (status === "resolved")
+            where.resolved_at = { not: null };
         const [total, list] = await Promise.all([
             prisma.errorGroup.count({ where }),
             prisma.errorGroup.findMany({
@@ -155,6 +186,22 @@ export async function apiRoutes(app, _opts) {
             }),
         ]);
         return reply.send({ items: list, total, page, pageSize });
+    });
+    app.patch("/errors/:id", async (request, reply) => {
+        const body = request.body;
+        if (typeof body?.resolved !== "boolean") {
+            return reply.status(400).send({ error: "Body must be JSON with resolved: boolean" });
+        }
+        try {
+            const group = await prisma.errorGroup.update({
+                where: { id: request.params.id },
+                data: { resolved_at: body.resolved ? new Date() : null },
+            });
+            return reply.send(group);
+        }
+        catch {
+            return reply.status(404).send({ error: "Not found" });
+        }
     });
     app.get("/errors/:id", async (request, reply) => {
         const { id } = request.params;
@@ -176,12 +223,50 @@ export async function apiRoutes(app, _opts) {
         const pageSize = parseListPageSize(query.pageSize, query.limit);
         const page = parsePositivePage(query.page, 1);
         const skip = (page - 1) * pageSize;
-        const where = {};
         const appId = queryApp(query.app);
+        const name = queryString(query.name);
+        const environment = queryString(query.environment);
+        const platform = queryString(query.platform);
+        const release = queryString(query.release);
+        const propertiesContains = queryString(query.propertiesContains);
+        const range = parseCreatedRange(query, "all");
+        const props = propertiesContains?.trim();
+        if (props) {
+            const whereSql = buildEventWhereSql({
+                appId,
+                name,
+                environment,
+                platform,
+                release,
+                gte: range.gte,
+                lte: range.lte,
+                propertiesContains: props,
+            });
+            const [countRow, rows] = await Promise.all([
+                prisma.$queryRaw(Prisma.sql `SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`),
+                prisma.$queryRaw(Prisma.sql `SELECT * FROM "Event" WHERE ${whereSql} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${skip}`),
+            ]);
+            const total = Number(countRow[0]?.c ?? 0);
+            return reply.send({ items: rows, total, page, pageSize });
+        }
+        const where = {};
         if (appId)
             where.app = appId;
-        if (query.name)
-            where.name = query.name;
+        if (name)
+            where.name = name;
+        if (environment)
+            where.environment = environment;
+        if (platform)
+            where.platform = platform;
+        if (release)
+            where.release = release;
+        if (range.gte || range.lte) {
+            where.created_at = {};
+            if (range.gte)
+                where.created_at.gte = range.gte;
+            if (range.lte)
+                where.created_at.lte = range.lte;
+        }
         const [total, list] = await Promise.all([
             prisma.event.count({ where }),
             prisma.event.findMany({
@@ -200,28 +285,26 @@ export async function apiRoutes(app, _opts) {
             return reply.status(404).send({ error: "Not found" });
         return reply.send(event);
     });
-    function parseSince(since) {
-        if (!since)
-            return null;
-        if (since === "24h")
-            return new Date(Date.now() - 24 * 60 * 60 * 1000);
-        if (since === "7d")
-            return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const d = new Date(since);
-        return Number.isNaN(d.getTime()) ? null : d;
-    }
     app.get("/sessions", async (request, reply) => {
         const query = request.query;
         const pageSize = parseListPageSize(query.pageSize, query.limit);
         const page = parsePositivePage(query.page, 1);
         const skip = (page - 1) * pageSize;
-        const sinceDate = parseSince(query.since);
-        const where = {};
         const appId = queryApp(query.app);
+        const platform = queryString(query.platform);
+        const range = parseCreatedRange(query, "24h");
+        const where = {};
         if (appId)
             where.app = appId;
-        if (sinceDate)
-            where.started_at = { gte: sinceDate };
+        if (platform)
+            where.platform = platform;
+        if (range.gte || range.lte) {
+            where.started_at = {};
+            if (range.gte)
+                where.started_at.gte = range.gte;
+            if (range.lte)
+                where.started_at.lte = range.lte;
+        }
         const [total, list] = await Promise.all([
             prisma.session.count({ where }),
             prisma.session.findMany({
@@ -239,6 +322,51 @@ export async function apiRoutes(app, _opts) {
         if (!session)
             return reply.status(404).send({ error: "Not found" });
         return reply.send(session);
+    });
+    app.get("/filter-options", async (request, reply) => {
+        const appFilter = queryApp(request.query.app);
+        const baseEvent = appFilter ? { app: appFilter } : {};
+        const baseSession = appFilter ? { app: appFilter } : {};
+        const baseError = appFilter ? { app: appFilter } : {};
+        const [envEvents, envErrors, platEvents, platSessions, relEvents,] = await Promise.all([
+            prisma.event.groupBy({
+                by: ["environment"],
+                where: { ...baseEvent, environment: { not: null } },
+            }),
+            prisma.errorGroup.groupBy({
+                by: ["environment"],
+                where: { ...baseError, environment: { not: null } },
+            }),
+            prisma.event.groupBy({
+                by: ["platform"],
+                where: { ...baseEvent, platform: { not: null } },
+            }),
+            prisma.session.groupBy({
+                by: ["platform"],
+                where: { ...baseSession, platform: { not: null } },
+            }),
+            prisma.event.groupBy({
+                by: ["release"],
+                where: { ...baseEvent, release: { not: null } },
+            }),
+        ]);
+        const environments = [
+            ...new Set([
+                ...envEvents.map((r) => r.environment).filter(Boolean),
+                ...envErrors.map((r) => r.environment).filter(Boolean),
+            ]),
+        ].sort();
+        const platforms = [
+            ...new Set([
+                ...platEvents.map((r) => r.platform).filter(Boolean),
+                ...platSessions.map((r) => r.platform).filter(Boolean),
+            ]),
+        ].sort();
+        const releases = relEvents
+            .map((r) => r.release)
+            .filter((x) => x != null && x !== "")
+            .sort();
+        return reply.send({ environments, platforms, releases });
     });
     app.get("/apps", async (_request, reply) => {
         const [eventsApps, errorsApps, sessionsApps] = await Promise.all([

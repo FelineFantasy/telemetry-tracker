@@ -5,6 +5,7 @@ import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";
+import { ErrorResolveButton } from "../ErrorResolveButton";
 
 type Occurrence = {
   id: string;
@@ -25,6 +26,8 @@ type ErrorGroup = {
   occurrences: number;
   first_seen: string;
   last_seen: string;
+  environment?: string | null;
+  resolved_at?: string | null;
   occurrences_list?: Occurrence[];
 };
 
@@ -73,26 +76,50 @@ export default async function ErrorDetailPage({
     group.message.length > 80
       ? group.message.slice(0, 80) + "\u2026"
       : group.message;
+  const resolved = Boolean(group.resolved_at);
   const context = [
     group.app,
+    group.environment ? `env ${group.environment}` : null,
     `${group.occurrences} occurrences`,
+    resolved ? "Resolved" : "Open",
     `First seen: ${new Date(group.first_seen).toLocaleString()}`,
     `Last seen: ${new Date(group.last_seen).toLocaleString()}`,
-  ].join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <>
       <NavBack href={`/dashboard/errors${appQuery}`}>← Errors</NavBack>
-      <PageTitle title={title} context={context} />
+      <div className="error-detail__head">
+        <PageTitle title={title} context={context} />
+        <div className="error-detail__actions">
+          <ErrorResolveButton
+            errorGroupId={group.id}
+            resolved={resolved}
+            apiBase={API_BASE}
+          />
+        </div>
+      </div>
       <p>
         <Badge>{group.app}</Badge>
+        {group.environment ? (
+          <>
+            {" "}
+            <Badge>{group.environment}</Badge>
+          </>
+        ) : null}
+        {resolved ? (
+          <>
+            {" "}
+            <span className="badge badge--resolved">Resolved</span>
+          </>
+        ) : null}
       </p>
       {group.top_stack && (
         <div className="card mt-md">
           <div className="card__label">Top stack</div>
-          <pre className="occurrence-card__meta">
-            {group.top_stack}
-          </pre>
+          <pre className="occurrence-card__meta">{group.top_stack}</pre>
         </div>
       )}
 
@@ -106,14 +133,24 @@ export default async function ErrorDetailPage({
                 {(() => {
                   const uid = o.user_id ?? o.anonymous_id;
                   return uid != null && uid !== "" ? (
-                    <> · <strong>Identity:</strong> {uid.length > 16 ? uid.slice(0, 16) + "\u2026" : uid}</>
+                    <>
+                      {" "}
+                      · <strong>Identity:</strong>{" "}
+                      {uid.length > 16 ? uid.slice(0, 16) + "\u2026" : uid}
+                    </>
                   ) : null;
                 })()}
                 {o.session_id != null && o.session_id !== "" && (
-                  <> · <strong>Session:</strong> {o.session_id}</>
+                  <>
+                    {" "}
+                    · <strong>Session:</strong> {o.session_id}
+                  </>
                 )}
                 {o.sdk_version != null && o.sdk_version !== "" && (
-                  <> · <strong>SDK:</strong> {o.sdk_version}</>
+                  <>
+                    {" "}
+                    · <strong>SDK:</strong> {o.sdk_version}
+                  </>
                 )}
               </div>
               {o.stack && (

@@ -7,7 +7,13 @@ export function computeFingerprint(message: string, stack?: string): string {
 
 export async function findOrCreateErrorGroup(
   prisma: PrismaClient,
-  data: { fingerprint: string; message: string; top_stack: string | null; app: string }
+  data: {
+    fingerprint: string;
+    message: string;
+    top_stack: string | null;
+    app: string;
+    environment?: string | null;
+  }
 ) {
   const existing = await prisma.errorGroup.findUnique({
     where: { fingerprint: data.fingerprint },
@@ -18,6 +24,9 @@ export async function findOrCreateErrorGroup(
       data: {
         occurrences: { increment: 1 },
         last_seen: new Date(),
+        ...(data.environment != null && data.environment !== ""
+          ? { environment: data.environment }
+          : {}),
       },
     });
     return existing;
@@ -28,6 +37,7 @@ export async function findOrCreateErrorGroup(
       message: data.message,
       top_stack: data.top_stack,
       app: data.app,
+      environment: data.environment ?? null,
       occurrences: 1,
     },
   });

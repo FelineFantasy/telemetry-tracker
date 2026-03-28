@@ -2058,6 +2058,115 @@
   margin: 0;
 }
 
+.filter-form--row {
+  margin-bottom: var(--space-sm);
+}
+
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.filter-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.filter-shortcuts__label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.filter-shortcuts__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.filter-shortcuts__link {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  color: var(--color-text-muted);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.filter-shortcuts__link:hover {
+  background: var(--color-bg);
+  border-color: var(--color-text-muted);
+}
+
+.filter-shortcuts__link--current {
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(45, 212, 191, 0.1);
+  color: var(--color-foreground);
+}
+
+.filter-custom-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
+.filter-custom-dates__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filter-custom-dates__span {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.list-result-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-md) 0;
+}
+
+.list-result-count__num {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin-right: var(--space-xs);
+}
+
+.badge--resolved {
+  display: inline-block;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+  padding: 0.125rem 0.5rem;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.error-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.error-detail__actions {
+  flex-shrink: 0;
+}
+
 .filter-input {
   min-height: var(--touch-min);
   padding: 0 var(--space-sm);

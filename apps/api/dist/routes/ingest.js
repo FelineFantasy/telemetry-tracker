@@ -27,6 +27,7 @@ const sessionSchema = z.object({
 const errorSchema = z.object({
     app: z.string().min(1),
     platform: z.string().optional(),
+    environment: z.string().optional(),
     message: z.string().min(1),
     stack: z.string().optional(),
     context: z.record(z.unknown()).optional(),
@@ -49,7 +50,7 @@ export async function ingestRoutes(app, _opts) {
             data: {
                 app: body.app,
                 platform: body.platform ?? null,
-                environment: null,
+                environment: body.environment ?? null,
                 release: body.release ?? null,
                 name: body.name,
                 user_id: body.user_id ?? null,
@@ -102,7 +103,7 @@ export async function ingestRoutes(app, _opts) {
                 data: {
                     app: body.app,
                     platform: body.platform ?? null,
-                    environment: null,
+                    environment: body.environment ?? null,
                     release: body.release ?? null,
                     name: body.name,
                     user_id: body.user_id ?? null,
@@ -127,6 +128,7 @@ export async function ingestRoutes(app, _opts) {
             message: body.message,
             top_stack: body.stack?.split("\n")[0]?.trim() ?? null,
             app: body.app,
+            environment: body.environment ?? null,
         });
         await prisma.errorOccurrence.create({
             data: {
