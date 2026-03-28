@@ -1,0 +1,44 @@
+/**
+ * Plan entitlements (provisional — replace with measured limits after real usage).
+ * Tier names, caps, and dimensions may change; see docs/ENTITLEMENTS.md.
+ */
+export type PlanLimits = {
+  /** Max ingest units per calendar month (event POST = 1, batch item = 1, error = 1, session = 1). */
+  monthlyIngestUnits: number;
+  /** Sustained requests/sec per project (burst can be higher with token bucket). */
+  maxIngestRps: number;
+  /** Distinct `app` strings allowed per project (SDK `app` field). */
+  maxAppsPerProject: number;
+  /** Projects per organization. */
+  maxProjectsPerOrg: number;
+  /** Active API keys per project. */
+  maxApiKeysPerProject: number;
+};
+
+export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
+  FREE: {
+    monthlyIngestUnits: 250_000,
+    maxIngestRps: 20,
+    maxAppsPerProject: 5,
+    maxProjectsPerOrg: 1,
+    maxApiKeysPerProject: 2,
+  },
+  PRO: {
+    monthlyIngestUnits: 5_000_000,
+    maxIngestRps: 100,
+    maxAppsPerProject: 50,
+    maxProjectsPerOrg: 10,
+    maxApiKeysPerProject: 10,
+  },
+  BUSINESS: {
+    monthlyIngestUnits: 50_000_000,
+    maxIngestRps: 500,
+    maxAppsPerProject: 500,
+    maxProjectsPerOrg: 50,
+    maxApiKeysPerProject: 50,
+  },
+} as const;
+
+export function limitsForPlan(tier: keyof typeof PLAN_LIMITS): PlanLimits {
+  return PLAN_LIMITS[tier] ?? PLAN_LIMITS.FREE;
+}

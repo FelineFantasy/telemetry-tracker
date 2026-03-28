@@ -23,6 +23,7 @@ try {
   app.get("/health", async (_req, reply) => reply.code(200).send({ ok: true }));
   app.get("/", async (_req, reply) => reply.code(200).send({ service: "telemetry-api", ok: true }));
 
+  // Ingest first: resolves project via API key + writes UsageMonthly; read API uses env-scoped project.
   await app.register(ingestRoutes, { prefix: "/ingest" });
   await app.register(apiRoutes, { prefix: "/api" });
 

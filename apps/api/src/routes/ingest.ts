@@ -1,9 +1,18 @@
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { z } from "zod";
-import { PrismaClient, type Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { prisma } from "../lib/db.js";
+import { createIngestAuthPreHandler, requireIngestProjectId } from "../middleware/ingest-auth.js";
+import { addIngestUnits } from "../lib/usage-meter.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
 
-const prisma = new PrismaClient();
+/**
+ * Ingest pipeline (implement in order):
+ * 1. Organization / 2. Project / 3. ApiKey — Prisma schema
+ * 4. Ingest auth middleware — `createIngestAuthPreHandler`
+ * 5. `project_id` on all writes — below
+ * 6. Usage metering — `addIngestUnits` (basic monthly rollup)
+ */
 
 const eventSchema = z.object({
   app: z.string().min(1),
@@ -50,7 +59,10 @@ export async function ingestRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions
 ) {
+  app.addHook("preHandler", createIngestAuthPreHandler(prisma));
+
   app.post("/event", async (request, reply) => {
+    const projectId = requireIngestProjectId(request);
     const parsed = eventSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
@@ -58,6 +70,7 @@ export async function ingestRoutes(
     const body = parsed.data;
     await prisma.event.create({
       data: {
+        project_id: projectId,
         app: body.app,
         platform: body.platform ?? null,
         environment: body.environment ?? null,
@@ -70,17 +83,19 @@ export async function ingestRoutes(
         properties: (body.properties ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     });
+    await addIngestUnits(prisma, projectId, 1);
     return reply.status(204).send();
   });
 
   app.post("/session", async (request, reply) => {
+    const projectId = requireIngestProjectId(request);
     const parsed = sessionSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
     const existing = await prisma.session.findFirst({
-      where: { session_id: body.session_id, app: body.app },
+      where: { project_id: projectId, session_id: body.session_id, app: body.app },
       orderBy: { started_at: "desc" },
     });
     if (existing && body.ended_at) {
@@ -91,6 +106,7 @@ export async function ingestRoutes(
     } else if (!existing) {
       await prisma.session.create({
         data: {
+          project_id: projectId,
           session_id: body.session_id,
           app: body.app,
           platform: body.platform ?? null,
@@ -101,17 +117,21 @@ export async function ingestRoutes(
         },
       });
     }
+    await addIngestUnits(prisma, projectId, 1);
     return reply.status(204).send();
   });
 
   app.post("/batch", async (request, reply) => {
+    const projectId = requireIngestProjectId(request);
     const parsed = batchSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
+    const n = parsed.data.events.length;
     for (const body of parsed.data.events) {
       await prisma.event.create({
         data: {
+          project_id: projectId,
           app: body.app,
           platform: body.platform ?? null,
           environment: body.environment ?? null,
@@ -125,10 +145,12 @@ export async function ingestRoutes(
         },
       });
     }
+    await addIngestUnits(prisma, projectId, n);
     return reply.status(204).send();
   });
 
   app.post("/error", async (request, reply) => {
+    const projectId = requireIngestProjectId(request);
     const parsed = errorSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
@@ -136,6 +158,7 @@ export async function ingestRoutes(
     const body = parsed.data;
     const fingerprint = computeFingerprint(body.message, body.stack);
     const errorGroup = await findOrCreateErrorGroup(prisma, {
+      projectId,
       fingerprint,
       message: body.message,
       top_stack: body.stack?.split("\n")[0]?.trim() ?? null,
@@ -153,6 +176,7 @@ export async function ingestRoutes(
         sdk_version: body.sdk_version ?? null,
       },
     });
+    await addIngestUnits(prisma, projectId, 1);
     return reply.status(204).send();
   });
 }
