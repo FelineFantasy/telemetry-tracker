@@ -14,6 +14,7 @@ import {
 } from "../lib/errors-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
+import { getOverviewTimeSeries } from "../lib/overview-timeseries.js";
 import {
   EVENT_SORT_SQL,
   eventListOrderBy,
@@ -173,6 +174,8 @@ export async function apiRoutes(
         }
       : { created_at: { gte: previousSince, lt: since } };
 
+    const rangeKey = range === "7d" ? "7d" : "24h";
+
     const [
       errorsCount,
       eventsCount,
@@ -182,6 +185,7 @@ export async function apiRoutes(
       eventCounts,
       errorsPrevious,
       eventsPrevious,
+      series,
     ] = await Promise.all([
       prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
       prisma.event.count({ where: eventWhere }),
@@ -204,6 +208,7 @@ export async function apiRoutes(
       }),
       prisma.errorOccurrence.count({ where: previousErrorWhere }),
       prisma.event.count({ where: previousEventWhere }),
+      getOverviewTimeSeries(prisma, rangeKey, since, appFilter),
     ]);
 
     const topEvents = await Promise.all(
@@ -245,6 +250,7 @@ export async function apiRoutes(
       errorsPage,
       eventsPage,
       listPageSize,
+      series,
     });
   });
 
