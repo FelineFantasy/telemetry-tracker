@@ -5,6 +5,7 @@ import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar"
 import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
+import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
@@ -205,7 +206,7 @@ export default async function EventsPage({
               <tr>
                 <th>Name</th>
                 <th>Properties</th>
-                <th>Created</th>
+                <th>When</th>
                 <th aria-hidden>View</th>
               </tr>
             </thead>
@@ -234,7 +235,9 @@ export default async function EventsPage({
                       <span className="table-properties-empty">—</span>
                     )}
                   </td>
-                  <td>{new Date(e.created_at).toLocaleString()}</td>
+                  <td>
+                    <TimeAgo iso={e.created_at} />
+                  </td>
                   <td className="table-cell-view">
                     <Link
                       href={
@@ -253,10 +256,11 @@ export default async function EventsPage({
         </TableWrap>
       ) : (
         <EmptyState
+          title="No events recorded"
           message={
             appFilter || firstQueryValue(sp.name)
-              ? "No events for this filter."
-              : "No events yet."
+              ? "No events match these filters. Try adjusting the name filter or date range."
+              : "No events have been recorded yet. Instrument your app and send events to see them here."
           }
         />
       )}

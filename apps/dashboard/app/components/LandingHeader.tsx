@@ -2,7 +2,8 @@ import Link from "next/link";
 import { BrandLogo } from "@/app/components/BrandLogo";
 
 const navItems = [
-  { href: "#hero", label: "Overview" },
+  { href: "#hero", label: "Home" },
+  { href: "#preview", label: "Product" },
   { href: "#features", label: "Features" },
   { href: "#workflow", label: "How it works" },
   { href: "#contact", label: "Contact" },
@@ -25,10 +26,10 @@ export function LandingHeader() {
         </nav>
         <div className="landing-header__actions">
           <Link href="/docs" className="landing-header__ghost">
-            Docs
+            View Docs
           </Link>
           <Link href="/dashboard/overview" className="landing-header__solid">
-            Dashboard
+            Open Dashboard
           </Link>
         </div>
       </div>

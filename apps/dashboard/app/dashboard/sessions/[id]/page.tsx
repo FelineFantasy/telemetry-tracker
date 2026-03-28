@@ -4,6 +4,9 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";
+import { TimeAgo } from "@/app/components/TimeAgo";
+import { formatRelativeTime } from "@/lib/format-time";
+import type { ReactNode } from "react";
 
 type SessionDetail = {
   id: string;
@@ -27,7 +30,7 @@ async function getSession(id: string): Promise<SessionDetail | null> {
   return res.json();
 }
 
-function MetaRow({ label, value }: { label: string; value: string | null | undefined }) {
+function MetaRow({ label, value }: { label: string; value: ReactNode }) {
   if (value == null || value === "") return null;
   return (
     <div className="event-detail__meta-row">
@@ -64,16 +67,13 @@ export default async function SessionDetailPage({
     return (
       <>
         <PageTitle title="Session not found" />
-        <EmptyState message="This session could not be found." />
+        <EmptyState title="Not found" message="This session could not be found." />
       </>
     );
   }
 
   const identity = session.user_id ?? session.anonymous_id ?? null;
-  const context = [
-    session.app,
-    new Date(session.started_at).toLocaleString(),
-  ].join(" · ");
+  const context = [session.app, `started ${formatRelativeTime(session.started_at)}`].join(" · ");
 
   return (
     <>
@@ -87,11 +87,8 @@ export default async function SessionDetailPage({
         <MetaRow label="Platform" value={session.platform} />
         <MetaRow label="Identity" value={identity} />
         <MetaRow label="SDK version" value={session.sdk_version} />
-        <MetaRow label="Started" value={new Date(session.started_at).toLocaleString()} />
-        <MetaRow
-          label="Ended"
-          value={session.ended_at ? new Date(session.ended_at).toLocaleString() : null}
-        />
+        <MetaRow label="Started" value={<TimeAgo iso={session.started_at} />} />
+        <MetaRow label="Ended" value={session.ended_at ? <TimeAgo iso={session.ended_at} /> : null} />
       </div>
     </>
   );

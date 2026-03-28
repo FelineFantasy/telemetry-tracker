@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { LandingHeader } from "@/app/components/LandingHeader";
 import { LandingHeroBrand } from "@/app/components/LandingHeroBrand";
+import { LandingProductPreview } from "@/app/components/LandingProductPreview";
 
 function IconErrors() {
   return (
@@ -125,22 +126,21 @@ export default function LandingPage() {
               <span className="landing-hero__sdk-badge">SDK</span>
             </div>
             <h1 id="landing-hero-title" className="landing-hero__title">
-              Lightweight telemetry for modern apps
+              One SDK
+              <br />
+              <span className="landing-hero__sub-accent">Full visibility across your apps</span>
             </h1>
             <p className="landing-hero__sub">
-              Track errors, events and sessions across all your apps{" "}
-              <span className="landing-hero__sub-accent">— with one SDK</span>
-            </p>
-            <p className="landing-hero__lede">
-              Stop juggling ad-hoc logs and one-off dashboards. Telemetry Tracker gives your team a
-              single view across clients and services—so you can ship with confidence.
+              See errors grouped with stack traces, follow product events, and trace sessions—across web,
+              mobile, and backend{" "}
+              <span className="landing-hero__sub-accent">without the noise of heavyweight APM suites.</span>
             </p>
             <div className="landing-hero__actions">
               <Link href="/dashboard/overview" className="landing-btn landing-btn--accent landing-btn--hero-primary">
-                Open dashboard
+                Open Dashboard
               </Link>
               <Link href="/docs" className="landing-btn landing-btn--ghost-light landing-btn--hero-secondary">
-                Documentation
+                View Docs
               </Link>
             </div>
             <div className="landing-hero__note-wrap">
@@ -153,6 +153,8 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <LandingProductPreview />
+
         <section
           id="features"
           className="landing-features landing-animate-section"
@@ -162,11 +164,11 @@ export default function LandingPage() {
             <div className="landing-features__header">
               <p className="landing-kicker">Capabilities</p>
               <h2 id="landing-features-title" className="landing-section-title">
-                Everything you need to observe production
+                Built for fast triage and calm drill-down
               </h2>
               <p className="landing-section-sub">
-                Built for teams who care about signal over noise—clear grouping, fast scanning, and
-                room to go deep when something breaks.
+                Grouped fingerprints, readable stacks, filters that match how you ship—so on-call stays
+                focused on fixing, not clicking through clutter.
               </p>
             </div>
             <ul className="landing-feature-grid">
@@ -220,14 +222,14 @@ export default function LandingPage() {
         <section className="landing-band landing-animate-section" aria-labelledby="landing-band-title">
           <div className="landing-band__inner">
             <h2 id="landing-band-title" className="landing-band__title">
-              Ready to dig into your data?
+              Ready to explore your telemetry?
             </h2>
             <p className="landing-band__text">
-              The dashboard is live—filter by app, browse error groups, and inspect events and
-              sessions in one flow.
+              Open the dashboard to filter by app, review grouped errors with stacks, and jump into
+              events and sessions in one place.
             </p>
             <Link href="/dashboard/overview" className="landing-btn landing-btn--on-accent">
-              Go to overview
+              Open Dashboard
             </Link>
           </div>
         </section>
@@ -252,7 +254,7 @@ export default function LandingPage() {
                   info@tacko.io
                 </a>
                 <Link href="/docs" className="landing-btn landing-btn--outline-dark">
-                  Browse docs
+                  View Docs
                 </Link>
               </div>
             </div>
@@ -276,13 +278,16 @@ export default function LandingPage() {
                   <Link href="/dashboard/overview">Dashboard</Link>
                 </li>
                 <li>
-                  <Link href="/docs">Documentation</Link>
+                  <Link href="/docs">View Docs</Link>
                 </li>
               </ul>
             </div>
             <div className="landing-footer__col">
               <h3 className="landing-footer__heading">Sections</h3>
               <ul className="landing-footer__list">
+                <li>
+                  <a href="#preview">Product</a>
+                </li>
                 <li>
                   <a href="#features">Features</a>
                 </li>
