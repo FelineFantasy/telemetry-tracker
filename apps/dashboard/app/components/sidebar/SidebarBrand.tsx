@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandLogo } from "@/app/components/BrandLogo";
 import { SidebarCloseIcon } from "./SidebarCloseIcon";
 
 /**
@@ -25,10 +26,8 @@ export function SidebarBrand({
         onClick={onNavigate}
         title="Telemetry Tracker — Home"
       >
+        <BrandLogo className="app-sidebar__brand-logo" size={64} />
         <span className="app-sidebar__brand-full">Telemetry Tracker</span>
-        <span className="app-sidebar__brand-short" aria-hidden>
-          T
-        </span>
       </Link>
       {showDrawerClose && onClose ? (
         <button

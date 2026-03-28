@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/app/components/BrandLogo";
 
 const navItems = [
   { href: "#hero", label: "Overview" },
@@ -12,7 +13,8 @@ export function LandingHeader() {
     <header className="landing-header">
       <div className="landing-header__bar">
         <Link href="/" className="landing-header__logo">
-          Telemetry Tracker
+          <BrandLogo className="landing-header__logo-img" size={40} priority />
+          <span>Telemetry Tracker</span>
         </Link>
         <nav className="landing-header__nav" aria-label="Page sections">
           {navItems.map(({ href, label }) => (

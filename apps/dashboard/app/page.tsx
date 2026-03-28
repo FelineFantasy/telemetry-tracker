@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { LandingHeader } from "@/app/components/LandingHeader";
+import { LandingHeroBrand } from "@/app/components/LandingHeroBrand";
 
 function IconErrors() {
   return (
@@ -68,7 +69,7 @@ const features = [
     title: "Error groups",
     body: "Fingerprints, stacks, and recent occurrences—grouped so regressions stand out.",
     icon: IconErrors,
-    accent: "teal" as const,
+    accent: "indigo" as const,
   },
   {
     title: "Events & screens",
@@ -115,33 +116,40 @@ export default function LandingPage() {
       <main id="main-content" className="landing-page">
         <section id="hero" className="landing-hero" aria-labelledby="landing-hero-title">
           <div className="landing-hero__mesh" aria-hidden />
-          <div className="landing-hero__glow landing-hero__glow--teal" aria-hidden />
+          <div className="landing-hero__glow landing-hero__glow--indigo" aria-hidden />
           <div className="landing-hero__glow landing-hero__glow--violet" aria-hidden />
           <div className="landing-hero__inner">
-            <p className="landing-hero__highlight-strap">
-              Lightweight telemetry for modern apps
-            </p>
+            <div className="landing-hero__brand-row">
+              <LandingHeroBrand />
+              <span className="landing-hero__brand-name">Telemetry Tracker</span>
+              <span className="landing-hero__sdk-badge">SDK</span>
+            </div>
             <h1 id="landing-hero-title" className="landing-hero__title">
-              <span className="landing-hero__title-line">
-                Track errors, events and sessions across all your apps
-              </span>{" "}
-              <span className="landing-hero__title-sdk">— with one SDK</span>
+              Lightweight telemetry for modern apps
             </h1>
+            <p className="landing-hero__sub">
+              Track errors, events and sessions across all your apps{" "}
+              <span className="landing-hero__sub-accent">— with one SDK</span>
+            </p>
             <p className="landing-hero__lede">
               Stop juggling ad-hoc logs and one-off dashboards. Telemetry Tracker gives your team a
               single view across clients and services—so you can ship with confidence.
             </p>
             <div className="landing-hero__actions">
-              <Link href="/dashboard/overview" className="landing-btn landing-btn--accent">
+              <Link href="/dashboard/overview" className="landing-btn landing-btn--accent landing-btn--hero-primary">
                 Open dashboard
               </Link>
-              <Link href="/docs" className="landing-btn landing-btn--ghost-light">
+              <Link href="/docs" className="landing-btn landing-btn--ghost-light landing-btn--hero-secondary">
                 Documentation
               </Link>
             </div>
-            <p className="landing-hero__note">
-              Self-hosted friendly · Scoped SDKs · Anonymous + identified users
-            </p>
+            <div className="landing-hero__note-wrap">
+              <div className="landing-hero__rule" aria-hidden />
+              <p className="landing-hero__note">
+                Self-hosted friendly • Scoped SDKs • Anonymous + identified users
+              </p>
+              <div className="landing-hero__rule" aria-hidden />
+            </div>
           </div>
         </section>
 

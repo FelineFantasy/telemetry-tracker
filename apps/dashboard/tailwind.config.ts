@@ -1,7 +1,8 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Dark-first design tokens (Vercel / Linear–inspired).
+ * Dark-first design tokens — brand palette (8-digit sources: #674fdcfc #8a7de4fe #b6abebfe #c0b9e128, transparent #00000000).
+ * Solid: primary #674fdc, mid #8a7de4, light #b6abeb, muted #c0b9e1.
  * Use semantic utilities: bg-background, text-foreground, border-border, bg-primary, etc.
  */
 const config: Config = {
@@ -27,43 +28,43 @@ const config: Config = {
         "2xl": "1.25rem",
       },
       boxShadow: {
-        xs: "0 1px 2px 0 rgb(0 0 0 / 0.35)",
-        sm: "0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.35)",
-        md: "0 4px 6px -1px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.4)",
-        lg: "0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.45)",
-        glow: "0 0 0 1px rgb(20 184 166 / 0.15), 0 8px 32px rgb(20 184 166 / 0.12)",
+        xs: "0 1px 2px 0 rgb(15 10 35 / 0.12)",
+        sm: "0 1px 3px 0 rgb(15 10 35 / 0.14), 0 1px 2px -1px rgb(15 10 35 / 0.1)",
+        md: "0 4px 6px -1px rgb(15 10 35 / 0.18), 0 2px 4px -2px rgb(15 10 35 / 0.12)",
+        lg: "0 10px 15px -3px rgb(15 10 35 / 0.22), 0 4px 6px -4px rgb(15 10 35 / 0.16)",
+        glow: "0 0 0 1px rgb(103 79 220 / 0.2), 0 8px 32px rgb(138 125 228 / 0.14)",
         "inner-soft": "inset 0 1px 0 0 rgb(255 255 255 / 0.04)",
       },
       colors: {
-        /* Soft slate canvas — avoids harsh pure black */
-        background: "#12161f",
-        foreground: "#f4f4f5",
+        /* Soft purple-gray canvas (aligned with brand — not near-black) */
+        background: "#06060f",
+        foreground: "#ffffff",
         surface: {
-          DEFAULT: "#1a1f2c",
-          alt: "#1e2433",
-          raised: "#232a3a",
+          DEFAULT: "#3d3758",
+          alt: "#45406a",
+          raised: "#4e4878",
         },
         muted: {
-          DEFAULT: "#2a3142",
-          foreground: "#a1a8b8",
+          DEFAULT: "#4a4565",
+          foreground: "#d4d0e8",
         },
         border: {
-          DEFAULT: "#2f3748",
-          subtle: "#3d4659",
+          DEFAULT: "#5c5678",
+          subtle: "#6a6488",
         },
         primary: {
-          DEFAULT: "#14b8a6",
-          foreground: "#042f2e",
-          hover: "#0d9488",
+          DEFAULT: "#674fdc",
+          foreground: "#ffffff",
+          hover: "#8a7de4",
         },
         secondary: {
-          DEFAULT: "#6366f1",
-          foreground: "#eef2ff",
-          hover: "#4f46e5",
+          DEFAULT: "#8a7de4",
+          foreground: "#1a1428",
+          hover: "#b6abeb",
         },
         accent: {
-          DEFAULT: "#8b5cf6",
-          foreground: "#f5f3ff",
+          DEFAULT: "#b6abeb",
+          foreground: "#161632",
         },
         danger: {
           DEFAULT: "#f87171",
@@ -81,11 +82,11 @@ const config: Config = {
           muted: "rgba(251, 191, 36, 0.12)",
         },
         code: {
-          bg: "#0f1f1c",
-          border: "#1d4f47",
-          foreground: "#8ed4c6",
+          bg: "#353050",
+          border: "#5c5690",
+          foreground: "#c0b9e1",
         },
-        ring: "#2dd4bf",
+        ring: "#8a7de4",
       },
       maxWidth: {
         prose: "65ch",
