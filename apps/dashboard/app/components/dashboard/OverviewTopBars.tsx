@@ -25,6 +25,9 @@ const FILL = {
   events: "#8a7de4",
 } as const;
 
+/** Recharts renders SVG; CSS variables often do not apply to tick `fill` — use explicit light text. */
+const TICK_FILL = "#d4d0e8";
+
 export function OverviewTopBars({ title, subtitle, rows, accent, emptyMessage }: Props) {
   const data = [...rows].reverse();
 
@@ -54,25 +57,30 @@ export function OverviewTopBars({ title, subtitle, rows, accent, emptyMessage }:
           <BarChart
             layout="vertical"
             data={data}
-            margin={{ top: 4, right: 16, left: 4, bottom: 4 }}
+            margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
             barCategoryGap={4}
           >
             <XAxis type="number" domain={[0, maxVal]} hide />
             <YAxis
               type="category"
               dataKey="label"
-              width={140}
-              tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+              width={148}
+              tick={{ fill: TICK_FILL, fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               interval={0}
             />
             <Tooltip
-              cursor={{ fill: "rgba(103, 79, 220, 0.06)" }}
+              cursor={{ fill: "rgba(103, 79, 220, 0.08)" }}
               contentStyle={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
+                background: "#3d3758",
+                border: "1px solid #5c5678",
                 borderRadius: "8px",
                 fontSize: "12px",
+                color: "#f1f5f9",
               }}
+              labelStyle={{ color: "#e8e4f7" }}
+              itemStyle={{ color: "#f8fafc" }}
             />
             <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={22}>
               {data.map((_, i) => (
