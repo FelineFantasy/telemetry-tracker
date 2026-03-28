@@ -5,6 +5,7 @@ import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListTool
 import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
+import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
@@ -212,10 +213,10 @@ export default async function SessionsPage({
                       ? truncate(s.user_id ?? s.anonymous_id ?? "", 20)
                       : "—"}
                   </td>
-                  <td>{new Date(s.started_at).toLocaleString()}</td>
                   <td>
-                    {s.ended_at ? new Date(s.ended_at).toLocaleString() : "—"}
+                    <TimeAgo iso={s.started_at} />
                   </td>
+                  <td>{s.ended_at ? <TimeAgo iso={s.ended_at} /> : "—"}</td>
                   <td className="table-cell-view">
                     <Link
                       href={
@@ -234,10 +235,11 @@ export default async function SessionsPage({
         </TableWrap>
       ) : (
         <EmptyState
+          title="No sessions recorded"
           message={
             appFilter
-              ? `No sessions for these filters (app "${appFilter}").`
-              : `No sessions for these filters (${rangeLabel}).`
+              ? `No sessions for app "${appFilter}" with these filters.`
+              : `No sessions match ${rangeLabel}. Try another range or clear filters.`
           }
         />
       )}

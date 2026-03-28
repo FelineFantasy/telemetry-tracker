@@ -4,6 +4,10 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";
+import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
+import { TimeAgo } from "@/app/components/TimeAgo";
+import { formatRelativeTime } from "@/lib/format-time";
+import type { ReactNode } from "react";
 
 type EventDetail = {
   id: string;
@@ -30,7 +34,7 @@ async function getEvent(id: string): Promise<EventDetail | null> {
   return res.json();
 }
 
-function MetaRow({ label, value }: { label: string; value: string | null | undefined }) {
+function MetaRow({ label, value }: { label: string; value: ReactNode }) {
   if (value == null || value === "") return null;
   return (
     <div className="event-detail__meta-row">
@@ -67,16 +71,13 @@ export default async function EventDetailPage({
     return (
       <>
         <PageTitle title="Event not found" />
-        <EmptyState message="This event could not be found." />
+        <EmptyState title="Not found" message="This event could not be found." />
       </>
     );
   }
 
   const identity = event.user_id ?? event.anonymous_id ?? null;
-  const context = [
-    event.app,
-    new Date(event.created_at).toLocaleString(),
-  ].join(" · ");
+  const context = [event.app, `created ${formatRelativeTime(event.created_at)}`].join(" · ");
 
   const hasProperties =
     event.properties != null &&
@@ -97,15 +98,12 @@ export default async function EventDetailPage({
         <MetaRow label="Identity" value={identity} />
         <MetaRow label="Session ID" value={event.session_id} />
         <MetaRow label="SDK version" value={event.sdk_version} />
-        <MetaRow label="Created" value={new Date(event.created_at).toLocaleString()} />
+        <MetaRow label="Created" value={<TimeAgo iso={event.created_at} />} />
       </div>
 
       {hasProperties && (
         <div className="card event-detail__properties mt-md">
-          <h2 className="event-detail__meta-title">Properties</h2>
-          <pre className="properties-json event-detail__properties-json">
-            {JSON.stringify(event.properties, null, 2)}
-          </pre>
+          <JsonContextView data={event.properties} title="Properties" />
         </div>
       )}
 

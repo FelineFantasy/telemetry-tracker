@@ -4,6 +4,7 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { Card } from "@/app/components/Card";
 import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
+import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { OverviewTopBars } from "@/app/components/dashboard/OverviewTopBars";
 import {
@@ -223,14 +224,14 @@ export default async function OverviewPage({
           subtitle="Occurrences in the current table page — compare at a glance"
           rows={mapErrorGroupsToBarRows(data.topErrorGroups ?? [])}
           accent="errors"
-          emptyMessage="No error groups on this page."
+          emptyMessage="No error groups recorded on this page."
         />
         <OverviewTopBars
           title="Top events (this page)"
           subtitle="Event name counts on the current table page"
           rows={mapTopEventsToBarRows(data.topEvents ?? [])}
           accent="events"
-          emptyMessage="No events on this page."
+          emptyMessage="No events recorded on this page."
         />
       </div>
 
@@ -274,14 +275,18 @@ export default async function OverviewPage({
                     {g.message}
                   </Link>{" "}
                   <span className="text-muted-foreground text-sm">
-                    — {g.occurrences} occurrences (last: {new Date(g.last_seen).toLocaleString()})
+                    — {g.occurrences} occurrences · last{" "}
+                    <TimeAgo iso={g.last_seen} className="text-muted-foreground" />
                   </span>
                 </li>
               )
             )}
           </ul>
         ) : (
-          <EmptyState message={`No errors in this period (${rangeLabel}).`} />
+          <EmptyState
+            title="No errors recorded"
+            message={`Nothing matched for ${rangeLabel}. Try another range or app filter.`}
+          />
         )}
         <Pagination
           total={data.errorsListTotal ?? 0}
@@ -347,7 +352,7 @@ export default async function OverviewPage({
                     </span>
                     {e.lastSeen ? (
                       <span className="text-muted-foreground text-sm">
-                        Last: {new Date(e.lastSeen).toLocaleString()}
+                        Last seen <TimeAgo iso={e.lastSeen} className="text-muted-foreground" />
                       </span>
                     ) : null}
                   </div>
@@ -356,7 +361,10 @@ export default async function OverviewPage({
             )}
           </ul>
         ) : (
-          <EmptyState message={`No events in this period (${rangeLabel}).`} />
+          <EmptyState
+            title="No events recorded"
+            message={`Nothing matched for ${rangeLabel}. Try another range or app filter.`}
+          />
         )}
         <Pagination
           total={data.eventsListTotal ?? 0}

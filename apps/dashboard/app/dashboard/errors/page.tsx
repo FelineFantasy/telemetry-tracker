@@ -6,6 +6,7 @@ import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar"
 import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
+import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
@@ -245,9 +246,8 @@ export default async function ErrorsListPage({
                 <pre className="occurrence-card__meta">{g.top_stack}</pre>
               )}
               <span className="card__label card__label--block">
-                {g.occurrences} occurrences · first{" "}
-                {new Date(g.first_seen).toLocaleString()} · last{" "}
-                {new Date(g.last_seen).toLocaleString()}
+                {g.occurrences} occurrences · first <TimeAgo iso={g.first_seen} /> · last{" "}
+                <TimeAgo iso={g.last_seen} />
                 {g.users_affected != null && g.users_affected > 0 ? (
                   <>
                     {" "}
@@ -280,10 +280,11 @@ export default async function ErrorsListPage({
         </ul>
       ) : (
         <EmptyState
+          title="No errors recorded"
           message={
             appFilter
-              ? `No errors for "${appFilter}" with these filters.`
-              : "No error groups match these filters."
+              ? `No error groups for "${appFilter}" with these filters.`
+              : "No error groups match these filters. Try another date range or clear filters."
           }
         />
       )}
