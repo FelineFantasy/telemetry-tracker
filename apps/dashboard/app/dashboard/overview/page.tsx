@@ -5,7 +5,13 @@ import { Card } from "@/app/components/Card";
 import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
+import { OverviewTopBars } from "@/app/components/dashboard/OverviewTopBars";
+import {
+  mapErrorGroupsToBarRows,
+  mapTopEventsToBarRows,
+} from "@/lib/overview-bar-rows";
 import { OverviewSortControls } from "@/app/components/dashboard/OverviewSortControls";
+import { OverviewTrendsChart } from "@/app/components/dashboard/OverviewTrendsChart";
 import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
@@ -14,6 +20,7 @@ import {
   parseOverviewListPageSize,
   parsePageParam,
 } from "@/lib/pagination";
+import type { OverviewApiResponse } from "@/lib/overview-api";
 import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
 
@@ -50,7 +57,15 @@ async function getOverview(
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
   }
-  return res.json();
+  return res.json() as Promise<OverviewApiResponse>;
+}
+
+function emptySeries(): OverviewApiResponse["series"] {
+  return {
+    bucket: "hour",
+    errors: [],
+    events: [],
+  };
 }
 
 function buildOverviewParamsRecord(
@@ -134,34 +149,7 @@ export default async function OverviewPage({
   const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
   const currentOverviewParams = buildOverviewParamsRecord(params);
 
-  let data: {
-    range?: string;
-    errorsLast24h: number;
-    eventsLast24h: number;
-    errorsPrevious: number;
-    eventsPrevious: number;
-    topErrorGroups?: Array<{
-      id: string;
-      message: string;
-      app: string;
-      occurrences: number;
-      last_seen: string;
-    }>;
-    topEvents?: Array<{
-      name: string;
-      count: number;
-      app: string;
-      platform: string | null;
-      environment: string | null;
-      release: string | null;
-      lastSeen: string | null;
-    }>;
-    errorsListTotal?: number;
-    eventsListTotal?: number;
-    errorsPage?: number;
-    eventsPage?: number;
-    listPageSize?: number;
-  };
+  let data: OverviewApiResponse;
   try {
     data = await getOverview(range, app ?? undefined, {
       errorsPage,
@@ -172,6 +160,9 @@ export default async function OverviewPage({
       topEventsSort,
       topEventsOrder,
     });
+    if (!data.series) {
+      data = { ...data, series: emptySeries() };
+    }
   } catch (e) {
     return (
       <>
@@ -227,6 +218,25 @@ export default async function OverviewPage({
         topEventsSort={topEventsSort}
         topEventsOrder={topEventsOrder}
       />
+
+      <OverviewTrendsChart series={data.series} rangeLabel={rangeLabel} />
+
+      <div className="overview-bar-grid mb-2 grid gap-6 md:grid-cols-2">
+        <OverviewTopBars
+          title="Top errors (this page)"
+          subtitle="Occurrences in the current table page — compare at a glance"
+          rows={mapErrorGroupsToBarRows(data.topErrorGroups ?? [])}
+          accent="errors"
+          emptyMessage="No error groups on this page."
+        />
+        <OverviewTopBars
+          title="Top events (this page)"
+          subtitle="Event name counts on the current table page"
+          rows={mapTopEventsToBarRows(data.topEvents ?? [])}
+          accent="events"
+          emptyMessage="No events on this page."
+        />
+      </div>
 
       <section className="overview-region overview-region--errors" aria-labelledby="overview-errors-heading">
         <header className="overview-region__header">
