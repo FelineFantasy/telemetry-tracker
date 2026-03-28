@@ -4,7 +4,13 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
+import { Pagination } from "@/app/components/ui/Pagination";
 import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  parsePageParam,
+  parsePageSizeParam,
+} from "@/lib/pagination";
 import Link from "next/link";
 
 type SessionRow = {
@@ -21,14 +27,22 @@ function truncate(s: string, len: number) {
 }
 
 async function getSessions(
-  app?: string,
-  since?: string
-): Promise<{ items: SessionRow[] }> {
+  app: string | undefined,
+  since: string | undefined,
+  page: number,
+  pageSize: number
+): Promise<{
+  items: SessionRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
   const params = new URLSearchParams();
   if (app) params.set("app", app);
   if (since) params.set("since", since);
-  const q = params.toString();
-  const res = await fetch(`${API_BASE}/api/sessions${q ? `?${q}` : ""}`, {
+  params.set("page", String(page));
+  params.set("pageSize", String(pageSize));
+  const res = await fetch(`${API_BASE}/api/sessions?${params.toString()}`, {
     cache: "no-store",
   });
   if (!res.ok) {
@@ -38,21 +52,53 @@ async function getSessions(
   return res.json();
 }
 
+function sessionsListHref(opts: {
+  app: string;
+  range: string;
+  page: number;
+  pageSize: number;
+}) {
+  const params = new URLSearchParams();
+  if (opts.app) params.set("app", opts.app);
+  if (opts.range === "7d") params.set("range", "7d");
+  if (opts.page > 1) params.set("page", String(opts.page));
+  if (opts.pageSize !== DEFAULT_LIST_PAGE_SIZE) {
+    params.set("pageSize", String(opts.pageSize));
+  }
+  const q = params.toString();
+  return q ? `/dashboard/sessions?${q}` : "/dashboard/sessions";
+}
+
 export default async function SessionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ app?: string; range?: string }>;
+  searchParams: Promise<{
+    app?: string;
+    range?: string;
+    page?: string;
+    pageSize?: string;
+    limit?: string;
+  }>;
 }) {
   const params = await searchParams;
   const appFilter = params.app ?? "";
   const range = params.range === "7d" ? "7d" : "24h";
   const since = range;
   const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
+  const page = parsePageParam(params.page);
+  const pageSize = parsePageSizeParam(params.pageSize, params.limit);
 
   let items: SessionRow[] = [];
+  let total = 0;
   try {
-    const data = await getSessions(appFilter || undefined, since);
+    const data = await getSessions(
+      appFilter || undefined,
+      since,
+      page,
+      pageSize
+    );
     items = data.items ?? [];
+    total = data.total ?? items.length;
   } catch (e) {
     return (
       <>
@@ -136,6 +182,19 @@ export default async function SessionsPage({
           }
         />
       )}
+      <Pagination
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        hrefForPage={(p) =>
+          sessionsListHref({
+            app: appFilter,
+            range,
+            page: p,
+            pageSize,
+          })
+        }
+      />
     </>
   );
 }

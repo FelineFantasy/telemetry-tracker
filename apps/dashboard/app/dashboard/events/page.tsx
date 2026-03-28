@@ -3,7 +3,13 @@ const API_BASE = process.env.API_URL || "http://localhost:3001";
 import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
+import { Pagination } from "@/app/components/ui/Pagination";
 import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  parsePageParam,
+  parsePageSizeParam,
+} from "@/lib/pagination";
 import { EventsFilter } from "./EventsFilter";
 import Link from "next/link";
 
@@ -15,14 +21,22 @@ type EventRow = {
 };
 
 async function getEvents(
-  app?: string,
-  name?: string
-): Promise<{ items: EventRow[] }> {
+  app: string | undefined,
+  name: string | undefined,
+  page: number,
+  pageSize: number
+): Promise<{
+  items: EventRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
   const params = new URLSearchParams();
   if (app) params.set("app", app);
   if (name) params.set("name", name);
-  const q = params.toString();
-  const res = await fetch(`${API_BASE}/api/events${q ? `?${q}` : ""}`, {
+  params.set("page", String(page));
+  params.set("pageSize", String(pageSize));
+  const res = await fetch(`${API_BASE}/api/events?${params.toString()}`, {
     cache: "no-store",
   });
   if (!res.ok) {
@@ -32,19 +46,51 @@ async function getEvents(
   return res.json();
 }
 
+function eventsListHref(opts: {
+  app: string;
+  name: string;
+  page: number;
+  pageSize: number;
+}) {
+  const params = new URLSearchParams();
+  if (opts.app) params.set("app", opts.app);
+  if (opts.name) params.set("name", opts.name);
+  if (opts.page > 1) params.set("page", String(opts.page));
+  if (opts.pageSize !== DEFAULT_LIST_PAGE_SIZE) {
+    params.set("pageSize", String(opts.pageSize));
+  }
+  const q = params.toString();
+  return q ? `/dashboard/events?${q}` : "/dashboard/events";
+}
+
 export default async function EventsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ app?: string; name?: string }>;
+  searchParams: Promise<{
+    app?: string;
+    name?: string;
+    page?: string;
+    pageSize?: string;
+    limit?: string;
+  }>;
 }) {
   const params = await searchParams;
   const appFilter = params.app ?? "";
   const nameFilter = params.name ?? "";
+  const page = parsePageParam(params.page);
+  const pageSize = parsePageSizeParam(params.pageSize, params.limit);
 
   let items: EventRow[] = [];
+  let total = 0;
   try {
-    const data = await getEvents(appFilter || undefined, nameFilter || undefined);
+    const data = await getEvents(
+      appFilter || undefined,
+      nameFilter || undefined,
+      page,
+      pageSize
+    );
     items = data.items ?? [];
+    total = data.total ?? items.length;
   } catch (e) {
     return (
       <>
@@ -63,7 +109,11 @@ export default async function EventsPage({
   return (
     <>
       <PageTitle title="Events" context={context} />
-      <EventsFilter appFilter={appFilter} nameFilter={nameFilter} />
+      <EventsFilter
+        appFilter={appFilter}
+        nameFilter={nameFilter}
+        pageSize={pageSize}
+      />
 
       {items.length ? (
         <TableWrap>
@@ -115,6 +165,19 @@ export default async function EventsPage({
           }
         />
       )}
+      <Pagination
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        hrefForPage={(p) =>
+          eventsListHref({
+            app: appFilter,
+            name: nameFilter,
+            page: p,
+            pageSize,
+          })
+        }
+      />
     </>
   );
 }

@@ -1,9 +1,14 @@
+import { DEFAULT_LIST_PAGE_SIZE } from "@/lib/pagination";
+
 export function EventsFilter({
   appFilter,
   nameFilter,
+  pageSize,
 }: {
   appFilter: string;
   nameFilter: string;
+  /** Preserved when applying filter so page size stays consistent (page resets via omission). */
+  pageSize: number;
 }) {
   return (
     <div className="filter-stack">
@@ -13,6 +18,9 @@ export function EventsFilter({
       <form method="get" action="/dashboard/events" className="filter-form">
         {appFilter ? (
           <input type="hidden" name="app" value={appFilter} />
+        ) : null}
+        {pageSize !== DEFAULT_LIST_PAGE_SIZE ? (
+          <input type="hidden" name="pageSize" value={String(pageSize)} />
         ) : null}
         <label htmlFor="event-name-filter" className="filter-label">
           Event name

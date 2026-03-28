@@ -1,7 +1,50 @@
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+const DEFAULT_LIST_PAGE_SIZE = 20;
+const MAX_LIST_PAGE_SIZE = 100;
+const OVERVIEW_LIST_PAGE_SIZE = 10;
+const MAX_OVERVIEW_LIST_PAGE_SIZE = 50;
+
+function parsePositivePage(value: string | undefined, fallback: number): number {
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n : fallback;
+}
+
+function parseListPageSize(
+  pageSize: string | undefined,
+  limit: string | undefined,
+  fallback = DEFAULT_LIST_PAGE_SIZE
+): number {
+  const raw = pageSize ?? limit;
+  const n = Math.floor(Number(raw));
+  const v = Number.isFinite(n) && n >= 1 ? n : fallback;
+  return Math.min(MAX_LIST_PAGE_SIZE, Math.max(1, v));
+}
+
+async function countDistinctEventNames(
+  since: Date,
+  appFilter: string | undefined
+): Promise<number> {
+  if (appFilter) {
+    const r = await prisma.$queryRaw<[{ c: bigint }]>(
+      Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
+        SELECT name FROM "Event" WHERE created_at >= ${since} AND app = ${appFilter}
+        GROUP BY name
+      ) t`
+    );
+    return Number(r[0]?.c ?? 0);
+  }
+  const r = await prisma.$queryRaw<[{ c: bigint }]>(
+    Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
+      SELECT name FROM "Event" WHERE created_at >= ${since}
+      GROUP BY name
+    ) t`
+  );
+  return Number(r[0]?.c ?? 0);
+}
 
 /** Fastify can expose repeated query keys as `string[]`; normalize to a single trimmed app id. */
 function queryApp(value: string | string[] | undefined): string | undefined {
@@ -24,10 +67,27 @@ export async function apiRoutes(
   _opts: FastifyPluginOptions
 ) {
   app.get("/overview", async (request, reply) => {
-    const query = request.query as { range?: string; app?: string | string[] };
+    const query = request.query as {
+      range?: string;
+      app?: string | string[];
+      errorsPage?: string;
+      eventsPage?: string;
+      listPageSize?: string;
+    };
     const range = query.range === "7d" ? "7d" : "24h";
     const appFilter = queryApp(query.app);
     const { since, previousSince, label } = parseRange(range);
+    const listPageSize = Math.min(
+      MAX_OVERVIEW_LIST_PAGE_SIZE,
+      Math.max(
+        1,
+        Math.floor(Number(query.listPageSize)) || OVERVIEW_LIST_PAGE_SIZE
+      )
+    );
+    const errorsPage = parsePositivePage(query.errorsPage, 1);
+    const eventsPage = parsePositivePage(query.eventsPage, 1);
+    const errorsSkip = (errorsPage - 1) * listPageSize;
+    const eventsSkip = (eventsPage - 1) * listPageSize;
 
     const baseWhere = { created_at: { gte: since } };
     const eventWhere = appFilter
@@ -55,6 +115,8 @@ export async function apiRoutes(
     const [
       errorsCount,
       eventsCount,
+      errorsListTotal,
+      eventsListTotal,
       errorGroups,
       eventCounts,
       errorsPrevious,
@@ -62,9 +124,12 @@ export async function apiRoutes(
     ] = await Promise.all([
       prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
       prisma.event.count({ where: eventWhere }),
+      prisma.errorGroup.count({ where: errorGroupWhere }),
+      countDistinctEventNames(since, appFilter),
       prisma.errorGroup.findMany({
         where: errorGroupWhere,
-        take: 10,
+        skip: errorsSkip,
+        take: listPageSize,
         orderBy: { occurrences: "desc" },
         include: { _count: { select: { occurrences_list: true } } },
       }),
@@ -73,11 +138,37 @@ export async function apiRoutes(
         where: eventWhere,
         _count: { name: true },
         orderBy: { _count: { name: "desc" } },
-        take: 10,
+        skip: eventsSkip,
+        take: listPageSize,
       }),
       prisma.errorOccurrence.count({ where: previousErrorWhere }),
       prisma.event.count({ where: previousEventWhere }),
     ]);
+
+    const topEvents = await Promise.all(
+      eventCounts.map(async (row) => {
+        const latest = await prisma.event.findFirst({
+          where: { ...eventWhere, name: row.name },
+          orderBy: { created_at: "desc" },
+          select: {
+            app: true,
+            platform: true,
+            environment: true,
+            release: true,
+            created_at: true,
+          },
+        });
+        return {
+          name: row.name,
+          count: row._count.name,
+          app: latest?.app ?? "",
+          platform: latest?.platform ?? null,
+          environment: latest?.environment ?? null,
+          release: latest?.release ?? null,
+          lastSeen: latest?.created_at.toISOString() ?? null,
+        };
+      })
+    );
 
     return reply.send({
       range: label,
@@ -87,22 +178,38 @@ export async function apiRoutes(
       errorsPrevious,
       eventsPrevious,
       topErrorGroups: errorGroups,
-      topEvents: eventCounts.map((e) => ({ name: e.name, count: e._count.name })),
+      topEvents,
+      errorsListTotal,
+      eventsListTotal,
+      errorsPage,
+      eventsPage,
+      listPageSize,
     });
   });
 
   app.get("/errors", async (request, reply) => {
-    const query = request.query as { app?: string | string[]; limit?: string };
-    const limit = Math.min(Number(query.limit) || 50, 100);
+    const query = request.query as {
+      app?: string | string[];
+      page?: string;
+      pageSize?: string;
+      limit?: string;
+    };
+    const pageSize = parseListPageSize(query.pageSize, query.limit);
+    const page = parsePositivePage(query.page, 1);
+    const skip = (page - 1) * pageSize;
     const appId = queryApp(query.app);
     const where = appId ? { app: appId } : {};
-    const list = await prisma.errorGroup.findMany({
-      where,
-      take: limit,
-      orderBy: { last_seen: "desc" },
-      include: { _count: { select: { occurrences_list: true } } },
-    });
-    return reply.send({ items: list });
+    const [total, list] = await Promise.all([
+      prisma.errorGroup.count({ where }),
+      prisma.errorGroup.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { last_seen: "desc" },
+        include: { _count: { select: { occurrences_list: true } } },
+      }),
+    ]);
+    return reply.send({ items: list, total, page, pageSize });
   });
 
   app.get<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
@@ -121,18 +228,30 @@ export async function apiRoutes(
   });
 
   app.get("/events", async (request, reply) => {
-    const query = request.query as { app?: string | string[]; limit?: string; name?: string };
-    const limit = Math.min(Number(query.limit) || 50, 100);
+    const query = request.query as {
+      app?: string | string[];
+      page?: string;
+      pageSize?: string;
+      limit?: string;
+      name?: string;
+    };
+    const pageSize = parseListPageSize(query.pageSize, query.limit);
+    const page = parsePositivePage(query.page, 1);
+    const skip = (page - 1) * pageSize;
     const where: { app?: string; name?: string } = {};
     const appId = queryApp(query.app);
     if (appId) where.app = appId;
     if (query.name) where.name = query.name;
-    const list = await prisma.event.findMany({
-      where,
-      take: limit,
-      orderBy: { created_at: "desc" },
-    });
-    return reply.send({ items: list });
+    const [total, list] = await Promise.all([
+      prisma.event.count({ where }),
+      prisma.event.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { created_at: "desc" },
+      }),
+    ]);
+    return reply.send({ items: list, total, page, pageSize });
   });
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
@@ -151,19 +270,31 @@ export async function apiRoutes(
   }
 
   app.get("/sessions", async (request, reply) => {
-    const query = request.query as { app?: string | string[]; limit?: string; since?: string };
-    const limit = Math.min(Number(query.limit) || 50, 100);
+    const query = request.query as {
+      app?: string | string[];
+      page?: string;
+      pageSize?: string;
+      limit?: string;
+      since?: string;
+    };
+    const pageSize = parseListPageSize(query.pageSize, query.limit);
+    const page = parsePositivePage(query.page, 1);
+    const skip = (page - 1) * pageSize;
     const sinceDate = parseSince(query.since);
     const where: { app?: string; started_at?: { gte: Date } } = {};
     const appId = queryApp(query.app);
     if (appId) where.app = appId;
     if (sinceDate) where.started_at = { gte: sinceDate };
-    const list = await prisma.session.findMany({
-      where,
-      take: limit,
-      orderBy: { started_at: "desc" },
-    });
-    return reply.send({ items: list });
+    const [total, list] = await Promise.all([
+      prisma.session.count({ where }),
+      prisma.session.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { started_at: "desc" },
+      }),
+    ]);
+    return reply.send({ items: list, total, page, pageSize });
   });
 
   app.get<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {

@@ -4,6 +4,12 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
+import { Pagination } from "@/app/components/ui/Pagination";
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  parsePageParam,
+  parsePageSizeParam,
+} from "@/lib/pagination";
 import Link from "next/link";
 
 type ErrorGroupRow = {
@@ -16,9 +22,23 @@ type ErrorGroupRow = {
   last_seen: string;
 };
 
-async function getErrors(app?: string): Promise<{ items: ErrorGroupRow[] }> {
-  const params = app ? `?app=${encodeURIComponent(app)}` : "";
-  const res = await fetch(`${API_BASE}/api/errors${params}`, { cache: "no-store" });
+async function getErrors(
+  app: string | undefined,
+  page: number,
+  pageSize: number
+): Promise<{
+  items: ErrorGroupRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}> {
+  const params = new URLSearchParams();
+  if (app) params.set("app", app);
+  params.set("page", String(page));
+  params.set("pageSize", String(pageSize));
+  const res = await fetch(`${API_BASE}/api/errors?${params.toString()}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
@@ -26,18 +46,46 @@ async function getErrors(app?: string): Promise<{ items: ErrorGroupRow[] }> {
   return res.json();
 }
 
+function errorsListHref(opts: {
+  app: string;
+  page: number;
+  pageSize: number;
+}) {
+  const params = new URLSearchParams();
+  if (opts.app) params.set("app", opts.app);
+  if (opts.page > 1) params.set("page", String(opts.page));
+  if (opts.pageSize !== DEFAULT_LIST_PAGE_SIZE) {
+    params.set("pageSize", String(opts.pageSize));
+  }
+  const q = params.toString();
+  return q ? `/dashboard/errors?${q}` : "/dashboard/errors";
+}
+
 export default async function ErrorsListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ app?: string }>;
+  searchParams: Promise<{
+    app?: string;
+    page?: string;
+    pageSize?: string;
+    limit?: string;
+  }>;
 }) {
   const params = await searchParams;
   const appFilter = params.app ?? "";
+  const page = parsePageParam(params.page);
+  const pageSize = parsePageSizeParam(params.pageSize, params.limit);
 
   let items: ErrorGroupRow[] = [];
+  let total = 0;
   try {
-    const data = await getErrors(appFilter || undefined);
+    const data = await getErrors(
+      appFilter || undefined,
+      page,
+      pageSize
+    );
     items = data.items ?? [];
+    total = data.total ?? items.length;
   } catch (e) {
     return (
       <>
@@ -87,6 +135,14 @@ export default async function ErrorsListPage({
           }
         />
       )}
+      <Pagination
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        hrefForPage={(p) =>
+          errorsListHref({ app: appFilter, page: p, pageSize })
+        }
+      />
     </>
   );
 }
