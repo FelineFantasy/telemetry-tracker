@@ -4,8 +4,8 @@ import { CodeBlock } from "@/app/components/docs/CodeBlock";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
-  title: "Docs — Telemetry Tracker",
-  description: "Integrate Telemetry Tracker with your app",
+  title: "Getting Started — Docs — Telemetry Tracker",
+  description: "What Telemetry Tracker is and how to send your first events",
 };
 
 const platforms = [
@@ -13,7 +13,7 @@ const platforms = [
     href: "/docs/nextjs",
     name: "Next.js",
     description:
-      "Provider, error boundary, page tracking, and (via core) global browser error/rejection handlers.",
+      "Provider, error boundary, page tracking, and global browser error handlers.",
   },
   {
     href: "/docs/nuxt",
@@ -32,25 +32,72 @@ const platforms = [
   },
 ] as const;
 
+const QUICK_START = `import { init } from "@tacko/telemetry-core";
+
+init({
+  ingestUrl: "https://your-api.example.com",
+  app: "my-app",
+});`;
+
 export default function DocsPage() {
   return (
     <DocsArticle
-      title="Introduction"
+      title="Getting Started"
       lede={
         <p>
-          Telemetry Tracker is a lightweight telemetry backend for errors, events, and sessions.
-          Send data from your apps via SDKs, then explore it in the dashboard.
+          Add a few lines of code, point at your ingest URL, and start shipping errors, events, and
+          sessions to the dashboard.
         </p>
       }
     >
+      <section
+        className="mb-10 rounded-xl border border-primary/35 bg-primary/10 p-6 shadow-sm"
+        aria-labelledby="what-is-this-heading"
+      >
+        <h2 id="what-is-this-heading" className="mt-0 text-lg font-semibold tracking-tight text-foreground">
+          What is this?
+        </h2>
+        <p className="mb-0 text-base leading-relaxed text-muted-foreground">
+          <strong className="font-semibold text-foreground">Telemetry Tracker</strong> is a small,
+          self-hostable pipeline for <strong className="font-semibold text-foreground">errors</strong>,{" "}
+          <strong className="font-semibold text-foreground">product events</strong>, and{" "}
+          <strong className="font-semibold text-foreground">sessions</strong>. You send JSON payloads
+          from your apps via our SDKs; the API stores and aggregates them; the web dashboard is where
+          you triage issues, scan trends, and drill into stacks and context—without running a full APM
+          suite.
+        </p>
+      </section>
+
+      <section className="mb-12" aria-labelledby="quick-start-heading">
+        <h2 id="quick-start-heading" className="scroll-mt-24">
+          Quick start
+        </h2>
+        <p className="text-muted-foreground">
+          Install <code className="text-foreground">@tacko/telemetry-core</code> (or a platform package
+          below). Replace <code className="text-foreground">ingestUrl</code> with your API base and{" "}
+          <code className="text-foreground">app</code> with a logical name for filters in the UI. Use{" "}
+          <strong className="text-foreground">Copy</strong> to paste into your project.
+        </p>
+        <CodeBlock caption="Minimal init" code={QUICK_START} lang="typescript" />
+        <p className="text-sm text-muted-foreground">
+          After <code className="text-foreground">init()</code>, browsers report uncaught errors and
+          unhandled rejections automatically. See{" "}
+          <Link href="/docs/sdk" className="text-link font-medium">
+            SDK
+          </Link>{" "}
+          for <code className="text-foreground">trackEvent</code>, identity, batching, and the{" "}
+          <code className="text-foreground">app</code> string.
+        </p>
+      </section>
+
       <section className="mb-12" aria-labelledby="how-it-works-heading">
-        <h2 id="how-it-works-heading">How it works</h2>
+        <h2 id="how-it-works-heading">How it fits together</h2>
         <ul className="mt-6 !list-none !pl-0 space-y-3">
           <li className="rounded-lg border border-border bg-surface/80 px-4 py-3 shadow-sm">
-            <strong className="font-semibold text-foreground">Ingest API</strong>
+            <strong className="font-semibold text-foreground">Ingest</strong>
             <span className="text-muted-foreground">
               {" "}
-              — Your app sends events, errors, and sessions to the API (e.g.{" "}
+              — Your services POST events, errors, and sessions to the API (e.g.{" "}
               <code>POST /ingest/event</code>).
             </span>
           </li>
@@ -58,46 +105,29 @@ export default function DocsPage() {
             <strong className="font-semibold text-foreground">SDKs</strong>
             <span className="text-muted-foreground">
               {" "}
-              — Platform-specific packages (<code>@tacko/telemetry-next</code>,{" "}
-              <code>@tacko/telemetry-node</code>, etc.) or the core library (
-              <code>@tacko/telemetry-core</code>) handle init, batching, and sending.
+              — Packages such as <code>@tacko/telemetry-next</code> and{" "}
+              <code>@tacko/telemetry-core</code> handle init, batching, and sending.
             </span>
           </li>
           <li className="rounded-lg border border-border bg-surface/80 px-4 py-3 shadow-sm">
             <strong className="font-semibold text-foreground">Dashboard</strong>
             <span className="text-muted-foreground">
               {" "}
-              — Overview, errors, events, and sessions with filters by app and time range.
+              — Overview, errors, events, and sessions with filters by app and time.{" "}
+              <Link href="/docs/dashboard" className="text-link font-medium">
+                Using the dashboard
+              </Link>
+              .
             </span>
           </li>
         </ul>
       </section>
 
-      <section className="mb-12" aria-labelledby="quick-start-heading">
-        <h2 id="quick-start-heading">Quick start (any platform)</h2>
-        <p>
-          Install <code>@tacko/telemetry-core</code> (or the platform package), then call{" "}
-          <code>init()</code> with your ingest URL and app name. In the browser, uncaught errors and
-          unhandled promise rejections are reported automatically after <code>init()</code>. Data
-          appears in the dashboard under that app name.
-        </p>
-        <CodeBlock
-          code={`import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
-
-init({
-  ingestUrl: "https://your-api.example.com",
-  app: "my-app",
-});
-
-trackEvent("button_click", { id: "submit" });
-trackError(new Error("Something broke"), { page: "/checkout" });
-screen("/home");
-identify("user-123");`}
-        />
-      </section>
-
       <section className="mb-12" aria-labelledby="platforms-heading">
-        <h2 id="platforms-heading">Platforms</h2>
+        <h2 id="platforms-heading">Choose a platform</h2>
+        <p className="text-muted-foreground">
+          Same data model everywhere—pick the guide that matches your stack.
+        </p>
         <ul className="mt-6 !list-none !pl-0 space-y-2">
           {platforms.map(({ href, name, description }) => (
             <li
@@ -111,26 +141,6 @@ identify("user-123");`}
             </li>
           ))}
         </ul>
-      </section>
-
-      <section className="mb-12" aria-labelledby="identity-heading">
-        <h2 id="identity-heading">Identity and anonymous ID</h2>
-        <p>
-          The SDK generates a stable anonymous device id on first <code>init()</code> and sends it
-          (and the SDK version) with every event, error, and session. When you call{" "}
-          <code>identify(userId)</code>, the same anonymous id is still sent so the backend can link
-          pre-login activity to the user. In the dashboard, a single <strong>Identity</strong> column
-          shows the user id when set, otherwise the anonymous id.
-        </p>
-      </section>
-
-      <section aria-labelledby="app-name-heading">
-        <h2 id="app-name-heading">App name</h2>
-        <p>
-          The <code>app</code> value is a string that identifies your application in the dashboard.
-          You don’t register apps in the UI; once you send at least one event or error with an app
-          name, it appears in the dashboard filters and data.
-        </p>
       </section>
     </DocsArticle>
   );
