@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export function SidebarLink({
   href,
   label,
   mono,
+  monoIcon,
   current,
   onNavigate,
   title,
@@ -14,7 +16,10 @@ export function SidebarLink({
 }: {
   href: string;
   label: string;
+  /** Collapsed-rail abbreviation (letters). Ignored when `monoIcon` is set. */
   mono: string;
+  /** Optional icon for collapsed rail — use instead of a single letter (e.g. Docs). */
+  monoIcon?: ReactNode;
   current?: boolean;
   onNavigate?: () => void;
   title?: string;
@@ -28,8 +33,11 @@ export function SidebarLink({
       onClick={onNavigate}
       title={title ?? label}
     >
-      <span className="app-sidebar__link-mono" aria-hidden>
-        {mono}
+      <span
+        className={cn("app-sidebar__link-mono", monoIcon ? "app-sidebar__link-mono--icon" : undefined)}
+        aria-hidden
+      >
+        {monoIcon ?? mono}
       </span>
       <span className="app-sidebar__link-label">{label}</span>
     </Link>

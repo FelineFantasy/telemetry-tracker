@@ -5,6 +5,7 @@ import { SidebarBrand } from "@/app/components/sidebar/SidebarBrand";
 import { useMobileDrawer } from "@/lib/useMobileDrawer";
 import { DashboardViewLinks } from "./DashboardViewLinks";
 import { SidebarLink } from "./SidebarLink";
+import { DocsNavIcon } from "./sidebarNavIcons";
 
 function ChevronCollapseIcon() {
   return (
@@ -83,7 +84,8 @@ export function AppSidebar({
           <SidebarLink
             href="/docs"
             label="Docs"
-            mono="D"
+            mono=""
+            monoIcon={<DocsNavIcon />}
             onNavigate={handleNav}
             title="Documentation"
             className="app-sidebar__link--footer"

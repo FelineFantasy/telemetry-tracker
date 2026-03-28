@@ -2,14 +2,20 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { SidebarLink } from "./SidebarLink";
+import {
+  ErrorsNavIcon,
+  EventsNavIcon,
+  OverviewNavIcon,
+  SessionsNavIcon,
+} from "./sidebarNavIcons";
 
 const DASHBOARD_BASE = "/dashboard";
 
 const dashboardViewLinks = [
-  { href: `${DASHBOARD_BASE}/overview`, label: "Overview", mono: "Ov" },
-  { href: `${DASHBOARD_BASE}/errors`, label: "Errors", mono: "Er" },
-  { href: `${DASHBOARD_BASE}/events`, label: "Events", mono: "Ev" },
-  { href: `${DASHBOARD_BASE}/sessions`, label: "Sessions", mono: "Se" },
+  { href: `${DASHBOARD_BASE}/overview`, label: "Overview", Icon: OverviewNavIcon },
+  { href: `${DASHBOARD_BASE}/errors`, label: "Errors", Icon: ErrorsNavIcon },
+  { href: `${DASHBOARD_BASE}/events`, label: "Events", Icon: EventsNavIcon },
+  { href: `${DASHBOARD_BASE}/sessions`, label: "Sessions", Icon: SessionsNavIcon },
 ] as const;
 
 function isViewCurrent(href: string, pathname: string): boolean {
@@ -37,12 +43,13 @@ export function DashboardViewLinks({ onNavigate }: { onNavigate?: () => void }) 
 
   return (
     <>
-      {dashboardViewLinks.map(({ href, label, mono }) => (
+      {dashboardViewLinks.map(({ href, label, Icon }) => (
         <SidebarLink
           key={href}
           href={hrefWithApp(href, searchParams)}
           label={label}
-          mono={mono}
+          mono=""
+          monoIcon={<Icon />}
           current={isViewCurrent(href, pathname)}
           onNavigate={onNavigate}
           title={label}
