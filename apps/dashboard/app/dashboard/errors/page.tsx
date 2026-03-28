@@ -30,6 +30,11 @@ type ErrorGroupRow = {
   last_seen: string;
   resolved_at?: string | null;
   environment?: string | null;
+  users_affected?: number;
+  sessions_affected?: number;
+  occurrences_recent?: number;
+  occurrences_previous?: number;
+  trend_ratio?: number;
 };
 
 async function getErrors(
@@ -72,6 +77,9 @@ function buildErrorsParamsRecord(sp: {
   environment?: string | string[];
   q?: string | string[];
   status?: string | string[];
+  sort?: string | string[];
+  order?: string | string[];
+  trendWindow?: string | string[];
 }): Record<string, string> {
   const keys = [
     "app",
@@ -84,6 +92,9 @@ function buildErrorsParamsRecord(sp: {
     "environment",
     "q",
     "status",
+    "sort",
+    "order",
+    "trendWindow",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -107,6 +118,9 @@ export default async function ErrorsListPage({
     environment?: string | string[];
     q?: string | string[];
     status?: string | string[];
+    sort?: string | string[];
+    order?: string | string[];
+    trendWindow?: string | string[];
   }>;
 }) {
   const sp = await searchParams;
@@ -135,12 +149,18 @@ export default async function ErrorsListPage({
   const env = firstQueryValue(sp.environment);
   const q = firstQueryValue(sp.q);
   const status = firstQueryValue(sp.status);
+  const sort = firstQueryValue(sp.sort);
+  const order = firstQueryValue(sp.order);
+  const trendWindow = firstQueryValue(sp.trendWindow);
   if (r) apiQuery.set("range", r);
   if (from) apiQuery.set("from", from);
   if (to) apiQuery.set("to", to);
   if (env) apiQuery.set("environment", env);
   if (q) apiQuery.set("q", q);
   if (status) apiQuery.set("status", status);
+  if (sort) apiQuery.set("sort", sort);
+  if (order) apiQuery.set("order", order);
+  if (trendWindow) apiQuery.set("trendWindow", trendWindow);
 
   let items: ErrorGroupRow[] = [];
   let total = 0;
@@ -246,6 +266,50 @@ export default async function ErrorsListPage({
           <option value="unresolved">Open</option>
           <option value="resolved">Resolved</option>
         </select>
+        <label className="filter-label" htmlFor="err-sort">
+          Sort by
+        </label>
+        <select
+          id="err-sort"
+          name="sort"
+          className="filter-input"
+          defaultValue={firstQueryValue(sp.sort) ?? "last_seen"}
+        >
+          <option value="last_seen">Last seen</option>
+          <option value="first_seen">First seen</option>
+          <option value="occurrences">Occurrences</option>
+          <option value="message">Message</option>
+          <option value="app">App</option>
+          <option value="environment">Environment</option>
+          <option value="users">Users affected</option>
+          <option value="sessions">Sessions</option>
+          <option value="trend">Trend</option>
+        </select>
+        <label className="filter-label" htmlFor="err-order">
+          Order
+        </label>
+        <select
+          id="err-order"
+          name="order"
+          className="filter-input"
+          defaultValue={firstQueryValue(sp.order) ?? "desc"}
+        >
+          <option value="desc">Descending</option>
+          <option value="asc">Ascending</option>
+        </select>
+        <label className="filter-label" htmlFor="err-trend-window">
+          Trend window
+        </label>
+        <select
+          id="err-trend-window"
+          name="trendWindow"
+          className="filter-input"
+          defaultValue={firstQueryValue(sp.trendWindow) ?? "24h"}
+          title="Length of each window for trend counts (recent vs previous)"
+        >
+          <option value="24h">24h</option>
+          <option value="7d">7d</option>
+        </select>
         <button type="submit" className="filter-btn">
           Apply filters
         </button>
@@ -287,6 +351,32 @@ export default async function ErrorsListPage({
                 {g.occurrences} occurrences · first{" "}
                 {new Date(g.first_seen).toLocaleString()} · last{" "}
                 {new Date(g.last_seen).toLocaleString()}
+                {g.users_affected != null && g.users_affected > 0 ? (
+                  <>
+                    {" "}
+                    · Users: {g.users_affected}
+                  </>
+                ) : null}
+                {g.sessions_affected != null && g.sessions_affected > 0 ? (
+                  <>
+                    {" "}
+                    · Sessions: {g.sessions_affected}
+                  </>
+                ) : null}
+                {(g.occurrences_recent ?? 0) + (g.occurrences_previous ?? 0) >
+                0 ? (
+                  <>
+                    {" "}
+                    · Trend: {g.occurrences_recent ?? 0} recent /{" "}
+                    {g.occurrences_previous ?? 0} prior
+                    {g.trend_ratio != null ? (
+                      <>
+                        {" "}
+                        (×{g.trend_ratio.toFixed(2)})
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
               </span>
             </li>
           ))}

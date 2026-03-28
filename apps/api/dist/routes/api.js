@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { fetchMetricsForGroupIds, isAggregateSort, listErrorGroupsAggregated, listErrorGroupsPrisma, parseErrorListOrderParam, parseErrorListSortParam, parseTrendWindowParam, serializeErrorGroupListItem, } from "../lib/errors-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
 const prisma = new PrismaClient();
@@ -156,36 +157,50 @@ export async function apiRoutes(app, _opts) {
         const q = queryString(query.q);
         const status = queryString(query.status) ?? "all";
         const range = parseCreatedRange(query, "all");
-        const where = {};
-        if (appId)
-            where.app = appId;
-        if (environment)
-            where.environment = environment;
-        if (q) {
-            where.message = { contains: q, mode: "insensitive" };
+        const sortParsed = parseErrorListSortParam(queryString(query.sort));
+        if (!sortParsed.ok) {
+            return reply.status(400).send({ error: "Invalid sort" });
         }
-        if (range.gte || range.lte) {
-            where.last_seen = {};
-            if (range.gte)
-                where.last_seen.gte = range.gte;
-            if (range.lte)
-                where.last_seen.lte = range.lte;
+        const orderParsed = parseErrorListOrderParam(queryString(query.order));
+        if (!orderParsed.ok) {
+            return reply.status(400).send({ error: "Invalid order" });
         }
-        if (status === "unresolved")
-            where.resolved_at = null;
-        if (status === "resolved")
-            where.resolved_at = { not: null };
-        const [total, list] = await Promise.all([
-            prisma.errorGroup.count({ where }),
-            prisma.errorGroup.findMany({
-                where,
-                skip,
-                take: pageSize,
-                orderBy: { last_seen: "desc" },
-                include: { _count: { select: { occurrences_list: true } } },
-            }),
-        ]);
-        return reply.send({ items: list, total, page, pageSize });
+        const trendWindowParsed = parseTrendWindowParam(queryString(query.trendWindow));
+        if (!trendWindowParsed.ok) {
+            return reply.status(400).send({ error: "Invalid trendWindow" });
+        }
+        const trendEnd = range.lte ?? new Date();
+        const filter = {
+            appId,
+            environment,
+            q,
+            range,
+            status: status === "unresolved"
+                ? "unresolved"
+                : status === "resolved"
+                    ? "resolved"
+                    : "all",
+        };
+        if (isAggregateSort(sortParsed.sort)) {
+            const { total, rows } = await listErrorGroupsAggregated(prisma, filter, sortParsed.sort, orderParsed.order, trendWindowParsed.trendWindow, trendEnd, skip, pageSize);
+            const items = rows.map((r) => serializeErrorGroupListItem(r));
+            return reply.send({ items, total, page, pageSize });
+        }
+        const scalarSort = sortParsed.sort;
+        const { total, groups } = await listErrorGroupsPrisma(prisma, filter, scalarSort, orderParsed.order, skip, pageSize);
+        const metrics = await fetchMetricsForGroupIds(prisma, groups.map((g) => g.id), trendWindowParsed.trendWindow, trendEnd);
+        const items = groups.map((g) => {
+            const m = metrics.get(g.id);
+            return {
+                ...g,
+                users_affected: m?.users_affected,
+                sessions_affected: m?.sessions_affected,
+                occurrences_recent: m?.occurrences_recent,
+                occurrences_previous: m?.occurrences_previous,
+                trend_ratio: m?.trend_ratio,
+            };
+        });
+        return reply.send({ items, total, page, pageSize });
     });
     app.patch("/errors/:id", async (request, reply) => {
         const body = request.body;

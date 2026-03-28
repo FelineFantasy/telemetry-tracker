@@ -34,8 +34,8 @@ export function parseCreatedRange(query, defaultPreset) {
                 : 24;
     return { gte: new Date(Date.now() - hours * 60 * 60 * 1000) };
 }
-/** If value is YYYY-MM-DD only, use end of that local day as UTC-ish end (parse as UTC date end). */
-function endOfDayIfDateOnly(iso) {
+/** If value is YYYY-MM-DD only, use end of that day (UTC) for inclusive upper bounds. */
+export function endOfDayIfDateOnly(iso) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
         return new Date(`${iso}T23:59:59.999Z`);
     }

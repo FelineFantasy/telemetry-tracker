@@ -47,6 +47,8 @@ model ErrorOccurrence {
   anonymous_id   String?
   sdk_version    String?
   created_at     DateTime   @default(now())
+
+  @@index([error_group_id, created_at])
 }
 
 model Session {
