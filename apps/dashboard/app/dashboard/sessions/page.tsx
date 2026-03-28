@@ -1,6 +1,7 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
+import { FilterFormSelect } from "@/app/components/dashboard/FilterFormSelect";
 import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
 import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -191,22 +192,12 @@ export default async function SessionsPage({
         {pageSize !== DEFAULT_LIST_PAGE_SIZE ? (
           <input type="hidden" name="pageSize" value={String(pageSize)} />
         ) : null}
-        <label className="filter-label" htmlFor="sess-plat">
-          Platform
-        </label>
-        <select
-          id="sess-plat"
+        <FilterFormSelect
           name="platform"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.platform) ?? ""}
-        >
-          <option value="">Any</option>
-          {platforms.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+          value={firstQueryValue(sp.platform) ?? ""}
+          items={platforms}
+          label="Platform"
+        />
         <button type="submit" className="filter-btn">
           Apply filters
         </button>

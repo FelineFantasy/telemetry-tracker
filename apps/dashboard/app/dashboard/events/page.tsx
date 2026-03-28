@@ -1,6 +1,7 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
+import { FilterFormSelect } from "@/app/components/dashboard/FilterFormSelect";
 import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
 import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -208,54 +209,24 @@ export default async function EventsPage({
           defaultValue={firstQueryValue(sp.name) ?? ""}
           placeholder="e.g. screen_view"
         />
-        <label className="filter-label" htmlFor="ev-env">
-          Environment
-        </label>
-        <select
-          id="ev-env"
+        <FilterFormSelect
           name="environment"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.environment) ?? ""}
-        >
-          <option value="">Any</option>
-          {opts.environments.map((e) => (
-            <option key={e} value={e}>
-              {e}
-            </option>
-          ))}
-        </select>
-        <label className="filter-label" htmlFor="ev-plat">
-          Platform
-        </label>
-        <select
-          id="ev-plat"
+          value={firstQueryValue(sp.environment) ?? ""}
+          items={opts.environments}
+          label="Environment"
+        />
+        <FilterFormSelect
           name="platform"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.platform) ?? ""}
-        >
-          <option value="">Any</option>
-          {opts.platforms.map((e) => (
-            <option key={e} value={e}>
-              {e}
-            </option>
-          ))}
-        </select>
-        <label className="filter-label" htmlFor="ev-rel">
-          Release
-        </label>
-        <select
-          id="ev-rel"
+          value={firstQueryValue(sp.platform) ?? ""}
+          items={opts.platforms}
+          label="Platform"
+        />
+        <FilterFormSelect
           name="release"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.release) ?? ""}
-        >
-          <option value="">Any</option>
-          {opts.releases.map((e) => (
-            <option key={e} value={e}>
-              {e}
-            </option>
-          ))}
-        </select>
+          value={firstQueryValue(sp.release) ?? ""}
+          items={opts.releases}
+          label="Release"
+        />
         <label className="filter-label" htmlFor="ev-props">
           Properties (contains)
         </label>

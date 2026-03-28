@@ -2,8 +2,8 @@ const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
 import { Badge } from "@/app/components/Badge";
-import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
-import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
+import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
+import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -186,134 +186,31 @@ export default async function ErrorsListPage({
   const hrefForPage = (p: number) =>
     mergeListQuery(ERRORS_PATH, currentParams, { page: String(p) });
 
-  const hiddenForCustomDates: Record<string, string> = { ...currentParams };
-  delete hiddenForCustomDates.from;
-  delete hiddenForCustomDates.to;
-  delete hiddenForCustomDates.page;
-  delete hiddenForCustomDates.range;
-
   const context = appFilter ? `App: ${appFilter}` : "All apps";
 
   return (
     <>
       <PageTitle title="Errors" context={context} />
 
-      <div className="filter-toolbar">
-        <DateRangeShortcuts
-          path={ERRORS_PATH}
-          currentParams={currentParams}
-          activePreset={rangeEff.activePreset}
-          customRange={rangeEff.customRange}
-        />
-        <CustomDateRangeForm
-          path={ERRORS_PATH}
-          hiddenParams={hiddenForCustomDates}
-          from={firstQueryValue(sp.from) ?? ""}
-          to={firstQueryValue(sp.to) ?? ""}
-        />
-      </div>
-
-      <form method="get" action={ERRORS_PATH} className="filter-form filter-form--row">
-        {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
-        {firstQueryValue(sp.range) ? (
-          <input type="hidden" name="range" value={firstQueryValue(sp.range) ?? ""} />
-        ) : null}
-        {firstQueryValue(sp.from) ? (
-          <input type="hidden" name="from" value={firstQueryValue(sp.from) ?? ""} />
-        ) : null}
-        {firstQueryValue(sp.to) ? (
-          <input type="hidden" name="to" value={firstQueryValue(sp.to) ?? ""} />
-        ) : null}
-        {pageSize !== DEFAULT_LIST_PAGE_SIZE ? (
-          <input type="hidden" name="pageSize" value={String(pageSize)} />
-        ) : null}
-        <label className="filter-label" htmlFor="err-q">
-          Message contains
-        </label>
-        <input
-          id="err-q"
-          name="q"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.q) ?? ""}
-          placeholder="Search message…"
-        />
-        <label className="filter-label" htmlFor="err-env">
-          Environment
-        </label>
-        <select
-          id="err-env"
-          name="environment"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.environment) ?? ""}
-        >
-          <option value="">Any</option>
-          {filterOptions.environments.map((e) => (
-            <option key={e} value={e}>
-              {e}
-            </option>
-          ))}
-        </select>
-        <label className="filter-label" htmlFor="err-status">
-          Status
-        </label>
-        <select
-          id="err-status"
-          name="status"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.status) ?? "all"}
-        >
-          <option value="all">All</option>
-          <option value="unresolved">Open</option>
-          <option value="resolved">Resolved</option>
-        </select>
-        <label className="filter-label" htmlFor="err-sort">
-          Sort by
-        </label>
-        <select
-          id="err-sort"
-          name="sort"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.sort) ?? "last_seen"}
-        >
-          <option value="last_seen">Last seen</option>
-          <option value="first_seen">First seen</option>
-          <option value="occurrences">Occurrences</option>
-          <option value="message">Message</option>
-          <option value="app">App</option>
-          <option value="environment">Environment</option>
-          <option value="users">Users affected</option>
-          <option value="sessions">Sessions</option>
-          <option value="trend">Trend</option>
-        </select>
-        <label className="filter-label" htmlFor="err-order">
-          Order
-        </label>
-        <select
-          id="err-order"
-          name="order"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.order) ?? "desc"}
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
-        <label className="filter-label" htmlFor="err-trend-window">
-          Trend window
-        </label>
-        <select
-          id="err-trend-window"
-          name="trendWindow"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.trendWindow) ?? "24h"}
-          title="Length of each window for trend counts (recent vs previous)"
-        >
-          <option value="24h">24h</option>
-          <option value="7d">7d</option>
-        </select>
-        <button type="submit" className="filter-btn">
-          Apply filters
-        </button>
-      </form>
+      <ErrorsListToolbar
+        path={ERRORS_PATH}
+        currentParams={currentParams}
+        activePreset={rangeEff.activePreset}
+        customRange={rangeEff.customRange}
+        rangePreset={r ?? ""}
+        appFilter={appFilter}
+        pageSize={String(pageSize)}
+        defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
+        from={from ?? ""}
+        to={to ?? ""}
+        q={q ?? ""}
+        environment={env ?? ""}
+        status={status ?? "all"}
+        sort={sort ?? "last_seen"}
+        order={order ?? "desc"}
+        trendWindow={trendWindow ?? "24h"}
+        environments={filterOptions.environments}
+      />
 
       <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
 

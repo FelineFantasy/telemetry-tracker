@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useId, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCustomSelect";
+import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
 import {
   buildDashboardHrefWithApp,
   dashboardPathForAppFilter,
@@ -20,9 +22,23 @@ export function DashboardAppContext({ apps }: { apps: string[] }) {
   const orphanApp = rawApp !== "" && !apps.includes(rawApp) ? rawApp : null;
   const value = orphanApp ?? rawApp;
 
-  const onChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const next = e.target.value;
+  const uid = useId().replace(/:/g, "");
+  const labelId = `dash-app-scope-l-${uid}`;
+  const triggerId = `dash-app-scope-t-${uid}`;
+
+  const options = useMemo((): DashboardSelectOption[] => {
+    const o: DashboardSelectOption[] = [{ value: "", label: "All apps" }];
+    if (orphanApp) {
+      o.push({ value: orphanApp, label: `${orphanApp} (not in list)` });
+    }
+    for (const app of apps) {
+      o.push({ value: app, label: app });
+    }
+    return o;
+  }, [apps, orphanApp]);
+
+  const onValueChange = useCallback(
+    (next: string) => {
       const href = buildDashboardHrefWithApp(
         pathForLinks,
         next === "" ? null : next,
@@ -37,28 +53,16 @@ export function DashboardAppContext({ apps }: { apps: string[] }) {
 
   return (
     <div className="dashboard-app-context">
-      <label htmlFor="dashboard-app-scope" className="dashboard-app-context__label">
+      <span id={labelId} className="dashboard-app-context__label">
         App scope
-      </label>
-      <select
-        id="dashboard-app-scope"
-        className="dashboard-app-context__select"
+      </span>
+      <DashboardCustomSelect
         value={value}
-        onChange={onChange}
-        aria-label="Filter telemetry by application"
-      >
-        <option value="">All apps</option>
-        {orphanApp ? (
-          <option value={orphanApp}>
-            {orphanApp} (not in list)
-          </option>
-        ) : null}
-        {apps.map((app) => (
-          <option key={app} value={app}>
-            {app}
-          </option>
-        ))}
-      </select>
+        options={options}
+        triggerId={triggerId}
+        listLabelledBy={labelId}
+        onValueChange={onValueChange}
+      />
     </div>
   );
 }
