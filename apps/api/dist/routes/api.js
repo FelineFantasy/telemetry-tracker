@@ -2,6 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { fetchMetricsForGroupIds, isAggregateSort, listErrorGroupsAggregated, listErrorGroupsPrisma, parseErrorListOrderParam, parseErrorListSortParam, parseTrendWindowParam, serializeErrorGroupListItem, } from "../lib/errors-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
+import { getOverviewTimeSeries } from "../lib/overview-timeseries.js";
 import { EVENT_SORT_SQL, eventListOrderBy, overviewErrorOrderBy, parseEventListSortParam, parseListOrderParam, parseOverviewErrorSortParam, parseOverviewTopEventsSortParam, parseSessionListSortParam, sessionListOrderBy, } from "../lib/list-sort-params.js";
 const prisma = new PrismaClient();
 const DEFAULT_LIST_PAGE_SIZE = 20;
@@ -107,7 +108,8 @@ export async function apiRoutes(app, _opts) {
                 app: appFilter,
             }
             : { created_at: { gte: previousSince, lt: since } };
-        const [errorsCount, eventsCount, errorsListTotal, eventsListTotal, errorGroups, eventCounts, errorsPrevious, eventsPrevious,] = await Promise.all([
+        const rangeKey = range === "7d" ? "7d" : "24h";
+        const [errorsCount, eventsCount, errorsListTotal, eventsListTotal, errorGroups, eventCounts, errorsPrevious, eventsPrevious, series,] = await Promise.all([
             prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
             prisma.event.count({ where: eventWhere }),
             prisma.errorGroup.count({ where: errorGroupWhere }),
@@ -129,6 +131,7 @@ export async function apiRoutes(app, _opts) {
             }),
             prisma.errorOccurrence.count({ where: previousErrorWhere }),
             prisma.event.count({ where: previousEventWhere }),
+            getOverviewTimeSeries(prisma, rangeKey, since, appFilter),
         ]);
         const topEvents = await Promise.all(eventCounts.map(async (row) => {
             const latest = await prisma.event.findFirst({
@@ -166,6 +169,7 @@ export async function apiRoutes(app, _opts) {
             errorsPage,
             eventsPage,
             listPageSize,
+            series,
         });
     });
     app.get("/errors", async (request, reply) => {
