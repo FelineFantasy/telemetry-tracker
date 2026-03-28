@@ -53,7 +53,7 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
             <CartesianGrid stroke="rgba(148, 163, 184, 0.12)" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
+              tick={{ fill: "#d4d0e8", fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: "rgba(148, 163, 184, 0.2)" }}
             />
@@ -74,15 +74,17 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
             />
             <Tooltip
               contentStyle={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
+                background: "#3d3758",
+                border: "1px solid #5c5678",
                 borderRadius: "8px",
                 fontSize: "12px",
+                color: "#f1f5f9",
               }}
-              labelStyle={{ color: "var(--color-foreground)" }}
+              labelStyle={{ color: "#e8e4f7" }}
+              itemStyle={{ color: "#f8fafc" }}
             />
             <Legend
-              wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }}
+              wrapperStyle={{ fontSize: "12px", paddingTop: "8px", color: "#d4d0e8" }}
               formatter={(value) => (value === "errors" ? "Errors" : "Events")}
             />
             <Line
