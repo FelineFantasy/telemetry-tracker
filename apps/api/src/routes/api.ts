@@ -15,6 +15,7 @@ import {
 } from "../lib/errors-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
+import { getOverviewTimeSeries } from "../lib/overview-timeseries.js";
 import {
   whereErrorGroupById,
   whereErrorGroupProject,
@@ -235,7 +236,7 @@ export async function apiRoutes(
     ]);
 
     const topEvents = await Promise.all(
-      eventCounts.map(async (row) => {
+      eventCounts.map(async (row: { name: string; _count: { name: number } }) => {
         const latest = await prisma.event.findFirst({
           where: { ...eventWhere, name: row.name },
           orderBy: { created_at: "desc" },
