@@ -2,6 +2,7 @@ const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
 import { FilterFormSelect } from "@/app/components/dashboard/FilterFormSelect";
+import { SortOrderSelects } from "@/app/components/dashboard/SortOrderSelects";
 import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
 import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -20,6 +21,15 @@ import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
 
 const EVENTS_PATH = "/dashboard/events";
+
+const EVENT_SORT_OPTIONS = [
+  { value: "created_at", label: "Created" },
+  { value: "name", label: "Name" },
+  { value: "app", label: "App" },
+  { value: "environment", label: "Environment" },
+  { value: "platform", label: "Platform" },
+  { value: "release", label: "Release" },
+] as const;
 
 type EventRow = {
   id: string;
@@ -79,6 +89,8 @@ function buildEventsParamsRecord(sp: Record<string, string | string[] | undefine
     "platform",
     "release",
     "propertiesContains",
+    "sort",
+    "order",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -121,6 +133,8 @@ export default async function EventsPage({
   const platform = firstQueryValue(sp.platform);
   const release = firstQueryValue(sp.release);
   const propertiesContains = firstQueryValue(sp.propertiesContains);
+  const sort = firstQueryValue(sp.sort);
+  const order = firstQueryValue(sp.order);
   if (r) apiQuery.set("range", r);
   if (from) apiQuery.set("from", from);
   if (to) apiQuery.set("to", to);
@@ -129,6 +143,8 @@ export default async function EventsPage({
   if (platform) apiQuery.set("platform", platform);
   if (release) apiQuery.set("release", release);
   if (propertiesContains) apiQuery.set("propertiesContains", propertiesContains);
+  if (sort) apiQuery.set("sort", sort);
+  if (order) apiQuery.set("order", order);
 
   let items: EventRow[] = [];
   let total = 0;
@@ -236,6 +252,11 @@ export default async function EventsPage({
           className="filter-input"
           defaultValue={firstQueryValue(sp.propertiesContains) ?? ""}
           placeholder="JSON substring…"
+        />
+        <SortOrderSelects
+          sortValue={sort ?? "created_at"}
+          orderValue={order ?? "desc"}
+          sortOptions={[...EVENT_SORT_OPTIONS]}
         />
         <button type="submit" className="filter-btn">
           Apply filters

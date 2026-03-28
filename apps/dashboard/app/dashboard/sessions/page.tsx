@@ -2,6 +2,7 @@ const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
 import { FilterFormSelect } from "@/app/components/dashboard/FilterFormSelect";
+import { SortOrderSelects } from "@/app/components/dashboard/SortOrderSelects";
 import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
 import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -20,6 +21,15 @@ import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
 
 const SESSIONS_PATH = "/dashboard/sessions";
+
+const SESSION_SORT_OPTIONS = [
+  { value: "started_at", label: "Started" },
+  { value: "ended_at", label: "Ended" },
+  { value: "session_id", label: "Session ID" },
+  { value: "app", label: "App" },
+  { value: "platform", label: "Platform" },
+  { value: "user_id", label: "User ID" },
+] as const;
 
 type SessionRow = {
   id: string;
@@ -71,6 +81,8 @@ function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefi
     "from",
     "to",
     "platform",
+    "sort",
+    "order",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -109,10 +121,14 @@ export default async function SessionsPage({
   const from = firstQueryValue(sp.from);
   const to = firstQueryValue(sp.to);
   const platform = firstQueryValue(sp.platform);
+  const sort = firstQueryValue(sp.sort);
+  const order = firstQueryValue(sp.order);
   if (r) apiQuery.set("range", r);
   if (from) apiQuery.set("from", from);
   if (to) apiQuery.set("to", to);
   if (platform) apiQuery.set("platform", platform);
+  if (sort) apiQuery.set("sort", sort);
+  if (order) apiQuery.set("order", order);
 
   let items: SessionRow[] = [];
   let total = 0;
@@ -197,6 +213,11 @@ export default async function SessionsPage({
           value={firstQueryValue(sp.platform) ?? ""}
           items={platforms}
           label="Platform"
+        />
+        <SortOrderSelects
+          sortValue={sort ?? "started_at"}
+          orderValue={order ?? "desc"}
+          sortOptions={[...SESSION_SORT_OPTIONS]}
         />
         <button type="submit" className="filter-btn">
           Apply filters

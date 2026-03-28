@@ -14,6 +14,17 @@ import {
 } from "../lib/errors-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
+import {
+  EVENT_SORT_SQL,
+  eventListOrderBy,
+  overviewErrorOrderBy,
+  parseEventListSortParam,
+  parseListOrderParam,
+  parseOverviewErrorSortParam,
+  parseOverviewTopEventsSortParam,
+  parseSessionListSortParam,
+  sessionListOrderBy,
+} from "../lib/list-sort-params.js";
 
 const prisma = new PrismaClient();
 
@@ -94,9 +105,29 @@ export async function apiRoutes(
       errorsPage?: string;
       eventsPage?: string;
       listPageSize?: string;
+      errorsSort?: string;
+      errorsOrder?: string;
+      topEventsSort?: string;
+      topEventsOrder?: string;
     };
     const range = query.range === "7d" ? "7d" : "24h";
     const appFilter = queryApp(query.app);
+    const errSortParsed = parseOverviewErrorSortParam(queryString(query.errorsSort));
+    if (!errSortParsed.ok) {
+      return reply.status(400).send({ error: "Invalid errorsSort" });
+    }
+    const errOrderParsed = parseListOrderParam(queryString(query.errorsOrder));
+    if (!errOrderParsed.ok) {
+      return reply.status(400).send({ error: "Invalid errorsOrder" });
+    }
+    const topEvSortParsed = parseOverviewTopEventsSortParam(queryString(query.topEventsSort));
+    if (!topEvSortParsed.ok) {
+      return reply.status(400).send({ error: "Invalid topEventsSort" });
+    }
+    const topEvOrderParsed = parseListOrderParam(queryString(query.topEventsOrder));
+    if (!topEvOrderParsed.ok) {
+      return reply.status(400).send({ error: "Invalid topEventsOrder" });
+    }
     const { since, previousSince, label } = parseRange(range);
     const listPageSize = Math.min(
       MAX_OVERVIEW_LIST_PAGE_SIZE,
@@ -109,6 +140,15 @@ export async function apiRoutes(
     const eventsPage = parsePositivePage(query.eventsPage, 1);
     const errorsSkip = (errorsPage - 1) * listPageSize;
     const eventsSkip = (eventsPage - 1) * listPageSize;
+
+    const errorGroupOrderBy = overviewErrorOrderBy(
+      errSortParsed.sort,
+      errOrderParsed.order
+    );
+    const eventGroupByOrderBy =
+      topEvSortParsed.sort === "count"
+        ? { _count: { name: topEvOrderParsed.order } }
+        : { name: topEvOrderParsed.order };
 
     const baseWhere = { created_at: { gte: since } };
     const eventWhere = appFilter
@@ -151,14 +191,14 @@ export async function apiRoutes(
         where: errorGroupWhere,
         skip: errorsSkip,
         take: listPageSize,
-        orderBy: { occurrences: "desc" },
+        orderBy: errorGroupOrderBy,
         include: { _count: { select: { occurrences_list: true } } },
       }),
       prisma.event.groupBy({
         by: ["name"],
         where: eventWhere,
         _count: { name: true },
-        orderBy: { _count: { name: "desc" } },
+        orderBy: eventGroupByOrderBy,
         skip: eventsSkip,
         take: listPageSize,
       }),
@@ -350,6 +390,8 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      sort?: string;
+      order?: string;
     };
     const pageSize = parseListPageSize(query.pageSize, query.limit);
     const page = parsePositivePage(query.page, 1);
@@ -361,6 +403,17 @@ export async function apiRoutes(
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
     const range = parseCreatedRange(query, "all");
+    const sortParsed = parseEventListSortParam(queryString(query.sort));
+    if (!sortParsed.ok) {
+      return reply.status(400).send({ error: "Invalid sort" });
+    }
+    const orderParsed = parseListOrderParam(queryString(query.order));
+    if (!orderParsed.ok) {
+      return reply.status(400).send({ error: "Invalid order" });
+    }
+    const eventOrderBy = eventListOrderBy(sortParsed.sort, orderParsed.order);
+    const orderDirSql =
+      orderParsed.order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
 
     const props = propertiesContains?.trim();
     if (props) {
@@ -374,12 +427,13 @@ export async function apiRoutes(
         lte: range.lte,
         propertiesContains: props,
       });
+      const ob = EVENT_SORT_SQL[sortParsed.sort];
       const [countRow, rows] = await Promise.all([
         prisma.$queryRaw<[{ c: bigint }]>(
           Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`
         ),
         prisma.$queryRaw<Record<string, unknown>[]>(
-          Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${skip}`
+          Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY ${ob} ${orderDirSql} LIMIT ${pageSize} OFFSET ${skip}`
         ),
       ]);
       const total = Number(countRow[0]?.c ?? 0);
@@ -403,7 +457,7 @@ export async function apiRoutes(
         where,
         skip,
         take: pageSize,
-        orderBy: { created_at: "desc" },
+        orderBy: eventOrderBy,
       }),
     ]);
     return reply.send({ items: list, total, page, pageSize });
@@ -426,6 +480,8 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       platform?: string;
+      sort?: string;
+      order?: string;
     };
     const pageSize = parseListPageSize(query.pageSize, query.limit);
     const page = parsePositivePage(query.page, 1);
@@ -433,6 +489,15 @@ export async function apiRoutes(
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
     const range = parseCreatedRange(query, "24h");
+    const sortParsed = parseSessionListSortParam(queryString(query.sort));
+    if (!sortParsed.ok) {
+      return reply.status(400).send({ error: "Invalid sort" });
+    }
+    const orderParsed = parseListOrderParam(queryString(query.order));
+    if (!orderParsed.ok) {
+      return reply.status(400).send({ error: "Invalid order" });
+    }
+    const sessionOrderBy = sessionListOrderBy(sortParsed.sort, orderParsed.order);
 
     const where: Prisma.SessionWhereInput = {};
     if (appId) where.app = appId;
@@ -448,7 +513,7 @@ export async function apiRoutes(
         where,
         skip,
         take: pageSize,
-        orderBy: { started_at: "desc" },
+        orderBy: sessionOrderBy,
       }),
     ]);
     return reply.send({ items: list, total, page, pageSize });

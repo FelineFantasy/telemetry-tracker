@@ -2856,6 +2856,42 @@
   color: var(--color-text);
 }
 
+/* Overview: list sort (matches filter toolbar / errors-filters spacing) */
+.overview-sort-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.overview-sort-tools__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+}
+
+.overview-sort-tools__heading {
+  width: 100%;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+@media (min-width: 720px) {
+  .overview-sort-tools__heading {
+    width: auto;
+    margin-right: var(--space-sm);
+  }
+}
+
 /* Overview: separate Errors vs Events so each block is unmistakable */
 .overview-region {
   margin-bottom: var(--space-xl);

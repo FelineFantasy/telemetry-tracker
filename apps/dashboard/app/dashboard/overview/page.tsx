@@ -5,8 +5,10 @@ import { Card } from "@/app/components/Card";
 import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
+import { OverviewSortControls } from "@/app/components/dashboard/OverviewSortControls";
 import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
 import { Pagination } from "@/app/components/ui/Pagination";
+import { mergeListQuery } from "@/lib/list-filters-url";
 import {
   OVERVIEW_LIST_PAGE_SIZE,
   parseOverviewListPageSize,
@@ -26,6 +28,10 @@ async function getOverview(
     errorsPage: number;
     eventsPage: number;
     listPageSize: number;
+    errorsSort: string;
+    errorsOrder: string;
+    topEventsSort: string;
+    topEventsOrder: string;
   }
 ) {
   const params = new URLSearchParams();
@@ -34,6 +40,10 @@ async function getOverview(
   params.set("errorsPage", String(list.errorsPage));
   params.set("eventsPage", String(list.eventsPage));
   params.set("listPageSize", String(list.listPageSize));
+  params.set("errorsSort", list.errorsSort);
+  params.set("errorsOrder", list.errorsOrder);
+  params.set("topEventsSort", list.topEventsSort);
+  params.set("topEventsOrder", list.topEventsOrder);
   const url = `${API_BASE}/api/overview?${params.toString()}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
@@ -43,31 +53,26 @@ async function getOverview(
   return res.json();
 }
 
-function rangeHref(path: string, range: string, app: string | null): string {
-  const params = new URLSearchParams();
-  if (range === "7d") params.set("range", "7d");
-  if (app) params.set("app", app);
-  const q = params.toString();
-  return q ? `${path}?${q}` : path;
-}
-
-function overviewListHref(opts: {
-  range: string;
-  app: string | null;
-  errorsPage: number;
-  eventsPage: number;
-  listPageSize: number;
-}) {
-  const params = new URLSearchParams();
-  if (opts.range === "7d") params.set("range", "7d");
-  if (opts.app) params.set("app", opts.app);
-  if (opts.errorsPage > 1) params.set("errorsPage", String(opts.errorsPage));
-  if (opts.eventsPage > 1) params.set("eventsPage", String(opts.eventsPage));
-  if (opts.listPageSize !== OVERVIEW_LIST_PAGE_SIZE) {
-    params.set("listPageSize", String(opts.listPageSize));
+function buildOverviewParamsRecord(
+  sp: Record<string, string | string[] | undefined>
+): Record<string, string> {
+  const keys = [
+    "range",
+    "app",
+    "errorsPage",
+    "eventsPage",
+    "listPageSize",
+    "errorsSort",
+    "errorsOrder",
+    "topEventsSort",
+    "topEventsOrder",
+  ] as const;
+  const out: Record<string, string> = {};
+  for (const k of keys) {
+    const v = firstQueryValue(sp[k]);
+    if (v !== undefined && v !== "") out[k] = v;
   }
-  const q = params.toString();
-  return q ? `${OVERVIEW_PATH}?${q}` : OVERVIEW_PATH;
+  return out;
 }
 
 function eventListHref(eventName: string, app: string | null): string {
@@ -109,6 +114,10 @@ export default async function OverviewPage({
     errorsPage?: string | string[];
     eventsPage?: string | string[];
     listPageSize?: string | string[];
+    errorsSort?: string | string[];
+    errorsOrder?: string | string[];
+    topEventsSort?: string | string[];
+    topEventsOrder?: string | string[];
   }>;
 }) {
   const params = await searchParams;
@@ -118,7 +127,12 @@ export default async function OverviewPage({
   const errorsPage = parsePageParam(firstQueryValue(params.errorsPage));
   const eventsPage = parsePageParam(firstQueryValue(params.eventsPage));
   const listPageSize = parseOverviewListPageSize(params.listPageSize);
+  const errorsSort = firstQueryValue(params.errorsSort) ?? "occurrences";
+  const errorsOrder = firstQueryValue(params.errorsOrder) ?? "desc";
+  const topEventsSort = firstQueryValue(params.topEventsSort) ?? "count";
+  const topEventsOrder = firstQueryValue(params.topEventsOrder) ?? "desc";
   const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
+  const currentOverviewParams = buildOverviewParamsRecord(params);
 
   let data: {
     range?: string;
@@ -153,6 +167,10 @@ export default async function OverviewPage({
       errorsPage,
       eventsPage,
       listPageSize,
+      errorsSort,
+      errorsOrder,
+      topEventsSort,
+      topEventsOrder,
     });
   } catch (e) {
     return (
@@ -177,12 +195,20 @@ export default async function OverviewPage({
       <RangeTabs
         tabs={[
           {
-            href: rangeHref(OVERVIEW_PATH, "24h", app),
+            href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
+              range: null,
+              errorsPage: null,
+              eventsPage: null,
+            }),
             label: "Last 24 hours",
             current: range === "24h",
           },
           {
-            href: rangeHref(OVERVIEW_PATH, "7d", app),
+            href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
+              range: "7d",
+              errorsPage: null,
+              eventsPage: null,
+            }),
             label: "Last 7 days",
             current: range === "7d",
           },
@@ -192,6 +218,15 @@ export default async function OverviewPage({
       <p className="page-context overview-compare text-muted-foreground">
         vs previous period (same length window immediately before)
       </p>
+
+      <OverviewSortControls
+        path={OVERVIEW_PATH}
+        currentParams={currentOverviewParams}
+        errorsSort={errorsSort}
+        errorsOrder={errorsOrder}
+        topEventsSort={topEventsSort}
+        topEventsOrder={topEventsOrder}
+      />
 
       <section className="overview-region overview-region--errors" aria-labelledby="overview-errors-heading">
         <header className="overview-region__header">
@@ -247,12 +282,8 @@ export default async function OverviewPage({
           page={data.errorsPage ?? errorsPage}
           pageSize={data.listPageSize ?? listPageSize}
           hrefForPage={(p) =>
-            overviewListHref({
-              range,
-              app,
-              errorsPage: p,
-              eventsPage: data.eventsPage ?? eventsPage,
-              listPageSize: data.listPageSize ?? listPageSize,
+            mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
+              errorsPage: String(p),
             })
           }
         />
@@ -326,12 +357,8 @@ export default async function OverviewPage({
           page={data.eventsPage ?? eventsPage}
           pageSize={data.listPageSize ?? listPageSize}
           hrefForPage={(p) =>
-            overviewListHref({
-              range,
-              app,
-              errorsPage: data.errorsPage ?? errorsPage,
-              eventsPage: p,
-              listPageSize: data.listPageSize ?? listPageSize,
+            mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
+              eventsPage: String(p),
             })
           }
         />
