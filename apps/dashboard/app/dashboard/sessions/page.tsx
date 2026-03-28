@@ -1,10 +1,8 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
-import { FilterFormSelect } from "@/app/components/dashboard/FilterFormSelect";
-import { SortOrderSelects } from "@/app/components/dashboard/SortOrderSelects";
-import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
-import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
+import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListToolbar";
+import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -21,15 +19,6 @@ import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
 
 const SESSIONS_PATH = "/dashboard/sessions";
-
-const SESSION_SORT_OPTIONS = [
-  { value: "started_at", label: "Started" },
-  { value: "ended_at", label: "Ended" },
-  { value: "session_id", label: "Session ID" },
-  { value: "app", label: "App" },
-  { value: "platform", label: "Platform" },
-  { value: "user_id", label: "User ID" },
-] as const;
 
 type SessionRow = {
   id: string;
@@ -154,12 +143,6 @@ export default async function SessionsPage({
   const hrefForPage = (p: number) =>
     mergeListQuery(SESSIONS_PATH, currentParams, { page: String(p) });
 
-  const hiddenForCustomDates: Record<string, string> = { ...currentParams };
-  delete hiddenForCustomDates.from;
-  delete hiddenForCustomDates.to;
-  delete hiddenForCustomDates.page;
-  delete hiddenForCustomDates.range;
-
   const rangeLabel =
     rangeEff.customRange || firstQueryValue(sp.from) || firstQueryValue(sp.to)
       ? "Custom range"
@@ -179,50 +162,22 @@ export default async function SessionsPage({
     <>
       <PageTitle title="Sessions" context={context} />
 
-      <div className="filter-toolbar">
-        <DateRangeShortcuts
-          path={SESSIONS_PATH}
-          currentParams={currentParams}
-          activePreset={rangeEff.activePreset}
-          customRange={rangeEff.customRange}
-        />
-        <CustomDateRangeForm
-          path={SESSIONS_PATH}
-          hiddenParams={hiddenForCustomDates}
-          from={firstQueryValue(sp.from) ?? ""}
-          to={firstQueryValue(sp.to) ?? ""}
-        />
-      </div>
-
-      <form method="get" action={SESSIONS_PATH} className="filter-form filter-form--row">
-        {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
-        {firstQueryValue(sp.range) ? (
-          <input type="hidden" name="range" value={firstQueryValue(sp.range) ?? ""} />
-        ) : null}
-        {firstQueryValue(sp.from) ? (
-          <input type="hidden" name="from" value={firstQueryValue(sp.from) ?? ""} />
-        ) : null}
-        {firstQueryValue(sp.to) ? (
-          <input type="hidden" name="to" value={firstQueryValue(sp.to) ?? ""} />
-        ) : null}
-        {pageSize !== DEFAULT_LIST_PAGE_SIZE ? (
-          <input type="hidden" name="pageSize" value={String(pageSize)} />
-        ) : null}
-        <FilterFormSelect
-          name="platform"
-          value={firstQueryValue(sp.platform) ?? ""}
-          items={platforms}
-          label="Platform"
-        />
-        <SortOrderSelects
-          sortValue={sort ?? "started_at"}
-          orderValue={order ?? "desc"}
-          sortOptions={[...SESSION_SORT_OPTIONS]}
-        />
-        <button type="submit" className="filter-btn">
-          Apply filters
-        </button>
-      </form>
+      <SessionsListToolbar
+        path={SESSIONS_PATH}
+        currentParams={currentParams}
+        activePreset={rangeEff.activePreset}
+        customRange={rangeEff.customRange}
+        rangePreset={r ?? ""}
+        appFilter={appFilter}
+        pageSize={String(pageSize)}
+        defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
+        from={from ?? ""}
+        to={to ?? ""}
+        platform={platform ?? ""}
+        sort={sort ?? "started_at"}
+        order={order ?? "desc"}
+        platforms={platforms}
+      />
 
       <ListResultCount total={total} noun={total === 1 ? "session" : "sessions"} />
 

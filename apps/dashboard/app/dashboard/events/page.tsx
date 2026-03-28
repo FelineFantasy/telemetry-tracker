@@ -1,10 +1,8 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
-import { FilterFormSelect } from "@/app/components/dashboard/FilterFormSelect";
-import { SortOrderSelects } from "@/app/components/dashboard/SortOrderSelects";
-import { CustomDateRangeForm } from "@/app/components/dashboard/CustomDateRangeForm";
-import { DateRangeShortcuts, effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
+import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar";
+import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -21,15 +19,6 @@ import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
 
 const EVENTS_PATH = "/dashboard/events";
-
-const EVENT_SORT_OPTIONS = [
-  { value: "created_at", label: "Created" },
-  { value: "name", label: "Name" },
-  { value: "app", label: "App" },
-  { value: "environment", label: "Environment" },
-  { value: "platform", label: "Platform" },
-  { value: "release", label: "Release" },
-] as const;
 
 type EventRow = {
   id: string;
@@ -170,12 +159,6 @@ export default async function EventsPage({
   const hrefForPage = (p: number) =>
     mergeListQuery(EVENTS_PATH, currentParams, { page: String(p) });
 
-  const hiddenForCustomDates: Record<string, string> = { ...currentParams };
-  delete hiddenForCustomDates.from;
-  delete hiddenForCustomDates.to;
-  delete hiddenForCustomDates.page;
-  delete hiddenForCustomDates.range;
-
   const contextParts = [];
   if (appFilter) contextParts.push(`App: ${appFilter}`);
   if (firstQueryValue(sp.name)) contextParts.push(`Event: ${firstQueryValue(sp.name)}`);
@@ -186,82 +169,28 @@ export default async function EventsPage({
     <>
       <PageTitle title="Events" context={context} />
 
-      <div className="filter-toolbar">
-        <DateRangeShortcuts
-          path={EVENTS_PATH}
-          currentParams={currentParams}
-          activePreset={rangeEff.activePreset}
-          customRange={rangeEff.customRange}
-        />
-        <CustomDateRangeForm
-          path={EVENTS_PATH}
-          hiddenParams={hiddenForCustomDates}
-          from={firstQueryValue(sp.from) ?? ""}
-          to={firstQueryValue(sp.to) ?? ""}
-        />
-      </div>
-
-      <form method="get" action={EVENTS_PATH} className="filter-form filter-form--row">
-        {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
-        {firstQueryValue(sp.range) ? (
-          <input type="hidden" name="range" value={firstQueryValue(sp.range) ?? ""} />
-        ) : null}
-        {firstQueryValue(sp.from) ? (
-          <input type="hidden" name="from" value={firstQueryValue(sp.from) ?? ""} />
-        ) : null}
-        {firstQueryValue(sp.to) ? (
-          <input type="hidden" name="to" value={firstQueryValue(sp.to) ?? ""} />
-        ) : null}
-        {pageSize !== DEFAULT_LIST_PAGE_SIZE ? (
-          <input type="hidden" name="pageSize" value={String(pageSize)} />
-        ) : null}
-        <label className="filter-label" htmlFor="ev-name">
-          Event name
-        </label>
-        <input
-          id="ev-name"
-          name="name"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.name) ?? ""}
-          placeholder="e.g. screen_view"
-        />
-        <FilterFormSelect
-          name="environment"
-          value={firstQueryValue(sp.environment) ?? ""}
-          items={opts.environments}
-          label="Environment"
-        />
-        <FilterFormSelect
-          name="platform"
-          value={firstQueryValue(sp.platform) ?? ""}
-          items={opts.platforms}
-          label="Platform"
-        />
-        <FilterFormSelect
-          name="release"
-          value={firstQueryValue(sp.release) ?? ""}
-          items={opts.releases}
-          label="Release"
-        />
-        <label className="filter-label" htmlFor="ev-props">
-          Properties (contains)
-        </label>
-        <input
-          id="ev-props"
-          name="propertiesContains"
-          className="filter-input"
-          defaultValue={firstQueryValue(sp.propertiesContains) ?? ""}
-          placeholder="JSON substring…"
-        />
-        <SortOrderSelects
-          sortValue={sort ?? "created_at"}
-          orderValue={order ?? "desc"}
-          sortOptions={[...EVENT_SORT_OPTIONS]}
-        />
-        <button type="submit" className="filter-btn">
-          Apply filters
-        </button>
-      </form>
+      <EventsListToolbar
+        path={EVENTS_PATH}
+        currentParams={currentParams}
+        activePreset={rangeEff.activePreset}
+        customRange={rangeEff.customRange}
+        rangePreset={r ?? ""}
+        appFilter={appFilter}
+        pageSize={String(pageSize)}
+        defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
+        from={from ?? ""}
+        to={to ?? ""}
+        name={name ?? ""}
+        environment={environment ?? ""}
+        platform={platform ?? ""}
+        release={release ?? ""}
+        propertiesContains={propertiesContains ?? ""}
+        sort={sort ?? "created_at"}
+        order={order ?? "desc"}
+        environments={opts.environments}
+        platforms={opts.platforms}
+        releases={opts.releases}
+      />
 
       <p className="filter-hint text-muted-foreground text-sm">
         Properties search matches raw JSON text (useful for known keys or values).

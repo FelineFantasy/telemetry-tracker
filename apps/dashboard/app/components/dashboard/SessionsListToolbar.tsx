@@ -9,28 +9,33 @@ import {
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 
+const SORT_OPTIONS: DashboardSelectOption[] = [
+  { value: "started_at", label: "Started" },
+  { value: "ended_at", label: "Ended" },
+  { value: "session_id", label: "Session ID" },
+  { value: "app", label: "App" },
+  { value: "platform", label: "Platform" },
+  { value: "user_id", label: "User ID" },
+];
+
 type Props = {
   path: string;
   currentParams: Record<string, string>;
   activePreset: string;
   customRange: boolean;
-  /** Current `range` query value when using presets (omit when empty). */
   rangePreset: string;
   appFilter: string;
   pageSize: string;
   defaultPageSize: number;
   from: string;
   to: string;
-  q: string;
-  environment: string;
-  status: string;
+  platform: string;
   sort: string;
   order: string;
-  trendWindow: string;
-  environments: string[];
+  platforms: string[];
 };
 
-export function ErrorsListToolbar({
+export function SessionsListToolbar({
   path,
   currentParams,
   activePreset,
@@ -41,48 +46,20 @@ export function ErrorsListToolbar({
   defaultPageSize,
   from,
   to,
-  q,
-  environment,
-  status,
+  platform,
   sort,
   order,
-  trendWindow,
-  environments,
+  platforms,
 }: Props) {
   const fieldIds = useId();
-
   const rangeSummary = listFiltersRangeSummary(customRange, from, to);
 
-  const sortOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "last_seen", label: "Last seen" },
-      { value: "first_seen", label: "First seen" },
-      { value: "occurrences", label: "Occurrences" },
-      { value: "message", label: "Message" },
-      { value: "app", label: "App" },
-      { value: "environment", label: "Environment" },
-      { value: "users", label: "Users affected" },
-      { value: "sessions", label: "Sessions" },
-      { value: "trend", label: "Trend" },
-    ],
-    []
-  );
-
-  const environmentOptions: DashboardSelectOption[] = useMemo(
+  const platformOptions: DashboardSelectOption[] = useMemo(
     () => [
       { value: "", label: "Any" },
-      ...environments.map((e) => ({ value: e, label: e })),
+      ...platforms.map((e) => ({ value: e, label: e })),
     ],
-    [environments]
-  );
-
-  const statusOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "all", label: "All" },
-      { value: "unresolved", label: "Open" },
-      { value: "resolved", label: "Resolved" },
-    ],
-    []
+    [platforms]
   );
 
   const id = (suffix: string) => `${fieldIds.replace(/:/g, "")}-${suffix}`;
@@ -111,38 +88,15 @@ export function ErrorsListToolbar({
 
         <div className="errors-filters__row errors-filters__row--search">
           <label className="errors-filters__field errors-filters__field--grow">
-            <span className="errors-filters__label">Search message</span>
-            <input
-              type="search"
-              name="q"
-              className="errors-filters__input errors-filters__input--search"
-              defaultValue={q}
-              placeholder="Filter by error text…"
-              autoComplete="off"
-            />
-          </label>
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("env-l")}>
-              Environment
+            <span className="errors-filters__label" id={id("plat-l")}>
+              Platform
             </span>
             <DashboardCustomSelect
-              name="environment"
-              value={environment}
-              options={environmentOptions}
-              triggerId={id("env-t")}
-              listLabelledBy={id("env-l")}
-            />
-          </label>
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("status-l")}>
-              Status
-            </span>
-            <DashboardCustomSelect
-              name="status"
-              value={status || "all"}
-              options={statusOptions}
-              triggerId={id("status-t")}
-              listLabelledBy={id("status-l")}
+              name="platform"
+              value={platform}
+              options={platformOptions}
+              triggerId={id("plat-t")}
+              listLabelledBy={id("plat-l")}
             />
           </label>
         </div>
@@ -154,8 +108,8 @@ export function ErrorsListToolbar({
             </span>
             <DashboardCustomSelect
               name="sort"
-              value={sort || "last_seen"}
-              options={sortOptions}
+              value={sort || "started_at"}
+              options={SORT_OPTIONS}
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}
             />
@@ -163,7 +117,7 @@ export function ErrorsListToolbar({
 
           <fieldset
             className="errors-filters__fieldset"
-            title="Descending: newest dates and largest counts first. Ascending: the opposite."
+            title="Descending vs ascending order for the selected column."
           >
             <legend className="errors-filters__label">Order</legend>
             <div className="errors-filters__segment" role="group" aria-label="Sort order">
@@ -174,20 +128,6 @@ export function ErrorsListToolbar({
               <label className="errors-filters__segment-item">
                 <input type="radio" name="order" value="asc" defaultChecked={order === "asc"} />
                 <span>Asc</span>
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset className="errors-filters__fieldset">
-            <legend className="errors-filters__label">Trend window</legend>
-            <div className="errors-filters__segment" role="group" aria-label="Trend comparison window">
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="trendWindow" value="24h" defaultChecked={trendWindow !== "7d"} />
-                <span>24h</span>
-              </label>
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="trendWindow" value="7d" defaultChecked={trendWindow === "7d"} />
-                <span>7d</span>
               </label>
             </div>
           </fieldset>

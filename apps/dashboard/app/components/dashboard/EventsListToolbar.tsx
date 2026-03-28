@@ -9,28 +9,39 @@ import {
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 
+const SORT_OPTIONS: DashboardSelectOption[] = [
+  { value: "created_at", label: "Created" },
+  { value: "name", label: "Name" },
+  { value: "app", label: "App" },
+  { value: "environment", label: "Environment" },
+  { value: "platform", label: "Platform" },
+  { value: "release", label: "Release" },
+];
+
 type Props = {
   path: string;
   currentParams: Record<string, string>;
   activePreset: string;
   customRange: boolean;
-  /** Current `range` query value when using presets (omit when empty). */
   rangePreset: string;
   appFilter: string;
   pageSize: string;
   defaultPageSize: number;
   from: string;
   to: string;
-  q: string;
+  name: string;
   environment: string;
-  status: string;
+  platform: string;
+  release: string;
+  propertiesContains: string;
   sort: string;
   order: string;
-  trendWindow: string;
   environments: string[];
+  platforms: string[];
+  releases: string[];
 };
 
-export function ErrorsListToolbar({
+export function EventsListToolbar({
   path,
   currentParams,
   activePreset,
@@ -41,32 +52,19 @@ export function ErrorsListToolbar({
   defaultPageSize,
   from,
   to,
-  q,
+  name,
   environment,
-  status,
+  platform,
+  release,
+  propertiesContains,
   sort,
   order,
-  trendWindow,
   environments,
+  platforms,
+  releases,
 }: Props) {
   const fieldIds = useId();
-
   const rangeSummary = listFiltersRangeSummary(customRange, from, to);
-
-  const sortOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "last_seen", label: "Last seen" },
-      { value: "first_seen", label: "First seen" },
-      { value: "occurrences", label: "Occurrences" },
-      { value: "message", label: "Message" },
-      { value: "app", label: "App" },
-      { value: "environment", label: "Environment" },
-      { value: "users", label: "Users affected" },
-      { value: "sessions", label: "Sessions" },
-      { value: "trend", label: "Trend" },
-    ],
-    []
-  );
 
   const environmentOptions: DashboardSelectOption[] = useMemo(
     () => [
@@ -75,14 +73,19 @@ export function ErrorsListToolbar({
     ],
     [environments]
   );
-
-  const statusOptions: DashboardSelectOption[] = useMemo(
+  const platformOptions: DashboardSelectOption[] = useMemo(
     () => [
-      { value: "all", label: "All" },
-      { value: "unresolved", label: "Open" },
-      { value: "resolved", label: "Resolved" },
+      { value: "", label: "Any" },
+      ...platforms.map((e) => ({ value: e, label: e })),
     ],
-    []
+    [platforms]
+  );
+  const releaseOptions: DashboardSelectOption[] = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      ...releases.map((e) => ({ value: e, label: e })),
+    ],
+    [releases]
   );
 
   const id = (suffix: string) => `${fieldIds.replace(/:/g, "")}-${suffix}`;
@@ -111,13 +114,13 @@ export function ErrorsListToolbar({
 
         <div className="errors-filters__row errors-filters__row--search">
           <label className="errors-filters__field errors-filters__field--grow">
-            <span className="errors-filters__label">Search message</span>
+            <span className="errors-filters__label">Event name</span>
             <input
               type="search"
-              name="q"
+              name="name"
               className="errors-filters__input errors-filters__input--search"
-              defaultValue={q}
-              placeholder="Filter by error text…"
+              defaultValue={name}
+              placeholder="e.g. screen_view"
               autoComplete="off"
             />
           </label>
@@ -134,15 +137,41 @@ export function ErrorsListToolbar({
             />
           </label>
           <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("status-l")}>
-              Status
+            <span className="errors-filters__label" id={id("plat-l")}>
+              Platform
             </span>
             <DashboardCustomSelect
-              name="status"
-              value={status || "all"}
-              options={statusOptions}
-              triggerId={id("status-t")}
-              listLabelledBy={id("status-l")}
+              name="platform"
+              value={platform}
+              options={platformOptions}
+              triggerId={id("plat-t")}
+              listLabelledBy={id("plat-l")}
+            />
+          </label>
+          <label className="errors-filters__field">
+            <span className="errors-filters__label" id={id("rel-l")}>
+              Release
+            </span>
+            <DashboardCustomSelect
+              name="release"
+              value={release}
+              options={releaseOptions}
+              triggerId={id("rel-t")}
+              listLabelledBy={id("rel-l")}
+            />
+          </label>
+        </div>
+
+        <div className="errors-filters__row">
+          <label className="errors-filters__field errors-filters__field--grow">
+            <span className="errors-filters__label">Properties (contains)</span>
+            <input
+              type="search"
+              name="propertiesContains"
+              className="errors-filters__input"
+              defaultValue={propertiesContains}
+              placeholder="JSON substring…"
+              autoComplete="off"
             />
           </label>
         </div>
@@ -154,8 +183,8 @@ export function ErrorsListToolbar({
             </span>
             <DashboardCustomSelect
               name="sort"
-              value={sort || "last_seen"}
-              options={sortOptions}
+              value={sort || "created_at"}
+              options={SORT_OPTIONS}
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}
             />
@@ -163,7 +192,7 @@ export function ErrorsListToolbar({
 
           <fieldset
             className="errors-filters__fieldset"
-            title="Descending: newest dates and largest counts first. Ascending: the opposite."
+            title="Descending vs ascending order for the selected column."
           >
             <legend className="errors-filters__label">Order</legend>
             <div className="errors-filters__segment" role="group" aria-label="Sort order">
@@ -174,20 +203,6 @@ export function ErrorsListToolbar({
               <label className="errors-filters__segment-item">
                 <input type="radio" name="order" value="asc" defaultChecked={order === "asc"} />
                 <span>Asc</span>
-              </label>
-            </div>
-          </fieldset>
-
-          <fieldset className="errors-filters__fieldset">
-            <legend className="errors-filters__label">Trend window</legend>
-            <div className="errors-filters__segment" role="group" aria-label="Trend comparison window">
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="trendWindow" value="24h" defaultChecked={trendWindow !== "7d"} />
-                <span>24h</span>
-              </label>
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="trendWindow" value="7d" defaultChecked={trendWindow === "7d"} />
-                <span>7d</span>
               </label>
             </div>
           </fieldset>
