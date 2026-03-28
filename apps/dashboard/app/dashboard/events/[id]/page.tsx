@@ -1,7 +1,6 @@
 const API_BASE = process.env.API_URL || "http://localhost:3001";
 
 import { PageTitle } from "@/app/components/PageTitle";
-import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";

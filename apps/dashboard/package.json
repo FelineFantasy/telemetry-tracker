@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
+    "lint": "eslint .",
+    "prebuild": "pnpm run lint",
     "build": "next build",
     "start": "next start"
   },

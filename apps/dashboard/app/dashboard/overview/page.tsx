@@ -15,11 +15,7 @@ import { OverviewTrendsChart } from "@/app/components/dashboard/OverviewTrendsCh
 import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
-import {
-  OVERVIEW_LIST_PAGE_SIZE,
-  parseOverviewListPageSize,
-  parsePageParam,
-} from "@/lib/pagination";
+import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse } from "@/lib/overview-api";
 import { firstQueryValue } from "@/lib/search-params";
 import Link from "next/link";
