@@ -1,5 +1,3 @@
-const API_BASE = process.env.API_URL || "http://localhost:3001";
-
 import { PageTitle } from "@/app/components/PageTitle";
 import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar";
 import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
@@ -17,6 +15,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { dashboardApiFetch } from "@/lib/dashboard-api";
 import Link from "next/link";
 
 const EVENTS_PATH = "/dashboard/events";
@@ -29,9 +28,7 @@ type EventRow = {
 };
 
 async function getEvents(search: URLSearchParams) {
-  const res = await fetch(`${API_BASE}/api/events?${search.toString()}`, {
-    cache: "no-store",
-  });
+  const res = await dashboardApiFetch(`/api/events?${search.toString()}`);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
@@ -47,9 +44,7 @@ async function getEvents(search: URLSearchParams) {
 async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
-  const res = await fetch(`${API_BASE}/api/filter-options?${p.toString()}`, {
-    cache: "no-store",
-  });
+  const res = await dashboardApiFetch(`/api/filter-options?${p.toString()}`);
   if (!res.ok) {
     return { environments: [] as string[], platforms: [] as string[], releases: [] as string[] };
   }

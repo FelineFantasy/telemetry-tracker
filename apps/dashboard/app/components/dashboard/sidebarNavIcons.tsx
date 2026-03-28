@@ -80,6 +80,27 @@ export function SessionsNavIcon(props: IconProps) {
   );
 }
 
+/** API key — key shape */
+export function ApiKeysNavIcon(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <path
+        d="M15.75 5.25a3 3 0 11-4.243 4.243L7.5 13.5v3h3l4.007-4.007a3 3 0 014.243-4.243z"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.5 19.5h3M6 18v3"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+      />
+    </IconShell>
+  );
+}
+
 /** Document with folded corner + lines — documentation (clean geometry at small sizes) */
 export function DocsNavIcon(props: IconProps) {
   return (

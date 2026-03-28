@@ -1,5 +1,3 @@
-const API_BASE = process.env.API_URL || "http://localhost:3001";
-
 import { PageTitle } from "@/app/components/PageTitle";
 import { Badge } from "@/app/components/Badge";
 import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
@@ -17,6 +15,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { dashboardApiFetch } from "@/lib/dashboard-api";
 import Link from "next/link";
 
 const ERRORS_PATH = "/dashboard/errors";
@@ -46,9 +45,7 @@ async function getErrors(
   page: number;
   pageSize: number;
 }> {
-  const res = await fetch(`${API_BASE}/api/errors?${search.toString()}`, {
-    cache: "no-store",
-  });
+  const res = await dashboardApiFetch(`/api/errors?${search.toString()}`);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
@@ -59,9 +56,7 @@ async function getErrors(
 async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
-  const res = await fetch(`${API_BASE}/api/filter-options?${p.toString()}`, {
-    cache: "no-store",
-  });
+  const res = await dashboardApiFetch(`/api/filter-options?${p.toString()}`);
   if (!res.ok) return { environments: [] as string[], platforms: [], releases: [] };
   const data = (await res.json()) as { environments?: string[] };
   return { environments: data.environments ?? [] };

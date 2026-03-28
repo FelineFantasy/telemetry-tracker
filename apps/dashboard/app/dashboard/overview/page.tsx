@@ -1,5 +1,3 @@
-const API_BASE = process.env.API_URL || "http://localhost:3001";
-
 import { PageTitle } from "@/app/components/PageTitle";
 import { Card } from "@/app/components/Card";
 import { Badge } from "@/app/components/Badge";
@@ -19,6 +17,7 @@ import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse } from "@/lib/overview-api";
 import { firstQueryValue } from "@/lib/search-params";
+import { dashboardApiFetch } from "@/lib/dashboard-api";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -48,8 +47,7 @@ async function getOverview(
   params.set("errorsOrder", list.errorsOrder);
   params.set("topEventsSort", list.topEventsSort);
   params.set("topEventsOrder", list.topEventsOrder);
-  const url = `${API_BASE}/api/overview?${params.toString()}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await dashboardApiFetch(`/api/overview?${params.toString()}`);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);

@@ -26,7 +26,7 @@ import {
   whereSessionById,
   whereSessionProject,
 } from "../lib/prisma-project-scope.js";
-import { readProjectIdFromEnv } from "../lib/project-scope.js";
+import { resolveReadProjectId } from "../lib/read-project-request.js";
 import {
   EVENT_SORT_SQL,
   eventListOrderBy,
@@ -38,9 +38,6 @@ import {
   parseSessionListSortParam,
   sessionListOrderBy,
 } from "../lib/list-sort-params.js";
-
-/** Dashboard read API is scoped to this project until per-user auth passes a project id. */
-const READ_PROJECT_ID = readProjectIdFromEnv();
 
 const DEFAULT_LIST_PAGE_SIZE = 20;
 const MAX_LIST_PAGE_SIZE = 100;
@@ -114,6 +111,7 @@ export async function apiRoutes(
   _opts: FastifyPluginOptions
 ) {
   app.get("/overview", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const query = request.query as {
       range?: string;
       app?: string | string[];
@@ -165,36 +163,36 @@ export async function apiRoutes(
         ? { _count: { name: topEvOrderParsed.order } }
         : { name: topEvOrderParsed.order };
 
-    const baseWhere = { ...whereEventProject(READ_PROJECT_ID), created_at: { gte: since } };
+    const baseWhere = { ...whereEventProject(projectId), created_at: { gte: since } };
     const eventWhere = appFilter
       ? { ...baseWhere, app: appFilter }
       : baseWhere;
     const errorGroupWhere = appFilter
       ? {
-          ...whereErrorGroupProject(READ_PROJECT_ID),
+          ...whereErrorGroupProject(projectId),
           last_seen: { gte: since },
           app: appFilter,
         }
-      : { ...whereErrorGroupProject(READ_PROJECT_ID), last_seen: { gte: since } };
+      : { ...whereErrorGroupProject(projectId), last_seen: { gte: since } };
     const errorOccurrenceWhere = whereErrorOccurrenceSince(
-      READ_PROJECT_ID,
+      projectId,
       since,
       appFilter
     );
     const previousErrorWhere = whereErrorOccurrencePreviousWindow(
-      READ_PROJECT_ID,
+      projectId,
       previousSince,
       since,
       appFilter
     );
     const previousEventWhere = appFilter
       ? {
-          ...whereEventProject(READ_PROJECT_ID),
+          ...whereEventProject(projectId),
           created_at: { gte: previousSince, lt: since },
           app: appFilter,
         }
       : {
-          ...whereEventProject(READ_PROJECT_ID),
+          ...whereEventProject(projectId),
           created_at: { gte: previousSince, lt: since },
         };
 
@@ -214,7 +212,7 @@ export async function apiRoutes(
       prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
       prisma.event.count({ where: eventWhere }),
       prisma.errorGroup.count({ where: errorGroupWhere }),
-      countDistinctEventNames(since, appFilter, READ_PROJECT_ID),
+      countDistinctEventNames(since, appFilter, projectId),
       prisma.errorGroup.findMany({
         where: errorGroupWhere,
         skip: errorsSkip,
@@ -232,7 +230,7 @@ export async function apiRoutes(
       }),
       prisma.errorOccurrence.count({ where: previousErrorWhere }),
       prisma.event.count({ where: previousEventWhere }),
-      getOverviewTimeSeries(prisma, rangeKey, since, appFilter),
+      getOverviewTimeSeries(prisma, projectId, rangeKey, since, appFilter),
     ]);
 
     const topEvents = await Promise.all(
@@ -279,6 +277,7 @@ export async function apiRoutes(
   });
 
   app.get("/errors", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const query = request.query as {
       app?: string | string[];
       page?: string;
@@ -335,7 +334,7 @@ export async function apiRoutes(
       const { total, rows } = await listErrorGroupsAggregated(
         prisma,
         filter,
-        READ_PROJECT_ID,
+        projectId,
         sortParsed.sort,
         orderParsed.order,
         trendWindowParsed.trendWindow,
@@ -351,7 +350,7 @@ export async function apiRoutes(
     const { total, groups } = await listErrorGroupsPrisma(
       prisma,
       filter,
-      READ_PROJECT_ID,
+      projectId,
       scalarSort,
       orderParsed.order,
       skip,
@@ -378,13 +377,14 @@ export async function apiRoutes(
   });
 
   app.patch<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const body = request.body as { resolved?: boolean };
     if (typeof body?.resolved !== "boolean") {
       return reply.status(400).send({ error: "Body must be JSON with resolved: boolean" });
     }
     try {
       const existing = await prisma.errorGroup.findFirst({
-        where: whereErrorGroupById(request.params.id, READ_PROJECT_ID),
+        where: whereErrorGroupById(request.params.id, projectId),
       });
       if (!existing) return reply.status(404).send({ error: "Not found" });
       const group = await prisma.errorGroup.update({
@@ -398,9 +398,10 @@ export async function apiRoutes(
   });
 
   app.get<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const { id } = request.params;
     const group = await prisma.errorGroup.findFirst({
-      where: whereErrorGroupById(id, READ_PROJECT_ID),
+      where: whereErrorGroupById(id, projectId),
       include: {
         occurrences_list: {
           orderBy: { created_at: "desc" },
@@ -413,6 +414,7 @@ export async function apiRoutes(
   });
 
   app.get("/events", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const query = request.query as {
       app?: string | string[];
       page?: string;
@@ -454,7 +456,7 @@ export async function apiRoutes(
     const props = propertiesContains?.trim();
     if (props) {
       const whereSql = buildEventWhereSql({
-        projectId: READ_PROJECT_ID,
+        projectId,
         appId,
         name,
         environment,
@@ -477,7 +479,7 @@ export async function apiRoutes(
       return reply.send({ items: rows, total, page, pageSize });
     }
 
-    const where: Prisma.EventWhereInput = whereEventProject(READ_PROJECT_ID);
+    const where: Prisma.EventWhereInput = whereEventProject(projectId);
     if (appId) where.app = appId;
     if (name) where.name = name;
     if (environment) where.environment = environment;
@@ -501,15 +503,17 @@ export async function apiRoutes(
   });
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const { id } = request.params;
     const event = await prisma.event.findFirst({
-      where: whereEventById(id, READ_PROJECT_ID),
+      where: whereEventById(id, projectId),
     });
     if (!event) return reply.status(404).send({ error: "Not found" });
     return reply.send(event);
   });
 
   app.get("/sessions", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const query = request.query as {
       app?: string | string[];
       page?: string;
@@ -538,7 +542,7 @@ export async function apiRoutes(
     }
     const sessionOrderBy = sessionListOrderBy(sortParsed.sort, orderParsed.order);
 
-    const where: Prisma.SessionWhereInput = whereSessionProject(READ_PROJECT_ID);
+    const where: Prisma.SessionWhereInput = whereSessionProject(projectId);
     if (appId) where.app = appId;
     if (platform) where.platform = platform;
     if (range.gte || range.lte) {
@@ -559,25 +563,27 @@ export async function apiRoutes(
   });
 
   app.get<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const { id } = request.params;
     const session = await prisma.session.findFirst({
-      where: whereSessionById(id, READ_PROJECT_ID),
+      where: whereSessionById(id, projectId),
     });
     if (!session) return reply.status(404).send({ error: "Not found" });
     return reply.send(session);
   });
 
   app.get("/filter-options", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const appFilter = queryApp((request.query as { app?: string | string[] }).app);
     const baseEvent: Prisma.EventWhereInput = appFilter
-      ? { ...whereEventProject(READ_PROJECT_ID), app: appFilter }
-      : whereEventProject(READ_PROJECT_ID);
+      ? { ...whereEventProject(projectId), app: appFilter }
+      : whereEventProject(projectId);
     const baseSession: Prisma.SessionWhereInput = appFilter
-      ? { ...whereSessionProject(READ_PROJECT_ID), app: appFilter }
-      : whereSessionProject(READ_PROJECT_ID);
+      ? { ...whereSessionProject(projectId), app: appFilter }
+      : whereSessionProject(projectId);
     const baseError: Prisma.ErrorGroupWhereInput = appFilter
-      ? { ...whereErrorGroupProject(READ_PROJECT_ID), app: appFilter }
-      : whereErrorGroupProject(READ_PROJECT_ID);
+      ? { ...whereErrorGroupProject(projectId), app: appFilter }
+      : whereErrorGroupProject(projectId);
 
     const [
       envEvents,
@@ -628,19 +634,20 @@ export async function apiRoutes(
     return reply.send({ environments, platforms, releases });
   });
 
-  app.get("/apps", async (_request, reply) => {
+  app.get("/apps", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request);
     const [eventsApps, errorsApps, sessionsApps] = await Promise.all([
       prisma.event.groupBy({
         by: ["app"],
-        where: whereEventProject(READ_PROJECT_ID),
+        where: whereEventProject(projectId),
       }),
       prisma.errorGroup.groupBy({
         by: ["app"],
-        where: whereErrorGroupProject(READ_PROJECT_ID),
+        where: whereErrorGroupProject(projectId),
       }),
       prisma.session.groupBy({
         by: ["app"],
-        where: whereSessionProject(READ_PROJECT_ID),
+        where: whereSessionProject(projectId),
       }),
     ]);
     const apps = [
