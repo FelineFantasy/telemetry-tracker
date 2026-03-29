@@ -72,6 +72,24 @@ export async function createDashboardApiKey(
   };
 }
 
+export async function setErrorResolvedAction(
+  errorGroupId: string,
+  resolved: boolean
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(`/api/errors/${errorGroupId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resolved }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  revalidatePath(`/dashboard/errors/${errorGroupId}`);
+  revalidatePath("/dashboard/errors");
+  return { ok: true };
+}
+
 export async function revokeDashboardApiKey(
   publicId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

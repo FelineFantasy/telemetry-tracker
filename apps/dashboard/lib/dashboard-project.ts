@@ -3,6 +3,9 @@ import { cookies } from "next/headers";
 /** Cookie storing the active dashboard project (matches API `X-Project-Id`). */
 export const TELEMETRY_PROJECT_COOKIE = "telemetry_project_id";
 
+/** Opaque session id (matches API `UserSession.id` / `Authorization: Bearer`). */
+export const TELEMETRY_SESSION_COOKIE = "telemetry_session";
+
 /** Default from migration + `TELEMETRY_PROJECT_ID` (same as API `readProjectIdFromEnv`). */
 export const DEFAULT_PROJECT_ID =
   process.env.TELEMETRY_PROJECT_ID?.trim() ||
@@ -15,6 +18,15 @@ export async function getDashboardProjectId(): Promise<string> {
     return v;
   }
   return DEFAULT_PROJECT_ID;
+}
+
+export async function getDashboardSessionId(): Promise<string | undefined> {
+  const c = await cookies();
+  const v = c.get(TELEMETRY_SESSION_COOKIE)?.value?.trim();
+  if (v && /^[0-9a-f-]{36}$/i.test(v)) {
+    return v;
+  }
+  return undefined;
 }
 
 export function dashboardApiHeaders(projectId: string): Record<string, string> {

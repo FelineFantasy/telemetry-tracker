@@ -111,7 +111,8 @@ export async function apiRoutes(
   _opts: FastifyPluginOptions
 ) {
   app.get("/overview", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const query = request.query as {
       range?: string;
       app?: string | string[];
@@ -277,7 +278,8 @@ export async function apiRoutes(
   });
 
   app.get("/errors", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const query = request.query as {
       app?: string | string[];
       page?: string;
@@ -377,7 +379,8 @@ export async function apiRoutes(
   });
 
   app.patch<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const body = request.body as { resolved?: boolean };
     if (typeof body?.resolved !== "boolean") {
       return reply.status(400).send({ error: "Body must be JSON with resolved: boolean" });
@@ -398,7 +401,8 @@ export async function apiRoutes(
   });
 
   app.get<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const { id } = request.params;
     const group = await prisma.errorGroup.findFirst({
       where: whereErrorGroupById(id, projectId),
@@ -414,7 +418,8 @@ export async function apiRoutes(
   });
 
   app.get("/events", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const query = request.query as {
       app?: string | string[];
       page?: string;
@@ -503,7 +508,8 @@ export async function apiRoutes(
   });
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const { id } = request.params;
     const event = await prisma.event.findFirst({
       where: whereEventById(id, projectId),
@@ -513,7 +519,8 @@ export async function apiRoutes(
   });
 
   app.get("/sessions", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const query = request.query as {
       app?: string | string[];
       page?: string;
@@ -563,7 +570,8 @@ export async function apiRoutes(
   });
 
   app.get<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const { id } = request.params;
     const session = await prisma.session.findFirst({
       where: whereSessionById(id, projectId),
@@ -573,7 +581,8 @@ export async function apiRoutes(
   });
 
   app.get("/filter-options", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const appFilter = queryApp((request.query as { app?: string | string[] }).app);
     const baseEvent: Prisma.EventWhereInput = appFilter
       ? { ...whereEventProject(projectId), app: appFilter }
@@ -635,7 +644,8 @@ export async function apiRoutes(
   });
 
   app.get("/apps", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const [eventsApps, errorsApps, sessionsApps] = await Promise.all([
       prisma.event.groupBy({
         by: ["app"],

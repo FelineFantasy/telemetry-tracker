@@ -5,6 +5,7 @@ import { MenuIcon } from "@/app/components/sidebar/MenuIcon";
 import { AppSidebar } from "./AppSidebar";
 import type { ProjectOption } from "./ProjectSwitcher";
 import { DashboardAppContext } from "./DashboardAppContext";
+import type { DashboardUser } from "@/lib/dashboard-user";
 
 const SIDEBAR_COLLAPSED_KEY = "telemetry-dashboard-sidebar-collapsed";
 
@@ -13,11 +14,13 @@ export function DashboardShell({
   children,
   projects = [],
   currentProjectId = "",
+  user = null,
 }: {
   apps: string[];
   children: React.ReactNode;
   projects?: ProjectOption[];
   currentProjectId?: string;
+  user?: DashboardUser | null;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
@@ -88,6 +91,7 @@ export function DashboardShell({
         onToggleDesktopCollapse={toggleDesktopSidebar}
         projects={projects}
         currentProjectId={currentProjectId}
+        user={user}
       />
       <div className="dashboard-right">
         {!sidebarOpen ? (

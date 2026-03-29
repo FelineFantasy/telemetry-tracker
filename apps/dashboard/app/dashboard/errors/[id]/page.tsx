@@ -8,7 +8,6 @@ import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
 import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import { getDashboardProjectId } from "@/lib/dashboard-project";
 import type { ReactNode } from "react";
 
 type Occurrence = {
@@ -64,7 +63,6 @@ export default async function ErrorDetailPage({
   const { id } = await params;
   const { app } = await searchParams;
   const appQuery = app?.trim() ? `?app=${encodeURIComponent(app)}` : "";
-  const projectId = await getDashboardProjectId();
 
   let group: ErrorGroup | null;
   try {
@@ -104,11 +102,7 @@ export default async function ErrorDetailPage({
       <div className="error-detail__head">
         <PageTitle title={title} context={contextLine} />
         <div className="error-detail__actions">
-          <ErrorResolveButton
-            errorGroupId={group.id}
-            resolved={resolved}
-            projectId={projectId}
-          />
+          <ErrorResolveButton errorGroupId={group.id} resolved={resolved} />
         </div>
       </div>
 
