@@ -5,8 +5,10 @@ import { SidebarBrand } from "@/app/components/sidebar/SidebarBrand";
 import { useMobileDrawer } from "@/lib/useMobileDrawer";
 import { ProjectSwitcher, type ProjectOption } from "./ProjectSwitcher";
 import { DashboardViewLinks } from "./DashboardViewLinks";
+import { LogoutForm } from "./LogoutForm";
 import { SidebarLink } from "./SidebarLink";
 import { DocsNavIcon } from "./sidebarNavIcons";
+import type { DashboardUser } from "@/lib/dashboard-user";
 
 function ChevronCollapseIcon() {
   return (
@@ -41,6 +43,7 @@ export function AppSidebar({
   onToggleDesktopCollapse,
   projects = [],
   currentProjectId = "",
+  user = null,
 }: {
   isOpen?: boolean;
   onClose?: () => void;
@@ -48,6 +51,7 @@ export function AppSidebar({
   onToggleDesktopCollapse?: () => void;
   projects?: ProjectOption[];
   currentProjectId?: string;
+  user?: DashboardUser | null;
 }) {
   const pathname = usePathname() ?? "/";
   const isMobileDrawer = useMobileDrawer();
@@ -91,6 +95,14 @@ export function AppSidebar({
       </nav>
 
       <div className="app-sidebar__rail-footer">
+        {user ? (
+          <div className="app-sidebar__user" aria-label="Account">
+            <div className="app-sidebar__user-email" title={user.email}>
+              {user.displayName ?? user.email}
+            </div>
+            <LogoutForm />
+          </div>
+        ) : null}
         <nav className="app-sidebar__footer" aria-label="Other">
           <SidebarLink
             href="/docs"

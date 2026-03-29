@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { prisma } from "../lib/db.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
+import { getSessionUser } from "../lib/auth-session.js";
 import { resolveReadProjectId } from "../lib/read-project-request.js";
 
 const DEFAULT_ORG_ID =
@@ -9,13 +10,30 @@ const DEFAULT_ORG_ID =
   "a0000000-0000-4000-8000-000000000001";
 
 /**
- * Dashboard-only routes: project list + API key lifecycle (no end-user auth yet).
+ * Dashboard routes: project list, org members, API key lifecycle.
  */
 export async function projectDashboardRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions
 ) {
-  app.get("/meta/projects", async (_request, reply) => {
+  app.get("/meta/projects", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (session) {
+      const orgRows = await prisma.organizationMembership.findMany({
+        where: { user_id: session.userId },
+        select: { organization_id: true },
+      });
+      const orgIds = [...new Set(orgRows.map((r) => r.organization_id))];
+      if (orgIds.length === 0) {
+        return reply.send({ projects: [] });
+      }
+      const projects = await prisma.project.findMany({
+        where: { organization_id: { in: orgIds }, deleted_at: null },
+        select: { id: true, name: true, slug: true },
+        orderBy: { name: "asc" },
+      });
+      return reply.send({ projects });
+    }
     const projects = await prisma.project.findMany({
       where: { organization_id: DEFAULT_ORG_ID, deleted_at: null },
       select: { id: true, name: true, slug: true },
@@ -24,8 +42,55 @@ export async function projectDashboardRoutes(
     return reply.send({ projects });
   });
 
+  app.get("/meta/members", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const q = request.query as { organizationId?: string };
+    let orgId =
+      typeof q.organizationId === "string" ? q.organizationId.trim() : "";
+    if (!orgId) {
+      const first = await prisma.organizationMembership.findFirst({
+        where: { user_id: session.userId },
+        orderBy: { created_at: "asc" },
+        select: { organization_id: true },
+      });
+      orgId = first?.organization_id ?? "";
+    }
+    if (!orgId) {
+      return reply.send({ organizationId: null, members: [] });
+    }
+    const ok = await prisma.organizationMembership.findFirst({
+      where: { user_id: session.userId, organization_id: orgId },
+    });
+    if (!ok) {
+      return reply.status(403).send({ error: "Not a member of this organization" });
+    }
+    const rows = await prisma.organizationMembership.findMany({
+      where: { organization_id: orgId },
+      select: {
+        role: true,
+        created_at: true,
+        user: { select: { id: true, email: true, display_name: true } },
+      },
+      orderBy: { created_at: "asc" },
+    });
+    return reply.send({
+      organizationId: orgId,
+      members: rows.map((r) => ({
+        userId: r.user.id,
+        email: r.user.email,
+        displayName: r.user.display_name,
+        role: r.role,
+        joinedAt: r.created_at.toISOString(),
+      })),
+    });
+  });
+
   app.get("/project/api-keys", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const keys = await prisma.apiKey.findMany({
       where: { project_id: projectId, deleted_at: null },
       orderBy: { created_at: "desc" },
@@ -53,7 +118,8 @@ export async function projectDashboardRoutes(
   });
 
   app.post("/project/api-keys", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request);
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
     const body = (request.body ?? {}) as { name?: string };
     const name =
       typeof body.name === "string" && body.name.trim() !== ""
@@ -86,7 +152,8 @@ export async function projectDashboardRoutes(
   app.post<{ Params: { publicId: string } }>(
     "/project/api-keys/:publicId/revoke",
     async (request, reply) => {
-      const projectId = await resolveReadProjectId(request);
+      const projectId = await resolveReadProjectId(request, reply);
+      if (projectId === null) return;
       const publicId = request.params.publicId.toLowerCase();
       if (!/^[a-f0-9]{32}$/.test(publicId)) {
         return reply.status(400).send({ error: "Invalid publicId" });

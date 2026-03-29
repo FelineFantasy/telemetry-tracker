@@ -80,6 +80,22 @@ export function SessionsNavIcon(props: IconProps) {
   );
 }
 
+/** Team — people */
+export function TeamNavIcon(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth={1.75} fill="none" />
+      <circle cx="15" cy="8" r="3" stroke="currentColor" strokeWidth={1.75} fill="none" />
+      <path
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        d="M5 19c.5-3 3.5-4 7-4s6.5 1 7 4"
+      />
+    </IconShell>
+  );
+}
+
 /** API key — key shape */
 export function ApiKeysNavIcon(props: IconProps) {
   return (

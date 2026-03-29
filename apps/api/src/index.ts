@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
+import { authRoutes } from "./routes/auth.js";
 import { projectDashboardRoutes } from "./routes/project-dashboard.js";
 
 const port = Number(process.env.PORT) || 3001;
@@ -18,7 +19,7 @@ try {
     max: 300,
     timeWindow: "1 minute",
   });
-  await app.register(cors, { origin: true });
+  await app.register(cors, { origin: true, credentials: true });
 
   // No DB – use to confirm the process is reachable (e.g. before /api/overview)
   app.get("/health", async (_req, reply) => reply.code(200).send({ ok: true }));
@@ -26,6 +27,7 @@ try {
 
   // Ingest first: resolves project via API key + writes UsageMonthly; read API uses env-scoped project.
   await app.register(ingestRoutes, { prefix: "/ingest" });
+  await app.register(authRoutes, { prefix: "/api" });
   await app.register(apiRoutes, { prefix: "/api" });
   await app.register(projectDashboardRoutes, { prefix: "/api" });
 

@@ -1,5 +1,6 @@
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "./db.js";
+import { getSessionUser } from "./auth-session.js";
 import { readProjectIdFromEnv } from "./project-scope.js";
 
 const UUID_RE =
@@ -18,17 +19,42 @@ function headerFirst(
 
 /**
  * Dashboard sends `X-Project-Id` to scope reads. Validates UUID and that the project exists
- * and is not soft-deleted; otherwise falls back to `TELEMETRY_PROJECT_ID`.
+ * and is not soft-deleted. If a session is present, the user must be a member of the project’s
+ * organization. Without a session, legacy behavior: any existing project id (or env fallback).
+ * Returns `null` after sending 403 when the session user may not access the project.
  */
 export async function resolveReadProjectId(
-  request: FastifyRequest
-): Promise<string> {
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<string | null> {
   const fallback = readProjectIdFromEnv();
   const raw = headerFirst(request, "x-project-id");
-  if (!raw || !UUID_RE.test(raw)) return fallback;
-  const row = await prisma.project.findFirst({
+  if (!raw || !UUID_RE.test(raw)) {
+    return fallback;
+  }
+
+  const project = await prisma.project.findFirst({
     where: { id: raw, deleted_at: null },
-    select: { id: true },
+    select: { id: true, organization_id: true },
   });
-  return row?.id ?? fallback;
+  if (!project) {
+    return fallback;
+  }
+
+  const session = await getSessionUser(request);
+  if (session) {
+    const m = await prisma.organizationMembership.findFirst({
+      where: {
+        user_id: session.userId,
+        organization_id: project.organization_id,
+      },
+    });
+    if (!m) {
+      await reply.status(403).send({ error: "Not a member of this project" });
+      return null;
+    }
+    return project.id;
+  }
+
+  return project.id;
 }
