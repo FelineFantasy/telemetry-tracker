@@ -6,6 +6,7 @@ import {
   createDashboardApiKey,
   revokeDashboardApiKey,
 } from "@/app/dashboard/actions";
+import { useDashboardCapabilities } from "@/app/components/dashboard/DashboardCapabilitiesContext";
 import { Button } from "@/app/components/ui/Button";
 import { Table, TableWrap } from "@/app/components/ui/Table";
 import { TimeAgo } from "@/app/components/TimeAgo";
@@ -19,6 +20,7 @@ export type ApiKeyRow = {
 };
 
 export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
+  const caps = useDashboardCapabilities();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [revokePending, setRevokePending] = useState<string | null>(null);
@@ -80,41 +82,51 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
         </div>
       ) : null}
 
-      <section className="api-keys__create card" aria-labelledby="create-key-heading">
-        <h2 id="create-key-heading" className="api-keys__section-title">
-          Create key
-        </h2>
-        <form action={onCreate} className="api-keys__form">
-          <label className="api-keys__label" htmlFor="key-name">
-            Label <span className="text-muted-foreground">(optional)</span>
-          </label>
-          <input
-            id="key-name"
-            name="name"
-            type="text"
-            className="filter-input api-keys__input"
-            placeholder="e.g. production CI"
-            maxLength={120}
-            autoComplete="off"
-            disabled={pending}
-          />
-          {formError ? (
-            <p className="api-keys__error" role="alert">
-              {formError}
-            </p>
-          ) : null}
-          <Button type="submit" variant="primary" disabled={pending}>
-            {pending ? "Creating…" : "Create API key"}
-          </Button>
-        </form>
-      </section>
+      {caps?.canCreateApiKey ? (
+        <section className="api-keys__create card" aria-labelledby="create-key-heading">
+          <h2 id="create-key-heading" className="api-keys__section-title">
+            Create key
+          </h2>
+          <form action={onCreate} className="api-keys__form">
+            <label className="api-keys__label" htmlFor="key-name">
+              Label <span className="text-muted-foreground">(optional)</span>
+            </label>
+            <input
+              id="key-name"
+              name="name"
+              type="text"
+              className="filter-input api-keys__input"
+              placeholder="e.g. production CI"
+              maxLength={120}
+              autoComplete="off"
+              disabled={pending}
+            />
+            {formError ? (
+              <p className="api-keys__error" role="alert">
+                {formError}
+              </p>
+            ) : null}
+            <Button type="submit" variant="primary" disabled={pending}>
+              {pending ? "Creating…" : "Create API key"}
+            </Button>
+          </form>
+        </section>
+      ) : caps ? (
+        <p className="text-muted-foreground api-keys__read-only-hint">
+          You don&apos;t have permission to create API keys. Ask an organization owner.
+        </p>
+      ) : null}
 
       <section className="api-keys__list" aria-labelledby="keys-list-heading">
         <h2 id="keys-list-heading" className="api-keys__section-title">
           Keys for this project
         </h2>
         {keys.length === 0 ? (
-          <p className="text-muted-foreground">No keys yet. Create one to send telemetry from your apps.</p>
+          <p className="text-muted-foreground">
+            {caps?.canCreateApiKey
+              ? "No keys yet. Create one to send telemetry from your apps."
+              : "No keys for this project yet."}
+          </p>
         ) : (
           <TableWrap>
             <Table>
@@ -151,7 +163,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
                         )}
                       </td>
                       <td className="api-keys__actions">
-                        {!revoked ? (
+                        {!revoked && caps?.canRevokeApiKey ? (
                           <Button
                             type="button"
                             variant="outline"

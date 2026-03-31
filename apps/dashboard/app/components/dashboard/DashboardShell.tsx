@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { MenuIcon } from "@/app/components/sidebar/MenuIcon";
 import { AppSidebar } from "./AppSidebar";
+import { DashboardCapabilitiesProvider } from "./DashboardCapabilitiesContext";
 import type { ProjectOption } from "./ProjectSwitcher";
 import { DashboardAppContext } from "./DashboardAppContext";
+import type { DashboardSessionContext } from "@/lib/dashboard-capabilities";
 import type { DashboardUser } from "@/lib/dashboard-user";
 
 const SIDEBAR_COLLAPSED_KEY = "telemetry-dashboard-sidebar-collapsed";
@@ -15,12 +17,14 @@ export function DashboardShell({
   projects = [],
   currentProjectId = "",
   user = null,
+  capabilities = null,
 }: {
   apps: string[];
   children: React.ReactNode;
   projects?: ProjectOption[];
   currentProjectId?: string;
   user?: DashboardUser | null;
+  capabilities?: DashboardSessionContext | null;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
@@ -105,8 +109,10 @@ export function DashboardShell({
           </button>
         ) : null}
         <main className="main" id="main-content">
-          <DashboardAppContext apps={apps} />
-          {children}
+          <DashboardCapabilitiesProvider value={capabilities}>
+            <DashboardAppContext apps={apps} />
+            {children}
+          </DashboardCapabilitiesProvider>
         </main>
       </div>
     </div>

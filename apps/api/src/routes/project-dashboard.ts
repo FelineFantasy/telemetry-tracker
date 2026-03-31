@@ -3,6 +3,13 @@ import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { prisma } from "../lib/db.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
 import { getSessionUser } from "../lib/auth-session.js";
+import {
+  canCreateApiKey,
+  canManageOrganization,
+  canResolveErrors,
+  canRevokeApiKey,
+  getMembershipRoleForProject,
+} from "../lib/org-permissions.js";
 import { resolveReadProjectId } from "../lib/read-project-request.js";
 
 const DEFAULT_ORG_ID =
@@ -40,6 +47,28 @@ export async function projectDashboardRoutes(
       orderBy: { name: "asc" },
     });
     return reply.send({ projects });
+  });
+
+  /** Role and mutation flags for the active project (`X-Project-Id` + session). */
+  app.get("/meta/session-context", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const role = await getMembershipRoleForProject(session.userId, projectId);
+    if (role === null) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    return reply.send({
+      projectId,
+      role,
+      canResolveErrors: canResolveErrors(role),
+      canCreateApiKey: canCreateApiKey(role),
+      canRevokeApiKey: canRevokeApiKey(role),
+      canManageOrganization: canManageOrganization(role),
+    });
   });
 
   app.get("/meta/members", async (request, reply) => {
@@ -120,6 +149,13 @@ export async function projectDashboardRoutes(
   app.post("/project/api-keys", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
+    const session = await getSessionUser(request);
+    if (session) {
+      const role = await getMembershipRoleForProject(session.userId, projectId);
+      if (!canCreateApiKey(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+    }
     const body = (request.body ?? {}) as { name?: string };
     const name =
       typeof body.name === "string" && body.name.trim() !== ""
@@ -154,6 +190,13 @@ export async function projectDashboardRoutes(
     async (request, reply) => {
       const projectId = await resolveReadProjectId(request, reply);
       if (projectId === null) return;
+      const session = await getSessionUser(request);
+      if (session) {
+        const role = await getMembershipRoleForProject(session.userId, projectId);
+        if (!canRevokeApiKey(role)) {
+          return reply.status(403).send({ error: "Forbidden" });
+        }
+      }
       const publicId = request.params.publicId.toLowerCase();
       if (!/^[a-f0-9]{32}$/.test(publicId)) {
         return reply.status(400).send({ error: "Invalid publicId" });

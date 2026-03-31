@@ -58,7 +58,7 @@ export async function authRoutes(
     const orgMemberCount = await prisma.organizationMembership.count({
       where: { organization_id: DEFAULT_ORG_ID },
     });
-    const role: OrgRole = orgMemberCount === 0 ? OrgRole.OWNER : OrgRole.MEMBER;
+    const role: OrgRole = orgMemberCount === 0 ? OrgRole.OWNER : OrgRole.VIEWER;
 
     const user = await prisma.user.create({
       data: {

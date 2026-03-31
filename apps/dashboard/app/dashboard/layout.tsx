@@ -1,5 +1,6 @@
 import { DashboardShell } from "@/app/components/dashboard/DashboardShell";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
 import { getDashboardProjectId } from "@/lib/dashboard-project";
 import { getDashboardUser } from "@/lib/dashboard-user";
 
@@ -24,11 +25,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [apps, projects, currentProjectId, user] = await Promise.all([
+  const [apps, projects, currentProjectId, user, capabilities] = await Promise.all([
     getApps(),
     getProjects(),
     getDashboardProjectId(),
     getDashboardUser(),
+    getDashboardSessionContext(),
   ]);
 
   return (
@@ -37,6 +39,7 @@ export default async function DashboardLayout({
       projects={projects}
       currentProjectId={currentProjectId}
       user={user}
+      capabilities={capabilities}
     >
       {children}
     </DashboardShell>
