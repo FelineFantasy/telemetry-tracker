@@ -26,7 +26,7 @@ import {
   whereSessionById,
   whereSessionProject,
 } from "../lib/prisma-project-scope.js";
-import { getSessionUser } from "../lib/auth-session.js";
+import { requireSessionUser } from "../lib/auth-session.js";
 import {
   canResolveErrors,
   getMembershipRoleForProject,
@@ -386,12 +386,11 @@ export async function apiRoutes(
   app.patch<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
-    const session = await getSessionUser(request);
-    if (session) {
-      const role = await getMembershipRoleForProject(session.userId, projectId);
-      if (!canResolveErrors(role)) {
-        return reply.status(403).send({ error: "Forbidden" });
-      }
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const role = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canResolveErrors(role)) {
+      return reply.status(403).send({ error: "Forbidden" });
     }
     const body = request.body as { resolved?: boolean };
     if (typeof body?.resolved !== "boolean") {

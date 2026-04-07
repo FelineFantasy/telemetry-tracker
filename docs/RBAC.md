@@ -25,7 +25,7 @@ Ingest remains authenticated with **project API keys**, not user sessions.
 
 **Registration:** The first user in the default organization becomes **`OWNER`**. Additional allowed signups receive **`VIEWER`** unless changed in the database.
 
-**API enforcement:** Mutations check the caller’s role when a **session** is present. Unauthenticated access to the read API retains legacy behavior for local/dev use; production deployments should rely on session-backed dashboard usage.
+**API enforcement:** **Mutations** (`POST`/`PATCH` that change data or API keys, including `PATCH /api/errors/:id`, `POST /api/project/api-keys`, revoke) **require** a valid session (`Authorization: Bearer` or session cookie) and then enforce role. Unauthenticated callers receive **401**. **GET** routes may still allow unauthenticated “legacy” project scoping for local/dev (see `resolveReadProjectId`); production dashboards should use sessions for reads too.
 
 **Dashboard:** `/api/meta/session-context` returns `role` and boolean flags (`canResolveErrors`, `canCreateApiKey`, `canRevokeApiKey`, `canManageOrganization`, `canCreateProject`) for the active project (`X-Project-Id` + session).
 

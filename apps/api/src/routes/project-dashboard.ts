@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fast
 import { OrgRole } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
-import { getSessionUser } from "../lib/auth-session.js";
+import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
 import {
   canCreateApiKey,
   canCreateProject,
@@ -484,12 +484,11 @@ export async function projectDashboardRoutes(
   app.post("/project/api-keys", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
-    const session = await getSessionUser(request);
-    if (session) {
-      const projRole = await getMembershipRoleForProject(session.userId, projectId);
-      if (!canCreateApiKey(projRole)) {
-        return reply.status(403).send({ error: "Forbidden" });
-      }
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
     }
     const body = (request.body ?? {}) as { name?: string; allowedApp?: string };
     const name =
@@ -531,12 +530,11 @@ export async function projectDashboardRoutes(
     async (request, reply) => {
       const projectId = await resolveReadProjectId(request, reply);
       if (projectId === null) return;
-      const session = await getSessionUser(request);
-      if (session) {
-        const projRole = await getMembershipRoleForProject(session.userId, projectId);
-        if (!canRevokeApiKey(projRole)) {
-          return reply.status(403).send({ error: "Forbidden" });
-        }
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const projRole = await getMembershipRoleForProject(session.userId, projectId);
+      if (!canRevokeApiKey(projRole)) {
+        return reply.status(403).send({ error: "Forbidden" });
       }
       const publicId = request.params.publicId.toLowerCase();
       if (!/^[a-f0-9]{32}$/.test(publicId)) {
