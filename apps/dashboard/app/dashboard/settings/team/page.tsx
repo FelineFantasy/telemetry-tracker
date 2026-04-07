@@ -63,7 +63,7 @@ export default async function TeamSettingsPage() {
 
   const organizationId = loaded.organizationId;
   const members = loaded.members;
-  const canManageMembers = Boolean(capabilities?.canManageOrganization);
+  const canManageMembers = Boolean(capabilities?.canManageMembers);
   const ownerCount = members.filter((m) => m.role === "OWNER").length;
 
   return (

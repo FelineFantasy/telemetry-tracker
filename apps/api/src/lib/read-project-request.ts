@@ -1,21 +1,11 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "./db.js";
 import { getSessionUser } from "./auth-session.js";
+import { headerFirst } from "./http-headers.js";
 import { readProjectIdFromEnv } from "./project-scope.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function headerFirst(
-  request: FastifyRequest,
-  name: string
-): string | undefined {
-  const v = request.headers[name];
-  if (v === undefined) return undefined;
-  const s = Array.isArray(v) ? v[0] : v;
-  const t = typeof s === "string" ? s.trim() : "";
-  return t || undefined;
-}
 
 /**
  * Dashboard sends `X-Project-Id` to scope reads. Validates UUID and that the project exists

@@ -14,6 +14,7 @@ import {
   getMembershipRoleForOrganization,
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
+import { headerFirst } from "../lib/http-headers.js";
 import {
   resolveReadProjectId,
   tryResolveReadProjectId,
@@ -27,14 +28,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const INVITE_DAYS = 7;
-
-function headerFirst(request: FastifyRequest, name: string): string | undefined {
-  const v = request.headers[name];
-  if (v === undefined) return undefined;
-  const s = Array.isArray(v) ? v[0] : v;
-  const t = typeof s === "string" ? s.trim() : "";
-  return t || undefined;
-}
 
 function readOrgIdHeader(request: FastifyRequest): string | undefined {
   const raw = headerFirst(request, "x-organization-id");
@@ -409,8 +402,8 @@ export async function projectDashboardRoutes(
 
   /**
    * Role and capability flags: project-scoped actions use membership for `X-Project-Id`;
-   * org-scoped actions (`canCreateProject`, `canManageOrganization`) use `X-Organization-Id` when
-   * set so they match the sidebar org, not the project cookie’s organization.
+   * org-scoped actions use `X-Organization-Id` when set so they match the sidebar org, not the
+   * project cookie’s organization.
    */
   app.get("/meta/session-context", async (request, reply) => {
     const session = await getSessionUser(request);
@@ -442,6 +435,7 @@ export async function projectDashboardRoutes(
       canRevokeApiKey: canRevokeApiKey(projRole),
       canManageOrganization: canManageOrganization(orgCapabilityRole),
       canCreateProject: canCreateProject(orgCapabilityRole),
+      canManageMembers: canManageMembers(orgCapabilityRole),
     });
   });
 

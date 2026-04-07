@@ -8,6 +8,8 @@ export type DashboardSessionContext = {
   canRevokeApiKey: boolean;
   canManageOrganization: boolean;
   canCreateProject: boolean;
+  /** Invite/change members — may diverge from {@link canManageOrganization} if RBAC evolves. */
+  canManageMembers: boolean;
 };
 
 /** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set. */
@@ -21,7 +23,8 @@ export async function getDashboardSessionContext(): Promise<DashboardSessionCont
     typeof data.canCreateApiKey !== "boolean" ||
     typeof data.canRevokeApiKey !== "boolean" ||
     typeof data.canManageOrganization !== "boolean" ||
-    typeof data.canCreateProject !== "boolean"
+    typeof data.canCreateProject !== "boolean" ||
+    typeof data.canManageMembers !== "boolean"
   ) {
     return null;
   }
