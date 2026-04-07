@@ -18,7 +18,8 @@ export type TeamMemberRow = {
   joinedAt: string;
 };
 
-const ROLES = ["OWNER", "EDITOR", "VIEWER"] as const;
+/** Least-privileged first for `<select>` default (VIEWER). */
+const ROLES = ["VIEWER", "EDITOR", "OWNER"] as const;
 
 export function TeamMembersClient({
   organizationId,
@@ -90,7 +91,13 @@ export function TeamMembersClient({
             <label className="text-sm text-muted-foreground" htmlFor="invite-role">
               Role
             </label>
-            <select id="invite-role" name="role" className="filter-input" disabled={pending}>
+            <select
+              id="invite-role"
+              name="role"
+              className="filter-input"
+              disabled={pending}
+              defaultValue="VIEWER"
+            >
               {ROLES.map((r) => (
                 <option key={r} value={r}>
                   {r}

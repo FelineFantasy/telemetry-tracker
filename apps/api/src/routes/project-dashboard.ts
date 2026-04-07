@@ -64,8 +64,9 @@ async function ensureUniqueSlug(orgId: string, base: string): Promise<string> {
   while (n < 1_000_000) {
     const slug =
       n === 0 ? stem : `${stem}-${n}`.slice(0, MAX_SLUG_LEN);
+    // `@@unique([organization_id, slug])` applies to soft-deleted rows too — must not reuse.
     const clash = await prisma.project.findFirst({
-      where: { organization_id: orgId, slug, deleted_at: null },
+      where: { organization_id: orgId, slug },
       select: { id: true },
     });
     if (!clash) return slug;
@@ -75,7 +76,7 @@ async function ensureUniqueSlug(orgId: string, base: string): Promise<string> {
     const suffix = randomBytes(5).toString("hex");
     const slug = `${stem}-${suffix}`.slice(0, MAX_SLUG_LEN);
     const clash = await prisma.project.findFirst({
-      where: { organization_id: orgId, slug, deleted_at: null },
+      where: { organization_id: orgId, slug },
       select: { id: true },
     });
     if (!clash) return slug;
