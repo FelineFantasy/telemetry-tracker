@@ -2,7 +2,10 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
-import { getDashboardOrganizationId } from "@/lib/dashboard-org";
+import {
+  getDashboardOrganizationId,
+  resolveActiveOrganizationId,
+} from "@/lib/dashboard-org";
 import { getDashboardUser } from "@/lib/dashboard-user";
 import {
   createOrganizationAction,
@@ -29,11 +32,10 @@ export default async function OrganizationSettingsPage() {
     getDashboardOrganizationId(),
   ]);
 
-  const orgIdSet = new Set(organizations.map((o) => o.id));
-  const effectiveOrgId =
-    currentOrgId && orgIdSet.has(currentOrgId)
-      ? currentOrgId
-      : organizations[0]?.id ?? null;
+  const effectiveOrgId = resolveActiveOrganizationId(
+    currentOrgId,
+    organizations
+  );
 
   if (!user) {
     return (

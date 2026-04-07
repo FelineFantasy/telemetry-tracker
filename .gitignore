@@ -6,3 +6,5 @@ package-lock.json
 **/package-lock.json
 .next
 apps/dashboard/.next
+apps/dashboard/tsconfig.tsbuildinfo
+apps/api/tsconfig.tsbuildinfo

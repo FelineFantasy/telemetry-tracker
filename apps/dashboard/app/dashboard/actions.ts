@@ -25,6 +25,7 @@ export async function setDashboardProjectId(projectId: string): Promise<
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 400,
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
   });
   revalidatePath("/dashboard", "layout");
   return { ok: true };
@@ -38,6 +39,7 @@ export async function resetDashboardProjectId(): Promise<void> {
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 400,
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
   });
   revalidatePath("/dashboard", "layout");
 }
@@ -47,6 +49,7 @@ const cookieOpts = {
   sameSite: "lax" as const,
   maxAge: 60 * 60 * 24 * 400,
   httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
 };
 
 /**

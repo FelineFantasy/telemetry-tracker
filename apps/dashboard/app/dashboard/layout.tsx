@@ -1,7 +1,10 @@
 import { DashboardShell } from "@/app/components/dashboard/DashboardShell";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
-import { getDashboardOrganizationId } from "@/lib/dashboard-org";
+import {
+  getDashboardOrganizationId,
+  resolveActiveOrganizationId,
+} from "@/lib/dashboard-org";
 import { getDashboardProjectId } from "@/lib/dashboard-project";
 import { getDashboardUser } from "@/lib/dashboard-user";
 
@@ -61,15 +64,13 @@ export default async function DashboardLayout({
     getDashboardSessionContext(),
   ]);
 
-  const orgIdSet = new Set(organizations.map((o) => o.id));
-  const resolvedOrgId =
-    cookieOrgId && orgIdSet.has(cookieOrgId)
-      ? cookieOrgId
-      : organizations[0]?.id ?? null;
+  const resolvedOrgId = resolveActiveOrganizationId(cookieOrgId, organizations);
 
   const projects =
     resolvedOrgId !== null
-      ? allProjects.filter((p) => p.organizationId === resolvedOrgId)
+      ? allProjects.filter(
+          (p) => p.organizationId.toLowerCase() === resolvedOrgId.toLowerCase(),
+        )
       : allProjects;
 
   return (

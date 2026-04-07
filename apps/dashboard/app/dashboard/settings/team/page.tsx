@@ -2,7 +2,10 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
-import { getDashboardOrganizationId } from "@/lib/dashboard-org";
+import {
+  getDashboardOrganizationId,
+  resolveActiveOrganizationId,
+} from "@/lib/dashboard-org";
 import { getDashboardUser } from "@/lib/dashboard-user";
 import { TeamMembersClient, type TeamMemberRow } from "./TeamMembersClient";
 
@@ -46,9 +49,7 @@ export default async function TeamSettingsPage() {
     getDashboardSessionContext(),
   ]);
 
-  const orgIdSet = new Set(orgs.map((o) => o.id));
-  const requestedOrg =
-    cookieOrg && orgIdSet.has(cookieOrg) ? cookieOrg : orgs[0]?.id ?? null;
+  const requestedOrg = resolveActiveOrganizationId(cookieOrg, orgs);
 
   const loaded = await loadMembers(requestedOrg);
 
