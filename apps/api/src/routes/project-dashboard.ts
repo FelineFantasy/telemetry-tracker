@@ -14,7 +14,10 @@ import {
   getMembershipRoleForOrganization,
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
-import { resolveReadProjectId } from "../lib/read-project-request.js";
+import {
+  resolveReadProjectId,
+  tryResolveReadProjectId,
+} from "../lib/read-project-request.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -404,26 +407,41 @@ export async function projectDashboardRoutes(
     }
   );
 
-  /** Role and mutation flags for the active project (`X-Project-Id` + session). */
+  /**
+   * Role and capability flags: project-scoped actions use membership for `X-Project-Id`;
+   * org-scoped actions (`canCreateProject`, `canManageOrganization`) use `X-Organization-Id` when
+   * set so they match the sidebar org, not the project cookie’s organization.
+   */
   app.get("/meta/session-context", async (request, reply) => {
     const session = await getSessionUser(request);
     if (!session) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
-    const projectId = await resolveReadProjectId(request, reply);
-    if (projectId === null) return;
-    const projRole = await getMembershipRoleForProject(session.userId, projectId);
-    if (projRole === null) {
+    const headerOrg = readOrgIdHeader(request);
+    const projectId = await tryResolveReadProjectId(request);
+    const projRole =
+      projectId !== null
+        ? await getMembershipRoleForProject(session.userId, projectId)
+        : null;
+
+    const orgRoleFromHeader = headerOrg
+      ? await getMembershipRoleForOrganization(session.userId, headerOrg)
+      : null;
+    /** Org-scoped UI (sidebar org): prefer explicit org membership; if header is stale, fall back to project org. */
+    const orgCapabilityRole = orgRoleFromHeader ?? projRole;
+
+    if (projRole === null && orgCapabilityRole === null) {
       return reply.status(403).send({ error: "Forbidden" });
     }
+
     return reply.send({
-      projectId,
-      role: projRole,
+      projectId: projectId ?? "",
+      role: projRole ?? orgCapabilityRole ?? OrgRole.VIEWER,
       canResolveErrors: canResolveErrors(projRole),
       canCreateApiKey: canCreateApiKey(projRole),
       canRevokeApiKey: canRevokeApiKey(projRole),
-      canManageOrganization: canManageOrganization(projRole),
-      canCreateProject: canCreateProject(projRole),
+      canManageOrganization: canManageOrganization(orgCapabilityRole),
+      canCreateProject: canCreateProject(orgCapabilityRole),
     });
   });
 

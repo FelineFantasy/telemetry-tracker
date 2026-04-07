@@ -44,7 +44,7 @@ export default async function OrganizationSettingsPage() {
     );
   }
 
-  /** OWNER in the active project’s org — matches POST /meta/projects. */
+  /** OWNER in the active organization (sidebar) — matches POST /meta/projects. */
   const canCreateProject = capabilities?.canCreateProject === true;
   const permissionsUnknown = capabilities === null;
 

@@ -58,3 +58,42 @@ export async function resolveReadProjectId(
 
   return project.id;
 }
+
+/**
+ * Like {@link resolveReadProjectId} but never sends a reply. When a session exists and the user is
+ * not a member of the project’s organization, returns `null` instead of 403 (for aggregating
+ * session context with org-scoped permissions).
+ */
+export async function tryResolveReadProjectId(
+  request: FastifyRequest
+): Promise<string | null> {
+  const fallback = readProjectIdFromEnv();
+  const raw = headerFirst(request, "x-project-id");
+  if (!raw || !UUID_RE.test(raw)) {
+    return fallback;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: raw, deleted_at: null },
+    select: { id: true, organization_id: true },
+  });
+  if (!project) {
+    return fallback;
+  }
+
+  const session = await getSessionUser(request);
+  if (session) {
+    const m = await prisma.organizationMembership.findFirst({
+      where: {
+        user_id: session.userId,
+        organization_id: project.organization_id,
+      },
+    });
+    if (!m) {
+      return null;
+    }
+    return project.id;
+  }
+
+  return project.id;
+}

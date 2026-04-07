@@ -10,7 +10,7 @@ export type DashboardSessionContext = {
   canCreateProject: boolean;
 };
 
-/** Role and mutation flags for the active project (session + `X-Project-Id`). */
+/** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set. */
 export async function getDashboardSessionContext(): Promise<DashboardSessionContext | null> {
   const res = await dashboardApiFetch("/api/meta/session-context");
   if (!res.ok) return null;

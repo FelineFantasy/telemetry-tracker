@@ -24,7 +24,9 @@ async function getOrganizations(): Promise<OrgRow[]> {
 type ProjectRow = { id: string; name: string; slug: string; organizationId: string };
 
 async function getProjects(): Promise<ProjectRow[]> {
-  const res = await dashboardApiFetch("/api/meta/projects");
+  const res = await dashboardApiFetch("/api/meta/projects", undefined, {
+    omitOrganizationHeader: true,
+  });
   if (!res.ok) return [];
   const data = await res.json();
   const raw = Array.isArray(data.projects) ? data.projects : [];
