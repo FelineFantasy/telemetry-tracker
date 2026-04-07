@@ -14,6 +14,7 @@ import { TimeAgo } from "@/app/components/TimeAgo";
 export type ApiKeyRow = {
   publicId: string;
   name: string | null;
+  allowedApp: string | null;
   createdAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
@@ -101,6 +102,19 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
               autoComplete="off"
               disabled={pending}
             />
+            <label className="api-keys__label" htmlFor="key-allowed-app">
+              Restrict to app <span className="text-muted-foreground">(optional)</span>
+            </label>
+            <input
+              id="key-allowed-app"
+              name="allowedApp"
+              type="text"
+              className="filter-input api-keys__input"
+              placeholder="e.g. my-ios-app — must match SDK app field"
+              maxLength={64}
+              autoComplete="off"
+              disabled={pending}
+            />
             {formError ? (
               <p className="api-keys__error" role="alert">
                 {formError}
@@ -133,6 +147,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
               <thead>
                 <tr>
                   <th>Label</th>
+                  <th>Allowed app</th>
                   <th>Public id</th>
                   <th>Created</th>
                   <th>Last used</th>
@@ -146,6 +161,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
                   return (
                     <tr key={k.publicId}>
                       <td>{k.name ?? "—"}</td>
+                      <td>{k.allowedApp ?? "—"}</td>
                       <td>
                         <code className="api-keys__mono">{k.publicId}</code>
                       </td>

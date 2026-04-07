@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MenuIcon } from "@/app/components/sidebar/MenuIcon";
 import { AppSidebar } from "./AppSidebar";
 import { DashboardCapabilitiesProvider } from "./DashboardCapabilitiesContext";
+import type { OrgOption } from "./OrgSwitcher";
 import type { ProjectOption } from "./ProjectSwitcher";
 import { DashboardAppContext } from "./DashboardAppContext";
 import type { DashboardSessionContext } from "@/lib/dashboard-capabilities";
@@ -14,6 +15,8 @@ const SIDEBAR_COLLAPSED_KEY = "telemetry-dashboard-sidebar-collapsed";
 export function DashboardShell({
   apps,
   children,
+  organizations = [],
+  currentOrganizationId = null,
   projects = [],
   currentProjectId = "",
   user = null,
@@ -21,6 +24,8 @@ export function DashboardShell({
 }: {
   apps: string[];
   children: React.ReactNode;
+  organizations?: OrgOption[];
+  currentOrganizationId?: string | null;
   projects?: ProjectOption[];
   currentProjectId?: string;
   user?: DashboardUser | null;
@@ -93,6 +98,8 @@ export function DashboardShell({
         onClose={closeSidebar}
         desktopCollapsed={desktopCollapsed}
         onToggleDesktopCollapse={toggleDesktopSidebar}
+        organizations={organizations}
+        currentOrganizationId={currentOrganizationId}
         projects={projects}
         currentProjectId={currentProjectId}
         user={user}

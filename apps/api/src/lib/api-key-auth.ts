@@ -23,6 +23,8 @@ export type VerifiedApiKey = {
   id: string;
   projectId: string;
   organizationPlanTier: "FREE" | "PRO" | "BUSINESS";
+  /** If set, ingest payloads must use this `app` value. */
+  allowedApp: string | null;
 };
 
 /**
@@ -76,6 +78,7 @@ export async function verifyIngestApiKey(
     id: row.id,
     projectId: row.project_id,
     organizationPlanTier: tier,
+    allowedApp: row.allowed_app,
   };
 }
 

@@ -9,6 +9,7 @@ type KeysApiResponse = {
   keys: {
     publicId: string;
     name: string | null;
+    allowedApp?: string | null;
     createdAt: string;
     lastUsedAt: string | null;
     revokedAt: string | null;
@@ -25,6 +26,7 @@ async function loadKeys(): Promise<{ ok: true; keys: ApiKeyRow[] } | { ok: false
   const keys: ApiKeyRow[] = (data.keys ?? []).map((k) => ({
     publicId: k.publicId,
     name: k.name,
+    allowedApp: k.allowedApp ?? null,
     createdAt: k.createdAt,
     lastUsedAt: k.lastUsedAt,
     revokedAt: k.revokedAt,

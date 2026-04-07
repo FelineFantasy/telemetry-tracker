@@ -11,12 +11,22 @@ Ingest remains authenticated with **project API keys**, not user sessions.
 | Read telemetry (dashboard GETs scoped to project) | Yes | Yes | Yes |
 | Resolve / unresolve error groups (`PATCH /api/errors/:id`) | No | Yes | Yes |
 | List API keys (`GET /api/project/api-keys`) | Yes | Yes | Yes |
-| Create API key (`POST /api/project/api-keys`) | No | Yes | Yes |
+| Create API key (`POST /api/project/api-keys`), optional `allowedApp` for per-app restriction | No | Yes | Yes |
 | Revoke API key (`POST /api/project/api-keys/:publicId/revoke`) | No | No | Yes |
-| Org settings, invites, project lifecycle (future routes) | No | No | Yes |
+| List organizations (`GET /api/meta/organizations`) | Yes | Yes | Yes |
+| Create organization (`POST /api/meta/organizations`; you become owner of the new org) | Yes | Yes | Yes |
+| Create project (`POST /api/meta/projects`) | No | No | Yes |
+| Add member / email invite (`POST /api/meta/organizations/:orgId/members`) | No | No | Yes |
+| Change member role (`PATCH /api/meta/organizations/:orgId/members/:userId`) | No | No | Yes |
+
+**Per-app API keys:** If `ApiKey.allowed_app` is set, ingest requests authenticated with that key must send the same value in the JSON `app` field on `/ingest/event`, `/ingest/session`, `/ingest/batch`, and `/ingest/error`. Mismatch returns **403**.
+
+**Invites:** Unknown emails create an `OrganizationInvite` row; owners receive an invite URL (e.g. `/register?invite=…`). `POST /api/auth/register` accepts optional `inviteToken`; the new user joins only that organization with the invite role (no default-org membership on that path).
 
 **Registration:** The first user in the default organization becomes **`OWNER`**. Additional allowed signups receive **`VIEWER`** unless changed in the database.
 
 **API enforcement:** Mutations check the caller’s role when a **session** is present. Unauthenticated access to the read API retains legacy behavior for local/dev use; production deployments should rely on session-backed dashboard usage.
 
-**Dashboard:** `/api/meta/session-context` returns `role` and boolean flags (`canResolveErrors`, `canCreateApiKey`, `canRevokeApiKey`, `canManageOrganization`) for the active project (`X-Project-Id` + session).
+**Dashboard:** `/api/meta/session-context` returns `role` and boolean flags (`canResolveErrors`, `canCreateApiKey`, `canRevokeApiKey`, `canManageOrganization`, `canCreateProject`) for the active project (`X-Project-Id` + session).
+
+**Organization scoping:** The dashboard may send `X-Organization-Id` so `GET /api/meta/projects` returns only projects in that organization (caller must be a member).

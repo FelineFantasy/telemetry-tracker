@@ -10,8 +10,15 @@ export async function getMembershipRoleForProject(
     select: { organization_id: true },
   });
   if (!project) return null;
+  return getMembershipRoleForOrganization(userId, project.organization_id);
+}
+
+export async function getMembershipRoleForOrganization(
+  userId: string,
+  organizationId: string
+): Promise<OrgRole | null> {
   const m = await prisma.organizationMembership.findFirst({
-    where: { user_id: userId, organization_id: project.organization_id },
+    where: { user_id: userId, organization_id: organizationId },
     select: { role: true },
   });
   return m?.role ?? null;
@@ -32,5 +39,13 @@ export function canRevokeApiKey(role: OrgRole | null): boolean {
 }
 
 export function canManageOrganization(role: OrgRole | null): boolean {
+  return role === OrgRole.OWNER;
+}
+
+export function canCreateProject(role: OrgRole | null): boolean {
+  return role === OrgRole.OWNER;
+}
+
+export function canManageMembers(role: OrgRole | null): boolean {
   return role === OrgRole.OWNER;
 }

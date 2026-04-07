@@ -7,6 +7,7 @@ export type DashboardSessionContext = {
   canCreateApiKey: boolean;
   canRevokeApiKey: boolean;
   canManageOrganization: boolean;
+  canCreateProject: boolean;
 };
 
 /** Role and mutation flags for the active project (session + `X-Project-Id`). */
@@ -19,7 +20,8 @@ export async function getDashboardSessionContext(): Promise<DashboardSessionCont
     typeof data.canResolveErrors !== "boolean" ||
     typeof data.canCreateApiKey !== "boolean" ||
     typeof data.canRevokeApiKey !== "boolean" ||
-    typeof data.canManageOrganization !== "boolean"
+    typeof data.canManageOrganization !== "boolean" ||
+    typeof data.canCreateProject !== "boolean"
   ) {
     return null;
   }

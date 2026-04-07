@@ -80,6 +80,21 @@ export function SessionsNavIcon(props: IconProps) {
   );
 }
 
+/** Organization — building */
+export function OrgNavIcon(props: IconProps) {
+  return (
+    <IconShell {...props}>
+      <path
+        d="M4 20V10l8-6 8 6v10M9 20v-6h6v6"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </IconShell>
+  );
+}
+
 /** Team — people */
 export function TeamNavIcon(props: IconProps) {
   return (

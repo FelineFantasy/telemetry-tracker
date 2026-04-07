@@ -5,16 +5,23 @@ export const metadata = {
   title: "Create account · Telemetry Tracker",
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invite?: string }>;
+}) {
+  const sp = await searchParams;
+  const inviteToken = typeof sp.invite === "string" ? sp.invite : "";
   return (
     <div className="auth-page">
       <div className="auth-page__panel card">
         <h1 className="auth-page__title">Create account</h1>
         <p className="auth-page__lede">
-          The first user becomes organization owner. Further signups may be disabled by your
-          deployment settings.
+          {inviteToken
+            ? "Complete registration to join the organization you were invited to."
+            : "The first user becomes organization owner. Further signups may be disabled by your deployment settings."}
         </p>
-        <RegisterForm />
+        <RegisterForm inviteToken={inviteToken} />
         <p className="auth-page__hint text-muted-foreground">
           <Link href="/">← Back to home</Link>
         </p>

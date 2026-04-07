@@ -12,13 +12,18 @@ export type IngestAuthFailure = { error: string; status: number };
 export async function resolveIngestProjectId(
   prisma: PrismaClient,
   request: FastifyRequest
-): Promise<{ projectId: string } | IngestAuthFailure> {
+): Promise<
+  { projectId: string; allowedApp: string | null | undefined } | IngestAuthFailure
+> {
   const verified = await verifyIngestApiKey(prisma, request);
   if (verified) {
-    return { projectId: verified.projectId };
+    return {
+      projectId: verified.projectId,
+      allowedApp: verified.allowedApp,
+    };
   }
   if (process.env.INGEST_ALLOW_UNAUTHENTICATED === "true") {
-    return { projectId: readProjectIdFromEnv() };
+    return { projectId: readProjectIdFromEnv(), allowedApp: undefined };
   }
   return {
     error:
@@ -42,6 +47,7 @@ export function createIngestAuthPreHandler(prisma: PrismaClient) {
       return;
     }
     request.ingestProjectId = result.projectId;
+    request.ingestApiKeyAllowedApp = result.allowedApp;
   };
 }
 

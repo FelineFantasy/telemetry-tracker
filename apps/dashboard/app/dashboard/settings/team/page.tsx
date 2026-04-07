@@ -1,30 +1,35 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import { Table, TableWrap } from "@/app/components/ui/Table";
-import { TimeAgo } from "@/app/components/TimeAgo";
+import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
+import { getDashboardOrganizationId } from "@/lib/dashboard-org";
+import { getDashboardUser } from "@/lib/dashboard-user";
+import { TeamMembersClient, type TeamMemberRow } from "./TeamMembersClient";
 
 export const dynamic = "force-dynamic";
 
-type MemberRow = {
-  userId: string;
-  email: string;
-  displayName: string | null;
-  role: string;
-  joinedAt: string;
-};
+async function loadOrganizations(): Promise<{ id: string }[]> {
+  const res = await dashboardApiFetch("/api/meta/organizations");
+  if (!res.ok) return [];
+  const data = (await res.json()) as { organizations?: { id: string }[] };
+  return Array.isArray(data.organizations) ? data.organizations : [];
+}
 
-async function loadMembers(): Promise<
-  { ok: true; organizationId: string | null; members: MemberRow[] } | { ok: false; message: string }
+async function loadMembers(
+  organizationId: string | null
+): Promise<
+  | { ok: true; organizationId: string | null; members: TeamMemberRow[] }
+  | { ok: false; message: string }
 > {
-  const res = await dashboardApiFetch("/api/meta/members");
+  const q = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : "";
+  const res = await dashboardApiFetch(`/api/meta/members${q}`);
   if (!res.ok) {
     const t = await res.text();
     return { ok: false, message: `Could not load members (${res.status}): ${t.slice(0, 200)}` };
   }
   const data = (await res.json()) as {
     organizationId: string | null;
-    members: MemberRow[];
+    members: TeamMemberRow[];
   };
   return {
     ok: true,
@@ -34,7 +39,19 @@ async function loadMembers(): Promise<
 }
 
 export default async function TeamSettingsPage() {
-  const loaded = await loadMembers();
+  const [orgs, cookieOrg, user, capabilities] = await Promise.all([
+    loadOrganizations(),
+    getDashboardOrganizationId(),
+    getDashboardUser(),
+    getDashboardSessionContext(),
+  ]);
+
+  const orgIdSet = new Set(orgs.map((o) => o.id));
+  const requestedOrg =
+    cookieOrg && orgIdSet.has(cookieOrg) ? cookieOrg : orgs[0]?.id ?? null;
+
+  const loaded = await loadMembers(requestedOrg);
+
   if (!loaded.ok) {
     return (
       <>
@@ -44,36 +61,24 @@ export default async function TeamSettingsPage() {
     );
   }
 
+  const organizationId = loaded.organizationId;
+  const members = loaded.members;
+  const canManageMembers = Boolean(capabilities?.canManageOrganization);
+  const ownerCount = members.filter((m) => m.role === "OWNER").length;
+
   return (
     <>
       <PageTitle title="Team" context="Members of your organization." />
-      {loaded.members.length === 0 ? (
-        <p className="text-muted-foreground">No members yet.</p>
+      {organizationId && user ? (
+        <TeamMembersClient
+          organizationId={organizationId}
+          members={members}
+          currentUserId={user.id}
+          canManageMembers={canManageMembers}
+          ownerCount={ownerCount}
+        />
       ) : (
-        <TableWrap>
-          <Table>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loaded.members.map((m) => (
-                <tr key={m.userId}>
-                  <td>{m.email}</td>
-                  <td>{m.displayName ?? "—"}</td>
-                  <td>{m.role}</td>
-                  <td>
-                    <TimeAgo iso={m.joinedAt} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </TableWrap>
+        <p className="text-muted-foreground">Join an organization to see members.</p>
       )}
     </>
   );
