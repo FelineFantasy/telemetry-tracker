@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { OrgRole } from "@prisma/client";
+import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { getSessionTokenFromRequest, getSessionUser } from "../lib/auth-session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
@@ -47,39 +47,69 @@ export async function authRoutes(
     }
 
     if (inviteToken) {
-      const invite = await prisma.organizationInvite.findUnique({
-        where: { token: inviteToken },
-      });
-      if (!invite || invite.expires_at.getTime() <= Date.now()) {
-        return reply.status(400).send({ error: "Invalid or expired invite" });
-      }
-      if (normalizeEmail(invite.email) !== email) {
-        return reply.status(400).send({ error: "Email must match the invite" });
-      }
-
-      const existingInvitee = await prisma.user.findUnique({ where: { email } });
-      if (existingInvitee) {
-        return reply.status(409).send({ error: "Email already registered" });
-      }
-
-      const user = await prisma.$transaction(async (tx) => {
-        const u = await tx.user.create({
-          data: {
-            email,
-            password_hash: hashPassword(password),
-            display_name: displayName,
-            memberships: {
-              create: {
-                organization_id: invite.organization_id,
-                role: invite.role,
+      const inviteOutcome = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "OrganizationInvite" WHERE token = ${inviteToken} FOR UPDATE`
+        );
+        const invite = await tx.organizationInvite.findUnique({
+          where: { token: inviteToken },
+        });
+        if (!invite) {
+          return { kind: "invalid_invite" as const };
+        }
+        if (invite.expires_at.getTime() <= Date.now()) {
+          return { kind: "expired" as const };
+        }
+        if (normalizeEmail(invite.email) !== email) {
+          return { kind: "email_mismatch" as const };
+        }
+        const existingInvitee = await tx.user.findUnique({ where: { email } });
+        if (existingInvitee) {
+          return { kind: "email_taken" as const };
+        }
+        try {
+          const u = await tx.user.create({
+            data: {
+              email,
+              password_hash: hashPassword(password),
+              display_name: displayName,
+              memberships: {
+                create: {
+                  organization_id: invite.organization_id,
+                  role: invite.role,
+                },
               },
             },
-          },
-          select: { id: true, email: true, display_name: true },
-        });
-        await tx.organizationInvite.delete({ where: { id: invite.id } });
-        return u;
+            select: { id: true, email: true, display_name: true },
+          });
+          await tx.organizationInvite.delete({ where: { id: invite.id } });
+          return {
+            kind: "ok" as const,
+            user: u,
+            organizationId: invite.organization_id,
+          };
+        } catch (e: unknown) {
+          if (
+            typeof e === "object" &&
+            e !== null &&
+            "code" in e &&
+            (e as { code: string }).code === "P2002"
+          ) {
+            return { kind: "email_taken" as const };
+          }
+          throw e;
+        }
       });
+      if (inviteOutcome.kind === "invalid_invite" || inviteOutcome.kind === "expired") {
+        return reply.status(400).send({ error: "Invalid or expired invite" });
+      }
+      if (inviteOutcome.kind === "email_mismatch") {
+        return reply.status(400).send({ error: "Email must match the invite" });
+      }
+      if (inviteOutcome.kind === "email_taken") {
+        return reply.status(409).send({ error: "Email already registered" });
+      }
+      const user = inviteOutcome.user;
 
       const sessionId = randomUUID();
       const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
@@ -94,7 +124,7 @@ export async function authRoutes(
       return reply.status(201).send({
         sessionId,
         expiresAt: expiresAt.toISOString(),
-        organizationId: invite.organization_id,
+        organizationId: inviteOutcome.organizationId,
         user: {
           id: user.id,
           email: user.email,

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
-import { OrgRole } from "@prisma/client";
+import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
 import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
@@ -370,32 +370,48 @@ export async function projectDashboardRoutes(
         return reply.status(400).send({ error: "role must be OWNER, EDITOR, or VIEWER" });
       }
 
-      const membership = await prisma.organizationMembership.findUnique({
-        where: {
-          user_id_organization_id: { user_id: targetUserId, organization_id: orgId },
-        },
-      });
-      if (!membership) {
-        return reply.status(404).send({ error: "Member not found" });
-      }
-
-      if (membership.role === OrgRole.OWNER && newRole !== OrgRole.OWNER) {
-        const ownerCount = await prisma.organizationMembership.count({
-          where: { organization_id: orgId, role: OrgRole.OWNER },
+      const patchResult = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
+        );
+        const membership = await tx.organizationMembership.findUnique({
+          where: {
+            user_id_organization_id: {
+              user_id: targetUserId,
+              organization_id: orgId,
+            },
+          },
         });
-        if (ownerCount <= 1) {
-          return reply
-            .status(400)
-            .send({ error: "Cannot change role of the last owner" });
+        if (!membership) {
+          return { status: 404 as const, error: "Member not found" };
         }
-      }
-
-      await prisma.organizationMembership.update({
-        where: {
-          user_id_organization_id: { user_id: targetUserId, organization_id: orgId },
-        },
-        data: { role: newRole },
+        if (membership.role === OrgRole.OWNER && newRole !== OrgRole.OWNER) {
+          const ownerCount = await tx.organizationMembership.count({
+            where: { organization_id: orgId, role: OrgRole.OWNER },
+          });
+          if (ownerCount <= 1) {
+            return {
+              status: 400 as const,
+              error: "Cannot change role of the last owner",
+            };
+          }
+        }
+        await tx.organizationMembership.update({
+          where: {
+            user_id_organization_id: {
+              user_id: targetUserId,
+              organization_id: orgId,
+            },
+          },
+          data: { role: newRole },
+        });
+        return { status: 204 as const };
       });
+      if (patchResult.status !== 204) {
+        return reply
+          .status(patchResult.status)
+          .send({ error: patchResult.error });
+      }
       return reply.status(204).send();
     }
   );
