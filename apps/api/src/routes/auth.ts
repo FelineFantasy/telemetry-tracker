@@ -94,6 +94,7 @@ export async function authRoutes(
       return reply.status(201).send({
         sessionId,
         expiresAt: expiresAt.toISOString(),
+        organizationId: invite.organization_id,
         user: {
           id: user.id,
           email: user.email,
@@ -147,6 +148,7 @@ export async function authRoutes(
     return reply.status(201).send({
       sessionId,
       expiresAt: expiresAt.toISOString(),
+      organizationId: DEFAULT_ORG_ID,
       user: {
         id: user.id,
         email: user.email,
@@ -180,9 +182,16 @@ export async function authRoutes(
       },
     });
 
+    const firstMembership = await prisma.organizationMembership.findFirst({
+      where: { user_id: user.id },
+      orderBy: { created_at: "asc" },
+      select: { organization_id: true },
+    });
+
     return reply.send({
       sessionId,
       expiresAt: expiresAt.toISOString(),
+      organizationId: firstMembership?.organization_id ?? null,
       user: {
         id: user.id,
         email: user.email,
