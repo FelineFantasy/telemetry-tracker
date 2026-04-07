@@ -46,11 +46,6 @@ export async function authRoutes(
       return reply.status(400).send({ error: "Password must be at least 8 characters" });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return reply.status(409).send({ error: "Email already registered" });
-    }
-
     if (inviteToken) {
       const invite = await prisma.organizationInvite.findUnique({
         where: { token: inviteToken },
@@ -60,6 +55,11 @@ export async function authRoutes(
       }
       if (normalizeEmail(invite.email) !== email) {
         return reply.status(400).send({ error: "Email must match the invite" });
+      }
+
+      const existingInvitee = await prisma.user.findUnique({ where: { email } });
+      if (existingInvitee) {
+        return reply.status(409).send({ error: "Email already registered" });
       }
 
       const user = await prisma.$transaction(async (tx) => {
@@ -107,6 +107,11 @@ export async function authRoutes(
       process.env.TELEMETRY_ALLOW_REGISTRATION === "true" || userCount === 0;
     if (!allowReg) {
       return reply.status(403).send({ error: "Registration is disabled" });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return reply.status(409).send({ error: "Email already registered" });
     }
 
     const orgMemberCount = await prisma.organizationMembership.count({
