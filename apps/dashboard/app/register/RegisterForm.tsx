@@ -7,7 +7,7 @@ import { register } from "@/app/auth/actions";
 import { Button } from "@/app/components/ui/Button";
 import Link from "next/link";
 
-export function RegisterForm() {
+export function RegisterForm({ inviteToken = "" }: { inviteToken?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -29,6 +29,7 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="auth-form">
+      {inviteToken ? <input type="hidden" name="inviteToken" value={inviteToken} /> : null}
       <label className="auth-form__label" htmlFor="reg-email">
         Email
       </label>

@@ -6,6 +6,7 @@ import {
   ApiKeysNavIcon,
   ErrorsNavIcon,
   EventsNavIcon,
+  OrgNavIcon,
   OverviewNavIcon,
   SessionsNavIcon,
   TeamNavIcon,
@@ -18,6 +19,7 @@ const dashboardViewLinks = [
   { href: `${DASHBOARD_BASE}/errors`, label: "Errors", Icon: ErrorsNavIcon },
   { href: `${DASHBOARD_BASE}/events`, label: "Events", Icon: EventsNavIcon },
   { href: `${DASHBOARD_BASE}/sessions`, label: "Sessions", Icon: SessionsNavIcon },
+  { href: `${DASHBOARD_BASE}/settings/organization`, label: "Organization", Icon: OrgNavIcon },
   { href: `${DASHBOARD_BASE}/settings/team`, label: "Team", Icon: TeamNavIcon },
   { href: `${DASHBOARD_BASE}/settings/keys`, label: "API keys", Icon: ApiKeysNavIcon },
 ] as const;
@@ -32,6 +34,9 @@ function isViewCurrent(href: string, pathname: string): boolean {
   }
   if (href === `${DASHBOARD_BASE}/settings/keys`) {
     return pathname.startsWith(`${DASHBOARD_BASE}/settings/keys`);
+  }
+  if (href === `${DASHBOARD_BASE}/settings/organization`) {
+    return pathname.startsWith(`${DASHBOARD_BASE}/settings/organization`);
   }
   if (href === `${DASHBOARD_BASE}/settings/team`) {
     return pathname.startsWith(`${DASHBOARD_BASE}/settings/team`);

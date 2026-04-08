@@ -94,17 +94,17 @@ The `tt_live_` prefix marks **production** credentials. Later you might add othe
 
 ---
 
-## Dashboard auth (next): users and memberships
+## Dashboard auth: users, memberships, and RBAC
 
-This repo’s ingest model is **org → project → API key**. **Human login** layers on naturally without changing that core:
+The ingest model remains **org → project → API key**. **Human login** is separate: **User** + **OrganizationMembership** with an **`OrgRole`**.
 
 | Concept | Role |
 |---------|------|
-| **User** | Identity (email/OAuth subject) — not the same as an API key. |
-| **OrganizationMembership** | `(user_id, organization_id)` with a **role**. |
-| **Roles** (evolve over time) | e.g. `owner`, `admin`, `member` — start with one role if needed. |
+| **User** | Identity (email + password in the reference implementation) — not the same as an API key. |
+| **OrganizationMembership** | `(user_id, organization_id)` with **`OWNER`**, **`EDITOR`**, or **`VIEWER`**. |
+| **Ingest** | Still **project API keys** only. |
 
-You do not need every role on day one; defining the shape early avoids awkward migrations when the dashboard ships. Memberships authorize **management** (create projects, rotate keys, view billing); **ingest** stays authenticated by **project API keys** (or future separate tokens).
+**Detailed permission matrix** (who can resolve errors, create/revoke keys, etc.): see [RBAC.md](./RBAC.md).
 
 ---
 

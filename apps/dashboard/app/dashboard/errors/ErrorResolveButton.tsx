@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { setErrorResolvedAction } from "@/app/dashboard/actions";
+import { useDashboardCapabilities } from "@/app/components/dashboard/DashboardCapabilitiesContext";
 import { Button } from "@/app/components/ui/Button";
 
 export function ErrorResolveButton({
@@ -12,8 +13,13 @@ export function ErrorResolveButton({
   errorGroupId: string;
   resolved: boolean;
 }) {
+  const caps = useDashboardCapabilities();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  if (!caps?.canResolveErrors) {
+    return null;
+  }
 
   function onClick() {
     startTransition(async () => {

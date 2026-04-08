@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SidebarBrand } from "@/app/components/sidebar/SidebarBrand";
 import { useMobileDrawer } from "@/lib/useMobileDrawer";
+import { OrgSwitcher, type OrgOption } from "./OrgSwitcher";
 import { ProjectSwitcher, type ProjectOption } from "./ProjectSwitcher";
 import { DashboardViewLinks } from "./DashboardViewLinks";
 import { LogoutForm } from "./LogoutForm";
@@ -41,6 +43,8 @@ export function AppSidebar({
   onClose,
   desktopCollapsed = false,
   onToggleDesktopCollapse,
+  organizations = [],
+  currentOrganizationId = null,
   projects = [],
   currentProjectId = "",
   user = null,
@@ -49,6 +53,8 @@ export function AppSidebar({
   onClose?: () => void;
   desktopCollapsed?: boolean;
   onToggleDesktopCollapse?: () => void;
+  organizations?: OrgOption[];
+  currentOrganizationId?: string | null;
   projects?: ProjectOption[];
   currentProjectId?: string;
   user?: DashboardUser | null;
@@ -84,9 +90,28 @@ export function AppSidebar({
         closeAriaLabel="Close application menu"
       />
 
+      {organizations.length > 0 && currentOrganizationId ? (
+        <div className="app-sidebar__project">
+          <OrgSwitcher
+            organizations={organizations}
+            currentOrganizationId={currentOrganizationId}
+          />
+        </div>
+      ) : null}
+
       {projects.length > 0 && currentProjectId ? (
         <div className="app-sidebar__project">
           <ProjectSwitcher projects={projects} currentProjectId={currentProjectId} />
+        </div>
+      ) : organizations.length > 0 ? (
+        <div className="app-sidebar__project">
+          <p className="project-switcher project-switcher--single text-muted-foreground text-sm m-0">
+            No projects in this organization.{" "}
+            <Link href="/dashboard/settings/organization" className="underline">
+              Create one
+            </Link>
+            .
+          </p>
         </div>
       ) : null}
 

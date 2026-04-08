@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { API_BASE_URL } from "@/lib/api-url";
+import { TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
 import {
   TELEMETRY_PROJECT_COOKIE,
   TELEMETRY_SESSION_COOKIE,
@@ -12,15 +13,47 @@ import {
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const PROJECT_MAX_AGE = 60 * 60 * 24 * 400;
 
-async function fetchFirstProjectId(sessionId: string): Promise<string | undefined> {
+async function fetchFirstProjectAndOrg(sessionId: string): Promise<{
+  projectId?: string;
+  organizationId?: string;
+}> {
   const res = await fetch(`${API_BASE_URL}/api/meta/projects`, {
     cache: "no-store",
     headers: { Authorization: `Bearer ${sessionId}` },
   });
+  if (!res.ok) return {};
+  const data = (await res.json()) as {
+    projects?: { id: string; organizationId?: string }[];
+  };
+  const p = data.projects?.[0];
+  if (!p) return {};
+  return {
+    projectId: p.id,
+    organizationId: p.organizationId,
+  };
+}
+
+/** First org the user belongs to (matches `GET /api/meta/organizations` order) — use when there are no projects yet. */
+async function fetchFirstOrganizationId(sessionId: string): Promise<string | undefined> {
+  const res = await fetch(`${API_BASE_URL}/api/meta/organizations`, {
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${sessionId}` },
+  });
   if (!res.ok) return undefined;
-  const data = (await res.json()) as { projects?: { id: string }[] };
-  const id = data.projects?.[0]?.id;
+  const data = (await res.json()) as { organizations?: { id: string }[] };
+  const id = data.organizations?.[0]?.id;
   return typeof id === "string" ? id : undefined;
+}
+
+function resolveBootstrapOrganizationId(
+  fromAuthResponse: unknown,
+  fromProject: string | undefined,
+  fromOrgList: string | undefined
+): string | undefined {
+  if (typeof fromAuthResponse === "string" && fromAuthResponse.trim() !== "") {
+    return fromAuthResponse.trim();
+  }
+  return fromProject ?? fromOrgList;
 }
 
 function cookieBase() {
@@ -48,6 +81,7 @@ export async function login(
   const data = (await res.json().catch(() => ({}))) as {
     error?: string;
     sessionId?: string;
+    organizationId?: string | null;
   };
   if (!res.ok) {
     return { ok: false, error: data.error ?? "Login failed" };
@@ -61,9 +95,24 @@ export async function login(
     ...cookieBase(),
     maxAge: SESSION_MAX_AGE,
   });
-  const projectId = await fetchFirstProjectId(sessionId);
+  const { projectId, organizationId: orgFromProject } =
+    await fetchFirstProjectAndOrg(sessionId);
+  let organizationId = resolveBootstrapOrganizationId(
+    data.organizationId,
+    orgFromProject,
+    undefined
+  );
+  if (!organizationId) {
+    organizationId = await fetchFirstOrganizationId(sessionId);
+  }
   if (projectId) {
     c.set(TELEMETRY_PROJECT_COOKIE, projectId, {
+      ...cookieBase(),
+      maxAge: PROJECT_MAX_AGE,
+    });
+  }
+  if (organizationId) {
+    c.set(TELEMETRY_ORG_COOKIE, organizationId.toLowerCase(), {
       ...cookieBase(),
       maxAge: PROJECT_MAX_AGE,
     });
@@ -78,17 +127,24 @@ export async function register(
   const password = String(formData.get("password") ?? "");
   const displayNameRaw = String(formData.get("displayName") ?? "").trim();
   const displayName = displayNameRaw ? displayNameRaw.slice(0, 120) : undefined;
+  const inviteToken = String(formData.get("inviteToken") ?? "").trim();
   if (!email || !password) {
     return { ok: false, error: "Email and password are required" };
   }
   const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, displayName }),
+    body: JSON.stringify({
+      email,
+      password,
+      displayName,
+      ...(inviteToken ? { inviteToken } : {}),
+    }),
   });
   const data = (await res.json().catch(() => ({}))) as {
     error?: string;
     sessionId?: string;
+    organizationId?: string | null;
   };
   if (!res.ok) {
     return { ok: false, error: data.error ?? "Registration failed" };
@@ -102,9 +158,24 @@ export async function register(
     ...cookieBase(),
     maxAge: SESSION_MAX_AGE,
   });
-  const projectId = await fetchFirstProjectId(sessionId);
+  const { projectId, organizationId: orgFromProject } =
+    await fetchFirstProjectAndOrg(sessionId);
+  let organizationId = resolveBootstrapOrganizationId(
+    data.organizationId,
+    orgFromProject,
+    undefined
+  );
+  if (!organizationId) {
+    organizationId = await fetchFirstOrganizationId(sessionId);
+  }
   if (projectId) {
     c.set(TELEMETRY_PROJECT_COOKIE, projectId, {
+      ...cookieBase(),
+      maxAge: PROJECT_MAX_AGE,
+    });
+  }
+  if (organizationId) {
+    c.set(TELEMETRY_ORG_COOKIE, organizationId.toLowerCase(), {
       ...cookieBase(),
       maxAge: PROJECT_MAX_AGE,
     });
@@ -122,6 +193,8 @@ export async function logout(): Promise<void> {
   }
   const c = await cookies();
   c.set(TELEMETRY_SESSION_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+  c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+  c.set(TELEMETRY_PROJECT_COOKIE, "", { ...cookieBase(), maxAge: 0 });
 }
 
 export async function logoutAction(): Promise<void> {

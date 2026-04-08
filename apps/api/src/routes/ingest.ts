@@ -1,4 +1,9 @@
-import type { FastifyInstance, FastifyPluginOptions } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyPluginOptions,
+  FastifyReply,
+  FastifyRequest,
+} from "fastify";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
@@ -55,6 +60,23 @@ const batchSchema = z.object({
   events: z.array(eventSchema).max(100),
 });
 
+const APP_RESTRICT_MSG =
+  "This API key is restricted to a specific app label; send a matching `app` field.";
+
+function assertIngestAppAllowed(
+  request: FastifyRequest,
+  app: string,
+  reply: FastifyReply
+): boolean {
+  const allowed = request.ingestApiKeyAllowedApp;
+  if (allowed == null) return true;
+  if (app !== allowed) {
+    void reply.status(403).send({ error: APP_RESTRICT_MSG });
+    return false;
+  }
+  return true;
+}
+
 export async function ingestRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions
@@ -68,6 +90,7 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
+    if (!assertIngestAppAllowed(request, body.app, reply)) return;
     await prisma.event.create({
       data: {
         project_id: projectId,
@@ -94,6 +117,7 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
+    if (!assertIngestAppAllowed(request, body.app, reply)) return;
     const existing = await prisma.session.findFirst({
       where: { project_id: projectId, session_id: body.session_id, app: body.app },
       orderBy: { started_at: "desc" },
@@ -128,6 +152,14 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const n = parsed.data.events.length;
+    const allowed = request.ingestApiKeyAllowedApp;
+    if (allowed != null) {
+      for (const ev of parsed.data.events) {
+        if (ev.app !== allowed) {
+          return reply.status(403).send({ error: APP_RESTRICT_MSG });
+        }
+      }
+    }
     for (const body of parsed.data.events) {
       await prisma.event.create({
         data: {
@@ -156,6 +188,7 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
+    if (!assertIngestAppAllowed(request, body.app, reply)) return;
     const fingerprint = computeFingerprint(body.message, body.stack);
     const errorGroup = await findOrCreateErrorGroup(prisma, {
       projectId,

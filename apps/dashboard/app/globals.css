@@ -1820,6 +1820,13 @@
   outline-offset: 1px;
 }
 
+.project-switcher__error {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--color-error);
+}
+
 .project-switcher__select:disabled {
   opacity: 0.65;
   cursor: wait;

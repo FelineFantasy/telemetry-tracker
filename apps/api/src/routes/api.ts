@@ -26,7 +26,12 @@ import {
   whereSessionById,
   whereSessionProject,
 } from "../lib/prisma-project-scope.js";
-import { resolveReadProjectId } from "../lib/read-project-request.js";
+import { requireSessionUser } from "../lib/auth-session.js";
+import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
+import {
+  resolveReadProjectId,
+  resolveReadProjectIdWithSession,
+} from "../lib/read-project-request.js";
 import {
   EVENT_SORT_SQL,
   eventListOrderBy,
@@ -379,8 +384,14 @@ export async function apiRoutes(
   });
 
   app.patch<{ Params: { id: string } }>("/errors/:id", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request, reply);
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
     if (projectId === null) return;
+    const role = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canResolveErrors(role)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
     const body = request.body as { resolved?: boolean };
     if (typeof body?.resolved !== "boolean") {
       return reply.status(400).send({ error: "Body must be JSON with resolved: boolean" });
