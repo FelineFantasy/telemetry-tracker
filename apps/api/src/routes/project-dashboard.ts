@@ -298,21 +298,45 @@ export async function projectDashboardRoutes(
 
       const target = await prisma.user.findUnique({ where: { email } });
       if (target) {
-        const existing = await prisma.organizationMembership.findUnique({
-          where: {
-            user_id_organization_id: { user_id: target.id, organization_id: orgId },
-          },
+        const addExisting = await prisma.$transaction(async (tx) => {
+          await tx.$executeRaw(
+            Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
+          );
+          const existing = await tx.organizationMembership.findUnique({
+            where: {
+              user_id_organization_id: {
+                user_id: target.id,
+                organization_id: orgId,
+              },
+            },
+          });
+          if (existing) {
+            return { kind: "already_member" as const };
+          }
+          try {
+            await tx.organizationMembership.create({
+              data: {
+                user_id: target.id,
+                organization_id: orgId,
+                role: newRole,
+              },
+            });
+            return { kind: "added" as const };
+          } catch (e: unknown) {
+            if (
+              typeof e === "object" &&
+              e !== null &&
+              "code" in e &&
+              (e as { code: string }).code === "P2002"
+            ) {
+              return { kind: "already_member" as const };
+            }
+            throw e;
+          }
         });
-        if (existing) {
+        if (addExisting.kind === "already_member") {
           return reply.status(409).send({ error: "User is already a member" });
         }
-        await prisma.organizationMembership.create({
-          data: {
-            user_id: target.id,
-            organization_id: orgId,
-            role: newRole,
-          },
-        });
         return reply.status(201).send({ status: "added" as const });
       }
 
