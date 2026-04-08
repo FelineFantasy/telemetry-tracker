@@ -47,7 +47,6 @@ export async function authRoutes(
     }
 
     if (inviteToken) {
-      const passwordHash = hashPassword(password);
       const inviteOutcome = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "OrganizationInvite" WHERE token = ${inviteToken} FOR UPDATE`
@@ -68,6 +67,7 @@ export async function authRoutes(
         if (existingInvitee) {
           return { kind: "email_taken" as const };
         }
+        const passwordHash = hashPassword(password);
         try {
           const u = await tx.user.create({
             data: {

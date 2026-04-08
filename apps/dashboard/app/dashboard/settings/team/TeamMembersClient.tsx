@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   inviteOrganizationMemberAction,
   updateOrganizationMemberRoleAction,
@@ -39,6 +39,28 @@ export function TeamMembersClient({
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  /** Optimistic role per member until server action + refresh complete. */
+  const [optimisticRoleByUser, setOptimisticRoleByUser] = useState<
+    Record<string, string>
+  >({});
+  const [roleChangePendingFor, setRoleChangePendingFor] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    setOptimisticRoleByUser((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const uid of Object.keys(prev)) {
+        const row = members.find((m) => m.userId === uid);
+        if (row && row.role === prev[uid]) {
+          delete next[uid];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [members]);
 
   function onInvite(formData: FormData) {
     setInviteError(null);
@@ -57,14 +79,31 @@ export function TeamMembersClient({
     });
   }
 
-  async function onRoleChange(userId: string, role: string) {
+  function onRoleChange(userId: string, role: string) {
     setRoleError(null);
-    const r = await updateOrganizationMemberRoleAction(organizationId, userId, role);
-    if (!r.ok) {
-      setRoleError(r.error);
-      return;
-    }
-    router.refresh();
+    setOptimisticRoleByUser((prev) => ({ ...prev, [userId]: role }));
+    startTransition(async () => {
+      setRoleChangePendingFor(userId);
+      try {
+        const r = await updateOrganizationMemberRoleAction(
+          organizationId,
+          userId,
+          role
+        );
+        if (!r.ok) {
+          setOptimisticRoleByUser((prev) => {
+            const n = { ...prev };
+            delete n[userId];
+            return n;
+          });
+          setRoleError(r.error);
+          return;
+        }
+        router.refresh();
+      } finally {
+        setRoleChangePendingFor(null);
+      }
+    });
   }
 
   return (
@@ -155,8 +194,9 @@ export function TeamMembersClient({
                       {canEditRole ? (
                         <select
                           className="filter-input min-h-9 py-1"
-                          value={m.role}
+                          value={optimisticRoleByUser[m.userId] ?? m.role}
                           aria-label={`Role for ${m.email}`}
+                          disabled={roleChangePendingFor === m.userId}
                           onChange={(e) => onRoleChange(m.userId, e.target.value)}
                         >
                           {ROLES.map((r) => (
