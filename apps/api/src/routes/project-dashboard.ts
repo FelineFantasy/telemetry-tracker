@@ -31,7 +31,8 @@ const INVITE_DAYS = 7;
 
 function readOrgIdHeader(request: FastifyRequest): string | undefined {
   const raw = headerFirst(request, "x-organization-id");
-  return raw && UUID_RE.test(raw) ? raw : undefined;
+  if (!raw || !UUID_RE.test(raw)) return undefined;
+  return raw.toLowerCase();
 }
 
 function slugifyProjectName(name: string): string {

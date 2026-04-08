@@ -193,6 +193,8 @@ export async function logout(): Promise<void> {
   }
   const c = await cookies();
   c.set(TELEMETRY_SESSION_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+  c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+  c.set(TELEMETRY_PROJECT_COOKIE, "", { ...cookieBase(), maxAge: 0 });
 }
 
 export async function logoutAction(): Promise<void> {
