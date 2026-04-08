@@ -74,6 +74,7 @@ model OrganizationInvite {
   invited_by      User         @relation("InviteCreatedBy", fields: [invited_by_id], references: [id], onDelete: Cascade)
   created_at      DateTime     @default(now()) @map("created_at")
 
+  @@unique([organization_id, email])
   @@index([organization_id])
   @@index([email])
 }

@@ -6,9 +6,8 @@ export type DashboardSessionContext = {
   canResolveErrors: boolean;
   canCreateApiKey: boolean;
   canRevokeApiKey: boolean;
-  canManageOrganization: boolean;
   canCreateProject: boolean;
-  /** Invite/change members — may diverge from {@link canManageOrganization} if RBAC evolves. */
+  /** Invite/change members (org owner only; same gate as API). */
   canManageMembers: boolean;
 };
 
@@ -22,7 +21,6 @@ export async function getDashboardSessionContext(): Promise<DashboardSessionCont
     typeof data.canResolveErrors !== "boolean" ||
     typeof data.canCreateApiKey !== "boolean" ||
     typeof data.canRevokeApiKey !== "boolean" ||
-    typeof data.canManageOrganization !== "boolean" ||
     typeof data.canCreateProject !== "boolean" ||
     typeof data.canManageMembers !== "boolean"
   ) {

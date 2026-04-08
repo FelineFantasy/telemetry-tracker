@@ -8,7 +8,6 @@ import {
   canCreateApiKey,
   canCreateProject,
   canManageMembers,
-  canManageOrganization,
   canResolveErrors,
   canRevokeApiKey,
   getMembershipRoleForOrganization,
@@ -341,23 +340,37 @@ export async function projectDashboardRoutes(
         return reply.status(201).send({ status: "added" as const });
       }
 
-      await prisma.organizationInvite.deleteMany({
-        where: { organization_id: orgId, email },
-      });
-
-      const token = randomBytes(32).toString("hex");
-      const expiresAt = new Date(
-        Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000
-      );
-      await prisma.organizationInvite.create({
-        data: {
-          organization_id: orgId,
-          email,
-          role: newRole,
-          token,
-          expires_at: expiresAt,
-          invited_by_id: session.userId,
-        },
+      const { token, expiresAt } = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
+        );
+        const newToken = randomBytes(32).toString("hex");
+        const exp = new Date(
+          Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000
+        );
+        const row = await tx.organizationInvite.upsert({
+          where: {
+            organization_id_email: {
+              organization_id: orgId,
+              email,
+            },
+          },
+          create: {
+            organization_id: orgId,
+            email,
+            role: newRole,
+            token: newToken,
+            expires_at: exp,
+            invited_by_id: session.userId,
+          },
+          update: {
+            role: newRole,
+            token: newToken,
+            expires_at: exp,
+            invited_by_id: session.userId,
+          },
+        });
+        return { token: row.token, expiresAt: row.expires_at };
       });
 
       const base = dashboardInviteBaseUrl();
@@ -474,7 +487,6 @@ export async function projectDashboardRoutes(
       canResolveErrors: canResolveErrors(projRole),
       canCreateApiKey: canCreateApiKey(projRole),
       canRevokeApiKey: canRevokeApiKey(projRole),
-      canManageOrganization: canManageOrganization(orgCapabilityRole),
       canCreateProject: canCreateProject(orgCapabilityRole),
       canManageMembers: canManageMembers(orgCapabilityRole),
     });

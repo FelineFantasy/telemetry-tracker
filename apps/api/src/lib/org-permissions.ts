@@ -51,10 +51,6 @@ export function canRevokeApiKey(role: OrgRole | null): boolean {
   return role === OrgRole.OWNER;
 }
 
-export function canManageOrganization(role: OrgRole | null): boolean {
-  return role === OrgRole.OWNER;
-}
-
 export function canCreateProject(role: OrgRole | null): boolean {
   return role === OrgRole.OWNER;
 }

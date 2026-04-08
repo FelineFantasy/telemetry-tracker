@@ -16,9 +16,11 @@ export function OrgSwitcher({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState(currentOrganizationId ?? "");
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   useEffect(() => {
     setValue(currentOrganizationId ?? "");
+    setSwitchError(null);
   }, [currentOrganizationId]);
 
   if (organizations.length === 0) {
@@ -48,10 +50,17 @@ export function OrgSwitcher({
         disabled={pending}
         onChange={(e) => {
           const id = e.target.value;
+          const previousSelection = value;
+          setSwitchError(null);
           setValue(id);
           startTransition(async () => {
             const r = await setDashboardOrganizationId(id);
-            if (r.ok) router.refresh();
+            if (r.ok) {
+              router.refresh();
+              return;
+            }
+            setValue(previousSelection);
+            setSwitchError(r.error);
           });
         }}
       >
@@ -61,6 +70,11 @@ export function OrgSwitcher({
           </option>
         ))}
       </select>
+      {switchError ? (
+        <p className="project-switcher__error" role="alert">
+          {switchError}
+        </p>
+      ) : null}
     </div>
   );
 }
