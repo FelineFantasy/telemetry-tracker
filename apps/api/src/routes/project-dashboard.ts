@@ -340,7 +340,7 @@ export async function projectDashboardRoutes(
         return reply.status(201).send({ status: "added" as const });
       }
 
-      const { token, expiresAt } = await prisma.$transaction(async (tx) => {
+      const { token } = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
         );
@@ -370,7 +370,7 @@ export async function projectDashboardRoutes(
             invited_by_id: session.userId,
           },
         });
-        return { token: row.token, expiresAt: row.expires_at };
+        return { token: row.token };
       });
 
       const base = dashboardInviteBaseUrl();
