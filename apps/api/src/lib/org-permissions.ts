@@ -24,6 +24,29 @@ export async function getMembershipRoleForOrganization(
   return m?.role ?? null;
 }
 
+/** One query: project + org membership role (replaces separate project + membership lookups). */
+export async function getRoleForProjectMembership(
+  userId: string,
+  projectId: string
+): Promise<OrgRole | null> {
+  const row = await prisma.project.findFirst({
+    where: { id: projectId, deleted_at: null },
+    select: {
+      organization: {
+        select: {
+          memberships: {
+            where: { user_id: userId },
+            select: { role: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+  if (!row) return null;
+  return row.organization.memberships[0]?.role ?? null;
+}
+
 export function canResolveErrors(role: OrgRole | null): boolean {
   if (role === null) return false;
   return role === OrgRole.OWNER || role === OrgRole.EDITOR;

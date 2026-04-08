@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "./db.js";
-import { getSessionUser } from "./auth-session.js";
+import { getSessionUser, type SessionUser } from "./auth-session.js";
 import { headerFirst } from "./http-headers.js";
 import { readProjectIdFromEnv } from "./project-scope.js";
 
@@ -46,6 +46,42 @@ export async function resolveReadProjectId(
     return project.id;
   }
 
+  return project.id;
+}
+
+/**
+ * Same as {@link resolveReadProjectId} for an authenticated caller, but uses a pre-loaded
+ * {@link SessionUser} so handlers can require the session once and avoid a second session lookup.
+ */
+export async function resolveReadProjectIdWithSession(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  session: SessionUser
+): Promise<string | null> {
+  const fallback = readProjectIdFromEnv();
+  const raw = headerFirst(request, "x-project-id");
+  if (!raw || !UUID_RE.test(raw)) {
+    return fallback;
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: raw, deleted_at: null },
+    select: { id: true, organization_id: true },
+  });
+  if (!project) {
+    return fallback;
+  }
+
+  const m = await prisma.organizationMembership.findFirst({
+    where: {
+      user_id: session.userId,
+      organization_id: project.organization_id,
+    },
+  });
+  if (!m) {
+    await reply.status(403).send({ error: "Not a member of this project" });
+    return null;
+  }
   return project.id;
 }
 

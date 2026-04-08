@@ -61,22 +61,25 @@ async function resolveProjectCookieForOrganization(
   sessionId: string,
   orgId: string,
   currentProjectId: string,
-  /** When set, use this successful org-scoped `/meta/projects` response (avoids a duplicate fetch after verify). */
-  orgScopedProjectsRes?: Response
+  /** When set, parsed org-scoped `/meta/projects` body (same scope as verify with `X-Organization-Id` for `orgId`). */
+  orgScopedProjectsPayload?: { projects?: { id: string }[] }
 ): Promise<string> {
   const trimmedOrg = orgId.trim().toLowerCase();
-  const res =
-    orgScopedProjectsRes ??
-    (await fetch(`${API_BASE_URL}/api/meta/projects`, {
+  let data: { projects?: { id: string }[] };
+  if (orgScopedProjectsPayload !== undefined) {
+    data = orgScopedProjectsPayload;
+  } else {
+    const res = await fetch(`${API_BASE_URL}/api/meta/projects`, {
       cache: "no-store",
       headers: {
         Authorization: `Bearer ${sessionId}`,
         "X-Project-Id": currentProjectId,
         "X-Organization-Id": trimmedOrg,
       },
-    }));
-  if (!res.ok) return currentProjectId;
-  const data = (await res.json()) as { projects?: { id: string }[] };
+    });
+    if (!res.ok) return currentProjectId;
+    data = (await res.json()) as { projects?: { id: string }[] };
+  }
   const inOrgIds = data.projects?.map((p) => p.id) ?? [];
   const current = currentProjectId.toLowerCase();
   if (inOrgIds.some((id) => id.toLowerCase() === current)) {
@@ -123,11 +126,12 @@ export async function setDashboardOrganizationId(
     const t = await verify.text();
     return { ok: false, error: t.slice(0, 200) || "Could not verify organization" };
   }
+  const verifyData = (await verify.json()) as { projects?: { id: string }[] };
   const nextProject = await resolveProjectCookieForOrganization(
     sessionId,
     trimmed,
     projectId,
-    verify
+    verifyData
   );
   const c = await cookies();
   c.set(TELEMETRY_ORG_COOKIE, trimmed, cookieOpts);
