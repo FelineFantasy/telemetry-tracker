@@ -17,6 +17,7 @@ import {
 import { headerFirst } from "../lib/http-headers.js";
 import {
   resolveReadProjectId,
+  resolveReadProjectIdWithSession,
   tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
 
@@ -557,10 +558,10 @@ export async function projectDashboardRoutes(
   });
 
   app.post("/project/api-keys", async (request, reply) => {
-    const projectId = await resolveReadProjectId(request, reply);
-    if (projectId === null) return;
     const session = await requireSessionUser(request, reply);
     if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
     const projRole = await getMembershipRoleForProject(session.userId, projectId);
     if (!canCreateApiKey(projRole)) {
       return reply.status(403).send({ error: "Forbidden" });
@@ -603,10 +604,10 @@ export async function projectDashboardRoutes(
   app.post<{ Params: { publicId: string } }>(
     "/project/api-keys/:publicId/revoke",
     async (request, reply) => {
-      const projectId = await resolveReadProjectId(request, reply);
-      if (projectId === null) return;
       const session = await requireSessionUser(request, reply);
       if (!session) return;
+      const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+      if (projectId === null) return;
       const projRole = await getMembershipRoleForProject(session.userId, projectId);
       if (!canRevokeApiKey(projRole)) {
         return reply.status(403).send({ error: "Forbidden" });

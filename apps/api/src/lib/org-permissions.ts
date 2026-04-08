@@ -1,31 +1,10 @@
 import { OrgRole } from "@prisma/client";
 import { prisma } from "./db.js";
 
+/**
+ * Org role for `userId` in the organization that owns `projectId` (one query: project + membership).
+ */
 export async function getMembershipRoleForProject(
-  userId: string,
-  projectId: string
-): Promise<OrgRole | null> {
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, deleted_at: null },
-    select: { organization_id: true },
-  });
-  if (!project) return null;
-  return getMembershipRoleForOrganization(userId, project.organization_id);
-}
-
-export async function getMembershipRoleForOrganization(
-  userId: string,
-  organizationId: string
-): Promise<OrgRole | null> {
-  const m = await prisma.organizationMembership.findFirst({
-    where: { user_id: userId, organization_id: organizationId },
-    select: { role: true },
-  });
-  return m?.role ?? null;
-}
-
-/** One query: project + org membership role (replaces separate project + membership lookups). */
-export async function getRoleForProjectMembership(
   userId: string,
   projectId: string
 ): Promise<OrgRole | null> {
@@ -45,6 +24,17 @@ export async function getRoleForProjectMembership(
   });
   if (!row) return null;
   return row.organization.memberships[0]?.role ?? null;
+}
+
+export async function getMembershipRoleForOrganization(
+  userId: string,
+  organizationId: string
+): Promise<OrgRole | null> {
+  const m = await prisma.organizationMembership.findFirst({
+    where: { user_id: userId, organization_id: organizationId },
+    select: { role: true },
+  });
+  return m?.role ?? null;
 }
 
 export function canResolveErrors(role: OrgRole | null): boolean {
