@@ -1,4 +1,9 @@
-import { createApp } from "./app.js";
+import { initSentryIfConfigured } from "./lib/observability.js";
+
+/** Sentry must init before any module that should be auto-instrumented (http, pg, …). Static imports of `./app.js` would load Fastify/Prisma/routes first. */
+await initSentryIfConfigured();
+
+const { createApp } = await import("./app.js");
 
 const port = Number(process.env.PORT) || 3001;
 // Railway proxy often connects via IPv4; 0.0.0.0 avoids "connection refused" 502. Override with HOST=:: if needed.

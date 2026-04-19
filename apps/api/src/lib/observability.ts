@@ -1,0 +1,43 @@
+import { randomUUID } from "node:crypto";
+import type { FastifyInstance } from "fastify";
+
+let sentryInitialized = false;
+
+/**
+ * Optional Sentry (`SENTRY_DSN`). Skipped in tests and when DSN is unset.
+ * Call from `index.ts` before dynamically importing `./app.js` so OpenTelemetry
+ * instrumentation can patch http, database clients, etc. Do not rely on calling this from `createApp()`.
+ */
+export async function initSentryIfConfigured(): Promise<void> {
+  if (process.env.NODE_ENV === "test") return;
+  const dsn = process.env.SENTRY_DSN?.trim();
+  if (!dsn || sentryInitialized) return;
+  const Sentry = await import("@sentry/node");
+  Sentry.init({
+    dsn,
+    environment: process.env.NODE_ENV ?? "development",
+    tracesSampleRate: 0,
+  });
+  sentryInitialized = true;
+}
+
+/** Request id + error logging + optional Sentry capture on `onError`. */
+export function registerObservabilityHooks(app: FastifyInstance): void {
+  app.addHook("onError", async (request, _reply, error) => {
+    request.log.error(
+      { err: error, reqId: request.id, url: request.url, method: request.method },
+      error.message
+    );
+    if (process.env.NODE_ENV === "test" || !process.env.SENTRY_DSN?.trim()) return;
+    try {
+      const Sentry = await import("@sentry/node");
+      Sentry.captureException(error);
+    } catch {
+      /* optional dep failed to load */
+    }
+  });
+}
+
+export function genReqId(): string {
+  return randomUUID();
+}
