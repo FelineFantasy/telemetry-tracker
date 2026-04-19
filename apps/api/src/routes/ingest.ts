@@ -121,18 +121,21 @@ export async function ingestRoutes(
     }
     const body = parsed.data;
     if (!assertIngestAppAllowed(request, body.app, reply)) return;
-    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
-    if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const existing = await prisma.session.findFirst({
       where: { project_id: projectId, session_id: body.session_id, app: body.app },
       orderBy: { started_at: "desc" },
     });
+    // Closing a session only sets `ended_at` — no new telemetry; must not be blocked by quota.
     if (existing && body.ended_at) {
       await prisma.session.update({
         where: { id: existing.id },
         data: { ended_at: new Date(body.ended_at) },
       });
-    } else if (!existing) {
+      return reply.status(204).send();
+    }
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
+    if (!existing) {
       await prisma.session.create({
         data: {
           project_id: projectId,
