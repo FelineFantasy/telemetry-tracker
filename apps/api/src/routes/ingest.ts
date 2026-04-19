@@ -133,6 +133,10 @@ export async function ingestRoutes(
       });
       return reply.status(204).send();
     }
+    // Same session already recorded, no end time — idempotent retry; nothing to write, bill, or quota-check.
+    if (existing && body.ended_at == null) {
+      return reply.status(204).send();
+    }
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     if (!existing) {
