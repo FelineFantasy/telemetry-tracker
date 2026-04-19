@@ -85,6 +85,11 @@ describe.skipIf(!runDbIntegration)("Auth and RBAC (integration)", () => {
     if (organizationId) {
       await prisma.organization.delete({ where: { id: organizationId } }).catch(() => {});
     }
+    // Users do not cascade from Organization; login tests also create UserSession rows (cascade on User delete).
+    const testEmails = [emailViewer, emailEditor].filter(Boolean);
+    if (testEmails.length > 0) {
+      await prisma.user.deleteMany({ where: { email: { in: testEmails } } }).catch(() => {});
+    }
     if (prevTelemetryProjectId === undefined) delete process.env.TELEMETRY_PROJECT_ID;
     else process.env.TELEMETRY_PROJECT_ID = prevTelemetryProjectId;
   });
