@@ -3,11 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { prisma } from "./lib/db.js";
 import { buildCorsOptions } from "./lib/cors-config.js";
-import {
-  genReqId,
-  initSentryIfConfigured,
-  registerObservabilityHooks,
-} from "./lib/observability.js";
+import { genReqId, registerObservabilityHooks } from "./lib/observability.js";
 import {
   rateLimitMaxApi,
   rateLimitMaxAuth,
@@ -26,8 +22,6 @@ const PAYLOAD_LIMIT = 200 * 1024; // 200 KB
  */
 export async function createApp(): Promise<FastifyInstance> {
   const isTest = process.env.NODE_ENV === "test";
-
-  await initSentryIfConfigured();
 
   const app = Fastify({
     logger: !isTest,

@@ -6,7 +6,7 @@ function parsePositiveInt(key: string, fallback: number): number {
   const v = process.env[key];
   if (v === undefined || v === "") return fallback;
   const n = Number.parseInt(v, 10);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 export function rateLimitMaxIngest(isTest: boolean): number {

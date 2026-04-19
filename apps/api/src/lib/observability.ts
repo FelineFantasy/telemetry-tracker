@@ -5,6 +5,8 @@ let sentryInitialized = false;
 
 /**
  * Optional Sentry (`SENTRY_DSN`). Skipped in tests and when DSN is unset.
+ * Call from `index.ts` before dynamically importing `./app.js` so OpenTelemetry
+ * instrumentation can patch http, database clients, etc. Do not rely on calling this from `createApp()`.
  */
 export async function initSentryIfConfigured(): Promise<void> {
   if (process.env.NODE_ENV === "test") return;
