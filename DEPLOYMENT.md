@@ -20,6 +20,26 @@ The dashboard talks to the API via `API_URL` (server-side only; not exposed to t
 |----------------|----------|---------|--------------------------------|
 | `DATABASE_URL` | Yes      | `postgresql://user:pass@host:5432/telemetry` | PostgreSQL connection string |
 | `PORT`         | No       | `3001`  | Server port (default 3001)     |
+| `NODE_ENV`     | No       | `production` | When `production`, CORS uses an allowlist (see below); omit or `development` for permissive local CORS. |
+
+**Optional — production browser clients (dashboard):** When `NODE_ENV=production`, set **`CORS_ORIGINS`** (comma-separated origins, e.g. `https://app.example.com,https://www.example.com`) or a single **`DASHBOARD_ORIGIN`**. If neither is set, the API does not reflect arbitrary browser origins, so credentialed requests from a hosted dashboard will fail. Development and test keep `origin: true`.
+
+**Optional — operations and tuning**
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `HOST` | `0.0.0.0` | Bind address (default `0.0.0.0`). |
+| `SENTRY_DSN` | — | If set, uncaught handler errors are reported to Sentry (skipped when `NODE_ENV=test`). |
+| `HEALTH_CHECK_DATABASE` | `true` | When `true`, `GET /health` runs a database connectivity check. |
+| `RATE_LIMIT_INGEST_MAX` | `3000` | Max requests per 60s window per client on `/ingest/*` (default 3000). |
+| `RATE_LIMIT_AUTH_MAX` | `30` | On `/api/auth/*` (default 30 per 60s). |
+| `RATE_LIMIT_API_MAX` | `300` | On other `/api/*` routes (default 300 per 60s). |
+| `RATE_LIMIT_PUBLIC_MAX` | `300` | On `GET /health` and `GET /` only (default 300 per 60s). Raise if many probes share one IP; `HEALTH_CHECK_DATABASE=true` makes `/health` heavier. |
+| `TELEMETRY_ALLOW_REGISTRATION` | `true` | Allow signups after the first user exists (first signup is always allowed). |
+| `TELEMETRY_ORGANIZATION_ID` | UUID | Default org id for legacy flows (has a built-in default if unset). |
+| `TELEMETRY_DASHBOARD_ORIGIN` | `https://app.example.com` | Base URL for member invite links (no trailing slash). |
+
+Ingest and local dev may also use `INGEST_ALLOW_UNAUTHENTICATED` and `TELEMETRY_PROJECT_ID` (see `docs/ENTITLEMENTS.md`); never enable unauthenticated ingest in production.
 
 ### Dashboard (`apps/dashboard`)
 
@@ -28,6 +48,10 @@ The dashboard talks to the API via `API_URL` (server-side only; not exposed to t
 | `API_URL`   | No       | `https://api.yourdomain.com` | Base URL of the API (no trailing `/`). Server-only.   |
 
 Default is `http://localhost:3001`. Set when the dashboard runs against a different API host.
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_TELEMETRY_PUBLIC_DASHBOARD` | If `true`, skips login middleware (local/legacy only; do not use on a public production URL). |
 
 ### PostgreSQL
 
@@ -168,7 +192,7 @@ Railway is using **Nixpacks** (npm) instead of Docker because the dashboard serv
 **Fix (dashboard service only; do not change API or Database):**
 
 1. Open the **dashboard** service in Railway → **Settings**.
-2. Set **Root Directory** to **empty** (clear the field so it uses the repo root). See the [Railway table](#railway-api--db--dashboard) above.
+2. Set **Root Directory** to **empty** (clear the field so it uses the repo root). See the **Railway (API + DB + Dashboard)** table under Option B above.
 3. **Watch Paths** can stay `apps/dashboard/**` (relative to repo root when Root Directory is empty).
 4. Redeploy. The root `railway.toml` and `Dockerfile` will be used; build will use Docker + pnpm. If Nixpacks still runs, in **Settings → Build** choose Dockerfile as the builder if available.
 
@@ -190,8 +214,9 @@ The proxy cannot reach the API process. Even when deploy logs show “Listening 
 - [ ] API and dashboard are served over HTTPS in production.
 - [ ] `API_URL` points at the real API URL when running the dashboard server.
 - [ ] Migrations have been run once: `pnpm db:migrate` or `prisma migrate deploy` in `apps/api`.
-- [ ] Rate limit (300/min) and body limit (200 KB) are acceptable for your usage (they are set in the API code).
-- [ ] Dashboard has no auth in this MVP; if the URL is public, restrict access (e.g. VPN, IP allowlist, or add a simple auth layer later).
+- [ ] **Rate limits** use separate caps for ingest, `/api/auth`, the rest of `/api`, and **`/health` + `/`** (`RATE_LIMIT_PUBLIC_MAX`; defaults per 60s window; see `RATE_LIMIT_*` above). **Request body** limit is 200 KB — acceptable for your payloads.
+- [ ] **Production CORS:** `CORS_ORIGINS` or `DASHBOARD_ORIGIN` matches your deployed dashboard origin when `NODE_ENV=production`.
+- [ ] The dashboard uses **email/password login**; for extra safety on a public URL, still use network controls (VPN, IP allowlist, SSO) as your threat model requires.
 
 ---
 
