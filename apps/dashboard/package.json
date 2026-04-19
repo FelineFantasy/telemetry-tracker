@@ -7,7 +7,9 @@
     "lint": "eslint .",
     "prebuild": "pnpm run lint",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tacko/telemetry-core": "workspace:*",
@@ -21,12 +23,16 @@
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.7.10",
+    "@testing-library/react": "^16.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
     "tailwindcss": "3",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "jsdom": "^26.1.0",
+    "vitest": "^3.0.5"
   }
 }

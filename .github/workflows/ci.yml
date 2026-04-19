@@ -51,6 +51,8 @@ jobs:
         run: pnpm --filter api exec prisma migrate deploy
 
       - name: Test
+        env:
+          RUN_DB_INTEGRATION_TESTS: "true"
         run: pnpm test
 
       - name: Build
