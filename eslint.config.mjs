@@ -13,10 +13,8 @@ const nextConfigs = compat.extends("next/core-web-vitals", "next/typescript");
 
 const dashboardRoot = path.join(__dirname, "apps/dashboard");
 
-const tsAppFiles = [
-  "**/apps/api/**/*.ts",
-  "**/packages/**/src/**/*.{ts,tsx}",
-];
+const apiTsFiles = "**/apps/api/**/*.ts";
+const packageTsFiles = "**/packages/**/src/**/*.{ts,tsx}";
 
 export default tseslint.config(
   {
@@ -27,14 +25,34 @@ export default tseslint.config(
       "**/coverage/**",
       "pnpm-lock.yaml",
       "**/next-env.d.ts",
-      // Vitest config and tests are not part of the API tsconfig project (build uses tsconfig.build.json).
-      "apps/api/vitest.config.ts",
-      "apps/api/**/*.test.ts",
     ],
   },
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
-    files: tsAppFiles,
+    files: [apiTsFiles],
+    languageOptions: {
+      ...config.languageOptions,
+      parserOptions: {
+        ...config.languageOptions?.parserOptions,
+        project: "./tsconfig.eslint.json",
+        tsconfigRootDir: path.join(__dirname, "apps/api"),
+      },
+    },
+    rules: {
+      ...config.rules,
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  })),
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: [packageTsFiles],
     languageOptions: {
       ...config.languageOptions,
       parserOptions: {
