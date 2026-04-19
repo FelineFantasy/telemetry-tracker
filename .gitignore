@@ -8,3 +8,5 @@ package-lock.json
 apps/dashboard/.next
 apps/dashboard/tsconfig.tsbuildinfo
 apps/api/tsconfig.tsbuildinfo
+apps/api/dist
+apps/api/node_modules
