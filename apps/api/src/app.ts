@@ -8,6 +8,7 @@ import {
   rateLimitMaxApi,
   rateLimitMaxAuth,
   rateLimitMaxIngest,
+  rateLimitMaxPublic,
   RATE_LIMIT_WINDOW_MS,
 } from "./lib/rate-limit-env.js";
 import { ingestRoutes } from "./routes/ingest.js";
@@ -33,20 +34,28 @@ export async function createApp(): Promise<FastifyInstance> {
 
   await app.register(cors, buildCorsOptions());
 
-  // Set HEALTH_CHECK_DATABASE=true in production (or staging) to verify DB connectivity; omit in dev if you prefer a dependency-free /health.
-  app.get("/health", async (_req, reply) => {
-    if (process.env.HEALTH_CHECK_DATABASE === "true") {
-      try {
-        await prisma.$queryRaw`SELECT 1`;
-        return reply.code(200).send({ ok: true, database: "ok" });
-      } catch {
-        return reply.code(503).send({ ok: false, database: "unavailable" });
-      }
+  await app.register(
+    async function publicSurface(f) {
+      await f.register(rateLimit, {
+        max: rateLimitMaxPublic(isTest),
+        timeWindow: RATE_LIMIT_WINDOW_MS,
+      });
+      // Set HEALTH_CHECK_DATABASE=true in production (or staging) to verify DB connectivity; omit in dev if you prefer a dependency-free /health.
+      f.get("/health", async (_req, reply) => {
+        if (process.env.HEALTH_CHECK_DATABASE === "true") {
+          try {
+            await prisma.$queryRaw`SELECT 1`;
+            return reply.code(200).send({ ok: true, database: "ok" });
+          } catch {
+            return reply.code(503).send({ ok: false, database: "unavailable" });
+          }
+        }
+        return reply.code(200).send({ ok: true });
+      });
+      f.get("/", async (_req, reply) =>
+        reply.code(200).send({ service: "telemetry-api", ok: true })
+      );
     }
-    return reply.code(200).send({ ok: true });
-  });
-  app.get("/", async (_req, reply) =>
-    reply.code(200).send({ service: "telemetry-api", ok: true })
   );
 
   await app.register(

@@ -20,3 +20,8 @@ export function rateLimitMaxAuth(isTest: boolean): number {
 export function rateLimitMaxApi(isTest: boolean): number {
   return isTest ? 100_000 : parsePositiveInt("RATE_LIMIT_API_MAX", 300);
 }
+
+/** `/health` and `/` (outside ingest and `/api` scopes). */
+export function rateLimitMaxPublic(isTest: boolean): number {
+  return isTest ? 100_000 : parsePositiveInt("RATE_LIMIT_PUBLIC_MAX", 300);
+}
