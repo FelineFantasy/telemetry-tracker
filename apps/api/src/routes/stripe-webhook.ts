@@ -9,6 +9,16 @@ function parsePlanTier(raw: string | undefined): PlanTier | null {
   return null;
 }
 
+/** Prisma P2002 — unique constraint (e.g. Stripe customer/sub already bound to another org). */
+function isUniqueConstraintError(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code: unknown }).code === "P2002"
+  );
+}
+
 /**
  * Stripe webhook (`POST /webhooks/stripe`). Registers only when
  * `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are set.
@@ -66,14 +76,26 @@ export async function registerStripeWebhookIfConfigured(
                       "id" in session.subscription
                     ? (session.subscription as Stripe.Subscription).id
                     : null;
-              await prisma.organization.updateMany({
-                where: { id: orgId, deleted_at: null },
-                data: {
-                  plan_tier: tier,
-                  stripe_customer_id: customerId,
-                  stripe_subscription_id: subId,
-                },
-              });
+              try {
+                await prisma.organization.updateMany({
+                  where: { id: orgId, deleted_at: null },
+                  data: {
+                    plan_tier: tier,
+                    stripe_customer_id: customerId,
+                    stripe_subscription_id: subId,
+                  },
+                });
+              } catch (e) {
+                if (!isUniqueConstraintError(e)) throw e;
+                request.log.warn(
+                  { err: e, orgId, eventId: event.id },
+                  "checkout.session.completed: Stripe customer/subscription ids already linked elsewhere; applying plan tier only"
+                );
+                await prisma.organization.updateMany({
+                  where: { id: orgId, deleted_at: null },
+                  data: { plan_tier: tier },
+                });
+              }
             }
             break;
           }
