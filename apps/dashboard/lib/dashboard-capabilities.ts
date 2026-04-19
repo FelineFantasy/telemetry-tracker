@@ -5,6 +5,7 @@ export type UsageQuotaInfo = {
   monthlyIngestUsed: number;
   monthlyIngestLimit: number;
   percentUsed: number;
+  quotaExceeded: boolean;
   nearQuota: boolean;
 };
 
@@ -35,11 +36,18 @@ function parseUsageQuota(uq: unknown): UsageQuotaInfo | null {
   ) {
     return null;
   }
+  const limit = o.monthlyIngestLimit;
+  const used = o.monthlyIngestUsed;
+  const quotaExceeded =
+    typeof o.quotaExceeded === "boolean"
+      ? o.quotaExceeded
+      : limit > 0 && used >= limit;
   return {
     planTier: o.planTier,
-    monthlyIngestUsed: o.monthlyIngestUsed,
-    monthlyIngestLimit: o.monthlyIngestLimit,
+    monthlyIngestUsed: used,
+    monthlyIngestLimit: limit,
     percentUsed: o.percentUsed,
+    quotaExceeded,
     nearQuota: o.nearQuota,
   };
 }

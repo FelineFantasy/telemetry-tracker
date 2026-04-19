@@ -494,7 +494,10 @@ export async function projectDashboardRoutes(
       planTier: string;
       monthlyIngestUsed: number;
       monthlyIngestLimit: number;
+      /** Rounded (used/limit)*100; not capped so it stays consistent with used/limit. */
       percentUsed: number;
+      /** True when usage is at or above the monthly cap (ingest is rejected for new units). */
+      quotaExceeded: boolean;
       nearQuota: boolean;
     } | null = null;
     if (projectId !== null) {
@@ -503,11 +506,13 @@ export async function projectDashboardRoutes(
         const used = await getMonthlyIngestUsed(prisma, projectId);
         const limit = ctx.limits.monthlyIngestUnits;
         const ratio = limit > 0 ? used / limit : 0;
+        const quotaExceeded = limit > 0 && used >= limit;
         usageQuota = {
           planTier: ctx.planTier,
           monthlyIngestUsed: used,
           monthlyIngestLimit: limit,
-          percentUsed: Math.min(100, Math.round(ratio * 100)),
+          percentUsed: Math.round(ratio * 100),
+          quotaExceeded,
           nearQuota: ratio >= 0.9,
         };
       }
