@@ -1,4 +1,4 @@
-import type { PlanTier, PrismaClient } from "@prisma/client";
+import { Prisma, type PlanTier, type PrismaClient } from "@prisma/client";
 import { limitsForPlan, type PlanLimits } from "../config/plans.js";
 import { currentYearMonth } from "./usage-meter.js";
 
@@ -60,37 +60,45 @@ export function checkMonthlyIngestUnits(
   return { ok: true };
 }
 
-/** Distinct `app` values across Event, Session, ErrorGroup for the project. */
-export async function loadDistinctAppSet(
+/**
+ * Which of the given `app` labels already appear in Event / Session / ErrorGroup for this project.
+ * Scoped `IN (...)` queries — avoids a full distinct scan on every ingest when labels are unchanged.
+ */
+export async function findAppsAlreadyRegisteredInProject(
   prisma: PrismaClient,
-  projectId: string
+  projectId: string,
+  appLabels: string[]
 ): Promise<Set<string>> {
-  const rows = await prisma.$queryRaw<{ app: string }[]>`
+  const unique = [...new Set(appLabels)];
+  if (unique.length === 0) return new Set();
+  const inList = Prisma.join(unique.map((a) => Prisma.sql`${a}`));
+  const rows = await prisma.$queryRaw<{ app: string }[]>(Prisma.sql`
     SELECT DISTINCT app FROM (
-      SELECT app FROM "Event" WHERE project_id = ${projectId}
+      SELECT app FROM "Event" WHERE project_id = ${projectId} AND app IN (${inList})
       UNION
-      SELECT app FROM "Session" WHERE project_id = ${projectId}
+      SELECT app FROM "Session" WHERE project_id = ${projectId} AND app IN (${inList})
       UNION
-      SELECT app FROM "ErrorGroup" WHERE project_id = ${projectId}
+      SELECT app FROM "ErrorGroup" WHERE project_id = ${projectId} AND app IN (${inList})
     ) AS u
-  `;
+  `);
   return new Set(rows.map((r) => r.app));
 }
 
-export function checkAppLabelsAllowed(
-  existingApps: Set<string>,
-  appLabels: string[],
-  limits: PlanLimits
-): { ok: true } | { ok: false; error: string } {
-  const needed = new Set<string>();
-  for (const a of appLabels) {
-    if (!existingApps.has(a)) needed.add(a);
-  }
-  const totalAfter = existingApps.size + needed.size;
-  if (totalAfter > limits.maxAppsPerProject) {
-    return { ok: false, error: APP_LIMIT };
-  }
-  return { ok: true };
+/** Full distinct app count — only call when the ingest payload may introduce new app labels. */
+export async function countDistinctAppsInProject(
+  prisma: PrismaClient,
+  projectId: string
+): Promise<number> {
+  const rows = await prisma.$queryRaw<{ n: bigint }[]>`
+    SELECT COUNT(*)::bigint AS n FROM (
+      SELECT DISTINCT app FROM "Event" WHERE project_id = ${projectId}
+      UNION
+      SELECT DISTINCT app FROM "Session" WHERE project_id = ${projectId}
+      UNION
+      SELECT DISTINCT app FROM "ErrorGroup" WHERE project_id = ${projectId}
+    ) AS u
+  `;
+  return Number(rows[0]?.n ?? 0);
 }
 
 export async function assertIngestPlanOrReply(
@@ -121,18 +129,26 @@ export async function assertIngestPlanOrReply(
       },
     };
   }
-  const apps = await loadDistinctAppSet(prisma, projectId);
-  const a = checkAppLabelsAllowed(apps, appLabels, ctx.limits);
-  if (!a.ok) {
-    return {
-      ok: false,
-      status: 403,
-      body: {
-        error: a.error,
-        code: "max_apps_per_project",
-        limit: ctx.limits.maxAppsPerProject,
-      },
-    };
+  const uniqueLabels = [...new Set(appLabels)];
+  const already = await findAppsAlreadyRegisteredInProject(
+    prisma,
+    projectId,
+    uniqueLabels
+  );
+  const newLabels = uniqueLabels.filter((a) => !already.has(a));
+  if (newLabels.length > 0) {
+    const totalDistinct = await countDistinctAppsInProject(prisma, projectId);
+    if (totalDistinct + newLabels.length > ctx.limits.maxAppsPerProject) {
+      return {
+        ok: false,
+        status: 403,
+        body: {
+          error: APP_LIMIT,
+          code: "max_apps_per_project",
+          limit: ctx.limits.maxAppsPerProject,
+        },
+      };
+    }
   }
   return { ok: true };
 }

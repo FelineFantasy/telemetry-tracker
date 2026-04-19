@@ -198,6 +198,7 @@ model ErrorGroup {
 
   @@unique([project_id, fingerprint])
   @@index([project_id, last_seen])
+  @@index([project_id, app])
 }
 
 model ErrorOccurrence {
@@ -229,4 +230,5 @@ model Session {
   ended_at     DateTime? @map("ended_at")
 
   @@index([project_id, started_at])
+  @@index([project_id, app])
 }

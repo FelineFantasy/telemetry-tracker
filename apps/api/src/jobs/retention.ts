@@ -56,6 +56,13 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
       const eg = await tx.errorGroup.deleteMany({
         where: { project_id: projectId, last_seen: { lt: cutoff } },
       });
+      await tx.$executeRaw`
+        UPDATE "ErrorGroup" AS eg
+        SET occurrences = (
+          SELECT COUNT(*)::int FROM "ErrorOccurrence" eo WHERE eo.error_group_id = eg.id
+        )
+        WHERE eg.project_id = ${projectId}
+      `;
       return {
         occ: occOld.count + occStale.count,
         ev: ev.count,
