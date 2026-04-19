@@ -2,6 +2,12 @@ import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
+import {
+  assertCanCreateApiKey,
+  assertCanCreateProject,
+  getMonthlyIngestUsed,
+  loadPlanContextForProject,
+} from "../lib/plan-enforcement.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
 import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
 import {
@@ -233,6 +239,11 @@ export async function projectDashboardRoutes(
         ? slugifyProjectName(body.slug.trim())
         : slugifyProjectName(name);
     const slug = await ensureUniqueSlug(orgId, slugBase);
+
+    const planCheck = await assertCanCreateProject(prisma, orgId);
+    if (!planCheck.ok) {
+      return reply.status(403).send({ error: planCheck.error, code: "max_projects_per_org" });
+    }
 
     const project = await prisma.project.create({
       data: {
@@ -482,6 +493,29 @@ export async function projectDashboardRoutes(
       return reply.status(403).send({ error: "Forbidden" });
     }
 
+    let usageQuota: {
+      planTier: string;
+      monthlyIngestUsed: number;
+      monthlyIngestLimit: number;
+      percentUsed: number;
+      nearQuota: boolean;
+    } | null = null;
+    if (projectId !== null) {
+      const ctx = await loadPlanContextForProject(prisma, projectId);
+      if (ctx) {
+        const used = await getMonthlyIngestUsed(prisma, projectId);
+        const limit = ctx.limits.monthlyIngestUnits;
+        const ratio = limit > 0 ? used / limit : 0;
+        usageQuota = {
+          planTier: ctx.planTier,
+          monthlyIngestUsed: used,
+          monthlyIngestLimit: limit,
+          percentUsed: Math.min(100, Math.round(ratio * 100)),
+          nearQuota: ratio >= 0.9,
+        };
+      }
+    }
+
     return reply.send({
       projectId: projectId ?? "",
       role: projRole ?? orgCapabilityRole ?? OrgRole.VIEWER,
@@ -490,6 +524,7 @@ export async function projectDashboardRoutes(
       canRevokeApiKey: canRevokeApiKey(projRole),
       canCreateProject: canCreateProject(orgCapabilityRole),
       canManageMembers: canManageMembers(orgCapabilityRole),
+      usageQuota,
     });
   });
 
@@ -587,6 +622,11 @@ export async function projectDashboardRoutes(
     let allowedApp: string | null = null;
     if (typeof body.allowedApp === "string" && body.allowedApp.trim() !== "") {
       allowedApp = body.allowedApp.trim().slice(0, 64);
+    }
+
+    const keyCheck = await assertCanCreateApiKey(prisma, projectId);
+    if (!keyCheck.ok) {
+      return reply.status(403).send({ error: keyCheck.error, code: "max_api_keys_per_project" });
     }
 
     const publicId = randomBytes(16).toString("hex");

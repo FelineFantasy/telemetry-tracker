@@ -1,5 +1,13 @@
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
+export type UsageQuotaInfo = {
+  planTier: string;
+  monthlyIngestUsed: number;
+  monthlyIngestLimit: number;
+  percentUsed: number;
+  nearQuota: boolean;
+};
+
 export type DashboardSessionContext = {
   projectId: string;
   role: "OWNER" | "EDITOR" | "VIEWER";
@@ -9,6 +17,8 @@ export type DashboardSessionContext = {
   canCreateProject: boolean;
   /** Invite/change members (org owner only; same gate as API). */
   canManageMembers: boolean;
+  /** Present when the API could resolve plan + usage for the active project. */
+  usageQuota: UsageQuotaInfo | null;
 };
 
 /** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set. */
@@ -23,6 +33,17 @@ export async function getDashboardSessionContext(): Promise<DashboardSessionCont
     typeof data.canRevokeApiKey !== "boolean" ||
     typeof data.canCreateProject !== "boolean" ||
     typeof data.canManageMembers !== "boolean"
+  ) {
+    return null;
+  }
+  const uq = data.usageQuota;
+  if (
+    uq != null &&
+    (typeof uq.planTier !== "string" ||
+      typeof uq.monthlyIngestUsed !== "number" ||
+      typeof uq.monthlyIngestLimit !== "number" ||
+      typeof uq.percentUsed !== "number" ||
+      typeof uq.nearQuota !== "boolean")
   ) {
     return null;
   }

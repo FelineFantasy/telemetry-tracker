@@ -1,0 +1,100 @@
+import type { FastifyInstance } from "fastify";
+import Stripe from "stripe";
+import { PlanTier } from "@prisma/client";
+import { prisma } from "../lib/db.js";
+
+function parsePlanTier(raw: string | undefined): PlanTier | null {
+  const u = raw?.trim().toUpperCase();
+  if (u === "FREE" || u === "PRO" || u === "BUSINESS") return u;
+  return null;
+}
+
+/**
+ * Stripe webhook (`POST /webhooks/stripe`). Registers only when
+ * `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are set.
+ * Uses a raw JSON body parser so signature verification works.
+ *
+ * Expected metadata on Checkout Session (etc.): `organization_id`, `plan_tier`.
+ */
+export async function registerStripeWebhookIfConfigured(
+  app: FastifyInstance
+): Promise<void> {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!secret || !key) return;
+
+  const stripe = new Stripe(key);
+
+  await app.register(
+    async function stripeScope(f) {
+      f.addContentTypeParser(
+        "application/json",
+        { parseAs: "buffer" },
+        (_req, body, done) => {
+          done(null, body);
+        }
+      );
+
+      f.post("/webhooks/stripe", async (request, reply) => {
+        const sig = request.headers["stripe-signature"];
+        if (typeof sig !== "string") {
+          return reply.status(400).send({ error: "Missing stripe-signature" });
+        }
+        const buf = request.body as Buffer;
+        let event: Stripe.Event;
+        try {
+          event = stripe.webhooks.constructEvent(buf, sig, secret);
+        } catch {
+          return reply.status(400).send({ error: "Invalid signature" });
+        }
+
+        switch (event.type) {
+          case "checkout.session.completed": {
+            const session = event.data.object as Stripe.Checkout.Session;
+            const orgId = session.metadata?.organization_id?.trim();
+            const tier = parsePlanTier(session.metadata?.plan_tier);
+            if (orgId && tier && tier !== PlanTier.FREE) {
+              const customerId =
+                typeof session.customer === "string"
+                  ? session.customer
+                  : session.customer?.id ?? null;
+              const subId =
+                typeof session.subscription === "string"
+                  ? session.subscription
+                  : session.subscription &&
+                      typeof session.subscription === "object" &&
+                      "id" in session.subscription
+                    ? (session.subscription as Stripe.Subscription).id
+                    : null;
+              await prisma.organization.updateMany({
+                where: { id: orgId, deleted_at: null },
+                data: {
+                  plan_tier: tier,
+                  stripe_customer_id: customerId,
+                  stripe_subscription_id: subId,
+                },
+              });
+            }
+            break;
+          }
+          case "customer.subscription.deleted": {
+            const sub = event.data.object as Stripe.Subscription;
+            await prisma.organization.updateMany({
+              where: { stripe_subscription_id: sub.id },
+              data: {
+                plan_tier: PlanTier.FREE,
+                stripe_subscription_id: null,
+              },
+            });
+            break;
+          }
+          default:
+            break;
+        }
+
+        return reply.send({ received: true });
+      });
+    },
+    { prefix: "/" }
+  );
+}
