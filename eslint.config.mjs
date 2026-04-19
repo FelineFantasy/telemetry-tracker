@@ -27,6 +27,9 @@ export default tseslint.config(
       "**/coverage/**",
       "pnpm-lock.yaml",
       "**/next-env.d.ts",
+      // Vitest config and tests are not part of the API tsconfig project (build uses tsconfig.build.json).
+      "apps/api/vitest.config.ts",
+      "apps/api/**/*.test.ts",
     ],
   },
   ...tseslint.configs.recommended.map((config) => ({
