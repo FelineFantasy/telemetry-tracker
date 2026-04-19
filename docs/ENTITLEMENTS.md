@@ -114,6 +114,14 @@ Retention may be enforced **per plan** (e.g. FREE: 14 days, PRO: 90 days). It ca
 
 ---
 
+## Implementation status (code vs this doc)
+
+| Area | Status |
+|------|--------|
+| Orgs, projects, API keys, soft-delete, ingest auth, `UsageMonthly` metering | Implemented — matches sections above. |
+| `PLAN_LIMITS` in [`apps/api/src/config/plans.ts`](../apps/api/src/config/plans.ts) | **Defaults only** — monthly unit caps, per-tier RPS, max projects/keys/apps from this table are **not** fully enforced in API routes yet; metering increments ingest units. Align enforcement before selling. |
+| Retention by tier | Not implemented (future). |
+
 ## Example plan limits (code defaults only)
 
 Source: `PLAN_LIMITS` in `apps/api/src/config/plans.ts`. **Replace these after a few weeks of metrics** — they are placeholders.
