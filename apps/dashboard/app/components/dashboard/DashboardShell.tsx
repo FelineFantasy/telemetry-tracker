@@ -117,6 +117,36 @@ export function DashboardShell({
         ) : null}
         <main className="main" id="main-content">
           <DashboardCapabilitiesProvider value={capabilities}>
+            {capabilities?.usageQuota?.nearQuota ? (
+              <div
+                className={
+                  capabilities.usageQuota.quotaExceeded
+                    ? "quota-near-banner mx-auto mb-4 max-w-[1400px] rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground"
+                    : "quota-near-banner mx-auto mb-4 max-w-[1400px] rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-foreground"
+                }
+                role="status"
+              >
+                {capabilities.usageQuota.quotaExceeded ? (
+                  <>
+                    Monthly ingest is at or above your{" "}
+                    <strong>{capabilities.usageQuota.planTier}</strong> plan limit (
+                    {capabilities.usageQuota.monthlyIngestUsed.toLocaleString()} /{" "}
+                    {capabilities.usageQuota.monthlyIngestLimit.toLocaleString()} units this
+                    month, <strong>{capabilities.usageQuota.percentUsed}%</strong>). New
+                    ingest is being rejected until usage drops or you upgrade.
+                  </>
+                ) : (
+                  <>
+                    Monthly ingest usage is high:{" "}
+                    <strong>{capabilities.usageQuota.percentUsed}%</strong> of your{" "}
+                    <strong>{capabilities.usageQuota.planTier}</strong> plan limit (
+                    {capabilities.usageQuota.monthlyIngestUsed.toLocaleString()} /{" "}
+                    {capabilities.usageQuota.monthlyIngestLimit.toLocaleString()} units this
+                    month). Ingest may be rejected if the limit is reached.
+                  </>
+                )}
+              </div>
+            ) : null}
             <DashboardAppContext apps={apps} />
             {children}
           </DashboardCapabilitiesProvider>

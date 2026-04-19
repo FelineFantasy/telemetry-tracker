@@ -119,8 +119,10 @@ Retention may be enforced **per plan** (e.g. FREE: 14 days, PRO: 90 days). It ca
 | Area | Status |
 |------|--------|
 | Orgs, projects, API keys, soft-delete, ingest auth, `UsageMonthly` metering | Implemented — matches sections above. |
-| `PLAN_LIMITS` in [`apps/api/src/config/plans.ts`](../apps/api/src/config/plans.ts) | **Defaults only** — monthly unit caps, per-tier RPS, max projects/keys/apps from this table are **not** fully enforced in API routes yet; metering increments ingest units. Align enforcement before selling. |
-| Retention by tier | Not implemented (future). |
+| `PLAN_LIMITS` in [`apps/api/src/config/plans.ts`](../apps/api/src/config/plans.ts) | **Enforced** — monthly ingest units (429 when over), max distinct `app` labels per project, max projects per org, max API keys per project. Per-tier **ingest RPS** in the table is not a separate token-bucket yet (global IP rate limits still apply on `/ingest`). |
+| Retention by tier | **Implemented** — `retentionDays` per tier in `plans.ts`; run [`apps/api/src/jobs/run-retention.ts`](../apps/api/src/jobs/run-retention.ts) on a schedule (`pnpm --filter api retention`). |
+| Stripe → `plan_tier` | **Webhook path implemented** — `POST /webhooks/stripe` when `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` are set; Checkout metadata `organization_id` + `plan_tier`; subscription deletion downgrades to FREE. Checkout UI is product-specific. |
+| Dashboard usage vs limits | **Near-quota banner** — session context includes `usageQuota`; UI warns at ≥90% of monthly ingest. |
 
 ## Example plan limits (code defaults only)
 

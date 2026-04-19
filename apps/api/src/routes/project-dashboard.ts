@@ -2,6 +2,12 @@ import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
+import {
+  createApiKeyWithPlanLimitCheck,
+  createProjectWithPlanLimitCheck,
+  getMonthlyIngestUsed,
+  loadPlanContextForProject,
+} from "../lib/plan-enforcement.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
 import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
 import {
@@ -234,14 +240,16 @@ export async function projectDashboardRoutes(
         : slugifyProjectName(name);
     const slug = await ensureUniqueSlug(orgId, slugBase);
 
-    const project = await prisma.project.create({
-      data: {
-        organization_id: orgId,
-        name,
-        slug,
-      },
-      select: { id: true, name: true, slug: true, organization_id: true },
-    });
+    const created = await createProjectWithPlanLimitCheck(prisma, orgId, { name, slug });
+    if (!created.ok) {
+      if (created.code === "org_not_found") {
+        return reply.status(403).send({ error: created.error });
+      }
+      return reply
+        .status(403)
+        .send({ error: created.error, code: "max_projects_per_org" });
+    }
+    const project = created.project;
     return reply.status(201).send({
       id: project.id,
       name: project.name,
@@ -482,6 +490,34 @@ export async function projectDashboardRoutes(
       return reply.status(403).send({ error: "Forbidden" });
     }
 
+    let usageQuota: {
+      planTier: string;
+      monthlyIngestUsed: number;
+      monthlyIngestLimit: number;
+      /** Rounded (used/limit)*100; not capped so it stays consistent with used/limit. */
+      percentUsed: number;
+      /** True when usage is at or above the monthly cap (ingest is rejected for new units). */
+      quotaExceeded: boolean;
+      nearQuota: boolean;
+    } | null = null;
+    if (projectId !== null) {
+      const ctx = await loadPlanContextForProject(prisma, projectId);
+      if (ctx) {
+        const used = await getMonthlyIngestUsed(prisma, projectId);
+        const limit = ctx.limits.monthlyIngestUnits;
+        const ratio = limit > 0 ? used / limit : 0;
+        const quotaExceeded = limit > 0 && used >= limit;
+        usageQuota = {
+          planTier: ctx.planTier,
+          monthlyIngestUsed: used,
+          monthlyIngestLimit: limit,
+          percentUsed: Math.round(ratio * 100),
+          quotaExceeded,
+          nearQuota: ratio >= 0.9,
+        };
+      }
+    }
+
     return reply.send({
       projectId: projectId ?? "",
       role: projRole ?? orgCapabilityRole ?? OrgRole.VIEWER,
@@ -490,6 +526,7 @@ export async function projectDashboardRoutes(
       canRevokeApiKey: canRevokeApiKey(projRole),
       canCreateProject: canCreateProject(orgCapabilityRole),
       canManageMembers: canManageMembers(orgCapabilityRole),
+      usageQuota,
     });
   });
 
@@ -594,15 +631,20 @@ export async function projectDashboardRoutes(
     const secretHash = hashApiKeySecret(publicId, secret);
     const fullKey = `tt_live_${publicId}_${secret}`;
 
-    await prisma.apiKey.create({
-      data: {
-        project_id: projectId,
-        public_id: publicId,
-        secret_hash: secretHash,
-        name,
-        allowed_app: allowedApp,
-      },
+    const keyCreated = await createApiKeyWithPlanLimitCheck(prisma, projectId, {
+      public_id: publicId,
+      secret_hash: secretHash,
+      name,
+      allowed_app: allowedApp,
     });
+    if (!keyCreated.ok) {
+      if (keyCreated.code === "project_not_found") {
+        return reply.status(403).send({ error: keyCreated.error });
+      }
+      return reply
+        .status(403)
+        .send({ error: keyCreated.error, code: "max_api_keys_per_project" });
+    }
 
     return reply.status(201).send({
       key: fullKey,

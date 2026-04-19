@@ -13,6 +13,8 @@ export type PlanLimits = {
   maxProjectsPerOrg: number;
   /** Active API keys per project. */
   maxApiKeysPerProject: number;
+  /** Telemetry rows older than this (days) may be deleted by the retention job. */
+  retentionDays: number;
 };
 
 export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
@@ -22,6 +24,7 @@ export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
     maxAppsPerProject: 5,
     maxProjectsPerOrg: 1,
     maxApiKeysPerProject: 2,
+    retentionDays: 14,
   },
   PRO: {
     monthlyIngestUnits: 5_000_000,
@@ -29,6 +32,7 @@ export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
     maxAppsPerProject: 50,
     maxProjectsPerOrg: 10,
     maxApiKeysPerProject: 10,
+    retentionDays: 90,
   },
   BUSINESS: {
     monthlyIngestUnits: 50_000_000,
@@ -36,6 +40,7 @@ export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
     maxAppsPerProject: 500,
     maxProjectsPerOrg: 50,
     maxApiKeysPerProject: 50,
+    retentionDays: 365,
   },
 } as const;
 

@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { createIngestAuthPreHandler, requireIngestProjectId } from "../middleware/ingest-auth.js";
+import { assertIngestPlanOrReply } from "../lib/plan-enforcement.js";
 import { addIngestUnits } from "../lib/usage-meter.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
 
@@ -91,6 +92,8 @@ export async function ingestRoutes(
     }
     const body = parsed.data;
     if (!assertIngestAppAllowed(request, body.app, reply)) return;
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     await prisma.event.create({
       data: {
         project_id: projectId,
@@ -122,12 +125,21 @@ export async function ingestRoutes(
       where: { project_id: projectId, session_id: body.session_id, app: body.app },
       orderBy: { started_at: "desc" },
     });
+    // Closing a session only sets `ended_at` — no new telemetry; must not be blocked by quota.
     if (existing && body.ended_at) {
       await prisma.session.update({
         where: { id: existing.id },
         data: { ended_at: new Date(body.ended_at) },
       });
-    } else if (!existing) {
+      return reply.status(204).send();
+    }
+    // Same session already recorded, no end time — idempotent retry; nothing to write, bill, or quota-check.
+    if (existing && body.ended_at == null) {
+      return reply.status(204).send();
+    }
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
+    if (!existing) {
       await prisma.session.create({
         data: {
           project_id: projectId,
@@ -160,6 +172,9 @@ export async function ingestRoutes(
         }
       }
     }
+    const batchApps = parsed.data.events.map((e) => e.app);
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, n, batchApps);
+    if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     for (const body of parsed.data.events) {
       await prisma.event.create({
         data: {
@@ -189,6 +204,8 @@ export async function ingestRoutes(
     }
     const body = parsed.data;
     if (!assertIngestAppAllowed(request, body.app, reply)) return;
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const fingerprint = computeFingerprint(body.message, body.stack);
     const errorGroup = await findOrCreateErrorGroup(prisma, {
       projectId,

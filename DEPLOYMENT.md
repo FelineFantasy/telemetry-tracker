@@ -38,8 +38,14 @@ The dashboard talks to the API via `API_URL` (server-side only; not exposed to t
 | `TELEMETRY_ALLOW_REGISTRATION` | `true` | Allow signups after the first user exists (first signup is always allowed). |
 | `TELEMETRY_ORGANIZATION_ID` | UUID | Default org id for legacy flows (has a built-in default if unset). |
 | `TELEMETRY_DASHBOARD_ORIGIN` | `https://app.example.com` | Base URL for member invite links (no trailing slash). |
+| `STRIPE_SECRET_KEY` | `sk_live_…` | Required to register the Stripe webhook handler. |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` | Verifies `POST /webhooks/stripe` signatures. |
+
+**Retention:** run `pnpm --filter api retention` on a schedule (e.g. nightly cron) so old telemetry rows are pruned per tier (`retentionDays` in `apps/api/src/config/plans.ts`). Requires `DATABASE_URL`.
 
 Ingest and local dev may also use `INGEST_ALLOW_UNAUTHENTICATED` and `TELEMETRY_PROJECT_ID` (see `docs/ENTITLEMENTS.md`); never enable unauthenticated ingest in production.
+
+**Stripe billing:** configure Checkout (or Billing Portal) in the Stripe dashboard so completed sessions include metadata `organization_id` (UUID) and `plan_tier` (`PRO` or `BUSINESS`). Point the webhook endpoint to `https://<your-api>/webhooks/stripe` and subscribe to `checkout.session.completed` and `customer.subscription.deleted`.
 
 ### Dashboard (`apps/dashboard`)
 

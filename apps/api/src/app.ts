@@ -15,6 +15,7 @@ import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
 import { authRoutes } from "./routes/auth.js";
 import { projectDashboardRoutes } from "./routes/project-dashboard.js";
+import { registerStripeWebhookIfConfigured } from "./routes/stripe-webhook.js";
 
 const PAYLOAD_LIMIT = 200 * 1024; // 200 KB
 
@@ -33,6 +34,8 @@ export async function createApp(): Promise<FastifyInstance> {
   registerObservabilityHooks(app);
 
   await app.register(cors, buildCorsOptions());
+
+  await registerStripeWebhookIfConfigured(app);
 
   await app.register(
     async function publicSurface(f) {
