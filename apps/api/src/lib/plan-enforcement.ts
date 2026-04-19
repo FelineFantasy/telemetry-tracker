@@ -153,62 +153,133 @@ export async function assertIngestPlanOrReply(
   return { ok: true };
 }
 
-export async function countActiveProjectsForOrg(
+const SERIALIZABLE_TX = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 5000,
+  timeout: 15000,
+} as const;
+
+const SERIALIZABLE_RETRY_ATTEMPTS = 5;
+
+function isPrismaTransactionConflict(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code: unknown }).code === "P2034"
+  );
+}
+
+async function runSerializableTransaction<T>(
   prisma: PrismaClient,
-  organizationId: string
-): Promise<number> {
-  return prisma.project.count({
-    where: { organization_id: organizationId, deleted_at: null },
+  fn: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  for (let attempt = 0; attempt < SERIALIZABLE_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await prisma.$transaction(fn, SERIALIZABLE_TX);
+    } catch (e) {
+      const retry =
+        isPrismaTransactionConflict(e) && attempt < SERIALIZABLE_RETRY_ATTEMPTS - 1;
+      if (!retry) throw e;
+    }
+  }
+  throw new Error("runSerializableTransaction: exhausted retries");
+}
+
+export type CreateProjectPlanResult =
+  | {
+      ok: true;
+      project: {
+        id: string;
+        name: string;
+        slug: string;
+        organization_id: string;
+      };
+    }
+  | { ok: false; error: string; code: "org_not_found" | "max_projects_per_org" };
+
+/**
+ * Count + insert under serializable isolation so concurrent creates cannot exceed the plan cap.
+ */
+export async function createProjectWithPlanLimitCheck(
+  prisma: PrismaClient,
+  organizationId: string,
+  data: { name: string; slug: string }
+): Promise<CreateProjectPlanResult> {
+  return runSerializableTransaction(prisma, async (tx) => {
+    const org = await tx.organization.findFirst({
+      where: { id: organizationId, deleted_at: null },
+      select: { plan_tier: true },
+    });
+    if (!org) {
+      return { ok: false, error: "Organization not found.", code: "org_not_found" };
+    }
+    const limits = limitsForPlan(org.plan_tier);
+    const n = await tx.project.count({
+      where: { organization_id: organizationId, deleted_at: null },
+    });
+    if (n >= limits.maxProjectsPerOrg) {
+      return { ok: false, error: PROJECT_LIMIT, code: "max_projects_per_org" };
+    }
+    const project = await tx.project.create({
+      data: {
+        organization_id: organizationId,
+        name: data.name,
+        slug: data.slug,
+      },
+      select: { id: true, name: true, slug: true, organization_id: true },
+    });
+    return { ok: true, project };
   });
 }
 
-export async function assertCanCreateProject(
-  prisma: PrismaClient,
-  organizationId: string
-): Promise<{ ok: true; limits: PlanLimits } | { ok: false; error: string }> {
-  const org = await prisma.organization.findFirst({
-    where: { id: organizationId, deleted_at: null },
-    select: { plan_tier: true },
-  });
-  if (!org) return { ok: false, error: "Organization not found." };
-  const limits = limitsForPlan(org.plan_tier);
-  const n = await countActiveProjectsForOrg(prisma, organizationId);
-  if (n >= limits.maxProjectsPerOrg) {
-    return { ok: false, error: PROJECT_LIMIT };
-  }
-  return { ok: true, limits };
-}
+export type CreateApiKeyPlanResult =
+  | { ok: true }
+  | { ok: false; error: string; code: "project_not_found" | "max_api_keys_per_project" };
 
-export async function countActiveApiKeysForProject(
+/**
+ * Count + insert under serializable isolation so concurrent creates cannot exceed the plan cap.
+ */
+export async function createApiKeyWithPlanLimitCheck(
   prisma: PrismaClient,
-  projectId: string
-): Promise<number> {
-  return prisma.apiKey.count({
-    where: {
-      project_id: projectId,
-      deleted_at: null,
-      revoked_at: null,
-    },
-  });
-}
-
-export async function assertCanCreateApiKey(
-  prisma: PrismaClient,
-  projectId: string
-): Promise<{ ok: true; limits: PlanLimits } | { ok: false; error: string }> {
-  const proj = await prisma.project.findFirst({
-    where: { id: projectId, deleted_at: null },
-    select: {
-      organization: { select: { plan_tier: true, deleted_at: true } },
-    },
-  });
-  if (!proj || proj.organization.deleted_at) {
-    return { ok: false, error: "Project not found." };
+  projectId: string,
+  data: {
+    public_id: string;
+    secret_hash: string;
+    name: string | null;
+    allowed_app: string | null;
   }
-  const limits = limitsForPlan(proj.organization.plan_tier);
-  const n = await countActiveApiKeysForProject(prisma, projectId);
-  if (n >= limits.maxApiKeysPerProject) {
-    return { ok: false, error: KEY_LIMIT };
-  }
-  return { ok: true, limits };
+): Promise<CreateApiKeyPlanResult> {
+  return runSerializableTransaction(prisma, async (tx) => {
+    const proj = await tx.project.findFirst({
+      where: { id: projectId, deleted_at: null },
+      select: {
+        organization: { select: { plan_tier: true, deleted_at: true } },
+      },
+    });
+    if (!proj || proj.organization.deleted_at) {
+      return { ok: false, error: "Project not found.", code: "project_not_found" };
+    }
+    const limits = limitsForPlan(proj.organization.plan_tier);
+    const n = await tx.apiKey.count({
+      where: {
+        project_id: projectId,
+        deleted_at: null,
+        revoked_at: null,
+      },
+    });
+    if (n >= limits.maxApiKeysPerProject) {
+      return { ok: false, error: KEY_LIMIT, code: "max_api_keys_per_project" };
+    }
+    await tx.apiKey.create({
+      data: {
+        project_id: projectId,
+        public_id: data.public_id,
+        secret_hash: data.secret_hash,
+        name: data.name,
+        allowed_app: data.allowed_app,
+      },
+    });
+    return { ok: true };
+  });
 }

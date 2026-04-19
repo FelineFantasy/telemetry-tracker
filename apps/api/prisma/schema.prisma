@@ -17,7 +17,7 @@ model Organization {
   name                 String
   plan_tier            PlanTier    @default(FREE)
   stripe_customer_id   String?     @unique @map("stripe_customer_id")
-  stripe_subscription_id String? @map("stripe_subscription_id")
+  stripe_subscription_id String? @unique @map("stripe_subscription_id")
   created_at           DateTime    @default(now()) @map("created_at")
   updated_at           DateTime    @updatedAt @map("updated_at")
   deleted_at           DateTime?   @map("deleted_at")

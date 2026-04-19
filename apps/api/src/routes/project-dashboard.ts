@@ -3,8 +3,8 @@ import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fast
 import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
-  assertCanCreateApiKey,
-  assertCanCreateProject,
+  createApiKeyWithPlanLimitCheck,
+  createProjectWithPlanLimitCheck,
   getMonthlyIngestUsed,
   loadPlanContextForProject,
 } from "../lib/plan-enforcement.js";
@@ -240,19 +240,16 @@ export async function projectDashboardRoutes(
         : slugifyProjectName(name);
     const slug = await ensureUniqueSlug(orgId, slugBase);
 
-    const planCheck = await assertCanCreateProject(prisma, orgId);
-    if (!planCheck.ok) {
-      return reply.status(403).send({ error: planCheck.error, code: "max_projects_per_org" });
+    const created = await createProjectWithPlanLimitCheck(prisma, orgId, { name, slug });
+    if (!created.ok) {
+      if (created.code === "org_not_found") {
+        return reply.status(403).send({ error: created.error });
+      }
+      return reply
+        .status(403)
+        .send({ error: created.error, code: "max_projects_per_org" });
     }
-
-    const project = await prisma.project.create({
-      data: {
-        organization_id: orgId,
-        name,
-        slug,
-      },
-      select: { id: true, name: true, slug: true, organization_id: true },
-    });
+    const project = created.project;
     return reply.status(201).send({
       id: project.id,
       name: project.name,
@@ -624,25 +621,25 @@ export async function projectDashboardRoutes(
       allowedApp = body.allowedApp.trim().slice(0, 64);
     }
 
-    const keyCheck = await assertCanCreateApiKey(prisma, projectId);
-    if (!keyCheck.ok) {
-      return reply.status(403).send({ error: keyCheck.error, code: "max_api_keys_per_project" });
-    }
-
     const publicId = randomBytes(16).toString("hex");
     const secret = randomBytes(32).toString("hex");
     const secretHash = hashApiKeySecret(publicId, secret);
     const fullKey = `tt_live_${publicId}_${secret}`;
 
-    await prisma.apiKey.create({
-      data: {
-        project_id: projectId,
-        public_id: publicId,
-        secret_hash: secretHash,
-        name,
-        allowed_app: allowedApp,
-      },
+    const keyCreated = await createApiKeyWithPlanLimitCheck(prisma, projectId, {
+      public_id: publicId,
+      secret_hash: secretHash,
+      name,
+      allowed_app: allowedApp,
     });
+    if (!keyCreated.ok) {
+      if (keyCreated.code === "project_not_found") {
+        return reply.status(403).send({ error: keyCreated.error });
+      }
+      return reply
+        .status(403)
+        .send({ error: keyCreated.error, code: "max_api_keys_per_project" });
+    }
 
     return reply.status(201).send({
       key: fullKey,
