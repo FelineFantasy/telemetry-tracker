@@ -37,6 +37,14 @@ Lightweight internal telemetry: errors, events, sessions, and a simple dashboard
    pnpm build
    ```
 
+4. **Tests** (optional)
+
+   ```bash
+   pnpm test
+   ```
+
+   Runs Vitest for the API and dashboard. Database-backed integration tests in `apps/api` need Postgres and `RUN_DB_INTEGRATION_TESTS=true`.
+
 ## Run
 
 - **API** (ingest + read): `pnpm dev:api` (default port 3001)
@@ -46,11 +54,11 @@ Override `API_URL` in `apps/dashboard/.env` if the dashboard runs against a diff
 
 ## Deployment (Railway)
 
-The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard (root Dockerfile at repo root). All deployment-related files (`Dockerfile`, `railway.toml`, `.dockerignore`, `docker-compose.yml`) are at repo root. See [DEPLOYMENT.md](DEPLOYMENT.md) for env vars, Root Directory settings, and migrations.
+The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard (root Dockerfile at repo root). All deployment-related files (`Dockerfile`, `railway.toml`, `.dockerignore`, `docker-compose.yml`) are at repo root. See [DEPLOYMENT.md](DEPLOYMENT.md) for env vars (including production **CORS** and **rate limits**), Root Directory settings, and migrations.
 
 ## Project layout
 
-- `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`
+- `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`, `GET /api/sessions`, …; session auth under `/api/auth/*`; org/project/API keys under `/api/meta/*` and `/api/project/*`
 - `apps/dashboard` – Next.js app: Overview, Errors list/detail, Events list
 - `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching; anonymous device id and SDK version on every payload; in the browser, global `window.onerror` and `unhandledrejection` after `init()`
 - `packages/telemetry-next` – Next.js: provider, error boundary, `useTrackPage()`
