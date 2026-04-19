@@ -76,14 +76,19 @@ export async function registerStripeWebhookIfConfigured(
                       "id" in session.subscription
                     ? (session.subscription as Stripe.Subscription).id
                     : null;
+              // Do not set Stripe ids to null when missing from the session — that would
+              // wipe values from a prior checkout and break subscription.deleted lookups.
+              const data: {
+                plan_tier: typeof tier;
+                stripe_customer_id?: string;
+                stripe_subscription_id?: string;
+              } = { plan_tier: tier };
+              if (customerId !== null) data.stripe_customer_id = customerId;
+              if (subId !== null) data.stripe_subscription_id = subId;
               try {
                 await prisma.organization.updateMany({
                   where: { id: orgId, deleted_at: null },
-                  data: {
-                    plan_tier: tier,
-                    stripe_customer_id: customerId,
-                    stripe_subscription_id: subId,
-                  },
+                  data,
                 });
               } catch (e) {
                 if (!isUniqueConstraintError(e)) throw e;

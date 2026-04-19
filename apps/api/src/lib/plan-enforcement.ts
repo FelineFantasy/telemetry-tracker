@@ -49,7 +49,7 @@ export async function getMonthlyIngestUsed(
   return row?.ingest_units ?? 0;
 }
 
-export function checkMonthlyIngestUnits(
+function checkMonthlyIngestUnits(
   used: number,
   additional: number,
   limits: PlanLimits
@@ -64,7 +64,7 @@ export function checkMonthlyIngestUnits(
  * Which of the given `app` labels already appear in Event / Session / ErrorGroup for this project.
  * Scoped `IN (...)` queries — avoids a full distinct scan on every ingest when labels are unchanged.
  */
-export async function findAppsAlreadyRegisteredInProject(
+async function findAppsAlreadyRegisteredInProject(
   prisma: PrismaClient,
   projectId: string,
   appLabels: string[]
@@ -85,7 +85,7 @@ export async function findAppsAlreadyRegisteredInProject(
 }
 
 /** Full distinct app count — only call when the ingest payload may introduce new app labels. */
-export async function countDistinctAppsInProject(
+async function countDistinctAppsInProject(
   prisma: PrismaClient,
   projectId: string
 ): Promise<number> {
