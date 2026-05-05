@@ -1,5 +1,10 @@
 version: "3"
 
+# Local dev: Postgres only. For production-style retention scheduling, run a cron or a small
+# sidecar on the same host as the API, for example (adjust paths and DATABASE_URL):
+#   0 3 * * * cd /path/to/telemetry-tracker && DATABASE_URL=... pnpm --filter api retention
+# Or use a scheduler service (Railway Cron, Kubernetes CronJob, systemd timer).
+
 services:
   postgres:
     image: postgres:16

@@ -9,6 +9,14 @@ export type UsageQuotaInfo = {
   nearQuota: boolean;
 };
 
+export type BillingHealthInfo = {
+  stripeSubscriptionStatus: string | null;
+  stripeCurrentPeriodEnd: string | null;
+  storedPlanTier: string;
+  effectivePlanTier: string;
+  billingAlertVariant: "past_due" | "unpaid" | "canceled" | null;
+};
+
 export type DashboardSessionContext = {
   projectId: string;
   role: "OWNER" | "EDITOR" | "VIEWER";
@@ -20,6 +28,8 @@ export type DashboardSessionContext = {
   canManageMembers: boolean;
   /** Present when the API could resolve plan + usage for the active project. */
   usageQuota: UsageQuotaInfo | null;
+  /** Stripe subscription fields for the active project’s org; null if unknown. */
+  billingHealth: BillingHealthInfo | null;
 };
 
 /** If shape is wrong (e.g. API mismatch), omit the banner rather than failing the whole session. */
@@ -52,6 +62,36 @@ function parseUsageQuota(uq: unknown): UsageQuotaInfo | null {
   };
 }
 
+function parseBillingHealth(bh: unknown): BillingHealthInfo | null {
+  if (bh == null) return null;
+  if (typeof bh !== "object" || bh === null) return null;
+  const o = bh as Record<string, unknown>;
+  const variant = o.billingAlertVariant;
+  const okVariant =
+    variant === null ||
+    variant === "past_due" ||
+    variant === "unpaid" ||
+    variant === "canceled";
+  if (
+    typeof o.storedPlanTier !== "string" ||
+    typeof o.effectivePlanTier !== "string" ||
+    (typeof o.stripeSubscriptionStatus !== "string" && o.stripeSubscriptionStatus !== null) ||
+    (typeof o.stripeCurrentPeriodEnd !== "string" && o.stripeCurrentPeriodEnd !== null) ||
+    !okVariant
+  ) {
+    return null;
+  }
+  return {
+    stripeSubscriptionStatus:
+      o.stripeSubscriptionStatus === null ? null : (o.stripeSubscriptionStatus as string),
+    stripeCurrentPeriodEnd:
+      o.stripeCurrentPeriodEnd === null ? null : (o.stripeCurrentPeriodEnd as string),
+    storedPlanTier: o.storedPlanTier,
+    effectivePlanTier: o.effectivePlanTier,
+    billingAlertVariant: variant as BillingHealthInfo["billingAlertVariant"],
+  };
+}
+
 /** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set. */
 export async function getDashboardSessionContext(): Promise<DashboardSessionContext | null> {
   const res = await dashboardApiFetch("/api/meta/session-context");
@@ -77,5 +117,6 @@ export async function getDashboardSessionContext(): Promise<DashboardSessionCont
     canCreateProject: data.canCreateProject,
     canManageMembers: data.canManageMembers,
     usageQuota: parseUsageQuota(data.usageQuota),
+    billingHealth: parseBillingHealth(data.billingHealth),
   };
 }

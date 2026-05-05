@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { PrismaClient } from "@prisma/client";
+import type { PlanTier, PrismaClient } from "@prisma/client";
+import { effectivePlanTierForLimits } from "./effective-plan-tier.js";
 
 /** Full key format: `tt_live_<publicId>_<secret>` (secret is hex, no underscores). */
 const KEY_RE = /^tt_live_([a-f0-9]{32})_([a-f0-9]+)$/i;
@@ -22,7 +23,7 @@ function safeEqualHex(a: string, b: string): boolean {
 export type VerifiedApiKey = {
   id: string;
   projectId: string;
-  organizationPlanTier: "FREE" | "PRO" | "BUSINESS";
+  organizationPlanTier: PlanTier;
   /** If set, ingest payloads must use this `app` value. */
   allowedApp: string | null;
 };
@@ -52,7 +53,19 @@ export async function verifyIngestApiKey(
 
   const row = await prisma.apiKey.findUnique({
     where: { public_id: publicId },
-    include: { project: { include: { organization: true } } },
+    include: {
+      project: {
+        include: {
+          organization: {
+            select: {
+              plan_tier: true,
+              stripe_subscription_status: true,
+              deleted_at: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!row) return null;
   if (row.revoked_at || row.deleted_at) return null;
@@ -66,7 +79,11 @@ export async function verifyIngestApiKey(
     return null;
   }
 
-  const tier = row.project.organization.plan_tier;
+  const org = row.project.organization;
+  const tier = effectivePlanTierForLimits(
+    org.plan_tier,
+    org.stripe_subscription_status
+  );
   void prisma.apiKey
     .update({
       where: { id: row.id },

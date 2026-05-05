@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { limitsForPlan } from "../config/plans.js";
+import { effectivePlanTierForLimits } from "../lib/effective-plan-tier.js";
 
 export type RetentionSweepResult = {
   projectsProcessed: number;
@@ -18,7 +19,13 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
     where: { deleted_at: null },
     select: {
       id: true,
-      organization: { select: { plan_tier: true, deleted_at: true } },
+      organization: {
+        select: {
+          plan_tier: true,
+          stripe_subscription_status: true,
+          deleted_at: true,
+        },
+      },
     },
   });
 
@@ -31,7 +38,11 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
   for (const p of projects) {
     if (p.organization.deleted_at) continue;
     projectsProcessed += 1;
-    const days = limitsForPlan(p.organization.plan_tier).retentionDays;
+    const effectiveTier = effectivePlanTierForLimits(
+      p.organization.plan_tier,
+      p.organization.stripe_subscription_status
+    );
+    const days = limitsForPlan(effectiveTier).retentionDays;
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const projectId = p.id;
 

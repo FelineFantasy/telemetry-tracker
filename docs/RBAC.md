@@ -27,6 +27,6 @@ Ingest remains authenticated with **project API keys**, not user sessions.
 
 **API enforcement:** **Mutations** (`POST`/`PATCH` that change data or API keys, including `PATCH /api/errors/:id`, `POST /api/project/api-keys`, revoke) **require** a valid session (`Authorization: Bearer` or session cookie) and then enforce role. Unauthenticated callers receive **401**. **GET** routes may still allow unauthenticated “legacy” project scoping for local/dev (see `resolveReadProjectId`); production dashboards should use sessions for reads too.
 
-**Dashboard:** `/api/meta/session-context` returns `role` and boolean flags (`canResolveErrors`, `canCreateApiKey`, `canRevokeApiKey`, `canCreateProject`, `canManageMembers`) for the active project and sidebar organization (`X-Project-Id` / `X-Organization-Id` + session).
+**Dashboard:** `/api/meta/session-context` returns `role`, boolean capability flags, `usageQuota`, and `billingHealth` (Stripe subscription snapshot for billing banners when configured) for the active project and sidebar organization (`X-Project-Id` / `X-Organization-Id` + session).
 
 **Organization scoping:** The dashboard may send `X-Organization-Id` so `GET /api/meta/projects` returns only projects in that organization (caller must be a member).

@@ -1,10 +1,16 @@
 import { Prisma, type PlanTier, type PrismaClient } from "@prisma/client";
 import { limitsForPlan, type PlanLimits } from "../config/plans.js";
+import { effectivePlanTierForLimits } from "./effective-plan-tier.js";
 import { currentYearMonth } from "./usage-meter.js";
 
 export type PlanContext = {
   organizationId: string;
+  /** Stored tier from DB (Stripe checkout / metadata). */
+  storedPlanTier: PlanTier;
+  /** Tier used for limits (may be FREE when Stripe subscription is canceled/unpaid/etc.). */
   planTier: PlanTier;
+  stripeSubscriptionStatus: string | null;
+  stripeCurrentPeriodEnd: Date | null;
   limits: PlanLimits;
 };
 
@@ -22,15 +28,25 @@ export async function loadPlanContextForProject(
     select: {
       organization_id: true,
       organization: {
-        select: { plan_tier: true, deleted_at: true },
+        select: {
+          plan_tier: true,
+          stripe_subscription_status: true,
+          stripe_current_period_end: true,
+          deleted_at: true,
+        },
       },
     },
   });
   if (!row || row.organization.deleted_at) return null;
-  const tier = row.organization.plan_tier;
+  const stored = row.organization.plan_tier;
+  const status = row.organization.stripe_subscription_status;
+  const tier = effectivePlanTierForLimits(stored, status);
   return {
     organizationId: row.organization_id,
+    storedPlanTier: stored,
     planTier: tier,
+    stripeSubscriptionStatus: status,
+    stripeCurrentPeriodEnd: row.organization.stripe_current_period_end,
     limits: limitsForPlan(tier),
   };
 }
@@ -209,12 +225,14 @@ export async function createProjectWithPlanLimitCheck(
   return runSerializableTransaction(prisma, async (tx) => {
     const org = await tx.organization.findFirst({
       where: { id: organizationId, deleted_at: null },
-      select: { plan_tier: true },
+      select: { plan_tier: true, stripe_subscription_status: true },
     });
     if (!org) {
       return { ok: false, error: "Organization not found.", code: "org_not_found" };
     }
-    const limits = limitsForPlan(org.plan_tier);
+    const limits = limitsForPlan(
+      effectivePlanTierForLimits(org.plan_tier, org.stripe_subscription_status)
+    );
     const n = await tx.project.count({
       where: { organization_id: organizationId, deleted_at: null },
     });
@@ -254,13 +272,24 @@ export async function createApiKeyWithPlanLimitCheck(
     const proj = await tx.project.findFirst({
       where: { id: projectId, deleted_at: null },
       select: {
-        organization: { select: { plan_tier: true, deleted_at: true } },
+        organization: {
+          select: {
+            plan_tier: true,
+            stripe_subscription_status: true,
+            deleted_at: true,
+          },
+        },
       },
     });
     if (!proj || proj.organization.deleted_at) {
       return { ok: false, error: "Project not found.", code: "project_not_found" };
     }
-    const limits = limitsForPlan(proj.organization.plan_tier);
+    const limits = limitsForPlan(
+      effectivePlanTierForLimits(
+        proj.organization.plan_tier,
+        proj.organization.stripe_subscription_status
+      )
+    );
     const n = await tx.apiKey.count({
       where: {
         project_id: projectId,
