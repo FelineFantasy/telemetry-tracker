@@ -13,5 +13,7 @@ describe("billingAlertVariant", () => {
     expect(billingAlertVariant("PAST_DUE")).toBe("past_due");
     expect(billingAlertVariant("unpaid")).toBe("unpaid");
     expect(billingAlertVariant("canceled")).toBe("canceled");
+    expect(billingAlertVariant("incomplete")).toBe("incomplete");
+    expect(billingAlertVariant("INCOMPLETE_EXPIRED")).toBe("incomplete_expired");
   });
 });

@@ -14,7 +14,13 @@ export type BillingHealthInfo = {
   stripeCurrentPeriodEnd: string | null;
   storedPlanTier: string;
   effectivePlanTier: string;
-  billingAlertVariant: "past_due" | "unpaid" | "canceled" | null;
+  billingAlertVariant:
+    | "past_due"
+    | "unpaid"
+    | "canceled"
+    | "incomplete"
+    | "incomplete_expired"
+    | null;
 };
 
 export type DashboardSessionContext = {
@@ -71,7 +77,9 @@ function parseBillingHealth(bh: unknown): BillingHealthInfo | null {
     variant === null ||
     variant === "past_due" ||
     variant === "unpaid" ||
-    variant === "canceled";
+    variant === "canceled" ||
+    variant === "incomplete" ||
+    variant === "incomplete_expired";
   if (
     typeof o.storedPlanTier !== "string" ||
     typeof o.effectivePlanTier !== "string" ||
