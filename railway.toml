@@ -1,5 +1,0 @@
-# Use root Dockerfile for services that build from repo root (e.g. dashboard).
-# Dashboard: set Root Directory to empty so this file is used and Docker (pnpm) runs instead of Nixpacks (npm).
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "./Dockerfile"

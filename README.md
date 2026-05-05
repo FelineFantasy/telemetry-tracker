@@ -2,6 +2,8 @@
 
 Lightweight internal telemetry: errors, events, sessions, and a simple dashboard.
 
+**Self-hosted:** this repo is not a managed cloud product—you run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)).
+
 ## Setup
 
 1. **Install dependencies**
@@ -54,7 +56,7 @@ Override `API_URL` in `apps/dashboard/.env` if the dashboard runs against a diff
 
 ## Deployment (Railway)
 
-The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard (root Dockerfile at repo root). All deployment-related files (`Dockerfile`, `railway.toml`, `.dockerignore`, `docker-compose.yml`) are at repo root. See [DEPLOYMENT.md](DEPLOYMENT.md) for env vars (including production **CORS** and **rate limits**), Root Directory settings, and migrations.
+The repo is set up for **Railway**: Postgres + API (Root Directory `apps/api`, Railpack) + Dashboard (Root Directory repo root, **Dockerfile** builder — see [DEPLOYMENT.md](DEPLOYMENT.md)). Deployment files (`Dockerfile`, `.dockerignore`, `docker-compose.yml`) live at repo root; there is **no** repo-root `railway.toml` that forces Docker on every service (that breaks the API build). See [DEPLOYMENT.md](DEPLOYMENT.md) for env vars (**CORS**, rate limits), per-service Railway settings, and migrations.
 
 ## Project layout
 

@@ -8,7 +8,7 @@ You have three pieces to deploy:
 
 The dashboard talks to the API via `API_URL` (server-side only; not exposed to the browser). The API talks to Postgres via `DATABASE_URL`.
 
-**Repo layout (deployment):** `Dockerfile`, `railway.toml`, `.dockerignore`, and `docker-compose.yml` live at the **repo root**. The single Dockerfile builds the dashboard (context = repo root, for workspace deps). The API has no Dockerfile in the repo (Railway uses Nixpacks for it).
+**Repo layout (deployment):** `Dockerfile`, `.dockerignore`, and `docker-compose.yml` live at the **repo root**. The single Dockerfile builds the **dashboard** only (build context must be the **repo root** so `packages/`, `pnpm-workspace.yaml`, and the root `eslint.config.mjs` exist). The API has no Dockerfile (on Railway it builds with **Railpack** / default Node when Root Directory is `apps/api`). **Do not** add a repo-root `railway.toml` that sets `builder = "DOCKERFILE"` for every service—that forces the dashboard Dockerfile onto the API and fails with missing files (e.g. `eslint.config.mjs`).
 
 ---
 
@@ -131,13 +131,13 @@ Use a managed PostgreSQL and deploy the API and dashboard as separate services.
 
 #### Railway (API + DB + Dashboard)
 
-Use these settings so only the dashboard uses the root Dockerfile; API and DB are unchanged.
+Use these settings so **only the dashboard** uses the root Dockerfile; API and DB stay on Railpack/npm.
 
 | Service    | Root Directory | Watch Paths (optional)     | Builder / Build |
 |------------|----------------|----------------------------|------------------|
 | **Database** | *(none – Postgres service)* | — | — |
-| **API**      | `apps/api`     | e.g. `apps/api/**`         | Nixpacks → `npm install` / `npm run build` / `npm run start` |
-| **Dashboard**| **empty** (repo root) | e.g. `apps/dashboard/**` | Docker (root `Dockerfile` + `railway.toml`) |
+| **API**      | `apps/api`     | e.g. `apps/api/**`         | **Railpack** (default) → install / `npm run build` / `npm run start` — **not** Docker |
+| **Dashboard**| **empty** (repo root) | e.g. `apps/dashboard/**` | **Dockerfile** — set only on this service (see below). **Do not** use a root `railway.toml` that forces Docker globally. |
 
 - **Database**
   - Create a PostgreSQL service. Use the URL Railway gives you (often database name `railway`). Prisma migrations will create the tables.
@@ -147,11 +147,11 @@ Use these settings so only the dashboard uses the root Dockerfile; API and DB ar
   - **Build**: `npm install` then `npm run build`; **Start**: `npm run start` (`node dist/index.js`).
   - **Env**: `DATABASE_URL` = Railway Postgres URL (prefer **internal** when API and DB are in the same project). `PORT` is set by Railway (usually 8080).
   - **Public domain port**: When you add a domain (e.g. `telemetry-api.tacko.io`) or use the generated `*.up.railway.app` URL, set the **target port** to **8080** in the service’s **Settings → Networking** (or the domain’s port setting). If the domain points at a different port, the proxy gets “connection refused” and you see 502 even though the app is listening.
-- **Dashboard service** — fix only this one
-  - **Root Directory**: set to **empty** (clear the field so the service uses the repo root). Do **not** use `apps/dashboard` or Railway will use Nixpacks/npm and fail with `Unsupported URL Type "workspace:"`.
-  - **Watch Paths**: you can keep `apps/dashboard/**` so only dashboard changes trigger redeploys (path is relative to repo root when Root Directory is empty).
-  - **Build**: With root as Root Directory, the root `railway.toml` forces Docker; the root `Dockerfile` builds the dashboard with pnpm. **Start**: handled by the Dockerfile (`pnpm start` in `apps/dashboard`).
-  - **Env**: `API_URL` = your API’s public URL (e.g. `https://your-api.up.railway.app`). Add a custom domain in the dashboard service if you want (e.g. `telemetry.yourdomain.com`).
+- **Dashboard service**
+  - **Root Directory**: set to **empty** (clear the field so the service uses the repo root). Do **not** use `apps/dashboard` alone or Railpack/npm will fail with `Unsupported URL Type "workspace:"`.
+  - **Watch Paths**: optional `apps/dashboard/**` (relative to repo root).
+  - **Build** (critical): **Settings → Build** → **Builder** = **Dockerfile**, **Dockerfile path** = `Dockerfile` (repo root). There is intentionally **no** repo-root `railway.toml` that sets Docker for all services—configure Dockerfile **only on this service**. The image runs `pnpm start` in `apps/dashboard` per the Dockerfile.
+  - **Env**: `API_URL` = your API’s public URL (e.g. `https://your-api.up.railway.app`).
 
 1. **Database**
    - Create a PostgreSQL database (Railway / Render / Neon / Supabase etc.).
@@ -185,7 +185,7 @@ You can containerize the API and the dashboard and keep Postgres in Docker too. 
 
 2. **Dashboard** (included in repo)
    - The root **Dockerfile** builds the dashboard; build context must be repo root (for `packages/` and pnpm workspace). Run from repo root: `docker build -t dashboard .` then run the container with `API_URL` set.
-   - See the Dockerfile and `railway.toml` at root for the exact build/start steps.
+   - See the root `Dockerfile` for build/start steps.
 
 3. **API container** (not in repo; example if you want Docker for API too)
    - Build context: monorepo root (or `apps/api` with a custom Dockerfile that copies Prisma from root). Install deps, `prisma generate`, build, run `node dist/index.js`. Env: `DATABASE_URL`, `PORT`. Run migrations in an init container or entrypoint.
@@ -197,6 +197,12 @@ You can containerize the API and the dashboard and keep Postgres in Docker too. 
 
 ## 4. Troubleshooting (Railway dashboard)
 
+**Error (API service):** Docker build fails with `"/eslint.config.mjs": not found` (or similar) while copying repo-root files.
+
+The API service is building the **dashboard Dockerfile** with a **narrow root directory** (e.g. `apps/api`). That happens when **Builder** is set to **Dockerfile** on the API service, or when a **repo-root `railway.toml`** forced `builder = "DOCKERFILE"` for every service. **Fix:** API service → **Build** → **Builder** = **Railpack** (or default), **not** Dockerfile. **Root Directory** = `apps/api`. Redeploy.
+
+---
+
 **Error:** `EUNSUPPORTEDPROTOCOL` / `Unsupported URL Type "workspace:"` when building the dashboard.
 
 Railway is using **Nixpacks** (npm) instead of Docker because the dashboard service has **Root Directory** set to `apps/dashboard`. The monorepo uses **pnpm** and `workspace:*`, which npm does not support.
@@ -206,7 +212,7 @@ Railway is using **Nixpacks** (npm) instead of Docker because the dashboard serv
 1. Open the **dashboard** service in Railway → **Settings**.
 2. Set **Root Directory** to **empty** (clear the field so it uses the repo root). See the **Railway (API + DB + Dashboard)** table under Option B above.
 3. **Watch Paths** can stay `apps/dashboard/**` (relative to repo root when Root Directory is empty).
-4. Redeploy. The root `railway.toml` and `Dockerfile` will be used; build will use Docker + pnpm. If Nixpacks still runs, in **Settings → Build** choose Dockerfile as the builder if available.
+4. Redeploy. In **Settings → Build**, set **Builder** to **Dockerfile** and **Dockerfile path** to `Dockerfile` so the build uses Docker + pnpm. If Railpack still runs, double-check Root Directory is empty (repo root).
 
 **API 502 "Application failed to respond" / "connection refused" (Railway):**
 

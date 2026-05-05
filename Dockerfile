@@ -1,5 +1,5 @@
-# Dashboard image – build context must be repo root (so packages/ and apps/ exist).
-# Railway: set dashboard service Root Directory to repo root so this file is used.
+# Dashboard image — build context must be repo root (packages/, pnpm workspace, root eslint.config.mjs).
+# Railway dashboard service: Root Directory = empty, Build → Dockerfile path = this file. Do not use for API.
 # syntax = docker/dockerfile:1
 
 ARG NODE_VERSION=20
