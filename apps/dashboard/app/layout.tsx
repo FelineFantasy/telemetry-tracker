@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { ToasterProvider } from "@/app/components/ToasterProvider";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -43,6 +44,7 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
+        <ToasterProvider />
         {children}
       </body>
     </html>

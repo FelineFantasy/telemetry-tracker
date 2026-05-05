@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { MenuIcon } from "@/app/components/sidebar/MenuIcon";
 import { AppSidebar } from "./AppSidebar";
 import { DashboardCapabilitiesProvider } from "./DashboardCapabilitiesContext";
@@ -11,6 +12,7 @@ import type { DashboardSessionContext } from "@/lib/dashboard-capabilities";
 import type { DashboardUser } from "@/lib/dashboard-user";
 
 const SIDEBAR_COLLAPSED_KEY = "telemetry-dashboard-sidebar-collapsed";
+const BILLING_TOAST_SESSION_KEY = "tt_dashboard_billing_toast_v1";
 
 export function DashboardShell({
   apps,
@@ -33,6 +35,7 @@ export function DashboardShell({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const billingToastShownRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -85,6 +88,26 @@ export function DashboardShell({
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    if (!capabilities || billingToastShownRef.current) return;
+    try {
+      if (sessionStorage.getItem(BILLING_TOAST_SESSION_KEY) === "1") {
+        billingToastShownRef.current = true;
+        return;
+      }
+      sessionStorage.setItem(BILLING_TOAST_SESSION_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    billingToastShownRef.current = true;
+    toast.message("Stripe billing", {
+      id: "dashboard-billing-info",
+      description:
+        "Plan tier syncs from Stripe after checkout or when a subscription ends. Failed payments, past-due invoices, and card errors are not shown in this app—check Stripe's emails or your billing portal.",
+      duration: 12_000,
+    });
+  }, [capabilities]);
 
   return (
     <div className="dashboard-layout">
