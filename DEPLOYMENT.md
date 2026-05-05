@@ -50,7 +50,8 @@ Ingest and local dev may also use `INGEST_ALLOW_UNAUTHENTICATED` and `TELEMETRY_
 - `checkout.session.completed`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
-- `invoice.payment_failed`
+
+Do **not** rely on `invoice.payment_failed` to set subscription status: it can fire while the subscription is still `active` (Stripe retries). Status should come from **`customer.subscription.updated`** (and checkout retrieve when applicable).
 
 ### Dashboard (`apps/dashboard`)
 

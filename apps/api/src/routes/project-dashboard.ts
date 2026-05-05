@@ -516,7 +516,7 @@ export async function projectDashboardRoutes(
         const ratio = limit > 0 ? used / limit : 0;
         const quotaExceeded = limit > 0 && used >= limit;
         usageQuota = {
-          planTier: ctx.storedPlanTier,
+          planTier: ctx.planTier,
           monthlyIngestUsed: used,
           monthlyIngestLimit: limit,
           percentUsed: Math.round(ratio * 100),

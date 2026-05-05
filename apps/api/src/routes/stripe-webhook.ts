@@ -7,10 +7,7 @@ import {
   parsePlanTierMetadata,
   subscriptionToOrgSyncPatch,
 } from "../lib/stripe-subscription-sync.js";
-import {
-  stripeInvoiceSubscriptionId,
-  stripeSubscriptionPeriodEndUnix,
-} from "../lib/stripe-runtime-fields.js";
+import { stripeSubscriptionPeriodEndUnix } from "../lib/stripe-runtime-fields.js";
 
 /** Prisma P2002 — unique constraint (e.g. Stripe customer/sub already bound to another org). */
 function isUniqueConstraintError(e: unknown): boolean {
@@ -140,17 +137,6 @@ export async function registerStripeWebhookIfConfigured(
                 stripe_current_period_end: null,
               },
             });
-            break;
-          }
-          case "invoice.payment_failed": {
-            const inv = event.data.object as Stripe.Invoice;
-            const subId = stripeInvoiceSubscriptionId(inv);
-            if (subId) {
-              await prisma.organization.updateMany({
-                where: { stripe_subscription_id: subId, deleted_at: null },
-                data: { stripe_subscription_status: "past_due" },
-              });
-            }
             break;
           }
           default:
