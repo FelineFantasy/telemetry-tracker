@@ -65,6 +65,10 @@ The repo is set up for **Railway**: Postgres + API (root `apps/api`) + Dashboard
 - `packages/telemetry-react-native` – React Native: global error handler, session, `trackScreen()`
 - `packages/telemetry-node` – Node: `uncaughtException` / `unhandledRejection`, optional middleware
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, local setup, and what CI runs. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). **Security:** report vulnerabilities privately per [SECURITY.md](SECURITY.md)—do not use public issues for undisclosed security bugs.
+
 ## SDK usage
 
 **Core (any app):**
