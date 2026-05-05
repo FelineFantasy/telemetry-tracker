@@ -20,7 +20,10 @@ import {
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
 import { headerFirst } from "../lib/http-headers.js";
-import { billingAlertVariant } from "../lib/billing-alert.js";
+import {
+  type BillingAlertVariant,
+  billingAlertVariant,
+} from "../lib/billing-alert.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -506,7 +509,7 @@ export async function projectDashboardRoutes(
       stripeCurrentPeriodEnd: string | null;
       storedPlanTier: string;
       effectivePlanTier: string;
-      billingAlertVariant: "past_due" | "unpaid" | "canceled" | null;
+      billingAlertVariant: BillingAlertVariant | null;
     } | null = null;
     if (projectId !== null) {
       const ctx = await loadPlanContextForProject(prisma, projectId);

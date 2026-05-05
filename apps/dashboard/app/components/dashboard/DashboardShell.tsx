@@ -171,6 +171,21 @@ export function DashboardShell({
                     is resolved. Check Stripe&apos;s email or your billing portal. (Effective tier:{" "}
                     <strong>{capabilities.billingHealth.effectivePlanTier}</strong>.)
                   </>
+                ) : capabilities.billingHealth.billingAlertVariant === "incomplete" ? (
+                  <>
+                    <strong>Subscription incomplete.</strong> Stripe has not activated this
+                    subscription yet (for example while a bank transfer or other delayed payment is
+                    pending). Until it becomes active, entitlements use the{" "}
+                    <strong>{capabilities.billingHealth.effectivePlanTier}</strong> tier. Check
+                    Stripe&apos;s email or your billing portal to finish setup.
+                  </>
+                ) : capabilities.billingHealth.billingAlertVariant === "incomplete_expired" ? (
+                  <>
+                    <strong>Subscription setup expired.</strong> The subscription never completed
+                    payment in time, so Stripe ended it. Entitlements use the{" "}
+                    <strong>{capabilities.billingHealth.effectivePlanTier}</strong> tier until you
+                    subscribe again via your billing portal.
+                  </>
                 ) : (
                   <>
                     <strong>Subscription canceled.</strong> This Stripe subscription is canceled.
