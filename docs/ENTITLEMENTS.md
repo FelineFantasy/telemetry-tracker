@@ -108,9 +108,11 @@ The ingest model remains **org → project → API key**. **Human login** is sep
 
 ---
 
-## Retention (future)
+## Retention (by plan)
 
-Retention may be enforced **per plan** (e.g. FREE: 14 days, PRO: 90 days). It can become a **primary cost control** and may **replace or complement** ingest-unit limits once you understand real query and storage patterns.
+Retention is **implemented** in code: each tier has `retentionDays` in [`apps/api/src/config/plans.ts`](../apps/api/src/config/plans.ts). A scheduled job deletes telemetry older than that window per project (see [`apps/api/src/jobs/run-retention.ts`](../apps/api/src/jobs/run-retention.ts), `pnpm --filter api retention`). Operationally, you must run that job (e.g. nightly cron) in each environment.
+
+Longer term, retention may still become a **primary cost driver** and you might tune days per tier or combine with ingest-unit caps as you learn query and storage patterns.
 
 ---
 
@@ -121,8 +123,10 @@ Retention may be enforced **per plan** (e.g. FREE: 14 days, PRO: 90 days). It ca
 | Orgs, projects, API keys, soft-delete, ingest auth, `UsageMonthly` metering | Implemented — matches sections above. |
 | `PLAN_LIMITS` in [`apps/api/src/config/plans.ts`](../apps/api/src/config/plans.ts) | **Enforced** — monthly ingest units (429 when over), max distinct `app` labels per project, max projects per org, max API keys per project. Per-tier **ingest RPS** in the table is not a separate token-bucket yet (global IP rate limits still apply on `/ingest`). |
 | Retention by tier | **Implemented** — `retentionDays` per tier in `plans.ts`; run [`apps/api/src/jobs/run-retention.ts`](../apps/api/src/jobs/run-retention.ts) on a schedule (`pnpm --filter api retention`). |
-| Stripe → `plan_tier` | **Webhook path implemented** — `POST /webhooks/stripe` when `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` are set; Checkout metadata `organization_id` + `plan_tier`; subscription deletion downgrades to FREE. Checkout UI is product-specific. |
+| Stripe → `plan_tier` | **Webhook path implemented** — `POST /webhooks/stripe` when `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` are set; **`checkout.session.completed`** and **`customer.subscription.deleted`** only. Checkout metadata `organization_id` + `plan_tier`; subscription deletion downgrades to FREE. There is **no** detection of failed payments, `past_due`, or invoice issues in the API—owners should rely on Stripe emails / Billing Portal; the dashboard shows a **one-per-session Sonner toast** with the same disclaimer (not live payment status). |
 | Dashboard usage vs limits | **Near-quota banner** — session context includes `usageQuota`; UI warns at ≥90% of monthly ingest. |
+
+For a broader **“what’s still missing for a mature SaaS”** checklist (Stripe events, ops, compliance, testing), see [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md).
 
 ## Example plan limits (code defaults only)
 

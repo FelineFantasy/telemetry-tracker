@@ -10,6 +10,7 @@ import { useDashboardCapabilities } from "@/app/components/dashboard/DashboardCa
 import { Button } from "@/app/components/ui/Button";
 import { Table, TableWrap } from "@/app/components/ui/Table";
 import { TimeAgo } from "@/app/components/TimeAgo";
+import { toast } from "sonner";
 
 export type ApiKeyRow = {
   publicId: string;
@@ -47,7 +48,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
     const r = await revokeDashboardApiKey(publicId);
     setRevokePending(null);
     if (!r.ok) {
-      alert(r.error);
+      toast.error(r.error);
     } else {
       router.refresh();
     }
@@ -69,8 +70,9 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(newKey);
+                  toast.success("Copied to clipboard");
                 } catch {
-                  alert("Could not copy to clipboard.");
+                  toast.error("Could not copy to clipboard.");
                 }
               }}
             >

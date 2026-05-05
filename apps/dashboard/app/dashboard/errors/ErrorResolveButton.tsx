@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { setErrorResolvedAction } from "@/app/dashboard/actions";
+import { toast } from "sonner";
 import { useDashboardCapabilities } from "@/app/components/dashboard/DashboardCapabilitiesContext";
 import { Button } from "@/app/components/ui/Button";
 
@@ -25,7 +26,7 @@ export function ErrorResolveButton({
     startTransition(async () => {
       const res = await setErrorResolvedAction(errorGroupId, !resolved);
       if (!res.ok) {
-        alert(res.error);
+        toast.error(res.error);
         return;
       }
       router.refresh();
