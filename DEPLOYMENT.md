@@ -45,7 +45,12 @@ The dashboard talks to the API via `API_URL` (server-side only; not exposed to t
 
 Ingest and local dev may also use `INGEST_ALLOW_UNAUTHENTICATED` and `TELEMETRY_PROJECT_ID` (see `docs/ENTITLEMENTS.md`); never enable unauthenticated ingest in production.
 
-**Stripe billing:** configure Checkout (or Billing Portal) in the Stripe dashboard so completed sessions include metadata `organization_id` (UUID) and `plan_tier` (`PRO` or `BUSINESS`). Point the webhook endpoint to `https://<your-api>/webhooks/stripe` and subscribe to `checkout.session.completed` and `customer.subscription.deleted`.
+**Stripe billing:** configure Checkout (or Billing Portal) in the Stripe dashboard so completed sessions include metadata `organization_id` (UUID) and `plan_tier` (`PRO` or `BUSINESS`). For plan changes that only touch the **Subscription** (not a new Checkout), set the same `plan_tier` on the **Subscription** or **Price** metadata so `customer.subscription.updated` can sync tier. Point the webhook endpoint to `https://<your-api>/webhooks/stripe` and subscribe to:
+
+- `checkout.session.completed`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.payment_failed`
 
 ### Dashboard (`apps/dashboard`)
 
@@ -216,6 +221,8 @@ The proxy cannot reach the API process. Even when deploy logs show “Listening 
 
 ## 5. Checklist before going live
 
+### Core
+
 - [ ] `DATABASE_URL` uses a strong password and (if public) TLS (e.g. `?sslmode=require` for cloud Postgres).
 - [ ] API and dashboard are served over HTTPS in production.
 - [ ] `API_URL` points at the real API URL when running the dashboard server.
@@ -223,6 +230,13 @@ The proxy cannot reach the API process. Even when deploy logs show “Listening 
 - [ ] **Rate limits** use separate caps for ingest, `/api/auth`, the rest of `/api`, and **`/health` + `/`** (`RATE_LIMIT_PUBLIC_MAX`; defaults per 60s window; see `RATE_LIMIT_*` above). **Request body** limit is 200 KB — acceptable for your payloads.
 - [ ] **Production CORS:** `CORS_ORIGINS` or `DASHBOARD_ORIGIN` matches your deployed dashboard origin when `NODE_ENV=production`.
 - [ ] The dashboard uses **email/password login**; for extra safety on a public URL, still use network controls (VPN, IP allowlist, SSO) as your threat model requires.
+
+### Operations (self-host and production)
+
+- [ ] **Telemetry retention:** schedule `pnpm --filter api retention` (or `tsx` equivalent) at least daily. Without it, old data is never pruned per tier (`retentionDays` in `apps/api/src/config/plans.ts`).
+- [ ] **Postgres backups:** use your host’s snapshots (e.g. RDS automated backups), or a cron `pg_dump` to durable storage; verify a restore drill periodically.
+- [ ] **Health checks:** set `HEALTH_CHECK_DATABASE=true` if your load balancer should fail when the DB is unreachable (`GET /health`).
+- [ ] **Stripe:** webhook URL reachable and events listed in §1 (API env vars); use Stripe CLI or Dashboard “Send test webhook” after deploy.
 
 ---
 

@@ -14,6 +14,15 @@ import type { DashboardUser } from "@/lib/dashboard-user";
 const SIDEBAR_COLLAPSED_KEY = "telemetry-dashboard-sidebar-collapsed";
 const BILLING_TOAST_SESSION_KEY = "tt_dashboard_billing_toast_v1";
 
+function formatPeriodEnd(iso: string | null): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+  } catch {
+    return null;
+  }
+}
+
 export function DashboardShell({
   apps,
   children,
@@ -104,7 +113,7 @@ export function DashboardShell({
     toast.message("Stripe billing", {
       id: "dashboard-billing-info",
       description:
-        "Plan tier syncs from Stripe after checkout or when a subscription ends. Failed payments, past-due invoices, and card errors are not shown in this app—check Stripe's emails or your billing portal.",
+        "Plan tier syncs from Stripe after checkout or when a subscription changes. Past-due, unpaid, or canceled subscriptions also show a banner here; use Stripe's email links or your billing portal to fix payment issues.",
       duration: 12_000,
     });
   }, [capabilities]);
@@ -140,6 +149,47 @@ export function DashboardShell({
         ) : null}
         <main className="main" id="main-content">
           <DashboardCapabilitiesProvider value={capabilities}>
+            {capabilities?.billingHealth?.billingAlertVariant ? (
+              <div
+                className={
+                  capabilities.billingHealth.billingAlertVariant === "past_due"
+                    ? "billing-alert-banner mx-auto mb-4 max-w-[1400px] rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-foreground"
+                    : "billing-alert-banner mx-auto mb-4 max-w-[1400px] rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground"
+                }
+                role="alert"
+              >
+                {capabilities.billingHealth.billingAlertVariant === "past_due" ? (
+                  <>
+                    <strong>Payment past due.</strong> Stripe reports this subscription as past due.
+                    Update your payment method using Stripe&apos;s email or your billing portal.
+                    Your <strong>{capabilities.billingHealth.storedPlanTier}</strong> limits still
+                    apply until Stripe updates the subscription.
+                  </>
+                ) : capabilities.billingHealth.billingAlertVariant === "unpaid" ? (
+                  <>
+                    <strong>Subscription unpaid.</strong> Paid limits are not available until billing
+                    is resolved. Check Stripe&apos;s email or your billing portal. (Effective tier:{" "}
+                    <strong>{capabilities.billingHealth.effectivePlanTier}</strong>.)
+                  </>
+                ) : (
+                  <>
+                    <strong>Subscription canceled.</strong> This Stripe subscription is canceled.
+                    Entitlements follow the <strong>{capabilities.billingHealth.effectivePlanTier}</strong>{" "}
+                    tier until you subscribe again.
+                  </>
+                )}
+                {formatPeriodEnd(capabilities.billingHealth.stripeCurrentPeriodEnd) ? (
+                  <>
+                    {" "}
+                    Current period end:{" "}
+                    <strong>
+                      {formatPeriodEnd(capabilities.billingHealth.stripeCurrentPeriodEnd)}
+                    </strong>
+                    .
+                  </>
+                ) : null}
+              </div>
+            ) : null}
             {capabilities?.usageQuota?.nearQuota ? (
               <div
                 className={

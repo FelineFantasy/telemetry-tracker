@@ -20,6 +20,7 @@ import {
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
 import { headerFirst } from "../lib/http-headers.js";
+import { billingAlertVariant } from "../lib/billing-alert.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -500,6 +501,13 @@ export async function projectDashboardRoutes(
       quotaExceeded: boolean;
       nearQuota: boolean;
     } | null = null;
+    let billingHealth: {
+      stripeSubscriptionStatus: string | null;
+      stripeCurrentPeriodEnd: string | null;
+      storedPlanTier: string;
+      effectivePlanTier: string;
+      billingAlertVariant: "past_due" | "unpaid" | "canceled" | null;
+    } | null = null;
     if (projectId !== null) {
       const ctx = await loadPlanContextForProject(prisma, projectId);
       if (ctx) {
@@ -508,12 +516,21 @@ export async function projectDashboardRoutes(
         const ratio = limit > 0 ? used / limit : 0;
         const quotaExceeded = limit > 0 && used >= limit;
         usageQuota = {
-          planTier: ctx.planTier,
+          planTier: ctx.storedPlanTier,
           monthlyIngestUsed: used,
           monthlyIngestLimit: limit,
           percentUsed: Math.round(ratio * 100),
           quotaExceeded,
           nearQuota: ratio >= 0.9,
+        };
+        billingHealth = {
+          stripeSubscriptionStatus: ctx.stripeSubscriptionStatus,
+          stripeCurrentPeriodEnd: ctx.stripeCurrentPeriodEnd
+            ? ctx.stripeCurrentPeriodEnd.toISOString()
+            : null,
+          storedPlanTier: ctx.storedPlanTier,
+          effectivePlanTier: ctx.planTier,
+          billingAlertVariant: billingAlertVariant(ctx.stripeSubscriptionStatus),
         };
       }
     }
@@ -527,6 +544,7 @@ export async function projectDashboardRoutes(
       canCreateProject: canCreateProject(orgCapabilityRole),
       canManageMembers: canManageMembers(orgCapabilityRole),
       usageQuota,
+      billingHealth,
     });
   });
 

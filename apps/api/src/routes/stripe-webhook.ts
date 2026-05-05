@@ -1,13 +1,16 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import Stripe from "stripe";
 import { PlanTier } from "@prisma/client";
 import { prisma } from "../lib/db.js";
-
-function parsePlanTier(raw: string | undefined): PlanTier | null {
-  const u = raw?.trim().toUpperCase();
-  if (u === "FREE" || u === "PRO" || u === "BUSINESS") return u;
-  return null;
-}
+import {
+  parsePlanTierMetadata,
+  subscriptionToOrgSyncPatch,
+} from "../lib/stripe-subscription-sync.js";
+import {
+  stripeInvoiceSubscriptionId,
+  stripeSubscriptionPeriodEndUnix,
+} from "../lib/stripe-runtime-fields.js";
 
 /** Prisma P2002 — unique constraint (e.g. Stripe customer/sub already bound to another org). */
 function isUniqueConstraintError(e: unknown): boolean {
@@ -25,6 +28,8 @@ function isUniqueConstraintError(e: unknown): boolean {
  * Uses a raw JSON body parser so signature verification works.
  *
  * Expected metadata on Checkout Session (etc.): `organization_id`, `plan_tier`.
+ * For `customer.subscription.updated`, also set `plan_tier` on the **Subscription** or **Price** metadata
+ * so plan changes sync (see docs/ENTITLEMENTS.md).
  */
 export async function registerStripeWebhookIfConfigured(
   app: FastifyInstance
@@ -62,7 +67,7 @@ export async function registerStripeWebhookIfConfigured(
           case "checkout.session.completed": {
             const session = event.data.object as Stripe.Checkout.Session;
             const orgId = session.metadata?.organization_id?.trim();
-            const tier = parsePlanTier(session.metadata?.plan_tier);
+            const tier = parsePlanTierMetadata(session.metadata?.plan_tier);
             if (orgId && tier && tier !== PlanTier.FREE) {
               const customerId =
                 typeof session.customer === "string"
@@ -76,15 +81,26 @@ export async function registerStripeWebhookIfConfigured(
                       "id" in session.subscription
                     ? (session.subscription as Stripe.Subscription).id
                     : null;
-              // Do not set Stripe ids to null when missing from the session — that would
-              // wipe values from a prior checkout and break subscription.deleted lookups.
-              const data: {
-                plan_tier: typeof tier;
-                stripe_customer_id?: string;
-                stripe_subscription_id?: string;
-              } = { plan_tier: tier };
+              const data: Prisma.OrganizationUpdateManyMutationInput = {
+                plan_tier: tier,
+              };
               if (customerId !== null) data.stripe_customer_id = customerId;
               if (subId !== null) data.stripe_subscription_id = subId;
+              if (subId !== null) {
+                try {
+                  const fullSub = await stripe.subscriptions.retrieve(subId);
+                  data.stripe_subscription_status = fullSub.status;
+                  const pe = stripeSubscriptionPeriodEndUnix(fullSub);
+                  data.stripe_current_period_end = pe
+                    ? new Date(pe * 1000)
+                    : null;
+                } catch (err) {
+                  request.log.warn(
+                    { err, subId, eventId: event.id },
+                    "checkout.session.completed: could not retrieve subscription for status fields"
+                  );
+                }
+              }
               try {
                 await prisma.organization.updateMany({
                   where: { id: orgId, deleted_at: null },
@@ -104,6 +120,15 @@ export async function registerStripeWebhookIfConfigured(
             }
             break;
           }
+          case "customer.subscription.updated": {
+            const sub = event.data.object as Stripe.Subscription;
+            const patch = subscriptionToOrgSyncPatch(sub);
+            await prisma.organization.updateMany({
+              where: { stripe_subscription_id: sub.id, deleted_at: null },
+              data: patch,
+            });
+            break;
+          }
           case "customer.subscription.deleted": {
             const sub = event.data.object as Stripe.Subscription;
             await prisma.organization.updateMany({
@@ -111,8 +136,21 @@ export async function registerStripeWebhookIfConfigured(
               data: {
                 plan_tier: PlanTier.FREE,
                 stripe_subscription_id: null,
+                stripe_subscription_status: null,
+                stripe_current_period_end: null,
               },
             });
+            break;
+          }
+          case "invoice.payment_failed": {
+            const inv = event.data.object as Stripe.Invoice;
+            const subId = stripeInvoiceSubscriptionId(inv);
+            if (subId) {
+              await prisma.organization.updateMany({
+                where: { stripe_subscription_id: subId, deleted_at: null },
+                data: { stripe_subscription_status: "past_due" },
+              });
+            }
             break;
           }
           default:
