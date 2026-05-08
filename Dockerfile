@@ -6,7 +6,6 @@ ARG NODE_VERSION=20
 FROM node:${NODE_VERSION}-slim AS base
 
 WORKDIR /app
-ENV NODE_ENV=production
 
 # Pin pnpm 9 (matches CI / lockfile v9). pnpm 11+ requires Node 22+ and breaks on node:20-slim.
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
@@ -31,6 +30,8 @@ COPY eslint.config.mjs ./eslint.config.mjs
 RUN pnpm --filter dashboard build
 
 FROM base AS runner
+
+ENV NODE_ENV=production
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/dashboard/package.json apps/dashboard/package.json
