@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginForm } from "./LoginForm";
 
-export const metadata = {
-  title: "Sign in · Telemetry Tracker",
+export const metadata: Metadata = {
+  title: "Sign in",
+  robots: { index: false, follow: true },
 };
 
 export default function LoginPage() {

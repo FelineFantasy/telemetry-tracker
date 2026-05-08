@@ -1,6 +1,7 @@
 {
   "name": "telemetry-tracker",
   "private": true,
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev:api": "pnpm --filter api dev",
     "dev:dashboard": "pnpm --filter dashboard dev",
