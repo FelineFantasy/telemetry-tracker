@@ -1,8 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { RegisterForm } from "./RegisterForm";
 
-export const metadata = {
-  title: "Create account · Telemetry Tracker",
+export const metadata: Metadata = {
+  title: "Create account",
+  robots: { index: false, follow: true },
 };
 
 export default async function RegisterPage({

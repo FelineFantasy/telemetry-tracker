@@ -58,6 +58,7 @@ Do **not** rely on `invoice.payment_failed` to set subscription status: it can f
 | Variable    | Required | Example                      | Description                                            |
 |-------------|----------|------------------------------|--------------------------------------------------------|
 | `API_URL`   | No       | `https://api.yourdomain.com` | Base URL of the API (no trailing `/`). Server-only.   |
+| `NEXT_PUBLIC_SITE_URL` | **Recommended** in production | `https://app.yourdomain.com` | Public origin of the dashboard (no trailing `/`). Drives `metadataBase`, canonical URLs, and Open Graph. If unset, Railway’s `RAILWAY_PUBLIC_DOMAIN` or Vercel’s `VERCEL_URL` is used when present; otherwise the build falls back to `http://localhost:3000` for metadata only—**set this for correct SEO on custom domains**. `sitemap.xml` / `robots.txt` resolve the origin at request time from the same variables. |
 
 Default is `http://localhost:3001`. Set when the dashboard runs against a different API host.
 
