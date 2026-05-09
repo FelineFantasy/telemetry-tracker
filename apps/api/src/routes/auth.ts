@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { OrgRole, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { getSessionTokenFromRequest, getSessionUser } from "../lib/auth-session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
