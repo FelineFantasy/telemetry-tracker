@@ -39,7 +39,10 @@ export default async function ApiKeysSettingsPage() {
   if (!loaded.ok) {
     return (
       <>
-        <PageTitle title="API keys" context="Create and revoke ingestion keys for the active project." />
+        <PageTitle
+          title="API keys"
+          context="Keys belong to the project selected in the sidebar (under the organization). Telemetry sent with a key is stored in that project only."
+        />
         <ErrorState message={loaded.message} />
       </>
     );
@@ -47,7 +50,10 @@ export default async function ApiKeysSettingsPage() {
 
   return (
     <>
-      <PageTitle title="API keys" context="Create and revoke ingestion keys for the active project." />
+      <PageTitle
+        title="API keys"
+        context="Keys belong to the project selected in the sidebar (under the organization). Telemetry sent with a key is stored in that project only."
+      />
       <ApiKeysClient keys={loaded.keys} />
     </>
   );

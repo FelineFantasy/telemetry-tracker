@@ -60,7 +60,7 @@ The repo is set up for **Railway**: Postgres + API (Root Directory `apps/api`, R
 
 ## Project layout
 
-- `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`, `GET /api/sessions`, …; session auth under `/api/auth/*`; org/project/API keys under `/api/meta/*` and `/api/project/*`
+- `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`, `GET /api/sessions`, …; session auth under `/api/auth/*`; org/project/API keys under `/api/meta/*` and `/api/project/*`. Self-serve registration does **not** attach users to a seed organization—they create a workspace in the dashboard (or join via invite); see [docs/RBAC.md](docs/RBAC.md) and [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md).
 - `apps/dashboard` – Next.js app: Overview, Errors list/detail, Events list
 - `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching; anonymous device id and SDK version on every payload; in the browser, global `window.onerror` and `unhandledrejection` after `init()`
 - `packages/telemetry-next` – Next.js: provider, error boundary, `useTrackPage()`

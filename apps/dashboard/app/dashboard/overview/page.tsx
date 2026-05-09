@@ -173,6 +173,9 @@ export default async function OverviewPage({
   const evDeltaFmt = formatDeltaLine(eventsDelta, "events");
   const contextParts = [rangeLabel];
   if (app) contextParts.push(`App: ${app}`);
+  contextParts.push(
+    "Charts reflect the project selected in the sidebar; App scope narrows to one SDK app name or All apps.",
+  );
   const context = contextParts.join(" · ");
 
   return (

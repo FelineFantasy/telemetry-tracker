@@ -116,6 +116,8 @@ export async function login(
       ...cookieBase(),
       maxAge: PROJECT_MAX_AGE,
     });
+  } else {
+    c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
   }
   return { ok: true };
 }
@@ -179,6 +181,8 @@ export async function register(
       ...cookieBase(),
       maxAge: PROJECT_MAX_AGE,
     });
+  } else {
+    c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
   }
   return { ok: true };
 }

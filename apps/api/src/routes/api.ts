@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyPluginOptions } from "fastify";
+import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
@@ -28,6 +28,7 @@ import {
 } from "../lib/prisma-project-scope.js";
 import { requireSessionUser } from "../lib/auth-session.js";
 import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
+import { headerFirst } from "../lib/http-headers.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -43,6 +44,16 @@ import {
   parseSessionListSortParam,
   sessionListOrderBy,
 } from "../lib/list-sort-params.js";
+
+const HEADER_ORG_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Sidebar org: when set, project-scoped reads must be under this organization. */
+function readDashboardOrganizationHeader(request: FastifyRequest): string | undefined {
+  const raw = headerFirst(request, "x-organization-id");
+  if (!raw || !HEADER_ORG_UUID_RE.test(raw)) return undefined;
+  return raw.toLowerCase();
+}
 
 const DEFAULT_LIST_PAGE_SIZE = 20;
 const MAX_LIST_PAGE_SIZE = 100;
@@ -657,6 +668,16 @@ export async function apiRoutes(
   app.get("/apps", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
+    const headerOrg = readDashboardOrganizationHeader(request);
+    if (headerOrg) {
+      const row = await prisma.project.findFirst({
+        where: { id: projectId, deleted_at: null },
+        select: { organization_id: true },
+      });
+      if (!row || row.organization_id.toLowerCase() !== headerOrg) {
+        return reply.status(403).send({ error: "Project is not in the selected organization" });
+      }
+    }
     const [eventsApps, errorsApps, sessionsApps] = await Promise.all([
       prisma.event.groupBy({
         by: ["app"],

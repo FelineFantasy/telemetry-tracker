@@ -12,6 +12,18 @@ import {
   getDashboardSessionId,
 } from "@/lib/dashboard-project";
 
+/** App names for `projectId` (must match sidebar project; API also checks org header vs project). */
+export async function loadDashboardApps(projectId: string): Promise<string[]> {
+  const trimmed = projectId.trim();
+  if (!/^[0-9a-f-]{36}$/i.test(trimmed)) return [];
+  const res = await dashboardApiFetch("/api/apps", undefined, {
+    projectIdOverride: trimmed,
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { apps?: unknown };
+  return Array.isArray(data.apps) ? (data.apps as string[]) : [];
+}
+
 export async function setDashboardProjectId(projectId: string): Promise<
   { ok: true } | { ok: false; error: string }
 > {

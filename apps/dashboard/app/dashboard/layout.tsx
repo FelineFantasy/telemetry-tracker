@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { DashboardShell } from "@/app/components/dashboard/DashboardShell";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
@@ -5,11 +6,24 @@ import {
   getDashboardOrganizationId,
   resolveActiveOrganizationId,
 } from "@/lib/dashboard-org";
-import { getDashboardProjectId } from "@/lib/dashboard-project";
+import {
+  TELEMETRY_PROJECT_COOKIE,
+  getDashboardProjectId,
+} from "@/lib/dashboard-project";
 import { getDashboardUser } from "@/lib/dashboard-user";
 
-async function getApps(): Promise<string[]> {
-  const res = await dashboardApiFetch("/api/apps");
+const PROJECT_COOKIE_OPTS = {
+  path: "/" as const,
+  sameSite: "lax" as const,
+  maxAge: 60 * 60 * 24 * 400,
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+};
+
+async function getAppsForProject(projectId: string): Promise<string[]> {
+  const res = await dashboardApiFetch("/api/apps", undefined, {
+    projectIdOverride: projectId,
+  });
   if (!res.ok) return [];
   const data = await res.json();
   return Array.isArray(data.apps) ? data.apps : [];
@@ -20,7 +34,7 @@ type OrgRow = { id: string; name: string };
 async function getOrganizations(): Promise<OrgRow[]> {
   const res = await dashboardApiFetch("/api/meta/organizations");
   if (!res.ok) return [];
-  const data = await res.json() as { organizations?: OrgRow[] };
+  const data = (await res.json()) as { organizations?: OrgRow[] };
   return Array.isArray(data.organizations) ? data.organizations : [];
 }
 
@@ -46,22 +60,15 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [
-    apps,
-    organizations,
-    allProjects,
-    cookieOrgId,
-    currentProjectId,
-    user,
-    capabilities,
-  ] = await Promise.all([
-    getApps(),
-    getOrganizations(),
-    getProjects(),
+  const [cookieOrgId, currentProjectId] = await Promise.all([
     getDashboardOrganizationId(),
     getDashboardProjectId(),
+  ]);
+
+  const [organizations, allProjects, user] = await Promise.all([
+    getOrganizations(),
+    getProjects(),
     getDashboardUser(),
-    getDashboardSessionContext(),
   ]);
 
   const resolvedOrgId = resolveActiveOrganizationId(cookieOrgId, organizations);
@@ -73,13 +80,35 @@ export default async function DashboardLayout({
         )
       : allProjects;
 
+  /** Project cookie can still point at another org after switching workspace — align before `/api/apps`. */
+  let effectiveProjectId: string;
+  if (projects.length === 0) {
+    effectiveProjectId =
+      resolvedOrgId !== null ? "" : currentProjectId;
+  } else if (
+    projects.some((p) => p.id.toLowerCase() === currentProjectId.toLowerCase())
+  ) {
+    effectiveProjectId = currentProjectId;
+  } else {
+    effectiveProjectId = projects[0]!.id;
+    const c = await cookies();
+    c.set(TELEMETRY_PROJECT_COOKIE, effectiveProjectId.toLowerCase(), PROJECT_COOKIE_OPTS);
+  }
+
+  const [apps, capabilities] = await Promise.all([
+    effectiveProjectId === ""
+      ? Promise.resolve([] as string[])
+      : getAppsForProject(effectiveProjectId),
+    getDashboardSessionContext(),
+  ]);
+
   return (
     <DashboardShell
       apps={apps}
       organizations={organizations}
       currentOrganizationId={resolvedOrgId}
       projects={projects}
-      currentProjectId={currentProjectId}
+      currentProjectId={effectiveProjectId}
       user={user}
       capabilities={capabilities}
     >

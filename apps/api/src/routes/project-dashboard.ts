@@ -479,16 +479,41 @@ export async function projectDashboardRoutes(
     }
     const headerOrg = readOrgIdHeader(request);
     const projectId = await tryResolveReadProjectId(request);
-    const projRole =
+    let projRole =
       projectId !== null
         ? await getMembershipRoleForProject(session.userId, projectId)
         : null;
+    /** Same org membership as GET /project/api-keys; covers edge cases where nested project select missed role. */
+    if (projectId !== null && projRole === null) {
+      const row = await prisma.project.findFirst({
+        where: { id: projectId, deleted_at: null },
+        select: { organization_id: true },
+      });
+      if (row) {
+        projRole = await getMembershipRoleForOrganization(
+          session.userId,
+          row.organization_id
+        );
+      }
+    }
 
     const orgRoleFromHeader = headerOrg
       ? await getMembershipRoleForOrganization(session.userId, headerOrg)
       : null;
     /** Org-scoped UI (sidebar org): prefer explicit org membership; if header is stale, fall back to project org. */
-    const orgCapabilityRole = orgRoleFromHeader ?? projRole;
+    let orgCapabilityRole = orgRoleFromHeader ?? projRole;
+
+    /** Stale project cookie or missing org header — still allow org-level caps if the user has any membership. */
+    if (orgCapabilityRole === null) {
+      const fallbackMembership = await prisma.organizationMembership.findFirst({
+        where: { user_id: session.userId },
+        orderBy: { created_at: "asc" },
+        select: { role: true },
+      });
+      if (fallbackMembership) {
+        orgCapabilityRole = fallbackMembership.role;
+      }
+    }
 
     if (projRole === null && orgCapabilityRole === null) {
       return reply.status(403).send({ error: "Forbidden" });

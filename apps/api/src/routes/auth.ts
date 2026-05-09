@@ -5,10 +5,6 @@ import { prisma } from "../lib/db.js";
 import { getSessionTokenFromRequest, getSessionUser } from "../lib/auth-session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 
-const DEFAULT_ORG_ID =
-  process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
-  "a0000000-0000-4000-8000-000000000001";
-
 const SESSION_DAYS = 30;
 
 function normalizeEmail(raw: string): string {
@@ -146,22 +142,12 @@ export async function authRoutes(
       return reply.status(409).send({ error: "Email already registered" });
     }
 
-    const orgMemberCount = await prisma.organizationMembership.count({
-      where: { organization_id: DEFAULT_ORG_ID },
-    });
-    const role: OrgRole = orgMemberCount === 0 ? OrgRole.OWNER : OrgRole.VIEWER;
-
+    /** Self-serve signup: no organization until the user creates one or accepts an invite. */
     const user = await prisma.user.create({
       data: {
         email,
         password_hash: hashPassword(password),
         display_name: displayName,
-        memberships: {
-          create: {
-            organization_id: DEFAULT_ORG_ID,
-            role,
-          },
-        },
       },
       select: { id: true, email: true, display_name: true },
     });
@@ -179,7 +165,7 @@ export async function authRoutes(
     return reply.status(201).send({
       sessionId,
       expiresAt: expiresAt.toISOString(),
-      organizationId: DEFAULT_ORG_ID,
+      organizationId: null,
       user: {
         id: user.id,
         email: user.email,
