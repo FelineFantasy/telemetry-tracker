@@ -2,7 +2,10 @@
 
 import { useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
+import {
+  ORGANIZATION_SETTINGS_NEW_PROJECT_URL,
+  ORGANIZATION_SETTINGS_PATH,
+} from "@/app/components/OrganizationSettingsNewProjectParam";
 import { SidebarBrand } from "@/app/components/sidebar/SidebarBrand";
 import { useMobileDrawer } from "@/lib/useMobileDrawer";
 import { OrgSwitcher, type OrgOption } from "./OrgSwitcher";
@@ -75,10 +78,8 @@ export function AppSidebar({
   const router = useRouter();
   const isMobileDrawer = useMobileDrawer();
 
-  const organizationSettingsPath = "/dashboard/settings/organization";
-
   const goToCreateProject = useCallback(() => {
-    const here = normalizeDashboardPath(pathname) === organizationSettingsPath;
+    const here = normalizeDashboardPath(pathname) === ORGANIZATION_SETTINGS_PATH;
     if (here) {
       document.getElementById("create-project-heading")?.scrollIntoView({
         behavior: "smooth",

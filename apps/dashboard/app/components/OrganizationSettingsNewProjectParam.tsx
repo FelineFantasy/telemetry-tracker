@@ -5,9 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export const NEW_PROJECT_PARAM = "newProject";
 
+/** Organization settings route (no query). */
+export const ORGANIZATION_SETTINGS_PATH = "/dashboard/settings/organization";
+
 /** Sidebar / deep-link target for “create project” from empty-org rail. */
 export const ORGANIZATION_SETTINGS_NEW_PROJECT_URL =
-  `/dashboard/settings/organization?${NEW_PROJECT_PARAM}=1`;
+  `${ORGANIZATION_SETTINGS_PATH}?${NEW_PROJECT_PARAM}=1`;
 
 /**
  * When the user lands on Organization settings with `?newProject=1` (e.g. from the empty-project

@@ -6,10 +6,7 @@ import { ScrollToHash } from "@/app/components/ScrollToHash";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
-import {
-  getDashboardOrganizationId,
-  resolveActiveOrganizationId,
-} from "@/lib/dashboard-org";
+import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
 import { getDashboardUser } from "@/lib/dashboard-user";
 import {
   createOrganizationAction,
@@ -19,40 +16,35 @@ import { Button } from "@/app/components/ui/Button";
 
 export const dynamic = "force-dynamic";
 
-type OrgRow = { id: string; name: string };
-
 type MemberRow = { userId: string; role: string };
 
 async function loadMembersForOrg(
   organizationId: string
 ): Promise<{ ok: true; members: MemberRow[] } | { ok: false }> {
   const res = await dashboardApiFetch(
-    `/api/meta/members?organizationId=${encodeURIComponent(organizationId)}`
+    `/api/meta/members?organizationId=${encodeURIComponent(organizationId)}`,
+    undefined,
+    { organizationIdOverride: organizationId }
   );
   if (!res.ok) return { ok: false };
   const data = (await res.json()) as { members?: MemberRow[] };
   return { ok: true, members: data.members ?? [] };
 }
 
-async function loadOrgs(): Promise<OrgRow[]> {
-  const res = await dashboardApiFetch("/api/meta/organizations");
-  if (!res.ok) return [];
-  const data = (await res.json()) as { organizations?: OrgRow[] };
-  return Array.isArray(data.organizations) ? data.organizations : [];
-}
-
 export default async function OrganizationSettingsPage() {
-  const [user, capabilities, organizations, currentOrgId] = await Promise.all([
+  const [workspace, user] = await Promise.all([
+    getDashboardWorkspaceForRequest(),
     getDashboardUser(),
-    getDashboardSessionContext(),
-    loadOrgs(),
-    getDashboardOrganizationId(),
   ]);
 
-  const effectiveOrgId = resolveActiveOrganizationId(
-    currentOrgId,
-    organizations
+  const { organizations, resolvedOrgId, effectiveProjectId } = workspace;
+
+  const capabilities = await getDashboardSessionContext(
+    effectiveProjectId === "" ? null : effectiveProjectId,
+    resolvedOrgId
   );
+
+  const effectiveOrgId = resolvedOrgId;
 
   const membersRes =
     effectiveOrgId !== null ? await loadMembersForOrg(effectiveOrgId) : { ok: false as const };
