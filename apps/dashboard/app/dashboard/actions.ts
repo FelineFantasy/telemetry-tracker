@@ -12,41 +12,6 @@ import {
   getDashboardSessionId,
 } from "@/lib/dashboard-project";
 
-/**
- * App names for `projectId` (must match sidebar project; API also checks org header vs project).
- * Returns `null` when the request fails or the body is unusable — callers should keep layout-provided
- * apps instead of treating that as “zero apps”.
- */
-export async function loadDashboardApps(
-  projectId: string,
-  organizationId?: string | null
-): Promise<string[] | null> {
-  const trimmed = projectId.trim();
-  if (!/^[0-9a-f-]{36}$/i.test(trimmed)) return null;
-  const orgTrimmed = organizationId?.trim();
-  let res: Response;
-  try {
-    res = await dashboardApiFetch("/api/apps", undefined, {
-      projectIdOverride: trimmed,
-      ...(orgTrimmed && /^[0-9a-f-]{36}$/i.test(orgTrimmed)
-        ? { organizationIdOverride: orgTrimmed.toLowerCase() }
-        : {}),
-    });
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    return null;
-  }
-  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
-  const apps = (data as { apps?: unknown }).apps;
-  return Array.isArray(apps) ? (apps as string[]) : null;
-}
-
 export async function setDashboardProjectId(projectId: string): Promise<
   { ok: true } | { ok: false; error: string }
 > {

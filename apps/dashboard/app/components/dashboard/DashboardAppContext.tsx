@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { loadDashboardApps } from "@/app/dashboard/actions";
 import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCustomSelect";
 import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
 import {
@@ -14,43 +13,14 @@ import {
  * Scope control (which app’s telemetry) — lives in the content column, not the nav rail,
  * matching common dashboard patterns (project/environment in header or toolbar).
  */
-export function DashboardAppContext({
-  apps: appsFromLayout,
-  currentOrganizationId,
-  currentProjectId,
-}: {
-  apps: string[];
-  currentOrganizationId: string | null;
-  currentProjectId: string;
-}) {
+export function DashboardAppContext({ apps }: { apps: string[] }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathForLinks = dashboardPathForAppFilter(pathname);
   const rawApp = searchParams.get("app") ?? "";
 
-  const [apps, setApps] = useState(appsFromLayout);
-  const skipProjectFetchRef = useRef(true);
-
-  useEffect(() => {
-    setApps(appsFromLayout);
-  }, [appsFromLayout]);
-
-  useEffect(() => {
-    if (skipProjectFetchRef.current) {
-      skipProjectFetchRef.current = false;
-      return;
-    }
-    let cancelled = false;
-    void loadDashboardApps(currentProjectId, currentOrganizationId).then((next) => {
-      if (!cancelled && next !== null) setApps(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentOrganizationId, currentProjectId]);
-
-  /** `app` query must name an app that exists for this project — no ad-hoc options. */
+  /** Server layout refreshes after project/org switch (`router.refresh()`); no client refetch. */
   const value = rawApp !== "" && apps.includes(rawApp) ? rawApp : "";
 
   useEffect(() => {

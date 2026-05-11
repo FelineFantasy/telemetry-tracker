@@ -27,10 +27,6 @@ const workspaceViewLinks = [
   { href: `${DASHBOARD_BASE}/settings/keys`, label: "API keys", Icon: ApiKeysNavIcon },
 ] as const;
 
-type DashboardNavItem =
-  | (typeof telemetryViewLinks)[number]
-  | (typeof workspaceViewLinks)[number];
-
 function isViewCurrent(href: string, pathname: string): boolean {
   if (href === `${DASHBOARD_BASE}/overview`) {
     return (
@@ -63,7 +59,7 @@ export function DashboardViewLinks({ onNavigate }: { onNavigate?: () => void }) 
   const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
 
-  const link = ({ href, label, Icon }: DashboardNavItem) => (
+  const telemetryLink = ({ href, label, Icon }: (typeof telemetryViewLinks)[number]) => (
     <SidebarLink
       key={href}
       href={hrefWithApp(href, searchParams)}
@@ -76,11 +72,25 @@ export function DashboardViewLinks({ onNavigate }: { onNavigate?: () => void }) 
     />
   );
 
+  /** Workspace routes ignore app scope — do not carry `?app=` from telemetry views. */
+  const workspaceLink = ({ href, label, Icon }: (typeof workspaceViewLinks)[number]) => (
+    <SidebarLink
+      key={href}
+      href={href}
+      label={label}
+      mono=""
+      monoIcon={<Icon />}
+      current={isViewCurrent(href, pathname)}
+      onNavigate={onNavigate}
+      title={label}
+    />
+  );
+
   return (
     <>
-      {telemetryViewLinks.map(link)}
+      {telemetryViewLinks.map(telemetryLink)}
       <hr className="app-sidebar__nav-separator" aria-hidden="true" />
-      {workspaceViewLinks.map(link)}
+      {workspaceViewLinks.map(workspaceLink)}
     </>
   );
 }

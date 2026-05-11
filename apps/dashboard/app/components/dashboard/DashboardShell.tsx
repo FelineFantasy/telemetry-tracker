@@ -235,11 +235,7 @@ export function DashboardShell({
                 )}
               </div>
             ) : null}
-            <DashboardAppContext
-              apps={apps}
-              currentOrganizationId={currentOrganizationId}
-              currentProjectId={currentProjectId}
-            />
+            <DashboardAppContext apps={apps} />
             {children}
           </DashboardCapabilitiesProvider>
         </main>
