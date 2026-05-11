@@ -13,11 +13,18 @@ import {
 } from "@/lib/dashboard-project";
 
 /** App names for `projectId` (must match sidebar project; API also checks org header vs project). */
-export async function loadDashboardApps(projectId: string): Promise<string[]> {
+export async function loadDashboardApps(
+  projectId: string,
+  organizationId?: string | null
+): Promise<string[]> {
   const trimmed = projectId.trim();
   if (!/^[0-9a-f-]{36}$/i.test(trimmed)) return [];
+  const orgTrimmed = organizationId?.trim();
   const res = await dashboardApiFetch("/api/apps", undefined, {
     projectIdOverride: trimmed,
+    ...(orgTrimmed && /^[0-9a-f-]{36}$/i.test(orgTrimmed)
+      ? { organizationIdOverride: orgTrimmed.toLowerCase() }
+      : {}),
   });
   if (!res.ok) return [];
   const data = (await res.json()) as { apps?: unknown };

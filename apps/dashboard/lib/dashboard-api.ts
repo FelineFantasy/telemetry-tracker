@@ -12,6 +12,11 @@ export type DashboardApiFetchOptions = {
   /** When true, do not send `X-Organization-Id` (avoids 403 from a stale org cookie on `/meta/projects`). */
   omitOrganizationHeader?: boolean;
   /**
+   * Use this exact organization id as `X-Organization-Id` instead of calling `getResolvedDashboardOrganizationId`
+   * (which fetches `/api/meta/organizations`). Prefer when the layout or a server action already knows the sidebar org.
+   */
+  organizationIdOverride?: string;
+  /**
    * Use this exact project id as `X-Project-Id` instead of reading the cookie again — keeps `/api/apps`
    * and layout shell aligned when several cookie reads run in one request.
    */
@@ -28,8 +33,12 @@ export async function dashboardApiFetch(
   const projectId =
     override && PROJECT_UUID_RE.test(override) ? override : await getDashboardProjectId();
   const sessionId = await getDashboardSessionId();
-  const orgId =
-    options?.omitOrganizationHeader ? undefined : await getResolvedDashboardOrganizationId();
+  const orgOverride = options?.organizationIdOverride?.trim();
+  const orgId = options?.omitOrganizationHeader
+    ? undefined
+    : orgOverride && PROJECT_UUID_RE.test(orgOverride)
+      ? orgOverride.toLowerCase()
+      : await getResolvedDashboardOrganizationId();
   const url = pathAndQuery.startsWith("http")
     ? pathAndQuery
     : `${API_BASE_URL}${pathAndQuery.startsWith("/") ? "" : "/"}${pathAndQuery}`;

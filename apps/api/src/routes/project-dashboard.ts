@@ -473,23 +473,10 @@ export async function projectDashboardRoutes(
     }
     const headerOrg = readOrganizationIdHeader(request);
     const projectId = await tryResolveReadProjectId(request);
-    let projRole =
+    const projRole =
       projectId !== null
         ? await getMembershipRoleForProject(session.userId, projectId)
         : null;
-    /** Same org membership as GET /project/api-keys; covers edge cases where nested project select missed role. */
-    if (projectId !== null && projRole === null) {
-      const row = await prisma.project.findFirst({
-        where: { id: projectId, deleted_at: null },
-        select: { organization_id: true },
-      });
-      if (row) {
-        projRole = await getMembershipRoleForOrganization(
-          session.userId,
-          row.organization_id
-        );
-      }
-    }
 
     const orgRoleFromHeader = headerOrg
       ? await getMembershipRoleForOrganization(session.userId, headerOrg)

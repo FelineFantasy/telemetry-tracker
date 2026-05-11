@@ -16,9 +16,11 @@ import {
  */
 export function DashboardAppContext({
   apps: appsFromLayout,
+  currentOrganizationId,
   currentProjectId,
 }: {
   apps: string[];
+  currentOrganizationId: string | null;
   currentProjectId: string;
 }) {
   const pathname = usePathname() ?? "/";
@@ -40,13 +42,13 @@ export function DashboardAppContext({
       return;
     }
     let cancelled = false;
-    void loadDashboardApps(currentProjectId).then((next) => {
+    void loadDashboardApps(currentProjectId, currentOrganizationId).then((next) => {
       if (!cancelled) setApps(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [currentProjectId]);
+  }, [currentOrganizationId, currentProjectId]);
 
   /** `app` query must name an app that exists for this project — no ad-hoc options. */
   const value = rawApp !== "" && apps.includes(rawApp) ? rawApp : "";

@@ -20,9 +20,15 @@ const PROJECT_COOKIE_OPTS = {
   secure: process.env.NODE_ENV === "production",
 };
 
-async function getAppsForProject(projectId: string): Promise<string[]> {
+async function getAppsForProject(
+  projectId: string,
+  organizationId: string | null
+): Promise<string[]> {
   const res = await dashboardApiFetch("/api/apps", undefined, {
     projectIdOverride: projectId,
+    ...(organizationId
+      ? { organizationIdOverride: organizationId }
+      : {}),
   });
   if (!res.ok) return [];
   const data = await res.json();
@@ -32,7 +38,9 @@ async function getAppsForProject(projectId: string): Promise<string[]> {
 type OrgRow = { id: string; name: string };
 
 async function getOrganizations(): Promise<OrgRow[]> {
-  const res = await dashboardApiFetch("/api/meta/organizations");
+  const res = await dashboardApiFetch("/api/meta/organizations", undefined, {
+    omitOrganizationHeader: true,
+  });
   if (!res.ok) return [];
   const data = (await res.json()) as { organizations?: OrgRow[] };
   return Array.isArray(data.organizations) ? data.organizations : [];
@@ -98,9 +106,10 @@ export default async function DashboardLayout({
   const [apps, capabilities] = await Promise.all([
     effectiveProjectId === ""
       ? Promise.resolve([] as string[])
-      : getAppsForProject(effectiveProjectId),
+      : getAppsForProject(effectiveProjectId, resolvedOrgId),
     getDashboardSessionContext(
-      effectiveProjectId === "" ? null : effectiveProjectId
+      effectiveProjectId === "" ? null : effectiveProjectId,
+      resolvedOrgId
     ),
   ]);
 

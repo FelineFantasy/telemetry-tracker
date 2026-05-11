@@ -1,4 +1,4 @@
-import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { dashboardApiFetch, type DashboardApiFetchOptions } from "@/lib/dashboard-api";
 
 export type UsageQuotaInfo = {
   planTier: string;
@@ -129,19 +129,29 @@ function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardS
 
 /** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set.
  * @param projectIdForRequest When a non-empty UUID, sent as `X-Project-Id` instead of the cookie (same request as `cookies().set` does not update reads). When `null`, skip the fetch and return `null` (e.g. org selected but no projects). When omitted, use the project cookie.
+ * @param organizationIdForRequest When a non-empty UUID, sent as `X-Organization-Id` instead of resolving org via an extra `/api/meta/organizations` fetch.
  */
 export async function getDashboardSessionContext(
-  projectIdForRequest?: string | null
+  projectIdForRequest?: string | null,
+  organizationIdForRequest?: string | null
 ): Promise<DashboardSessionContext | null> {
   if (projectIdForRequest === null) {
     return null;
   }
   const trimmed = projectIdForRequest?.trim();
-  const fetchOpts =
-    trimmed && /^[0-9a-f-]{36}$/i.test(trimmed)
-      ? { projectIdOverride: trimmed }
-      : undefined;
-  const res = await dashboardApiFetch("/api/meta/session-context", undefined, fetchOpts);
+  const orgTrimmed = organizationIdForRequest?.trim();
+  const fetchOpts: DashboardApiFetchOptions = {};
+  if (trimmed && /^[0-9a-f-]{36}$/i.test(trimmed)) {
+    fetchOpts.projectIdOverride = trimmed;
+  }
+  if (orgTrimmed && /^[0-9a-f-]{36}$/i.test(orgTrimmed)) {
+    fetchOpts.organizationIdOverride = orgTrimmed.toLowerCase();
+  }
+  const res = await dashboardApiFetch(
+    "/api/meta/session-context",
+    undefined,
+    Object.keys(fetchOpts).length > 0 ? fetchOpts : undefined
+  );
   if (!res.ok) return null;
   let data: Record<string, unknown>;
   try {
