@@ -99,7 +99,9 @@ export default async function DashboardLayout({
     effectiveProjectId === ""
       ? Promise.resolve([] as string[])
       : getAppsForProject(effectiveProjectId),
-    getDashboardSessionContext(),
+    getDashboardSessionContext(
+      effectiveProjectId === "" ? null : effectiveProjectId
+    ),
   ]);
 
   return (

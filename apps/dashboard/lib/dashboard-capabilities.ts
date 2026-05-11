@@ -127,9 +127,21 @@ function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardS
   };
 }
 
-/** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set. */
-export async function getDashboardSessionContext(): Promise<DashboardSessionContext | null> {
-  const res = await dashboardApiFetch("/api/meta/session-context");
+/** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set.
+ * @param projectIdForRequest When a non-empty UUID, sent as `X-Project-Id` instead of the cookie (same request as `cookies().set` does not update reads). When `null`, skip the fetch and return `null` (e.g. org selected but no projects). When omitted, use the project cookie.
+ */
+export async function getDashboardSessionContext(
+  projectIdForRequest?: string | null
+): Promise<DashboardSessionContext | null> {
+  if (projectIdForRequest === null) {
+    return null;
+  }
+  const trimmed = projectIdForRequest?.trim();
+  const fetchOpts =
+    trimmed && /^[0-9a-f-]{36}$/i.test(trimmed)
+      ? { projectIdOverride: trimmed }
+      : undefined;
+  const res = await dashboardApiFetch("/api/meta/session-context", undefined, fetchOpts);
   if (!res.ok) return null;
   let data: Record<string, unknown>;
   try {
