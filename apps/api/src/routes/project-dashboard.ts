@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
@@ -19,7 +19,7 @@ import {
   getMembershipRoleForOrganization,
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
-import { headerFirst } from "../lib/http-headers.js";
+import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import {
   type BillingAlertVariant,
   billingAlertVariant,
@@ -38,12 +38,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const INVITE_DAYS = 7;
-
-function readOrgIdHeader(request: FastifyRequest): string | undefined {
-  const raw = headerFirst(request, "x-organization-id");
-  if (!raw || !UUID_RE.test(raw)) return undefined;
-  return raw.toLowerCase();
-}
 
 function slugifyProjectName(name: string): string {
   const s = name
@@ -158,7 +152,7 @@ export async function projectDashboardRoutes(
 
   app.get("/meta/projects", async (request, reply) => {
     const session = await getSessionUser(request);
-    const headerOrg = readOrgIdHeader(request);
+    const headerOrg = readOrganizationIdHeader(request);
 
     if (session) {
       const orgRows = await prisma.organizationMembership.findMany({
@@ -477,7 +471,7 @@ export async function projectDashboardRoutes(
     if (!session) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
-    const headerOrg = readOrgIdHeader(request);
+    const headerOrg = readOrganizationIdHeader(request);
     const projectId = await tryResolveReadProjectId(request);
     const projRole =
       projectId !== null
@@ -487,7 +481,7 @@ export async function projectDashboardRoutes(
     const orgRoleFromHeader = headerOrg
       ? await getMembershipRoleForOrganization(session.userId, headerOrg)
       : null;
-    /** Org-scoped UI (sidebar org): prefer explicit org membership; if header is stale, fall back to project org. */
+    /** Org-scoped UI (sidebar org): explicit membership for `X-Organization-Id`; if absent, project org role only (never another org’s role). */
     const orgCapabilityRole = orgRoleFromHeader ?? projRole;
 
     if (projRole === null && orgCapabilityRole === null) {

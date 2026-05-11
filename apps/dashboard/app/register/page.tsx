@@ -21,7 +21,7 @@ export default async function RegisterPage({
         <p className="auth-page__lede">
           {inviteToken
             ? "Complete registration to join the organization you were invited to."
-            : "The first user becomes organization owner. Further signups may be disabled by your deployment settings."}
+            : "After you sign in, create your first organization (workspace). Add projects under Organization settings, then create API keys so your SDK can send telemetry. Invited users skip this and land in the host organization."}
         </p>
         <RegisterForm inviteToken={inviteToken} />
         <p className="auth-page__hint text-muted-foreground">

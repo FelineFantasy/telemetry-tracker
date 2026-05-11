@@ -23,6 +23,10 @@ export type ApiKeyRow = {
 
 export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
   const caps = useDashboardCapabilities();
+  /** Session blob missing (fetch/parse failure) — still show actions; API enforces create/revoke. */
+  const permUnknown = caps === null;
+  const canCreateApiKey = caps?.canCreateApiKey === true || permUnknown;
+  const canRevokeApiKey = caps?.canRevokeApiKey === true || permUnknown;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [revokePending, setRevokePending] = useState<string | null>(null);
@@ -85,7 +89,14 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
         </div>
       ) : null}
 
-      {caps?.canCreateApiKey ? (
+      {permUnknown ? (
+        <p className="m-0 max-w-lg rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-foreground" role="status">
+          Workspace permissions did not load. Create and revoke are still available; the server
+          will reject actions your account is not allowed to perform.
+        </p>
+      ) : null}
+
+      {canCreateApiKey ? (
         <section className="api-keys__create card" aria-labelledby="create-key-heading">
           <h2 id="create-key-heading" className="api-keys__section-title">
             Create key
@@ -127,11 +138,12 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
             </Button>
           </form>
         </section>
-      ) : caps ? (
+      ) : (
         <p className="text-muted-foreground api-keys__read-only-hint">
-          You don&apos;t have permission to create API keys. Ask an organization owner.
+          You don&apos;t have permission to create API keys. Ask an organization owner or editor to
+          grant access.
         </p>
-      ) : null}
+      )}
 
       <section className="api-keys__list" aria-labelledby="keys-list-heading">
         <h2 id="keys-list-heading" className="api-keys__section-title">
@@ -139,7 +151,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
         </h2>
         {keys.length === 0 ? (
           <p className="text-muted-foreground">
-            {caps?.canCreateApiKey
+            {canCreateApiKey
               ? "No keys yet. Create one to send telemetry from your apps."
               : "No keys for this project yet."}
           </p>
@@ -181,7 +193,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
                         )}
                       </td>
                       <td className="api-keys__actions">
-                        {!revoked && caps?.canRevokeApiKey ? (
+                        {!revoked && canRevokeApiKey ? (
                           <Button
                             type="button"
                             variant="outline"

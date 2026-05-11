@@ -35,8 +35,8 @@ The dashboard talks to the API via `API_URL` (server-side only; not exposed to t
 | `RATE_LIMIT_AUTH_MAX` | `30` | On `/api/auth/*` (default 30 per 60s). |
 | `RATE_LIMIT_API_MAX` | `300` | On other `/api/*` routes (default 300 per 60s). |
 | `RATE_LIMIT_PUBLIC_MAX` | `300` | On `GET /health` and `GET /` only (default 300 per 60s). Raise if many probes share one IP; `HEALTH_CHECK_DATABASE=true` makes `/health` heavier. |
-| `TELEMETRY_ALLOW_REGISTRATION` | `true` | Allow signups after the first user exists (first signup is always allowed). |
-| `TELEMETRY_ORGANIZATION_ID` | UUID | Default org id for legacy flows (has a built-in default if unset). |
+| `TELEMETRY_ALLOW_REGISTRATION` | `true` | When `true`, `POST /api/auth/register` is allowed after at least one user row exists. The **first** user row is always allowed when the DB is empty (so you can bootstrap). Self-serve signups do **not** get an organization automatically—they create one in the dashboard (`POST /api/meta/organizations`) or join via an invite link. |
+| `TELEMETRY_ORGANIZATION_ID` | UUID | **Legacy / unauthenticated dashboard reads:** default organization id used when `GET /api/meta/projects` is called **without** a session (see `project-dashboard.ts`). Seeded migrations include a matching org row. **Not** used to attach new self-serve users to an org (that path creates users with zero memberships). Built-in default UUID if unset. |
 | `TELEMETRY_DASHBOARD_ORIGIN` | `https://app.example.com` | Base URL for member invite links (no trailing slash). |
 | `STRIPE_SECRET_KEY` | `sk_live_…` | Required to register the Stripe webhook handler. |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` | Verifies `POST /webhooks/stripe` signatures. |

@@ -11,7 +11,9 @@ export type DashboardUser = {
 export async function getDashboardUser(): Promise<DashboardUser | null> {
   const session = await getDashboardSessionId();
   if (!session) return null;
-  const res = await dashboardApiFetch("/api/auth/me");
+  const res = await dashboardApiFetch("/api/auth/me", undefined, {
+    omitOrganizationHeader: true,
+  });
   if (!res.ok) return null;
   const data = (await res.json()) as {
     user: { id: string; email: string; displayName: string | null };

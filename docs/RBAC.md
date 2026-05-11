@@ -21,9 +21,9 @@ Ingest remains authenticated with **project API keys**, not user sessions.
 
 **Per-app API keys:** If `ApiKey.allowed_app` is set, ingest requests authenticated with that key must send the same value in the JSON `app` field on `/ingest/event`, `/ingest/session`, `/ingest/batch`, and `/ingest/error`. Mismatch returns **403**.
 
-**Invites:** Unknown emails create an `OrganizationInvite` row; owners receive an invite URL (e.g. `/register?invite=…`). `POST /api/auth/register` accepts optional `inviteToken`; the new user joins only that organization with the invite role (no default-org membership on that path).
+**Invites:** Unknown emails create an `OrganizationInvite` row; owners receive an invite URL (e.g. `/register?invite=…`). `POST /api/auth/register` with `inviteToken` creates the user with a single **OrganizationMembership** on that organization at the invite role.
 
-**Registration:** The first user in the default organization becomes **`OWNER`**. Additional allowed signups receive **`VIEWER`** unless changed in the database.
+**Registration (self-serve, no invite):** The new user is created **without** any `OrganizationMembership`. They use `POST /api/meta/organizations` to create a workspace (they become **`OWNER`** of that org), then add projects and API keys as usual. **`TELEMETRY_ALLOW_REGISTRATION`** controls whether signups are allowed after the first user row exists; the first user row can still be created this way when the database is empty.
 
 **API enforcement:** **Mutations** (`POST`/`PATCH` that change data or API keys, including `PATCH /api/errors/:id`, `POST /api/project/api-keys`, revoke) **require** a valid session (`Authorization: Bearer` or session cookie) and then enforce role. Unauthenticated callers receive **401**. **GET** routes may still allow unauthenticated “legacy” project scoping for local/dev (see `resolveReadProjectId`); production dashboards should use sessions for reads too.
 

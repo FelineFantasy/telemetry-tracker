@@ -20,3 +20,14 @@ export function buildDashboardHrefWithApp(
   const q = params.toString();
   return q ? `${path}?${q}` : path;
 }
+
+/** Same path and query as now, but drop `app` (e.g. after switching project/org). */
+export function hrefWithoutAppSearchParam(
+  pathname: string,
+  searchParams: URLSearchParams | { toString(): string }
+): string {
+  const params = new URLSearchParams(searchParams.toString());
+  params.delete("app");
+  const q = params.toString();
+  return q ? `${pathname}?${q}` : pathname;
+}

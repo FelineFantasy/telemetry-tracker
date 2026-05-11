@@ -1,4 +1,4 @@
-import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { dashboardApiFetch, type DashboardApiFetchOptions } from "@/lib/dashboard-api";
 
 export type UsageQuotaInfo = {
   planTier: string;
@@ -100,31 +100,67 @@ function parseBillingHealth(bh: unknown): BillingHealthInfo | null {
   };
 }
 
-/** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set. */
-export async function getDashboardSessionContext(): Promise<DashboardSessionContext | null> {
-  const res = await dashboardApiFetch("/api/meta/session-context");
-  if (!res.ok) return null;
-  const data = (await res.json()) as Record<string, unknown>;
-  if (
-    typeof data.role !== "string" ||
-    typeof data.canResolveErrors !== "boolean" ||
-    typeof data.canCreateApiKey !== "boolean" ||
-    typeof data.canRevokeApiKey !== "boolean" ||
-    typeof data.canCreateProject !== "boolean" ||
-    typeof data.canManageMembers !== "boolean" ||
-    typeof data.projectId !== "string"
-  ) {
-    return null;
-  }
+function parseSessionRole(value: unknown): DashboardSessionContext["role"] {
+  if (value === "OWNER" || value === "EDITOR" || value === "VIEWER") return value;
+  return "VIEWER";
+}
+
+function parseSessionBool(value: unknown): boolean {
+  return value === true;
+}
+
+/**
+ * Build session context from API JSON without discarding the whole payload when a field is
+ * missing or mistyped (older API builds, proxies). Booleans default false; role defaults VIEWER.
+ */
+function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardSessionContext {
   return {
-    projectId: data.projectId,
-    role: data.role as DashboardSessionContext["role"],
-    canResolveErrors: data.canResolveErrors,
-    canCreateApiKey: data.canCreateApiKey,
-    canRevokeApiKey: data.canRevokeApiKey,
-    canCreateProject: data.canCreateProject,
-    canManageMembers: data.canManageMembers,
+    projectId: typeof data.projectId === "string" ? data.projectId : "",
+    role: parseSessionRole(data.role),
+    canResolveErrors: parseSessionBool(data.canResolveErrors),
+    canCreateApiKey: parseSessionBool(data.canCreateApiKey),
+    canRevokeApiKey: parseSessionBool(data.canRevokeApiKey),
+    canCreateProject: parseSessionBool(data.canCreateProject),
+    canManageMembers: parseSessionBool(data.canManageMembers),
     usageQuota: parseUsageQuota(data.usageQuota),
     billingHealth: parseBillingHealth(data.billingHealth),
   };
+}
+
+/** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set.
+ * @param projectIdForRequest When a non-empty UUID, sent as `X-Project-Id` instead of the cookie (same request as `cookies().set` does not update reads). When `null`, skip the fetch and return `null` (e.g. org selected but no projects). When omitted, use the project cookie.
+ * @param organizationIdForRequest When a non-empty UUID, sent as `X-Organization-Id` instead of resolving org via an extra `/api/meta/organizations` fetch.
+ */
+export async function getDashboardSessionContext(
+  projectIdForRequest?: string | null,
+  organizationIdForRequest?: string | null
+): Promise<DashboardSessionContext | null> {
+  if (projectIdForRequest === null) {
+    return null;
+  }
+  const trimmed = projectIdForRequest?.trim();
+  const orgTrimmed = organizationIdForRequest?.trim();
+  const fetchOpts: DashboardApiFetchOptions = {};
+  if (trimmed && /^[0-9a-f-]{36}$/i.test(trimmed)) {
+    fetchOpts.projectIdOverride = trimmed;
+  }
+  if (orgTrimmed && /^[0-9a-f-]{36}$/i.test(orgTrimmed)) {
+    fetchOpts.organizationIdOverride = orgTrimmed.toLowerCase();
+  }
+  const res = await dashboardApiFetch(
+    "/api/meta/session-context",
+    undefined,
+    Object.keys(fetchOpts).length > 0 ? fetchOpts : undefined
+  );
+  if (!res.ok) return null;
+  let data: Record<string, unknown>;
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return null;
+  }
+  return parseDashboardSessionPayload(data);
 }

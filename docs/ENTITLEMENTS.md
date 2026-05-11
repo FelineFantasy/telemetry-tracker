@@ -104,7 +104,7 @@ The ingest model remains **org → project → API key**. **Human login** is sep
 | **OrganizationMembership** | `(user_id, organization_id)` with **`OWNER`**, **`EDITOR`**, or **`VIEWER`**. |
 | **Ingest** | Still **project API keys** only. |
 
-**Detailed permission matrix** (who can resolve errors, create/revoke keys, etc.): see [RBAC.md](./RBAC.md).
+**Onboarding:** `POST /api/auth/register` **without** `inviteToken` creates a user with **no** `OrganizationMembership`. They create an organization via `POST /api/meta/organizations` (dashboard: Organization settings), then add projects and API keys. **With** `inviteToken`, registration adds a single membership on the invited organization at the invite role. **Detailed permission matrix** (who can resolve errors, create/revoke keys, etc.): see [RBAC.md](./RBAC.md).
 
 ---
 

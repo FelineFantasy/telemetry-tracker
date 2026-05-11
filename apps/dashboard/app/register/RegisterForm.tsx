@@ -22,7 +22,9 @@ export function RegisterForm({ inviteToken = "" }: { inviteToken?: string }) {
         setError(r.error);
         return;
       }
-      router.push("/dashboard/overview");
+      router.push(
+        inviteToken ? "/dashboard/overview" : "/dashboard/settings/organization"
+      );
       router.refresh();
     });
   }
