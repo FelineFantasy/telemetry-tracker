@@ -43,7 +43,7 @@ export function DashboardAppContext({
     }
     let cancelled = false;
     void loadDashboardApps(currentProjectId, currentOrganizationId).then((next) => {
-      if (!cancelled) setApps(next);
+      if (!cancelled && next !== null) setApps(next);
     });
     return () => {
       cancelled = true;
