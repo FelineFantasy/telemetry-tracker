@@ -11,3 +11,13 @@ export function headerFirst(
   const t = typeof s === "string" ? s.trim() : "";
   return t || undefined;
 }
+
+const ORGANIZATION_ID_HEADER_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Validated `X-Organization-Id` from dashboard requests (UUID, lowercased). */
+export function readOrganizationIdHeader(request: FastifyRequest): string | undefined {
+  const raw = headerFirst(request, "x-organization-id");
+  if (!raw || !ORGANIZATION_ID_HEADER_UUID_RE.test(raw)) return undefined;
+  return raw.toLowerCase();
+}
