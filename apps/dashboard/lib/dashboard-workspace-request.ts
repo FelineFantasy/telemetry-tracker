@@ -16,10 +16,6 @@ export type DashboardProjectRow = {
   organizationId: string;
 };
 
-async function fetchOrganizations(): Promise<DashboardOrgRow[]> {
-  return fetchDashboardOrganizationsList();
-}
-
 async function fetchAllProjects(): Promise<DashboardProjectRow[]> {
   const res = await dashboardApiFetch("/api/meta/projects", undefined, {
     omitOrganizationHeader: true,
@@ -56,7 +52,7 @@ export const getDashboardWorkspaceForRequest = cache(async function getDashboard
   ]);
 
   const [organizations, allProjects] = await Promise.all([
-    fetchOrganizations(),
+    fetchDashboardOrganizationsList(),
     fetchAllProjects(),
   ]);
 
@@ -70,8 +66,9 @@ export const getDashboardWorkspaceForRequest = cache(async function getDashboard
       : allProjects;
 
   let effectiveProjectId: string;
+  /** No project in scope — including zero org memberships (`resolvedOrgId === null`) or org with no projects. Never fall back to `currentProjectId` / default seed UUID from another org. */
   if (projects.length === 0) {
-    effectiveProjectId = resolvedOrgId !== null ? "" : currentProjectId;
+    effectiveProjectId = "";
   } else if (projects.some((p) => p.id.toLowerCase() === currentProjectId.toLowerCase())) {
     effectiveProjectId = currentProjectId;
   } else {
