@@ -39,15 +39,17 @@ export default async function OrganizationSettingsPage() {
 
   const { organizations, resolvedOrgId, effectiveProjectId } = workspace;
 
-  const capabilities = await getDashboardSessionContext(
-    effectiveProjectId === "" ? null : effectiveProjectId,
-    resolvedOrgId
-  );
-
   const effectiveOrgId = resolvedOrgId;
 
-  const membersRes =
-    effectiveOrgId !== null ? await loadMembersForOrg(effectiveOrgId) : { ok: false as const };
+  const [capabilities, membersRes] = await Promise.all([
+    getDashboardSessionContext(
+      effectiveProjectId === "" ? null : effectiveProjectId,
+      resolvedOrgId
+    ),
+    effectiveOrgId !== null
+      ? loadMembersForOrg(effectiveOrgId)
+      : Promise.resolve({ ok: false as const }),
+  ]);
 
   if (!user) {
     return (
