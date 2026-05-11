@@ -1,22 +1,11 @@
-import { cookies } from "next/headers";
 import { cache } from "react";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import {
+  fetchDashboardOrganizationsList,
   getDashboardOrganizationId,
   resolveActiveOrganizationId,
 } from "@/lib/dashboard-org";
-import {
-  TELEMETRY_PROJECT_COOKIE,
-  getDashboardProjectId,
-} from "@/lib/dashboard-project";
-
-const PROJECT_COOKIE_OPTS = {
-  path: "/" as const,
-  sameSite: "lax" as const,
-  maxAge: 60 * 60 * 24 * 400,
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-};
+import { getDashboardProjectId } from "@/lib/dashboard-project";
 
 export type DashboardOrgRow = { id: string; name: string };
 
@@ -28,12 +17,7 @@ export type DashboardProjectRow = {
 };
 
 async function fetchOrganizations(): Promise<DashboardOrgRow[]> {
-  const res = await dashboardApiFetch("/api/meta/organizations", undefined, {
-    omitOrganizationHeader: true,
-  });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { organizations?: DashboardOrgRow[] };
-  return Array.isArray(data.organizations) ? data.organizations : [];
+  return fetchDashboardOrganizationsList();
 }
 
 async function fetchAllProjects(): Promise<DashboardProjectRow[]> {
@@ -54,10 +38,11 @@ async function fetchAllProjects(): Promise<DashboardProjectRow[]> {
 }
 
 /**
- * Resolves sidebar org, project list for that org, and an `effectiveProjectId` aligned with the
- * org cookie (may write the project cookie when the stored project belongs to another org).
- * Use before `getDashboardSessionContext` / `/api/apps` so `X-Project-Id` matches the same request’s cookies().
- * Wrapped in `cache` so the dashboard layout and nested pages (e.g. organization settings) share one resolution per request.
+ * Resolves sidebar org, project list for that org, and `effectiveProjectId` aligned with the
+ * selected organization when the project cookie points at another org’s project.
+ * Does not mutate cookies — Next.js Server Components cannot call `cookies().set()`; pass
+ * `effectiveProjectId` / `resolvedOrgId` into `dashboardApiFetch` via overrides instead.
+ * Wrapped in `cache` so the dashboard layout and nested pages share one resolution per request.
  */
 export const getDashboardWorkspaceForRequest = cache(async function getDashboardWorkspaceForRequest(): Promise<{
   organizations: DashboardOrgRow[];
@@ -91,8 +76,6 @@ export const getDashboardWorkspaceForRequest = cache(async function getDashboard
     effectiveProjectId = currentProjectId;
   } else {
     effectiveProjectId = projects[0]!.id;
-    const c = await cookies();
-    c.set(TELEMETRY_PROJECT_COOKIE, effectiveProjectId.toLowerCase(), PROJECT_COOKIE_OPTS);
   }
 
   return { organizations, projects, resolvedOrgId, effectiveProjectId };
