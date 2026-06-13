@@ -7,16 +7,29 @@ import { readProjectIdFromEnv } from "./project-scope.js";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Legacy unauthenticated reads: allowed in non-production or when explicitly enabled. */
+export function allowUnauthenticatedReads(): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  return process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS === "true";
+}
+
 /**
  * Dashboard sends `X-Project-Id` to scope reads. Validates UUID and that the project exists
  * and is not soft-deleted. If a session is present, the user must be a member of the project’s
- * organization. Without a session, legacy behavior: any existing project id (or env fallback).
- * Returns `null` after sending 403 when the session user may not access the project.
+ * organization. Without a session, legacy behavior (dev only): any existing project id (or env fallback).
+ * In production, unauthenticated reads return 401 unless `TELEMETRY_ALLOW_UNAUTHENTICATED_READS=true`.
+ * Returns `null` after sending 403/401 when access is denied.
  */
 export async function resolveReadProjectId(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<string | null> {
+  const session = await getSessionUser(request);
+  if (!session && !allowUnauthenticatedReads()) {
+    await reply.status(401).send({ error: "Unauthorized" });
+    return null;
+  }
+
   const fallback = readProjectIdFromEnv();
   const raw = headerFirst(request, "x-project-id");
   if (!raw || !UUID_RE.test(raw)) {
@@ -31,7 +44,6 @@ export async function resolveReadProjectId(
     return fallback;
   }
 
-  const session = await getSessionUser(request);
   if (session) {
     const m = await prisma.organizationMembership.findFirst({
       where: {
@@ -93,6 +105,11 @@ export async function resolveReadProjectIdWithSession(
 export async function tryResolveReadProjectId(
   request: FastifyRequest
 ): Promise<string | null> {
+  const session = await getSessionUser(request);
+  if (!session && !allowUnauthenticatedReads()) {
+    return null;
+  }
+
   const fallback = readProjectIdFromEnv();
   const raw = headerFirst(request, "x-project-id");
   if (!raw || !UUID_RE.test(raw)) {
@@ -107,7 +124,6 @@ export async function tryResolveReadProjectId(
     return fallback;
   }
 
-  const session = await getSessionUser(request);
   if (session) {
     const m = await prisma.organizationMembership.findFirst({
       where: {

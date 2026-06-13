@@ -4,6 +4,7 @@ import {
   trackEvent,
   trackError as coreTrackError,
   screen as coreScreen,
+  buildIngestHeaders,
   getConfigOrNull,
   getAnonymousId,
   getUserId,
@@ -35,7 +36,7 @@ async function sendSession(endedAt?: Date): Promise<void> {
   try {
     await fetch(`${base}/ingest/session`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildIngestHeaders(cfg),
       body: JSON.stringify({
         session_id: sessionId,
         app: cfg.app,

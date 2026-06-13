@@ -14,6 +14,8 @@ import {
   canCreateApiKey,
   canCreateProject,
   canManageMembers,
+  canArchiveOrganization,
+  canArchiveProject,
   canResolveErrors,
   canRevokeApiKey,
   getMembershipRoleForOrganization,
@@ -29,6 +31,7 @@ import {
   resolveReadProjectIdWithSession,
   tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
+import { sendTransactionalEmail } from "../lib/email.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -256,6 +259,65 @@ export async function projectDashboardRoutes(
     });
   });
 
+  app.post<{ Params: { orgId: string } }>(
+    "/meta/organizations/:orgId/archive",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const orgId = request.params.orgId.trim();
+      if (!UUID_RE.test(orgId)) {
+        return reply.status(400).send({ error: "Invalid organization id" });
+      }
+      const role = await getMembershipRoleForOrganization(session.userId, orgId);
+      if (!canArchiveOrganization(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+      const org = await prisma.organization.findFirst({
+        where: { id: orgId, deleted_at: null },
+        select: { id: true },
+      });
+      if (!org) {
+        return reply.status(404).send({ error: "Organization not found" });
+      }
+      await prisma.organization.update({
+        where: { id: orgId },
+        data: { deleted_at: new Date() },
+      });
+      return reply.status(204).send();
+    }
+  );
+
+  app.post<{ Params: { projectId: string } }>(
+    "/meta/projects/:projectId/archive",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const projectId = request.params.projectId.trim();
+      if (!UUID_RE.test(projectId)) {
+        return reply.status(400).send({ error: "Invalid project id" });
+      }
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, deleted_at: null },
+        select: { id: true, organization_id: true },
+      });
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+      const role = await getMembershipRoleForOrganization(
+        session.userId,
+        project.organization_id
+      );
+      if (!canArchiveProject(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { deleted_at: new Date() },
+      });
+      return reply.status(204).send();
+    }
+  );
+
   app.get("/meta/invites/preview", async (request, reply) => {
     const q = request.query as { token?: string };
     const token = typeof q.token === "string" ? q.token.trim() : "";
@@ -385,6 +447,12 @@ export async function projectDashboardRoutes(
         ? `${base}/register?invite=${encodeURIComponent(token)}`
         : `/register?invite=${encodeURIComponent(token)}`;
 
+      void sendTransactionalEmail({
+        to: email,
+        subject: "You're invited to Telemetry Tracker",
+        html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
+      });
+
       return reply.status(201).send({
         status: "invited" as const,
         inviteUrl,
@@ -492,11 +560,10 @@ export async function projectDashboardRoutes(
       planTier: string;
       monthlyIngestUsed: number;
       monthlyIngestLimit: number;
-      /** Rounded (used/limit)*100; not capped so it stays consistent with used/limit. */
       percentUsed: number;
-      /** True when usage is at or above the monthly cap (ingest is rejected for new units). */
       quotaExceeded: boolean;
       nearQuota: boolean;
+      retentionDays: number;
     } | null = null;
     let billingHealth: {
       stripeSubscriptionStatus: string | null;
@@ -519,6 +586,7 @@ export async function projectDashboardRoutes(
           percentUsed: Math.round(ratio * 100),
           quotaExceeded,
           nearQuota: ratio >= 0.9,
+          retentionDays: ctx.limits.retentionDays,
         };
         billingHealth = {
           stripeSubscriptionStatus: ctx.stripeSubscriptionStatus,
@@ -540,6 +608,8 @@ export async function projectDashboardRoutes(
       canRevokeApiKey: canRevokeApiKey(projRole),
       canCreateProject: canCreateProject(orgCapabilityRole),
       canManageMembers: canManageMembers(orgCapabilityRole),
+      canArchiveOrganization: canArchiveOrganization(orgCapabilityRole),
+      canArchiveProject: canArchiveProject(orgCapabilityRole),
       usageQuota,
       billingHealth,
     });

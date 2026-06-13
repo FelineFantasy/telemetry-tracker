@@ -138,6 +138,29 @@ describe.skipIf(!runDbIntegration)("Auth and RBAC (integration)", () => {
     expect(meBody.memberships.some((m) => m.role === "VIEWER")).toBe(true);
   });
 
+  it("GET /api/errors returns 401 without session in production", async () => {
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevAllowReads = process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;
+    process.env.NODE_ENV = "production";
+    delete process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;
+
+    try {
+      const res = await app!.inject({
+        method: "GET",
+        url: "/api/errors",
+        headers: { "x-project-id": projectId },
+      });
+      expect(res.statusCode).toBe(401);
+      const body = JSON.parse(res.body) as { error?: string };
+      expect(body.error).toBe("Unauthorized");
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNodeEnv;
+      if (prevAllowReads === undefined) delete process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;
+      else process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS = prevAllowReads;
+    }
+  });
+
   it("PATCH /api/errors/:id returns 403 for VIEWER", async () => {
     const login = await app!.inject({
       method: "POST",

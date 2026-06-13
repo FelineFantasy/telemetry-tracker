@@ -1,7 +1,7 @@
 "use client";
 import { Fragment as _Fragment, jsx as _jsx } from "react/jsx-runtime";
 import React from "react";
-import { init as coreInit, identify, trackEvent as coreTrackEvent, trackError as coreTrackError, screen as coreScreen, } from "@tacko/telemetry-core";
+import { init as coreInit, identify, trackEvent as coreTrackEvent, trackError as coreTrackError, screen as coreScreen, getSessionId, endSession, } from "@tacko/telemetry-core";
 let initialized = false;
 export function init(config) {
     coreInit(config);
@@ -10,7 +10,7 @@ export function init(config) {
         window.__telemetry_initialized = true;
     }
 }
-export { identify, coreTrackEvent as trackEvent, coreScreen as screen };
+export { identify, coreTrackEvent as trackEvent, coreScreen as screen, getSessionId, endSession, };
 export function trackError(error, context) {
     coreTrackError(error, context);
 }

@@ -1,4 +1,4 @@
-import { init as coreInit, identify, trackEvent, trackError as coreTrackError, screen as coreScreen, getConfigOrNull, getAnonymousId, getUserId, SDK_VERSION, } from "@tacko/telemetry-core";
+import { init as coreInit, identify, trackEvent, trackError as coreTrackError, screen as coreScreen, buildIngestHeaders, getConfigOrNull, getAnonymousId, getUserId, SDK_VERSION, } from "@tacko/telemetry-core";
 const g = typeof globalThis !== "undefined" ? globalThis : undefined;
 const ErrorUtils = g != null && typeof g.ErrorUtils !== "undefined"
     ? g.ErrorUtils
@@ -15,7 +15,7 @@ async function sendSession(endedAt) {
     try {
         await fetch(`${base}/ingest/session`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: buildIngestHeaders(cfg),
             body: JSON.stringify({
                 session_id: sessionId,
                 app: cfg.app,

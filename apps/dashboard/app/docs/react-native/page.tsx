@@ -41,6 +41,7 @@ npm install @tacko/telemetry-react-native`}
 init({
   ingestUrl: "https://your-api.example.com",
   app: "my-rn-app",
+  apiKey: "tt_live_<publicId>_<secret>",
   platform: "react-native",
 });`}
       />

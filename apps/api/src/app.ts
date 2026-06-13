@@ -15,6 +15,7 @@ import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
 import { authRoutes } from "./routes/auth.js";
 import { projectDashboardRoutes } from "./routes/project-dashboard.js";
+import { billingRoutes } from "./routes/billing.js";
 import { registerStripeWebhookIfConfigured } from "./routes/stripe-webhook.js";
 
 const PAYLOAD_LIMIT = 200 * 1024; // 200 KB
@@ -91,6 +92,7 @@ export async function createApp(): Promise<FastifyInstance> {
       });
       await f.register(apiRoutes);
       await f.register(projectDashboardRoutes);
+      await f.register(billingRoutes);
     },
     { prefix: "/api" }
   );

@@ -13,6 +13,8 @@ import {
   createProjectAction,
 } from "@/app/dashboard/actions";
 import { Button } from "@/app/components/ui/Button";
+import { OrganizationArchiveSection } from "@/app/dashboard/settings/organization/OrganizationArchiveSection";
+import { OrganizationUsageCard } from "@/app/dashboard/settings/organization/OrganizationUsageCard";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +39,7 @@ export default async function OrganizationSettingsPage() {
     getDashboardUser(),
   ]);
 
-  const { organizations, resolvedOrgId, effectiveProjectId } = workspace;
+  const { organizations, resolvedOrgId, effectiveProjectId, projects } = workspace;
 
   const effectiveOrgId = resolvedOrgId;
 
@@ -122,6 +124,18 @@ export default async function OrganizationSettingsPage() {
           )}
           .
         </p>
+      ) : null}
+
+      {capabilities?.usageQuota && effectiveOrgId ? (
+        <OrganizationUsageCard
+          usage={capabilities.usageQuota}
+          organizationId={effectiveOrgId}
+          canManageBilling={capabilities.canManageMembers}
+          hasStripeCustomer={
+            capabilities.billingHealth?.stripeSubscriptionStatus != null ||
+            capabilities.billingHealth?.storedPlanTier !== "FREE"
+          }
+        />
       ) : null}
 
       {effectiveOrgId ? (
@@ -260,6 +274,16 @@ export default async function OrganizationSettingsPage() {
           </section>
         )}
       </div>
+
+      {effectiveOrgId && activeOrgName ? (
+        <OrganizationArchiveSection
+          organizationId={effectiveOrgId}
+          organizationName={activeOrgName}
+          projects={projects.map((p) => ({ id: p.id, name: p.name, slug: p.slug }))}
+          canArchiveProject={capabilities?.canArchiveProject === true}
+          canArchiveOrganization={capabilities?.canArchiveOrganization === true}
+        />
+      ) : null}
     </>
   );
 }

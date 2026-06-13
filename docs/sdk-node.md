@@ -23,6 +23,7 @@ import { init, trackEvent, trackError } from "@tacko/telemetry-node";
 init({
   ingestUrl: "https://your-api.example.com",
   app: "my-backend",
+  apiKey: process.env.TELEMETRY_API_KEY,
   platform: "node",  // default
 });
 ```
@@ -67,7 +68,7 @@ The implementation assumes a minimal `req`: `method`, `url`, and optionally `bod
 ```ts
 import { init, middleware } from "@tacko/telemetry-node";
 
-init({ ingestUrl: "http://localhost:3001", app: "api" });
+init({ ingestUrl: "http://localhost:3001", app: "api", apiKey: process.env.TELEMETRY_API_KEY, environment: "development" });
 
 const telemetryMiddleware = middleware({ trackRequestBody: false });
 

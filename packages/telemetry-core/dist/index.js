@@ -38,10 +38,99 @@ export function getAnonymousId() {
 let config = null;
 let userId = null;
 let browserHandlersInstalled = false;
+let sessionLifecycleInstalled = false;
+let sessionId = null;
+let sessionStartedAt = null;
 const DEFAULT_BATCH_INTERVAL = 5000;
 const DEFAULT_BATCH_SIZE = 10;
 const eventQueue = [];
 let flushTimer = null;
+function ensureUrlFromCfg(cfg, path) {
+    const base = cfg.ingestUrl.replace(/\/$/, "");
+    return `${base}${path}`;
+}
+function buildSessionPayload(cfg, endedAt) {
+    return {
+        session_id: sessionId,
+        app: cfg.app,
+        platform: cfg.platform ?? undefined,
+        environment: cfg.environment ?? undefined,
+        user_id: userId ?? undefined,
+        anonymous_id: getAnonymousId(),
+        sdk_version: SDK_VERSION,
+        started_at: sessionStartedAt?.toISOString(),
+        ended_at: endedAt?.toISOString(),
+    };
+}
+async function postSession(cfg, endedAt) {
+    if (!sessionId)
+        return;
+    try {
+        const res = await fetch(ensureUrlFromCfg(cfg, "/ingest/session"), {
+            method: "POST",
+            headers: buildIngestHeaders(cfg),
+            body: JSON.stringify(buildSessionPayload(cfg, endedAt)),
+        });
+        if (!res.ok) {
+            console.warn("[telemetry] session ingest failed:", res.status, await res.text());
+        }
+    }
+    catch (e) {
+        console.warn("[telemetry] session send error:", e);
+    }
+}
+function postSessionKeepalive(endedAt) {
+    const cfg = getConfigOrNull();
+    if (!cfg || !sessionId)
+        return;
+    try {
+        void fetch(ensureUrlFromCfg(cfg, "/ingest/session"), {
+            method: "POST",
+            headers: buildIngestHeaders(cfg),
+            body: JSON.stringify(buildSessionPayload(cfg, endedAt)),
+            keepalive: true,
+        });
+    }
+    catch (_) { }
+}
+function startSession() {
+    sessionId = generateUUID();
+    sessionStartedAt = new Date();
+    const cfg = getConfigOrNull();
+    if (cfg) {
+        void postSession(cfg);
+    }
+}
+function installBrowserSessionLifecycle() {
+    if (sessionLifecycleInstalled)
+        return;
+    if (typeof window === "undefined" ||
+        typeof window.addEventListener !== "function" ||
+        typeof document === "undefined")
+        return;
+    sessionLifecycleInstalled = true;
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+            postSessionKeepalive(new Date());
+        }
+    });
+    window.addEventListener("pagehide", () => {
+        postSessionKeepalive(new Date());
+    });
+}
+export function getSessionId() {
+    return sessionId;
+}
+/** End the current session and clear the in-memory session id. */
+export function endSession() {
+    const cfg = getConfigOrNull();
+    if (!cfg || !sessionId)
+        return;
+    const ended = new Date();
+    void postSession(cfg, ended);
+    sessionId = null;
+    sessionStartedAt = null;
+}
 /** Only install in real browser environments; skip in React Native / Node even if `window` is polyfilled. */
 function installBrowserErrorHandlers() {
     if (browserHandlersInstalled)
@@ -76,6 +165,7 @@ function installBrowserErrorHandlers() {
 }
 export function init(c) {
     config = { ...c };
+    warnIfMissingApiKey(config);
     getAnonymousId(); // ensure anonymous id exists and is persisted (browser) or set in memory (Node)
     const interval = c.batchInterval ?? DEFAULT_BATCH_INTERVAL;
     if (interval > 0 && typeof setInterval !== "undefined") {
@@ -85,6 +175,8 @@ export function init(c) {
             t.unref();
     }
     installBrowserErrorHandlers();
+    startSession();
+    installBrowserSessionLifecycle();
 }
 export function identify(id) {
     userId = id;
@@ -98,12 +190,29 @@ function ensureUrl(url) {
     const base = getConfig().ingestUrl.replace(/\/$/, "");
     return `${base}${url}`;
 }
+/** Headers for ingest POST requests (Authorization + Content-Type). */
+export function buildIngestHeaders(cfg) {
+    const headers = { "Content-Type": "application/json" };
+    const key = cfg.apiKey?.trim();
+    if (key) {
+        headers.Authorization = `Bearer ${key}`;
+    }
+    return headers;
+}
+function warnIfMissingApiKey(cfg) {
+    if (cfg.apiKey?.trim())
+        return;
+    const env = cfg.environment?.toLowerCase();
+    if (env === "development" || env === "dev" || env === "test")
+        return;
+    console.warn("[telemetry] apiKey is not set — ingest requests will fail unless the server allows unauthenticated ingest.");
+}
 async function send(path, body) {
     const cfg = getConfig();
     try {
         const res = await fetch(ensureUrl(path), {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: buildIngestHeaders(cfg),
             body: JSON.stringify({
                 ...body,
                 app: cfg.app,
@@ -143,7 +252,7 @@ function flushEvents() {
     }));
     fetch(`${base}/ingest/batch`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildIngestHeaders(cfg),
         body: JSON.stringify({ events }),
     }).catch((e) => console.warn("[telemetry] batch send error:", e));
 }
@@ -154,7 +263,7 @@ export function trackEvent(name, properties) {
     const item = {
         name,
         user_id: userId,
-        session_id: undefined,
+        session_id: sessionId ?? undefined,
         properties: properties ?? undefined,
     };
     if (interval > 0 && typeof setInterval !== "undefined") {
@@ -186,7 +295,7 @@ export function trackError(error, context) {
         stack: stack ?? undefined,
         context: context ?? undefined,
         user_id: userId ?? undefined,
-        session_id: undefined,
+        session_id: sessionId ?? undefined,
     }).catch(() => { });
 }
 export function screen(name) {

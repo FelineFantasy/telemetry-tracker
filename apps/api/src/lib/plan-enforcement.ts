@@ -1,6 +1,7 @@
 import { Prisma, type PlanTier, type PrismaClient } from "@prisma/client";
 import { limitsForPlan, type PlanLimits } from "../config/plans.js";
 import { effectivePlanTierForLimits } from "./effective-plan-tier.js";
+import { consumeIngestRps } from "./ingest-project-rps.js";
 import { currentYearMonth } from "./usage-meter.js";
 
 export type PlanContext = {
@@ -129,6 +130,17 @@ export async function assertIngestPlanOrReply(
       ok: false,
       status: 403,
       body: { error: "Project not found or organization inactive." },
+    };
+  }
+  if (!consumeIngestRps(projectId, ctx.limits.maxIngestRps)) {
+    return {
+      ok: false,
+      status: 429,
+      body: {
+        error: "Ingest rate limit exceeded for this project (plan max RPS).",
+        code: "ingest_rps",
+        limit: ctx.limits.maxIngestRps,
+      },
     };
   }
   const used = await getMonthlyIngestUsed(prisma, projectId);

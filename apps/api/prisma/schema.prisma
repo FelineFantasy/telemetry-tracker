@@ -43,6 +43,7 @@ model User {
   sessions       UserSession[]
   memberships    OrganizationMembership[]
   invites_sent   OrganizationInvite[] @relation("InviteCreatedBy")
+  password_reset_tokens PasswordResetToken[]
 }
 
 /// Org membership for dashboard authorization.
@@ -88,6 +89,19 @@ model UserSession {
   id         String   @id @default(uuid())
   user_id    String   @map("user_id")
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  expires_at DateTime @map("expires_at")
+  created_at DateTime @default(now()) @map("created_at")
+
+  @@index([user_id])
+  @@index([expires_at])
+}
+
+/// One-time password reset link (hashed token stored as opaque hex).
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  user_id    String   @map("user_id")
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token      String   @unique
   expires_at DateTime @map("expires_at")
   created_at DateTime @default(now()) @map("created_at")
 

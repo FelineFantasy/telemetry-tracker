@@ -36,12 +36,25 @@ The dashboard talks to the API via `API_URL` (server-side only; not exposed to t
 | `RATE_LIMIT_API_MAX` | `300` | On other `/api/*` routes (default 300 per 60s). |
 | `RATE_LIMIT_PUBLIC_MAX` | `300` | On `GET /health` and `GET /` only (default 300 per 60s). Raise if many probes share one IP; `HEALTH_CHECK_DATABASE=true` makes `/health` heavier. |
 | `TELEMETRY_ALLOW_REGISTRATION` | `true` | When `true`, `POST /api/auth/register` is allowed after at least one user row exists. The **first** user row is always allowed when the DB is empty (so you can bootstrap). Self-serve signups do **not** get an organization automatically—they create one in the dashboard (`POST /api/meta/organizations`) or join via an invite link. |
+| `TELEMETRY_ALLOW_UNAUTHENTICATED_READS` | `true` | When `true` in **production**, allows `GET /api/*` telemetry reads without a session (legacy local tooling). Omit or set `false` in production so dashboard reads require login. Non-production always allows unauthenticated reads. |
 | `TELEMETRY_ORGANIZATION_ID` | UUID | **Legacy / unauthenticated dashboard reads:** default organization id used when `GET /api/meta/projects` is called **without** a session (see `project-dashboard.ts`). Seeded migrations include a matching org row. **Not** used to attach new self-serve users to an org (that path creates users with zero memberships). Built-in default UUID if unset. |
 | `TELEMETRY_DASHBOARD_ORIGIN` | `https://app.example.com` | Base URL for member invite links (no trailing slash). |
-| `STRIPE_SECRET_KEY` | `sk_live_…` | Required to register the Stripe webhook handler. |
+| `STRIPE_SECRET_KEY` | `sk_live_…` | Required to register the Stripe webhook handler and billing checkout/portal routes. |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` | Verifies `POST /webhooks/stripe` signatures. |
+| `STRIPE_PRICE_PRO` | `price_…` | Stripe Price id for Pro checkout (`POST /api/meta/organizations/:orgId/billing/checkout`). |
+| `STRIPE_PRICE_BUSINESS` | `price_…` | Stripe Price id for Business checkout. |
+| `RESEND_API_KEY` | — | Optional: send invite and password-reset emails via Resend. |
+| `TELEMETRY_EMAIL_FROM` | `Telemetry <noreply@yourdomain.com>` | Required with `RESEND_API_KEY` for outbound email. |
 
 **Retention:** run `pnpm --filter api retention` on a schedule (e.g. nightly cron) so old telemetry rows are pruned per tier (`retentionDays` in `apps/api/src/config/plans.ts`). Requires `DATABASE_URL`.
+
+**Railway cron example:** add a Cron service (or scheduled job) with Root Directory `apps/api`, command:
+
+```bash
+pnpm exec tsx src/jobs/run-retention.ts
+```
+
+Schedule: `0 3 * * *` (03:00 UTC daily). Use the same `DATABASE_URL` as the API. See [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) for a full go-live checklist.
 
 Ingest and local dev may also use `INGEST_ALLOW_UNAUTHENTICATED` and `TELEMETRY_PROJECT_ID` (see `docs/ENTITLEMENTS.md`); never enable unauthenticated ingest in production.
 

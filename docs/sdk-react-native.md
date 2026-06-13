@@ -28,6 +28,7 @@ import { init } from "@tacko/telemetry-react-native";
 init({
   ingestUrl: "https://your-api.example.com",
   app: "my-mobile-app",
+  apiKey: "tt_live_<publicId>_<secret>",
   platform: "react-native",  // or "ios" / "android"
 });
 ```

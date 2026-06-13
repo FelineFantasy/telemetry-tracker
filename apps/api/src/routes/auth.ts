@@ -1,11 +1,18 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { getSessionTokenFromRequest, getSessionUser } from "../lib/auth-session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
+import { sendTransactionalEmail } from "../lib/email.js";
 
 const SESSION_DAYS = 30;
+const RESET_TOKEN_HOURS = 1;
+
+function dashboardOriginBase(): string {
+  const raw = process.env.TELEMETRY_DASHBOARD_ORIGIN?.trim();
+  return raw ? raw.replace(/\/$/, "") : "";
+}
 
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
@@ -215,6 +222,76 @@ export async function authRoutes(
         displayName: user.display_name,
       },
     });
+  });
+
+  app.post("/auth/forgot-password", async (request, reply) => {
+    const body = (request.body ?? {}) as { email?: string };
+    const email = typeof body.email === "string" ? normalizeEmail(body.email) : "";
+    const generic = { ok: true as const, message: "If that email exists, a reset link was sent." };
+
+    if (!email.includes("@")) {
+      return reply.status(400).send({ error: "Invalid email" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return reply.send(generic);
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_HOURS * 60 * 60 * 1000);
+    await prisma.passwordResetToken.deleteMany({ where: { user_id: user.id } });
+    await prisma.passwordResetToken.create({
+      data: {
+        user_id: user.id,
+        token,
+        expires_at: expiresAt,
+      },
+    });
+
+    const base = dashboardOriginBase();
+    const resetPath = `/reset-password?token=${encodeURIComponent(token)}`;
+    const resetUrl = base ? `${base}${resetPath}` : resetPath;
+
+    await sendTransactionalEmail({
+      to: email,
+      subject: "Reset your Telemetry Tracker password",
+      html: `<p>Reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in ${RESET_TOKEN_HOURS} hour(s).</p>`,
+    });
+
+    if (process.env.NODE_ENV !== "production") {
+      return reply.send({ ...generic, resetUrl, resetToken: token });
+    }
+    return reply.send(generic);
+  });
+
+  app.post("/auth/reset-password", async (request, reply) => {
+    const body = (request.body ?? {}) as { token?: string; password?: string };
+    const token = typeof body.token === "string" ? body.token.trim() : "";
+    const password = typeof body.password === "string" ? body.password : "";
+
+    if (!token || token.length < 32) {
+      return reply.status(400).send({ error: "Invalid or missing token" });
+    }
+    if (!isStrongPassword(password)) {
+      return reply.status(400).send({ error: "Password must be at least 8 characters" });
+    }
+
+    const row = await prisma.passwordResetToken.findUnique({ where: { token } });
+    if (!row || row.expires_at.getTime() <= Date.now()) {
+      return reply.status(400).send({ error: "Invalid or expired reset link" });
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: row.user_id },
+        data: { password_hash: hashPassword(password) },
+      }),
+      prisma.passwordResetToken.delete({ where: { id: row.id } }),
+      prisma.userSession.deleteMany({ where: { user_id: row.user_id } }),
+    ]);
+
+    return reply.send({ ok: true });
   });
 
   app.post("/auth/logout", async (request, reply) => {
