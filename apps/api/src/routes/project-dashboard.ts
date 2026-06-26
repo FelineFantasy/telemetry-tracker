@@ -326,9 +326,13 @@ export async function projectDashboardRoutes(
     }
     const invite = await prisma.organizationInvite.findUnique({
       where: { token },
-      include: { organization: { select: { name: true } } },
+      include: { organization: { select: { name: true, deleted_at: true } } },
     });
-    if (!invite || invite.expires_at.getTime() <= Date.now()) {
+    if (
+      !invite ||
+      invite.organization.deleted_at != null ||
+      invite.expires_at.getTime() <= Date.now()
+    ) {
       return reply.send({ valid: false });
     }
     return reply.send({
@@ -371,6 +375,13 @@ export async function projectDashboardRoutes(
           await tx.$executeRaw(
             Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
           );
+          const org = await tx.organization.findFirst({
+            where: { id: orgId, deleted_at: null },
+            select: { id: true },
+          });
+          if (!org) {
+            return { kind: "org_unavailable" as const };
+          }
           const existing = await tx.organizationMembership.findUnique({
             where: {
               user_id_organization_id: {
@@ -403,6 +414,9 @@ export async function projectDashboardRoutes(
             throw e;
           }
         });
+        if (addExisting.kind === "org_unavailable") {
+          return reply.status(404).send({ error: "Organization not found or archived" });
+        }
         if (addExisting.kind === "already_member") {
           return reply.status(409).send({ error: "User is already a member" });
         }
@@ -414,10 +428,17 @@ export async function projectDashboardRoutes(
         return reply.status(503).send({ error: "Dashboard origin is not configured" });
       }
 
-      const { token } = await prisma.$transaction(async (tx) => {
+      const inviteResult = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
         );
+        const org = await tx.organization.findFirst({
+          where: { id: orgId, deleted_at: null },
+          select: { id: true },
+        });
+        if (!org) {
+          return { kind: "org_unavailable" as const };
+        }
         const newToken = randomBytes(32).toString("hex");
         const exp = new Date(
           Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000
@@ -444,8 +465,13 @@ export async function projectDashboardRoutes(
             invited_by_id: session.userId,
           },
         });
-        return { token: row.token };
+        return { kind: "invited" as const, token: row.token };
       });
+
+      if (inviteResult.kind === "org_unavailable") {
+        return reply.status(404).send({ error: "Organization not found or archived" });
+      }
+      const token = inviteResult.token;
 
       const inviteUrl = `${base}/register?invite=${encodeURIComponent(token)}`;
 

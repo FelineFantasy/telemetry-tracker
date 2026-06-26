@@ -53,8 +53,12 @@ export async function authRoutes(
         );
         const invite = await tx.organizationInvite.findUnique({
           where: { token: inviteToken },
+          include: { organization: { select: { deleted_at: true } } },
         });
         if (!invite) {
+          return { kind: "invalid_invite" as const };
+        }
+        if (invite.organization.deleted_at != null) {
           return { kind: "invalid_invite" as const };
         }
         if (invite.expires_at.getTime() <= Date.now()) {

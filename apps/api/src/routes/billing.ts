@@ -31,6 +31,59 @@ function parseUpgradeTier(raw: unknown): "PRO" | "BUSINESS" | null {
   return null;
 }
 
+/** Resolve Stripe customer id without holding a row lock across Stripe API calls. */
+async function resolveStripeCustomerId(
+  stripe: Stripe,
+  orgId: string
+): Promise<string | null> {
+  const unlocked = await prisma.organization.findFirst({
+    where: { id: orgId, deleted_at: null },
+    select: { stripe_customer_id: true, name: true },
+  });
+  if (!unlocked) return null;
+  if (unlocked.stripe_customer_id) return unlocked.stripe_customer_id;
+
+  const pendingCreate = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
+    );
+    const org = await tx.organization.findFirst({
+      where: { id: orgId, deleted_at: null },
+      select: { stripe_customer_id: true, name: true },
+    });
+    if (!org) return null;
+    if (org.stripe_customer_id) {
+      return { kind: "existing" as const, customerId: org.stripe_customer_id };
+    }
+    return { kind: "create" as const, orgName: org.name };
+  });
+  if (!pendingCreate) return null;
+  if (pendingCreate.kind === "existing") return pendingCreate.customerId;
+
+  const customer = await stripe.customers.create({
+    name: pendingCreate.orgName,
+    metadata: { organization_id: orgId },
+  });
+
+  const savedId = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(
+      Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
+    );
+    const org = await tx.organization.findFirst({
+      where: { id: orgId, deleted_at: null },
+      select: { stripe_customer_id: true },
+    });
+    if (!org) return null;
+    if (org.stripe_customer_id) return org.stripe_customer_id;
+    await tx.organization.update({
+      where: { id: orgId },
+      data: { stripe_customer_id: customer.id },
+    });
+    return customer.id;
+  });
+  return savedId;
+}
+
 /**
  * Stripe Checkout + Billing Portal for organization owners.
  * Requires STRIPE_SECRET_KEY and price ids STRIPE_PRICE_PRO / STRIPE_PRICE_BUSINESS.
@@ -66,38 +119,10 @@ export async function billingRoutes(
         return reply.status(503).send({ error: "Stripe price not configured for this tier" });
       }
 
-      const locked = await prisma.$transaction(async (tx) => {
-        await tx.$executeRaw(
-          Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
-        );
-        const org = await tx.organization.findFirst({
-          where: { id: orgId, deleted_at: null },
-          select: {
-            id: true,
-            name: true,
-            stripe_customer_id: true,
-          },
-        });
-        if (!org) return null;
-
-        if (org.stripe_customer_id) {
-          return { customerId: org.stripe_customer_id };
-        }
-
-        const customer = await stripe.customers.create({
-          name: org.name,
-          metadata: { organization_id: orgId },
-        });
-        await tx.organization.update({
-          where: { id: orgId },
-          data: { stripe_customer_id: customer.id },
-        });
-        return { customerId: customer.id };
-      });
-      if (!locked) {
+      const customerId = await resolveStripeCustomerId(stripe, orgId);
+      if (!customerId) {
         return reply.status(404).send({ error: "Organization not found" });
       }
-      const customerId = locked.customerId;
 
       const origin = dashboardOriginOrNull();
       if (!origin) {
