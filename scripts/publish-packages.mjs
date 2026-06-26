@@ -39,6 +39,26 @@ const dryRun = process.argv.includes("--dry-run");
 const otpArg = process.argv.find((a) => a.startsWith("--otp="));
 const otpFlag = otpArg ? ` ${otpArg}` : "";
 
+function assertNpmAuth() {
+  if (dryRun) return;
+  try {
+    execSync("npm whoami", { cwd: root, stdio: "pipe" });
+  } catch {
+    console.error(`
+npm publish failed: not logged in to https://registry.npmjs.org/
+
+  1. npm login
+  2. Ensure your npm user can publish the @tacko scope (create org at npmjs.com/org/create if needed)
+  3. pnpm publish:packages -- --otp=123456   (if 2FA is enabled)
+
+Dry run (no login): pnpm publish:dry
+`);
+    process.exit(1);
+  }
+}
+
+assertNpmAuth();
+
 // 1. Get core version
 const corePkgPath = join(packagesDir, coreName, "package.json");
 const coreVersion = readJson(corePkgPath).version;

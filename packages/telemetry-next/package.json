@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/unjica/telemetry-tracker.git",
+    "url": "https://github.com/Telemetry-Tracker/telemetry-tracker.git",
     "directory": "packages/telemetry-next"
   },
   "type": "module",

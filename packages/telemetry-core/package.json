@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/unjica/telemetry-tracker.git",
+    "url": "https://github.com/Telemetry-Tracker/telemetry-tracker.git",
     "directory": "packages/telemetry-core"
   },
   "type": "module",
@@ -21,7 +21,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "node scripts/inject-version.cjs && tsc",
+    "build": "node scripts/inject-version.cjs && rm -rf dist && tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
     "prepublishOnly": "pnpm run build"

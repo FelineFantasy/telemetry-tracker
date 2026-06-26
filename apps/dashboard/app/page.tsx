@@ -5,6 +5,7 @@ import { LandingHeader } from "@/app/components/LandingHeader";
 import { LandingHeroBrand } from "@/app/components/LandingHeroBrand";
 import { LandingProductPreview } from "@/app/components/LandingProductPreview";
 import { LandingWhySection } from "@/app/components/LandingWhySection";
+import { socialPreviewImage } from "@/lib/social-image";
 import { resolveMetadataBase } from "@/lib/site-url";
 
 function IconErrors() {
@@ -129,10 +130,12 @@ export function generateMetadata(): Metadata {
       title: homeTitle,
       description: homeDescription,
       url: `${origin}/`,
+      images: [socialPreviewImage],
     },
     twitter: {
       title: homeTitle,
       description: homeDescription,
+      images: [socialPreviewImage.url],
     },
   };
 }
