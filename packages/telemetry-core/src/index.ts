@@ -147,11 +147,13 @@ function installBrowserSessionLifecycle(): void {
     return;
   sessionLifecycleInstalled = true;
 
-  window.addEventListener("pagehide", () => {
+  window.addEventListener("pagehide", (event: Event) => {
+    if ((event as PageTransitionEvent).persisted) return;
     closeSessionKeepalive(new Date());
   });
 
-  window.addEventListener("pageshow", () => {
+  window.addEventListener("pageshow", (event: Event) => {
+    if ((event as PageTransitionEvent).persisted) return;
     if (!sessionId) {
       startSession();
     }
@@ -215,6 +217,9 @@ function installBrowserErrorHandlers(): void {
 }
 
 export function init(c: TelemetryConfig): void {
+  if (sessionId) {
+    endSession();
+  }
   config = { ...c };
   warnIfMissingApiKey(config);
   getAnonymousId(); // ensure anonymous id exists and is persisted (browser) or set in memory (Node)

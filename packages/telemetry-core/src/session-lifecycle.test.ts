@@ -47,9 +47,13 @@ describe("browser session lifecycle", () => {
     vi.unstubAllGlobals();
   });
 
-  function fire(type: string): void {
+  function fire(type: string, init?: { persisted?: boolean }): void {
+    const event = new Event(type);
+    if (init?.persisted != null) {
+      Object.defineProperty(event, "persisted", { value: init.persisted });
+    }
     for (const listener of listeners.get(type) ?? []) {
-      listener(new Event(type));
+      listener(event);
     }
   }
 
@@ -72,12 +76,51 @@ describe("browser session lifecycle", () => {
     const firstId = getSessionId();
     expect(firstId).toBeTruthy();
 
-    fire("pagehide");
+    fire("pagehide", { persisted: false });
     expect(getSessionId()).toBeNull();
 
-    fire("pageshow");
+    fire("pageshow", { persisted: false });
     const secondId = getSessionId();
     expect(secondId).toBeTruthy();
     expect(secondId).not.toBe(firstId);
+  });
+
+  it("keeps the session when pagehide is for back-forward cache", async () => {
+    const { getSessionId } = await import("./index.js");
+    const firstId = getSessionId();
+    expect(firstId).toBeTruthy();
+
+    fire("pagehide", { persisted: true });
+    expect(getSessionId()).toBe(firstId);
+
+    fire("pageshow", { persisted: true });
+    expect(getSessionId()).toBe(firstId);
+  });
+
+  it("ends the prior session when init is called again", async () => {
+    const { init, getSessionId } = await import("./index.js");
+    const firstId = getSessionId();
+    expect(firstId).toBeTruthy();
+
+    init({
+      ingestUrl: "http://localhost:3001",
+      app: "test-app",
+      apiKey: "tt_live_pub_secret",
+      batchInterval: 0,
+      environment: "test",
+    });
+
+    const secondId = getSessionId();
+    expect(secondId).toBeTruthy();
+    expect(secondId).not.toBe(firstId);
+
+    const sessionPosts = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes("/ingest/session")
+    );
+    const endedFirst = sessionPosts.some(([, opts]) => {
+      const body = JSON.parse((opts as RequestInit).body as string);
+      return body.session_id === firstId && body.ended_at != null;
+    });
+    expect(endedFirst).toBe(true);
   });
 });

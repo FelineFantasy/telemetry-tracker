@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import Stripe from "stripe";
-import { PlanTier } from "@prisma/client";
+import { PlanTier, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { requireSessionUser } from "../lib/auth-session.js";
 import {
@@ -66,30 +66,38 @@ export async function billingRoutes(
         return reply.status(503).send({ error: "Stripe price not configured for this tier" });
       }
 
-      const org = await prisma.organization.findFirst({
-        where: { id: orgId, deleted_at: null },
-        select: {
-          id: true,
-          name: true,
-          stripe_customer_id: true,
-        },
-      });
-      if (!org) {
-        return reply.status(404).send({ error: "Organization not found" });
-      }
+      const locked = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
+        );
+        const org = await tx.organization.findFirst({
+          where: { id: orgId, deleted_at: null },
+          select: {
+            id: true,
+            name: true,
+            stripe_customer_id: true,
+          },
+        });
+        if (!org) return null;
 
-      let customerId = org.stripe_customer_id;
-      if (!customerId) {
+        if (org.stripe_customer_id) {
+          return { customerId: org.stripe_customer_id };
+        }
+
         const customer = await stripe.customers.create({
           name: org.name,
           metadata: { organization_id: orgId },
         });
-        customerId = customer.id;
-        await prisma.organization.update({
+        await tx.organization.update({
           where: { id: orgId },
-          data: { stripe_customer_id: customerId },
+          data: { stripe_customer_id: customer.id },
         });
+        return { customerId: customer.id };
+      });
+      if (!locked) {
+        return reply.status(404).send({ error: "Organization not found" });
       }
+      const customerId = locked.customerId;
 
       const origin = dashboardOriginOrNull();
       if (!origin) {

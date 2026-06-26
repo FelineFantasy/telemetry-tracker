@@ -117,10 +117,14 @@ function installBrowserSessionLifecycle() {
         typeof document === "undefined")
         return;
     sessionLifecycleInstalled = true;
-    window.addEventListener("pagehide", () => {
+    window.addEventListener("pagehide", (event) => {
+        if (event.persisted)
+            return;
         closeSessionKeepalive(new Date());
     });
-    window.addEventListener("pageshow", () => {
+    window.addEventListener("pageshow", (event) => {
+        if (event.persisted)
+            return;
         if (!sessionId) {
             startSession();
         }
@@ -172,6 +176,9 @@ function installBrowserErrorHandlers() {
     });
 }
 export function init(c) {
+    if (sessionId) {
+        endSession();
+    }
     config = { ...c };
     warnIfMissingApiKey(config);
     getAnonymousId(); // ensure anonymous id exists and is persisted (browser) or set in memory (Node)
