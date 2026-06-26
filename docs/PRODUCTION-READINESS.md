@@ -55,5 +55,5 @@ Manually verify: login, overview loads, ingest with API key returns 200, ingest 
 ## Known limitations (v1)
 
 - Per-project ingest RPS bucket is **in-memory** (single API process). Horizontal scaling needs a shared rate limiter later.
-- Password reset in production requires email (Phase 4) or manual link sharing until configured.
+- Password reset in production requires **`RESEND_API_KEY`** and **`TELEMETRY_EMAIL_FROM`** on the API (see [DEPLOYMENT.md](../DEPLOYMENT.md)); without them, admins must share reset links manually.
 - No built-in error spike alerts or Slack webhooks.

@@ -2,7 +2,7 @@
 
 Lightweight self-hosted telemetry: errors, events, sessions, and a dashboard.
 
-**Self-hosted:** run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)). Production checklist: [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md). Releases and deploy runbook: [docs/RELEASE.md](docs/RELEASE.md).
+**Self-hosted:** run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)). Production checklist: [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md). Releases and deploy runbook: [docs/RELEASE.md](docs/RELEASE.md). **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) · [good first issues](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 
 ## Quickstart
 

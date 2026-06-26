@@ -60,6 +60,16 @@ Use descriptive migration names. For production, only `prisma migrate deploy` is
 - Describe **what** changed and **why** in the PR body (reproduce steps for bugs).
 - If you are unsure about product or security behavior (auth, ingest, billing), open an issue first.
 
+## Good first issues
+
+New contributors: look for issues labeled [**good first issue**](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22). Suggested starting points:
+
+- Documentation and tests (low risk, helps you learn the repo layout)
+- Retention and ingest edge cases called out in [PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) known limitations
+- Dashboard polish and accessibility
+
+Comment on an issue before opening a PR if you want to confirm scope.
+
 ## Code of conduct
 
 Participation is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md). Please read it before contributing.
