@@ -32,6 +32,7 @@ import {
   tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
 import { sendTransactionalEmail } from "../lib/email.js";
+import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -91,11 +92,6 @@ async function ensureUniqueSlug(orgId: string, base: string): Promise<string> {
 function parseOrgRole(raw: unknown): OrgRole | null {
   if (raw === "OWNER" || raw === "EDITOR" || raw === "VIEWER") return raw;
   return null;
-}
-
-function dashboardInviteBaseUrl(): string {
-  const raw = process.env.TELEMETRY_DASHBOARD_ORIGIN?.trim();
-  return raw ? raw.replace(/\/$/, "") : "";
 }
 
 /**
@@ -413,6 +409,11 @@ export async function projectDashboardRoutes(
         return reply.status(201).send({ status: "added" as const });
       }
 
+      const base = dashboardOriginOrNull();
+      if (!base) {
+        return reply.status(503).send({ error: "Dashboard origin is not configured" });
+      }
+
       const { token } = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
@@ -446,10 +447,7 @@ export async function projectDashboardRoutes(
         return { token: row.token };
       });
 
-      const base = dashboardInviteBaseUrl();
-      const inviteUrl = base
-        ? `${base}/register?invite=${encodeURIComponent(token)}`
-        : `/register?invite=${encodeURIComponent(token)}`;
+      const inviteUrl = `${base}/register?invite=${encodeURIComponent(token)}`;
 
       void sendTransactionalEmail({
         to: email,

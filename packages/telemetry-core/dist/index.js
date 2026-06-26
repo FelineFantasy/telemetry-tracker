@@ -117,14 +117,6 @@ function installBrowserSessionLifecycle() {
         typeof document === "undefined")
         return;
     sessionLifecycleInstalled = true;
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") {
-            closeSessionKeepalive(new Date());
-        }
-        else if (document.visibilityState === "visible" && !sessionId) {
-            startSession();
-        }
-    });
     window.addEventListener("pagehide", () => {
         closeSessionKeepalive(new Date());
     });

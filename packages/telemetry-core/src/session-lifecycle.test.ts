@@ -33,7 +33,7 @@ describe("browser session lifecycle", () => {
     });
     vi.stubGlobal("setInterval", () => 0 as unknown as ReturnType<typeof setInterval>);
 
-    const { init, getSessionId, trackEvent } = await import("./index.js");
+    const { init } = await import("./index.js");
     init({
       ingestUrl: "http://localhost:3001",
       app: "test-app",
@@ -41,8 +41,6 @@ describe("browser session lifecycle", () => {
       batchInterval: 0,
       environment: "test",
     });
-
-    return { getSessionId, trackEvent };
   });
 
   afterEach(() => {
@@ -55,29 +53,31 @@ describe("browser session lifecycle", () => {
     }
   }
 
-  it("starts a new session after tab hide when tab becomes visible again", async () => {
-    const { getSessionId, trackEvent } = await import("./index.js");
+  it("keeps the same session id across tab hide/show", async () => {
+    const { getSessionId } = await import("./index.js");
     const firstId = getSessionId();
     expect(firstId).toBeTruthy();
 
     visibilityState = "hidden";
     fire("visibilitychange");
-    expect(getSessionId()).toBeNull();
+    expect(getSessionId()).toBe(firstId);
 
     visibilityState = "visible";
     fire("visibilitychange");
+    expect(getSessionId()).toBe(firstId);
+  });
+
+  it("closes the session on pagehide and starts a new one on pageshow", async () => {
+    const { getSessionId } = await import("./index.js");
+    const firstId = getSessionId();
+    expect(firstId).toBeTruthy();
+
+    fire("pagehide");
+    expect(getSessionId()).toBeNull();
+
+    fire("pageshow");
     const secondId = getSessionId();
     expect(secondId).toBeTruthy();
     expect(secondId).not.toBe(firstId);
-
-    trackEvent("after_return");
-    await new Promise((r) => setTimeout(r, 10));
-
-    const eventCall = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes("/ingest/event")
-    );
-    expect(eventCall).toBeTruthy();
-    const body = JSON.parse((eventCall![1] as RequestInit).body as string);
-    expect(body.session_id).toBe(secondId);
   });
 });

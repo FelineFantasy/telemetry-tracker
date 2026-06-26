@@ -135,17 +135,6 @@ export async function assertIngestPlanOrReply(
       body: { error: "Project not found or organization inactive." },
     };
   }
-  if (!consumeIngestRps(projectId, ctx.limits.maxIngestRps)) {
-    return {
-      ok: false,
-      status: 429,
-      body: {
-        error: "Ingest rate limit exceeded for this project (plan max RPS).",
-        code: "ingest_rps",
-        limit: ctx.limits.maxIngestRps,
-      },
-    };
-  }
   const used = await getMonthlyIngestUsed(prisma, projectId);
   const m = checkMonthlyIngestUnits(used, additionalUnits, ctx.limits);
   if (!m.ok) {
@@ -157,6 +146,17 @@ export async function assertIngestPlanOrReply(
         code: "monthly_ingest_quota",
         limit: ctx.limits.monthlyIngestUnits,
         used,
+      },
+    };
+  }
+  if (!consumeIngestRps(projectId, ctx.limits.maxIngestRps)) {
+    return {
+      ok: false,
+      status: 429,
+      body: {
+        error: "Ingest rate limit exceeded for this project (plan max RPS).",
+        code: "ingest_rps",
+        limit: ctx.limits.maxIngestRps,
       },
     };
   }
