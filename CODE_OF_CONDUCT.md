@@ -38,8 +38,8 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement. **For this repository,** use one of the following:
 
-- Open a [GitHub issue](https://github.com/unjica/telemetry-tracker/issues) asking for a **private follow-up** (do not post personal details of others in public).
-- Use [GitHub Security advisories](https://github.com/unjica/telemetry-tracker/security/advisories) if the matter is sensitive or safety-related.
+- Open a [GitHub issue](https://github.com/Telemetry-Tracker/telemetry-tracker/issues) asking for a **private follow-up** (do not post personal details of others in public).
+- Use [GitHub Security advisories](https://github.com/Telemetry-Tracker/telemetry-tracker/security/advisories) if the matter is sensitive or safety-related.
 
 All complaints will be reviewed and investigated promptly and fairly. Community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

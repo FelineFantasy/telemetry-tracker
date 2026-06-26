@@ -10,7 +10,7 @@ Security fixes are applied to the default branch (`main`) and released as usual 
 
 Preferred options:
 
-1. **GitHub private security advisory** for this repository: use **Security → Report a vulnerability** on [github.com/unjica/telemetry-tracker](https://github.com/unjica/telemetry-tracker). That opens a private channel with maintainers.
+1. **GitHub private security advisory** for this repository: use **Security → Report a vulnerability** on [github.com/Telemetry-Tracker/telemetry-tracker](https://github.com/Telemetry-Tracker/telemetry-tracker). That opens a private channel with maintainers.
 2. If you cannot use advisories, contact the repository maintainers through a **private** channel (e.g. email or DM if published on the maintainer profile) and ask for a secure way to share details.
 
 Include:
