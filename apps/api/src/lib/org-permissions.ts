@@ -58,3 +58,11 @@ export function canCreateProject(role: OrgRole | null): boolean {
 export function canManageMembers(role: OrgRole | null): boolean {
   return role === OrgRole.OWNER;
 }
+
+export function canArchiveOrganization(role: OrgRole | null): boolean {
+  return role === OrgRole.OWNER;
+}
+
+export function canArchiveProject(role: OrgRole | null): boolean {
+  return role === OrgRole.OWNER;
+}

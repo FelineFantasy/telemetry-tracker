@@ -24,6 +24,7 @@ import { init } from "@tacko/telemetry-core";
 init({
   ingestUrl: "https://your-api.example.com",  // base URL of the ingest API (no trailing slash)
   app: "my-app",                             // app identifier
+  apiKey: "tt_live_<publicId>_<secret>",     // project API key from the dashboard (required in production)
   platform: "web",                            // optional: e.g. "web", "ios", "android"
   environment: "production",                  // optional
   release: "1.2.3",                          // optional
@@ -31,6 +32,12 @@ init({
   batchSize: 10,                             // optional: flush when queue reaches this size (default 10)
 });
 ```
+
+The SDK sends the key as `Authorization: Bearer <apiKey>`. If `apiKey` is omitted and `environment` is not `development`/`dev`/`test`, a console warning is logged.
+
+### `buildIngestHeaders(config)`
+
+Returns `{ "Content-Type": "application/json", Authorization: "Bearer …" }` when `apiKey` is set. Used internally and exported for custom ingest calls (e.g. React Native session payloads).
 
 ### `trackEvent(name, properties?)`
 
@@ -85,11 +92,16 @@ identify(null);  // clear
 
 **Anonymous ID and SDK version:** On first `init()`, the SDK creates a stable **anonymous ID** (UUID), stored in browser `localStorage` or in memory in Node. Every event, error, and session payload includes `anonymous_id` and `sdk_version`. When you call `identify(userId)`, the same anonymous ID is still sent alongside `user_id`, so the backend can link pre-login activity to the user. The dashboard shows a single **Identity** column (user id when set, otherwise anonymous id).
 
+### `getSessionId()` / `endSession()`
+
+On `init()`, the SDK starts an in-memory session and sends `POST /ingest/session`. Events and errors include `session_id`. In browsers, session updates are sent on tab hide/unload via `fetch` with `keepalive`. Call `endSession()` to close explicitly (e.g. on SPA logout).
+
 ### Helpers
 
-- `**getUserId(): string | null`** – Current user id.
-- `**getAnonymousId(): string**` – Anonymous device/session id (created on first `init()`).
-- `**getConfigOrNull(): TelemetryConfig | null**` – Config if `init()` was called.
+- **`getUserId(): string | null`** – Current user id.
+- **`getSessionId(): string | null`** – Current session id (from `init()`).
+- **`getAnonymousId(): string`** – Anonymous device id (created on first `init()`).
+- **`getConfigOrNull(): TelemetryConfig | null`** – Config if `init()` was called.
 
 ## Batching
 
@@ -100,7 +112,12 @@ When `batchInterval > 0` (default), `trackEvent` and `screen` are queued and sen
 ```ts
 import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
 
-init({ ingestUrl: "http://localhost:3001", app: "my-app" });
+init({
+  ingestUrl: "http://localhost:3001",
+  app: "my-app",
+  apiKey: process.env.TELEMETRY_API_KEY, // tt_live_… from dashboard
+  environment: "development",
+});
 
 trackEvent("click", { button: "submit" });
 trackError(new Error("Something broke"), { page: "/checkout" });

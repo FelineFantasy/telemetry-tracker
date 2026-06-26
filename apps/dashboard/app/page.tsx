@@ -1,9 +1,11 @@
 import type { CSSProperties } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingHeader } from "@/app/components/LandingHeader";
 import { LandingHeroBrand } from "@/app/components/LandingHeroBrand";
 import { LandingProductPreview } from "@/app/components/LandingProductPreview";
 import { LandingWhySection } from "@/app/components/LandingWhySection";
+import { resolveMetadataBase } from "@/lib/site-url";
 
 function IconErrors() {
   return (
@@ -110,6 +112,30 @@ const steps = [
     body: "Use the dashboard to filter by app, drill into groups, and inspect sessions end to end.",
   },
 ] as const;
+
+const homeTitle = "Telemetry Tracker — Self-hosted errors, events & sessions";
+const homeDescription =
+  "Ship errors, events, and sessions to your own API. Open-source dashboard for triage, filters, and SDKs for web, Next.js, Node, and React Native—privacy-friendly and self-hosted.";
+
+export function generateMetadata(): Metadata {
+  const base = resolveMetadataBase() ?? new URL("http://localhost:3000");
+  const origin = base.origin;
+
+  return {
+    title: { absolute: homeTitle },
+    description: homeDescription,
+    alternates: { canonical: `${origin}/` },
+    openGraph: {
+      title: homeTitle,
+      description: homeDescription,
+      url: `${origin}/`,
+    },
+    twitter: {
+      title: homeTitle,
+      description: homeDescription,
+    },
+  };
+}
 
 export default function LandingPage() {
   return (

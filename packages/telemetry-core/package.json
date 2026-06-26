@@ -1,6 +1,6 @@
 {
   "name": "@tacko/telemetry-core",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Lightweight telemetry client: events, errors, sessions. Framework-agnostic core.",
   "license": "MIT",
   "repository": {
@@ -17,14 +17,24 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "node scripts/inject-version.cjs && tsc",
     "dev": "tsc --watch",
+    "test": "vitest run",
     "prepublishOnly": "pnpm run build"
   },
-  "keywords": ["telemetry", "analytics", "events", "errors", "tracking"],
+  "keywords": [
+    "telemetry",
+    "analytics",
+    "events",
+    "errors",
+    "tracking"
+  ],
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.6"
   }
 }

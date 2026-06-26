@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { FastifyInstance, FastifyPluginOptions, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
@@ -14,21 +14,26 @@ import {
   canCreateApiKey,
   canCreateProject,
   canManageMembers,
+  canArchiveOrganization,
+  canArchiveProject,
   canResolveErrors,
   canRevokeApiKey,
   getMembershipRoleForOrganization,
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
-import { headerFirst } from "../lib/http-headers.js";
+import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import {
   type BillingAlertVariant,
   billingAlertVariant,
 } from "../lib/billing-alert.js";
 import {
+  allowUnauthenticatedReads,
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
   tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
+import { sendTransactionalEmail } from "../lib/email.js";
+import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -38,12 +43,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const INVITE_DAYS = 7;
-
-function readOrgIdHeader(request: FastifyRequest): string | undefined {
-  const raw = headerFirst(request, "x-organization-id");
-  if (!raw || !UUID_RE.test(raw)) return undefined;
-  return raw.toLowerCase();
-}
 
 function slugifyProjectName(name: string): string {
   const s = name
@@ -96,11 +95,6 @@ function parseOrgRole(raw: unknown): OrgRole | null {
   return null;
 }
 
-function dashboardInviteBaseUrl(): string {
-  const raw = process.env.TELEMETRY_DASHBOARD_ORIGIN?.trim();
-  return raw ? raw.replace(/\/$/, "") : "";
-}
-
 /**
  * Dashboard routes: project list, org members, API key lifecycle.
  */
@@ -114,7 +108,7 @@ export async function projectDashboardRoutes(
       return reply.status(401).send({ error: "Unauthorized" });
     }
     const rows = await prisma.organizationMembership.findMany({
-      where: { user_id: session.userId },
+      where: { user_id: session.userId, organization: { deleted_at: null } },
       select: {
         organization: { select: { id: true, name: true } },
       },
@@ -158,11 +152,11 @@ export async function projectDashboardRoutes(
 
   app.get("/meta/projects", async (request, reply) => {
     const session = await getSessionUser(request);
-    const headerOrg = readOrgIdHeader(request);
+    const headerOrg = readOrganizationIdHeader(request);
 
     if (session) {
       const orgRows = await prisma.organizationMembership.findMany({
-        where: { user_id: session.userId },
+        where: { user_id: session.userId, organization: { deleted_at: null } },
         select: { organization_id: true },
       });
       const orgIds = [...new Set(orgRows.map((r) => r.organization_id))];
@@ -179,7 +173,11 @@ export async function projectDashboardRoutes(
       }
 
       const projects = await prisma.project.findMany({
-        where: { organization_id: { in: filterIds }, deleted_at: null },
+        where: {
+          organization_id: { in: filterIds },
+          deleted_at: null,
+          organization: { deleted_at: null },
+        },
         select: { id: true, name: true, slug: true, organization_id: true },
         orderBy: { name: "asc" },
       });
@@ -194,6 +192,10 @@ export async function projectDashboardRoutes(
     }
 
     if (headerOrg) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    if (!allowUnauthenticatedReads()) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
 
@@ -262,6 +264,65 @@ export async function projectDashboardRoutes(
     });
   });
 
+  app.post<{ Params: { orgId: string } }>(
+    "/meta/organizations/:orgId/archive",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const orgId = request.params.orgId.trim();
+      if (!UUID_RE.test(orgId)) {
+        return reply.status(400).send({ error: "Invalid organization id" });
+      }
+      const role = await getMembershipRoleForOrganization(session.userId, orgId);
+      if (!canArchiveOrganization(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+      const org = await prisma.organization.findFirst({
+        where: { id: orgId, deleted_at: null },
+        select: { id: true },
+      });
+      if (!org) {
+        return reply.status(404).send({ error: "Organization not found" });
+      }
+      await prisma.organization.update({
+        where: { id: orgId },
+        data: { deleted_at: new Date() },
+      });
+      return reply.status(204).send();
+    }
+  );
+
+  app.post<{ Params: { projectId: string } }>(
+    "/meta/projects/:projectId/archive",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const projectId = request.params.projectId.trim();
+      if (!UUID_RE.test(projectId)) {
+        return reply.status(400).send({ error: "Invalid project id" });
+      }
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, deleted_at: null },
+        select: { id: true, organization_id: true },
+      });
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+      const role = await getMembershipRoleForOrganization(
+        session.userId,
+        project.organization_id
+      );
+      if (!canArchiveProject(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { deleted_at: new Date() },
+      });
+      return reply.status(204).send();
+    }
+  );
+
   app.get("/meta/invites/preview", async (request, reply) => {
     const q = request.query as { token?: string };
     const token = typeof q.token === "string" ? q.token.trim() : "";
@@ -270,9 +331,13 @@ export async function projectDashboardRoutes(
     }
     const invite = await prisma.organizationInvite.findUnique({
       where: { token },
-      include: { organization: { select: { name: true } } },
+      include: { organization: { select: { name: true, deleted_at: true } } },
     });
-    if (!invite || invite.expires_at.getTime() <= Date.now()) {
+    if (
+      !invite ||
+      invite.organization.deleted_at != null ||
+      invite.expires_at.getTime() <= Date.now()
+    ) {
       return reply.send({ valid: false });
     }
     return reply.send({
@@ -315,6 +380,13 @@ export async function projectDashboardRoutes(
           await tx.$executeRaw(
             Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
           );
+          const org = await tx.organization.findFirst({
+            where: { id: orgId, deleted_at: null },
+            select: { id: true },
+          });
+          if (!org) {
+            return { kind: "org_unavailable" as const };
+          }
           const existing = await tx.organizationMembership.findUnique({
             where: {
               user_id_organization_id: {
@@ -347,16 +419,31 @@ export async function projectDashboardRoutes(
             throw e;
           }
         });
+        if (addExisting.kind === "org_unavailable") {
+          return reply.status(404).send({ error: "Organization not found or archived" });
+        }
         if (addExisting.kind === "already_member") {
           return reply.status(409).send({ error: "User is already a member" });
         }
         return reply.status(201).send({ status: "added" as const });
       }
 
-      const { token } = await prisma.$transaction(async (tx) => {
+      const base = dashboardOriginOrNull();
+      if (!base) {
+        return reply.status(503).send({ error: "Dashboard origin is not configured" });
+      }
+
+      const inviteResult = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "Organization" WHERE id = ${orgId} FOR UPDATE`
         );
+        const org = await tx.organization.findFirst({
+          where: { id: orgId, deleted_at: null },
+          select: { id: true },
+        });
+        if (!org) {
+          return { kind: "org_unavailable" as const };
+        }
         const newToken = randomBytes(32).toString("hex");
         const exp = new Date(
           Date.now() + INVITE_DAYS * 24 * 60 * 60 * 1000
@@ -383,13 +470,21 @@ export async function projectDashboardRoutes(
             invited_by_id: session.userId,
           },
         });
-        return { token: row.token };
+        return { kind: "invited" as const, token: row.token };
       });
 
-      const base = dashboardInviteBaseUrl();
-      const inviteUrl = base
-        ? `${base}/register?invite=${encodeURIComponent(token)}`
-        : `/register?invite=${encodeURIComponent(token)}`;
+      if (inviteResult.kind === "org_unavailable") {
+        return reply.status(404).send({ error: "Organization not found or archived" });
+      }
+      const token = inviteResult.token;
+
+      const inviteUrl = `${base}/register?invite=${encodeURIComponent(token)}`;
+
+      void sendTransactionalEmail({
+        to: email,
+        subject: "You're invited to Telemetry Tracker",
+        html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
+      });
 
       return reply.status(201).send({
         status: "invited" as const,
@@ -477,7 +572,7 @@ export async function projectDashboardRoutes(
     if (!session) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
-    const headerOrg = readOrgIdHeader(request);
+    const headerOrg = readOrganizationIdHeader(request);
     const projectId = await tryResolveReadProjectId(request);
     const projRole =
       projectId !== null
@@ -487,7 +582,7 @@ export async function projectDashboardRoutes(
     const orgRoleFromHeader = headerOrg
       ? await getMembershipRoleForOrganization(session.userId, headerOrg)
       : null;
-    /** Org-scoped UI (sidebar org): prefer explicit org membership; if header is stale, fall back to project org. */
+    /** Org-scoped UI (sidebar org): explicit membership for `X-Organization-Id`; if absent, project org role only (never another org’s role). */
     const orgCapabilityRole = orgRoleFromHeader ?? projRole;
 
     if (projRole === null && orgCapabilityRole === null) {
@@ -498,17 +593,17 @@ export async function projectDashboardRoutes(
       planTier: string;
       monthlyIngestUsed: number;
       monthlyIngestLimit: number;
-      /** Rounded (used/limit)*100; not capped so it stays consistent with used/limit. */
       percentUsed: number;
-      /** True when usage is at or above the monthly cap (ingest is rejected for new units). */
       quotaExceeded: boolean;
       nearQuota: boolean;
+      retentionDays: number;
     } | null = null;
     let billingHealth: {
       stripeSubscriptionStatus: string | null;
       stripeCurrentPeriodEnd: string | null;
       storedPlanTier: string;
       effectivePlanTier: string;
+      hasStripeCustomer: boolean;
       billingAlertVariant: BillingAlertVariant | null;
     } | null = null;
     if (projectId !== null) {
@@ -525,6 +620,7 @@ export async function projectDashboardRoutes(
           percentUsed: Math.round(ratio * 100),
           quotaExceeded,
           nearQuota: ratio >= 0.9,
+          retentionDays: ctx.limits.retentionDays,
         };
         billingHealth = {
           stripeSubscriptionStatus: ctx.stripeSubscriptionStatus,
@@ -533,6 +629,7 @@ export async function projectDashboardRoutes(
             : null,
           storedPlanTier: ctx.storedPlanTier,
           effectivePlanTier: ctx.planTier,
+          hasStripeCustomer: ctx.stripeCustomerId != null,
           billingAlertVariant: billingAlertVariant(ctx.stripeSubscriptionStatus),
         };
       }
@@ -546,6 +643,8 @@ export async function projectDashboardRoutes(
       canRevokeApiKey: canRevokeApiKey(projRole),
       canCreateProject: canCreateProject(orgCapabilityRole),
       canManageMembers: canManageMembers(orgCapabilityRole),
+      canArchiveOrganization: canArchiveOrganization(orgCapabilityRole),
+      canArchiveProject: canArchiveProject(orgCapabilityRole),
       usageQuota,
       billingHealth,
     });

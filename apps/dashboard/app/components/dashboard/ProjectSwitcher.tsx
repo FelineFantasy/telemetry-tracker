@@ -1,8 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { setDashboardProjectId } from "@/app/dashboard/actions";
+import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
+import {
+  formatProjectRailName,
+  LEGACY_SEEDED_PROJECT_NAME,
+} from "@/lib/workspace-placeholders";
 
 export type ProjectOption = { id: string; name: string; slug: string };
 
@@ -14,6 +19,8 @@ export function ProjectSwitcher({
   currentProjectId: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "/";
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState(currentProjectId);
 
@@ -22,11 +29,27 @@ export function ProjectSwitcher({
   }, [currentProjectId]);
 
   if (projects.length <= 1) {
+    const p = projects[0];
+    const name = p?.name ?? "Default";
+    const slug = p?.slug ?? "";
+    const displayName = formatProjectRailName(name, slug);
+    const isPlaceholder = name === LEGACY_SEEDED_PROJECT_NAME && slug === "default";
     return (
-      <div className="project-switcher project-switcher--single">
+      <div
+        className="project-switcher project-switcher--single"
+        role="group"
+        aria-label={`Project: ${displayName}`}
+      >
         <span className="project-switcher__label">Project</span>
-        <span className="project-switcher__name" title={projects[0]?.name}>
-          {projects[0]?.name ?? "Default"}
+        <span
+          className="project-switcher__name"
+          title={
+            isPlaceholder
+              ? `The first project row created when this workspace was provisioned (stored as “${name}”). Not a separate product tier—add more projects under Organization → Settings if you need them.`
+              : `${name}${slug ? ` · ${slug}` : ""}`
+          }
+        >
+          {displayName}
         </span>
       </div>
     );
@@ -47,7 +70,10 @@ export function ProjectSwitcher({
           setValue(id);
           startTransition(async () => {
             const r = await setDashboardProjectId(id);
-            if (r.ok) router.refresh();
+            if (r.ok) {
+              router.replace(hrefWithoutAppSearchParam(pathname, searchParams));
+              router.refresh();
+            }
           });
         }}
       >

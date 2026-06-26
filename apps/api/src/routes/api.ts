@@ -28,6 +28,7 @@ import {
 } from "../lib/prisma-project-scope.js";
 import { requireSessionUser } from "../lib/auth-session.js";
 import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
+import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -657,6 +658,16 @@ export async function apiRoutes(
   app.get("/apps", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
+    const headerOrg = readOrganizationIdHeader(request);
+    if (headerOrg) {
+      const row = await prisma.project.findFirst({
+        where: { id: projectId, deleted_at: null },
+        select: { organization_id: true },
+      });
+      if (!row || row.organization_id.toLowerCase() !== headerOrg) {
+        return reply.status(403).send({ error: "Project is not in the selected organization" });
+      }
+    }
     const [eventsApps, errorsApps, sessionsApps] = await Promise.all([
       prisma.event.groupBy({
         by: ["app"],

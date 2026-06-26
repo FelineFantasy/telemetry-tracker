@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginForm } from "./LoginForm";
 
-export const metadata = {
-  title: "Sign in · Telemetry Tracker",
+export const metadata: Metadata = {
+  title: "Sign in",
+  robots: { index: false, follow: true },
 };
 
 export default function LoginPage() {
@@ -12,7 +14,7 @@ export default function LoginPage() {
       <div className="auth-page__panel card">
         <h1 className="auth-page__title">Sign in</h1>
         <p className="auth-page__lede">
-          Use your dashboard account for this organization.
+          Sign in with the email and password for your dashboard account.
         </p>
         <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
           <LoginForm />

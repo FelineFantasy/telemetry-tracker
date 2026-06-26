@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useMemo } from "react";
+import { useCallback, useEffect, useId, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCustomSelect";
 import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
@@ -19,8 +19,15 @@ export function DashboardAppContext({ apps }: { apps: string[] }) {
   const router = useRouter();
   const pathForLinks = dashboardPathForAppFilter(pathname);
   const rawApp = searchParams.get("app") ?? "";
-  const orphanApp = rawApp !== "" && !apps.includes(rawApp) ? rawApp : null;
-  const value = orphanApp ?? rawApp;
+
+  /** Server layout refreshes after project/org switch (`router.refresh()`); no client refetch. */
+  const value = rawApp !== "" && apps.includes(rawApp) ? rawApp : "";
+
+  useEffect(() => {
+    if (apps.length === 0) return;
+    if (rawApp === "" || apps.includes(rawApp)) return;
+    router.replace(buildDashboardHrefWithApp(pathForLinks, null, searchParams));
+  }, [apps, pathForLinks, rawApp, router, searchParams]);
 
   const uid = useId().replace(/:/g, "");
   const labelId = `dash-app-scope-l-${uid}`;
@@ -28,14 +35,11 @@ export function DashboardAppContext({ apps }: { apps: string[] }) {
 
   const options = useMemo((): DashboardSelectOption[] => {
     const o: DashboardSelectOption[] = [{ value: "", label: "All apps" }];
-    if (orphanApp) {
-      o.push({ value: orphanApp, label: `${orphanApp} (not in list)` });
-    }
     for (const app of apps) {
       o.push({ value: app, label: app });
     }
     return o;
-  }, [apps, orphanApp]);
+  }, [apps]);
 
   const onValueChange = useCallback(
     (next: string) => {
@@ -53,16 +57,23 @@ export function DashboardAppContext({ apps }: { apps: string[] }) {
 
   return (
     <div className="dashboard-app-context">
-      <span id={labelId} className="dashboard-app-context__label">
-        App scope
-      </span>
-      <DashboardCustomSelect
-        value={value}
-        options={options}
-        triggerId={triggerId}
-        listLabelledBy={labelId}
-        onValueChange={onValueChange}
-      />
+      <div className="dashboard-app-context__row">
+        <span id={labelId} className="dashboard-app-context__label">
+          App scope
+        </span>
+        <DashboardCustomSelect
+          value={value}
+          options={options}
+          triggerId={triggerId}
+          listLabelledBy={labelId}
+          onValueChange={onValueChange}
+        />
+      </div>
+      <p className="dashboard-app-context__hint m-0">
+        These names come from telemetry for the <strong>selected project</strong>—each event
+        includes an <strong>app</strong> string from your SDK. This control only filters what you
+        see; it does not create apps or move data between projects.
+      </p>
     </div>
   );
 }

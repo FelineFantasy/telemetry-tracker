@@ -18,6 +18,19 @@ export default function DocsDashboardPage() {
         </p>
       }
     >
+      <section className="mb-10" aria-labelledby="dash-onboard-heading">
+        <h2 id="dash-onboard-heading">Onboarding</h2>
+        <ol className="list-decimal pl-5 text-muted-foreground space-y-2">
+          <li>Register or sign in, then create an <strong className="text-foreground">organization</strong> and <strong className="text-foreground">project</strong> under Organization settings.</li>
+          <li>Create an <strong className="text-foreground">API key</strong> (Settings → API keys). Copy the <code className="text-foreground">tt_live_…</code> secret once.</li>
+          <li>
+            In your app: <code className="text-foreground">init(&#123; ingestUrl, app, apiKey &#125;)</code> — see{" "}
+            <Link href="/docs/sdk">SDK docs</Link>.
+          </li>
+          <li>Confirm data on Overview, Errors, Events, and Sessions.</li>
+        </ol>
+      </section>
+
       <section className="mb-10" aria-labelledby="dash-open-heading">
         <h2 id="dash-open-heading">Open the app</h2>
         <p>

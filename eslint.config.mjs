@@ -25,6 +25,7 @@ export default tseslint.config(
       "**/coverage/**",
       "pnpm-lock.yaml",
       "**/next-env.d.ts",
+      "**/packages/**/*.test.ts",
     ],
   },
   ...tseslint.configs.recommended.map((config) => ({

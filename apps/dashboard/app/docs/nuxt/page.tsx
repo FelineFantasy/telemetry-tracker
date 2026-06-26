@@ -54,6 +54,7 @@ export default defineNuxtPlugin(() => {
   init({
     ingestUrl: config.public.telemetryIngestUrl as string,
     app: config.public.telemetryApp as string,
+    apiKey: config.public.telemetryApiKey as string,
     platform: "web",
     environment: process.dev ? "development" : "production",
   });

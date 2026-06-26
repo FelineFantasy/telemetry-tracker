@@ -116,6 +116,8 @@ export async function login(
       ...cookieBase(),
       maxAge: PROJECT_MAX_AGE,
     });
+  } else {
+    c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
   }
   return { ok: true };
 }
@@ -179,6 +181,8 @@ export async function register(
       ...cookieBase(),
       maxAge: PROJECT_MAX_AGE,
     });
+  } else {
+    c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
   }
   return { ok: true };
 }
@@ -200,4 +204,57 @@ export async function logout(): Promise<void> {
 export async function logoutAction(): Promise<void> {
   await logout();
   redirect("/login");
+}
+
+export async function requestPasswordReset(
+  formData: FormData
+): Promise<
+  | { ok: true; message: string; resetUrl?: string }
+  | { ok: false; error: string }
+> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email.includes("@")) {
+    return { ok: false, error: "Valid email is required" };
+  }
+  const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+    resetUrl?: string;
+  };
+  if (!res.ok) {
+    return { ok: false, error: data.error ?? "Request failed" };
+  }
+  return {
+    ok: true,
+    message: data.message ?? "If that email exists, a reset link was sent.",
+    resetUrl: data.resetUrl,
+  };
+}
+
+export async function resetPassword(
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const token = String(formData.get("token") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  if (!token) {
+    return { ok: false, error: "Missing reset token" };
+  }
+  if (password.length < 8) {
+    return { ok: false, error: "Password must be at least 8 characters" };
+  }
+  const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) {
+    return { ok: false, error: data.error ?? "Reset failed" };
+  }
+  return { ok: true };
 }

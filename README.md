@@ -1,8 +1,31 @@
-# Telemetry Tracker MVP
+# Telemetry Tracker
 
-Lightweight internal telemetry: errors, events, sessions, and a simple dashboard.
+Lightweight self-hosted telemetry: errors, events, sessions, and a dashboard.
 
-**Self-hosted:** this repo is not a managed cloud product—you run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)).
+**Self-hosted:** run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)). Production checklist: [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md).
+
+## Quickstart
+
+1. **Run locally** (see Setup below): API on `:3001`, dashboard on `:3000`.
+2. **Sign in** at `/register` → create an **organization** and **project** under Organization settings.
+3. **Create an API key** under Settings → API keys. Copy the `tt_live_…` secret once.
+4. **Instrument your app:**
+
+```ts
+import { init, trackEvent, trackError } from "@tacko/telemetry-core";
+
+init({
+  ingestUrl: "http://localhost:3001",
+  app: "my-app",
+  apiKey: process.env.TELEMETRY_API_KEY!, // tt_live_… from dashboard
+  environment: "development",
+});
+
+trackEvent("hello");
+trackError(new Error("test"));
+```
+
+5. Open **Overview** in the dashboard to see events and errors.
 
 ## Setup
 
@@ -60,7 +83,7 @@ The repo is set up for **Railway**: Postgres + API (Root Directory `apps/api`, R
 
 ## Project layout
 
-- `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`, `GET /api/sessions`, …; session auth under `/api/auth/*`; org/project/API keys under `/api/meta/*` and `/api/project/*`
+- `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`, `GET /api/sessions`, …; session auth under `/api/auth/*`; org/project/API keys under `/api/meta/*` and `/api/project/*`. Self-serve registration does **not** attach users to a seed organization—they create a workspace in the dashboard (or join via invite); see [docs/RBAC.md](docs/RBAC.md) and [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md).
 - `apps/dashboard` – Next.js app: Overview, Errors list/detail, Events list
 - `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching; anonymous device id and SDK version on every payload; in the browser, global `window.onerror` and `unhandledrejection` after `init()`
 - `packages/telemetry-next` – Next.js: provider, error boundary, `useTrackPage()`
@@ -78,7 +101,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, local setup, and what 
 ```ts
 import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
 
-init({ ingestUrl: "http://localhost:3001", app: "my-app" });
+init({ ingestUrl: "http://localhost:3001", app: "my-app", apiKey: process.env.TELEMETRY_API_KEY, environment: "development" });
 trackEvent("click", { button: "submit" });
 trackError(new Error("Something broke"), { page: "/checkout" });
 screen("/home");

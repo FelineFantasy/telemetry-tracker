@@ -1,7 +1,6 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
 import {
   getDashboardOrganizationId,
   resolveActiveOrganizationId,
@@ -42,11 +41,10 @@ async function loadMembers(
 }
 
 export default async function TeamSettingsPage() {
-  const [orgs, cookieOrg, user, capabilities] = await Promise.all([
+  const [orgs, cookieOrg, user] = await Promise.all([
     loadOrganizations(),
     getDashboardOrganizationId(),
     getDashboardUser(),
-    getDashboardSessionContext(),
   ]);
 
   const requestedOrg = resolveActiveOrganizationId(cookieOrg, orgs);
@@ -56,7 +54,10 @@ export default async function TeamSettingsPage() {
   if (!loaded.ok) {
     return (
       <>
-        <PageTitle title="Team" context="Members of your organization." />
+        <PageTitle
+          title="Team"
+          context="Everyone listed here belongs to the organization selected in the sidebar. Roles apply across all projects in that organization—they are not per-project accounts."
+        />
         <ErrorState message={loaded.message} />
       </>
     );
@@ -64,12 +65,18 @@ export default async function TeamSettingsPage() {
 
   const organizationId = loaded.organizationId;
   const members = loaded.members;
-  const canManageMembers = Boolean(capabilities?.canManageMembers);
+  /** Same rule as the API (owners only). Prefer the members payload so UI matches the table — session-context can be null or misaligned with org headers. */
+  const canManageMembers = Boolean(
+    user && members.some((m) => m.userId === user.id && m.role === "OWNER")
+  );
   const ownerCount = members.filter((m) => m.role === "OWNER").length;
 
   return (
     <>
-      <PageTitle title="Team" context="Members of your organization." />
+      <PageTitle
+        title="Team"
+        context="Everyone listed here belongs to the organization selected in the sidebar. Roles apply across all projects in that organization—they are not per-project accounts."
+      />
       {organizationId && user ? (
         <TeamMembersClient
           organizationId={organizationId}

@@ -89,7 +89,7 @@ If you prefer not to use the provider:
 import { init, useTrackPage } from "@tacko/telemetry-next";
 import { usePathname } from "next/navigation";
 
-init({ ingestUrl: "http://localhost:3001", app: "my-app" });
+init({ ingestUrl: "http://localhost:3001", app: "my-app", apiKey: process.env.NEXT_PUBLIC_TELEMETRY_API_KEY });
 
 export function Navigation() {
   const pathname = usePathname();

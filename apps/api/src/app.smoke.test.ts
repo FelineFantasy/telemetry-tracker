@@ -42,4 +42,26 @@ describe("API smoke", () => {
       }
     }
   });
+
+  it("GET /api/meta/projects returns 401 without session in production", async () => {
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevAllowReads = process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;
+    process.env.NODE_ENV = "production";
+    delete process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;
+
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/meta/projects",
+      });
+      expect(res.statusCode).toBe(401);
+      const body = JSON.parse(res.body) as { error?: string };
+      expect(body.error).toBe("Unauthorized");
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNodeEnv;
+      if (prevAllowReads === undefined) delete process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;
+      else process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS = prevAllowReads;
+    }
+  });
 });
