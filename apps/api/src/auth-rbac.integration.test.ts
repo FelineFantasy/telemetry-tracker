@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { OrgRole } from "@prisma/client";
 import { createApp } from "./app.js";
 import { hashPassword } from "./lib/password.js";
+import { DEFAULT_LEGACY_PROJECT_ID } from "./lib/project-scope.js";
 import { prisma } from "./lib/db.js";
 
 const runDbIntegration = process.env.RUN_DB_INTEGRATION_TESTS === "true";
@@ -183,6 +184,51 @@ describe.skipIf(!runDbIntegration)("Auth and RBAC (integration)", () => {
     expect(res.statusCode).toBe(403);
     const body = JSON.parse(res.body) as { error?: string };
     expect(body.error).toBe("Forbidden");
+  });
+
+  it("GET /api/apps rejects authenticated fallback project access without membership", async () => {
+    await prisma.event.create({
+      data: {
+        project_id: DEFAULT_LEGACY_PROJECT_ID,
+        app: "fallback-private-app",
+        name: "fallback-private-event",
+      },
+    });
+
+    const login = await app!.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "content-type": "application/json" },
+      payload: { email: emailViewer, password },
+    });
+    const { sessionId } = JSON.parse(login.body) as { sessionId: string };
+
+    const noHeader = await app!.inject({
+      method: "GET",
+      url: "/api/apps",
+      headers: { authorization: `Bearer ${sessionId}` },
+    });
+    expect(noHeader.statusCode).toBe(403);
+
+    const invalidHeader = await app!.inject({
+      method: "GET",
+      url: "/api/apps",
+      headers: {
+        authorization: `Bearer ${sessionId}`,
+        "x-project-id": "00000000-0000-4000-8000-000000000099",
+      },
+    });
+    expect(invalidHeader.statusCode).toBe(403);
+
+    const ownProject = await app!.inject({
+      method: "GET",
+      url: "/api/apps",
+      headers: {
+        authorization: `Bearer ${sessionId}`,
+        "x-project-id": projectId,
+      },
+    });
+    expect(ownProject.statusCode).toBe(200);
   });
 
   it("PATCH /api/errors/:id returns 200 for EDITOR", async () => {

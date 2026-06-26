@@ -19,6 +19,11 @@ type ProjectScope = {
   orgArchived: boolean;
 };
 
+type ResolvedProject = {
+  id: string;
+  scope: ProjectScope | null;
+};
+
 async function loadProjectScope(projectId: string): Promise<ProjectScope | null> {
   const project = await prisma.project.findFirst({
     where: { id: projectId, deleted_at: null },
@@ -48,10 +53,56 @@ async function membershipForUser(
 }
 
 /**
+ * Resolve the project id from `X-Project-Id` or the env fallback.
+ * When the header is missing, invalid, or points at a deleted project, falls back to
+ * `TELEMETRY_PROJECT_ID` / the seeded default project.
+ */
+async function resolveRequestedProject(
+  request: FastifyRequest
+): Promise<ResolvedProject> {
+  const fallbackId = readProjectIdFromEnv();
+  const raw = headerFirst(request, "x-project-id");
+
+  if (raw && UUID_RE.test(raw)) {
+    const scope = await loadProjectScope(raw);
+    if (scope) {
+      return { id: scope.id, scope };
+    }
+  }
+
+  const fallbackScope = await loadProjectScope(fallbackId);
+  return {
+    id: fallbackScope?.id ?? fallbackId,
+    scope: fallbackScope,
+  };
+}
+
+async function authorizeSessionProjectRead(
+  session: SessionUser,
+  resolved: ResolvedProject,
+  reply: FastifyReply
+): Promise<string | null> {
+  if (!resolved.scope) {
+    await reply.status(404).send({ error: "Project not found" });
+    return null;
+  }
+  if (resolved.scope.orgArchived) {
+    await reply.status(403).send({ error: "Organization has been archived" });
+    return null;
+  }
+  if (!(await membershipForUser(session.userId, resolved.scope.organizationId))) {
+    await reply.status(403).send({ error: "Not a member of this project" });
+    return null;
+  }
+  return resolved.scope.id;
+}
+
+/**
  * Dashboard sends `X-Project-Id` to scope reads. Validates UUID and that the project exists
  * and is not soft-deleted, and that its organization is not archived. If a session is present,
- * the user must be a member of the project’s organization. Without a session, legacy behavior
- * (dev only): any existing project id (or env fallback).
+ * the user must be a member of the project’s organization (including when the env fallback
+ * project is used). Without a session, legacy behavior (dev only): any existing project id
+ * (or env fallback).
  * In production, unauthenticated reads return 401 unless `TELEMETRY_ALLOW_UNAUTHENTICATED_READS=true`.
  * Returns `null` after sending 403/401 when access is denied.
  */
@@ -65,31 +116,20 @@ export async function resolveReadProjectId(
     return null;
   }
 
-  const fallback = readProjectIdFromEnv();
-  const raw = headerFirst(request, "x-project-id");
-  if (!raw || !UUID_RE.test(raw)) {
-    return fallback;
+  const resolved = await resolveRequestedProject(request);
+
+  if (session) {
+    return authorizeSessionProjectRead(session, resolved, reply);
   }
 
-  const project = await loadProjectScope(raw);
-  if (!project) {
-    return fallback;
-  }
-
-  if (project.orgArchived) {
+  if (resolved.scope?.orgArchived) {
     await reply.status(403).send({ error: "Organization has been archived" });
     return null;
   }
-
-  if (session) {
-    if (!(await membershipForUser(session.userId, project.organizationId))) {
-      await reply.status(403).send({ error: "Not a member of this project" });
-      return null;
-    }
-    return project.id;
+  if (resolved.scope) {
+    return resolved.scope.id;
   }
-
-  return project.id;
+  return resolved.id;
 }
 
 /**
@@ -101,27 +141,8 @@ export async function resolveReadProjectIdWithSession(
   reply: FastifyReply,
   session: SessionUser
 ): Promise<string | null> {
-  const fallback = readProjectIdFromEnv();
-  const raw = headerFirst(request, "x-project-id");
-  if (!raw || !UUID_RE.test(raw)) {
-    return fallback;
-  }
-
-  const project = await loadProjectScope(raw);
-  if (!project) {
-    return fallback;
-  }
-
-  if (project.orgArchived) {
-    await reply.status(403).send({ error: "Organization has been archived" });
-    return null;
-  }
-
-  if (!(await membershipForUser(session.userId, project.organizationId))) {
-    await reply.status(403).send({ error: "Not a member of this project" });
-    return null;
-  }
-  return project.id;
+  const resolved = await resolveRequestedProject(request);
+  return authorizeSessionProjectRead(session, resolved, reply);
 }
 
 /**
@@ -137,27 +158,23 @@ export async function tryResolveReadProjectId(
     return null;
   }
 
-  const fallback = readProjectIdFromEnv();
-  const raw = headerFirst(request, "x-project-id");
-  if (!raw || !UUID_RE.test(raw)) {
-    return fallback;
-  }
-
-  const project = await loadProjectScope(raw);
-  if (!project) {
-    return fallback;
-  }
-
-  if (project.orgArchived) {
-    return null;
-  }
+  const resolved = await resolveRequestedProject(request);
 
   if (session) {
-    if (!(await membershipForUser(session.userId, project.organizationId))) {
+    if (!resolved.scope || resolved.scope.orgArchived) {
       return null;
     }
-    return project.id;
+    if (!(await membershipForUser(session.userId, resolved.scope.organizationId))) {
+      return null;
+    }
+    return resolved.scope.id;
   }
 
-  return project.id;
+  if (resolved.scope?.orgArchived) {
+    return null;
+  }
+  if (resolved.scope) {
+    return resolved.scope.id;
+  }
+  return resolved.id;
 }
