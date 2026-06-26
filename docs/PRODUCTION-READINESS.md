@@ -1,6 +1,6 @@
 # Production readiness checklist
 
-Use this before exposing Telemetry Tracker on the public internet or handing it to a production team.
+Use this before exposing Telemetry Tracker on the public internet or handing it to a production team. For tagging, GitHub Releases, and the Railway deploy runbook, see [RELEASE.md](./RELEASE.md).
 
 ## Security
 
