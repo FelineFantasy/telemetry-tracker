@@ -67,6 +67,8 @@ export function LoginForm() {
       </Button>
       <p className="auth-form__footer">
         <Link href="/register">Create an account</Link>
+        {" · "}
+        <Link href="/forgot-password">Forgot password?</Link>
       </p>
     </form>
   );

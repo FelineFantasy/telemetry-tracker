@@ -7,6 +7,8 @@ import {
   trackEvent as coreTrackEvent,
   trackError as coreTrackError,
   screen as coreScreen,
+  getSessionId,
+  endSession,
   type TelemetryConfig,
 } from "@tacko/telemetry-core";
 
@@ -22,7 +24,13 @@ export function init(config: TelemetryNextConfig): void {
   }
 }
 
-export { identify, coreTrackEvent as trackEvent, coreScreen as screen };
+export {
+  identify,
+  coreTrackEvent as trackEvent,
+  coreScreen as screen,
+  getSessionId,
+  endSession,
+};
 
 export function trackError(error: Error, context?: Record<string, unknown>): void {
   coreTrackError(error, context);

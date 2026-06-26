@@ -1,6 +1,7 @@
 import { Prisma, type PlanTier, type PrismaClient } from "@prisma/client";
 import { limitsForPlan, type PlanLimits } from "../config/plans.js";
 import { effectivePlanTierForLimits } from "./effective-plan-tier.js";
+import { consumeIngestRps } from "./ingest-project-rps.js";
 import { currentYearMonth } from "./usage-meter.js";
 
 export type PlanContext = {
@@ -9,6 +10,7 @@ export type PlanContext = {
   storedPlanTier: PlanTier;
   /** Tier used for limits (may be FREE when Stripe subscription is canceled/unpaid/etc.). */
   planTier: PlanTier;
+  stripeCustomerId: string | null;
   stripeSubscriptionStatus: string | null;
   stripeCurrentPeriodEnd: Date | null;
   limits: PlanLimits;
@@ -30,6 +32,7 @@ export async function loadPlanContextForProject(
       organization: {
         select: {
           plan_tier: true,
+          stripe_customer_id: true,
           stripe_subscription_status: true,
           stripe_current_period_end: true,
           deleted_at: true,
@@ -45,6 +48,7 @@ export async function loadPlanContextForProject(
     organizationId: row.organization_id,
     storedPlanTier: stored,
     planTier: tier,
+    stripeCustomerId: row.organization.stripe_customer_id,
     stripeSubscriptionStatus: status,
     stripeCurrentPeriodEnd: row.organization.stripe_current_period_end,
     limits: limitsForPlan(tier),
@@ -142,6 +146,17 @@ export async function assertIngestPlanOrReply(
         code: "monthly_ingest_quota",
         limit: ctx.limits.monthlyIngestUnits,
         used,
+      },
+    };
+  }
+  if (!consumeIngestRps(projectId, ctx.limits.maxIngestRps)) {
+    return {
+      ok: false,
+      status: 429,
+      body: {
+        error: "Ingest rate limit exceeded for this project (plan max RPS).",
+        code: "ingest_rps",
+        limit: ctx.limits.maxIngestRps,
       },
     };
   }

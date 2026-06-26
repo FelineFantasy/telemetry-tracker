@@ -1,0 +1,59 @@
+# Production readiness checklist
+
+Use this before exposing Telemetry Tracker on the public internet or handing it to a production team.
+
+## Security
+
+| Item | Action |
+|------|--------|
+| Ingest auth | **`INGEST_ALLOW_UNAUTHENTICATED` must be off** in production. SDKs must send `apiKey` (`tt_live_…`). |
+| Dashboard reads | With `NODE_ENV=production`, `GET /api/*` requires a session. Do not set `TELEMETRY_ALLOW_UNAUTHENTICATED_READS` unless you have a deliberate legacy tooling need. |
+| CORS | Set `CORS_ORIGINS` or `DASHBOARD_ORIGIN` so only your dashboard origin can call the API with credentials. |
+| Registration | After bootstrap, set `TELEMETRY_ALLOW_REGISTRATION=false` if you do not want open signups. |
+| Secrets | Store `DATABASE_URL`, Stripe keys, and API keys in your platform secret manager — never in git. |
+| HTTPS | Terminate TLS at your reverse proxy / Railway / load balancer for both API and dashboard. |
+
+## Operations
+
+| Item | Action |
+|------|--------|
+| Database | Managed Postgres with automated backups and a tested restore procedure. |
+| Migrations | Run `pnpm --filter api exec prisma migrate deploy` on every API deploy (CI does this on `main`). |
+| Retention | Schedule **`pnpm --filter api retention`** nightly (see [DEPLOYMENT.md](../DEPLOYMENT.md)). Without it, telemetry grows until manual cleanup. |
+| Health | Set `HEALTH_CHECK_DATABASE=true` on the API so `GET /health` verifies Postgres. |
+| Observability | Optional `SENTRY_DSN` on the API for uncaught errors. Monitor API 5xx, ingest 429 rate, and disk/DB size. |
+| Rate limits | Tune `RATE_LIMIT_*` env vars if you see false positives from shared IPs. Per-project ingest RPS follows plan tiers in `apps/api/src/config/plans.ts`. |
+
+## Billing (optional)
+
+Stripe is optional for self-host. If enabled:
+
+- Webhook endpoint: `POST /webhooks/stripe` with `STRIPE_WEBHOOK_SECRET`
+- Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+- Checkout metadata: `organization_id`, `plan_tier` on session or subscription/price
+
+See [DEPLOYMENT.md](../DEPLOYMENT.md) and [ENTITLEMENTS.md](./ENTITLEMENTS.md).
+
+## Bootstrap
+
+1. Deploy Postgres, API, dashboard.
+2. Open dashboard → register first user (allowed when DB is empty).
+3. Create organization → project → API key.
+4. Configure SDK: `init({ ingestUrl, app, apiKey })`.
+5. Disable open registration if desired.
+
+## Testing before go-live
+
+```bash
+pnpm lint
+RUN_DB_INTEGRATION_TESTS=true pnpm test
+pnpm build
+```
+
+Manually verify: login, overview loads, ingest with API key returns 200, ingest without key returns 401.
+
+## Known limitations (v1)
+
+- Per-project ingest RPS bucket is **in-memory** (single API process). Horizontal scaling needs a shared rate limiter later.
+- Password reset in production requires email (Phase 4) or manual link sharing until configured.
+- No built-in error spike alerts or Slack webhooks.

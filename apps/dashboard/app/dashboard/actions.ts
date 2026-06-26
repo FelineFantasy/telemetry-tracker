@@ -311,6 +311,102 @@ export async function createDashboardApiKey(
   };
 }
 
+export async function archiveProjectAction(
+  projectId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const id = projectId.trim().toLowerCase();
+  if (!/^[0-9a-f-]{36}$/.test(id)) {
+    return { ok: false, error: "Invalid project id" };
+  }
+  const res = await dashboardApiFetch(`/api/meta/projects/${id}/archive`, {
+    method: "POST",
+  });
+  if (res.status === 204) {
+    const current = (await getDashboardProjectId()).toLowerCase();
+    if (current === id) {
+      await resetDashboardProjectId();
+    }
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/settings/organization");
+    return { ok: true };
+  }
+  const t = await res.text();
+  return { ok: false, error: t.slice(0, 400) || res.statusText };
+}
+
+export async function archiveOrganizationAction(
+  organizationId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const oid = organizationId.trim().toLowerCase();
+  if (!/^[0-9a-f-]{36}$/.test(oid)) {
+    return { ok: false, error: "Invalid organization id" };
+  }
+  const res = await dashboardApiFetch(`/api/meta/organizations/${oid}/archive`, {
+    method: "POST",
+  });
+  if (res.status === 204) {
+    const c = await cookies();
+    c.delete(TELEMETRY_ORG_COOKIE);
+    await resetDashboardProjectId();
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/settings/organization");
+    return { ok: true };
+  }
+  const t = await res.text();
+  return { ok: false, error: t.slice(0, 400) || res.statusText };
+}
+
+export async function createBillingCheckoutAction(
+  organizationId: string,
+  planTier: "PRO" | "BUSINESS"
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const oid = organizationId.trim().toLowerCase();
+  if (!/^[0-9a-f-]{36}$/.test(oid)) {
+    return { ok: false, error: "Invalid organization id" };
+  }
+  const res = await dashboardApiFetch(
+    `/api/meta/organizations/${oid}/billing/checkout`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planTier }),
+    },
+    { organizationIdOverride: oid }
+  );
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  const data = (await res.json()) as { url?: string };
+  if (!data.url) {
+    return { ok: false, error: "No checkout URL returned" };
+  }
+  return { ok: true, url: data.url };
+}
+
+export async function createBillingPortalAction(
+  organizationId: string
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const oid = organizationId.trim().toLowerCase();
+  if (!/^[0-9a-f-]{36}$/.test(oid)) {
+    return { ok: false, error: "Invalid organization id" };
+  }
+  const res = await dashboardApiFetch(
+    `/api/meta/organizations/${oid}/billing/portal`,
+    { method: "POST" },
+    { organizationIdOverride: oid }
+  );
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  const data = (await res.json()) as { url?: string };
+  if (!data.url) {
+    return { ok: false, error: "No portal URL returned" };
+  }
+  return { ok: true, url: data.url };
+}
+
 export async function setErrorResolvedAction(
   errorGroupId: string,
   resolved: boolean

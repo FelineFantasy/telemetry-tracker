@@ -13,6 +13,7 @@ const FULL_EXAMPLE = `import { init, trackEvent, trackError, screen, identify } 
 init({
   ingestUrl: "https://your-api.example.com",
   app: "my-app",
+  apiKey: "tt_live_<publicId>_<secret>",
 });
 
 trackEvent("button_click", { id: "submit" });
@@ -35,7 +36,7 @@ export default function DocsSdkPage() {
       <section className="mb-10" aria-labelledby="sdk-init-heading">
         <h2 id="sdk-init-heading">init(config)</h2>
         <p>
-          Required: <code>ingestUrl</code> (your API base URL) and <code>app</code> (a string that
+          Required: <code>ingestUrl</code> (your API base URL), <code>app</code> (a string that
           groups data in the dashboard). Optional: <code>platform</code>, <code>environment</code>,{" "}
           <code>release</code>, <code>batchInterval</code>, <code>batchSize</code>.
         </p>

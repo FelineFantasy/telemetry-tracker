@@ -7,6 +7,7 @@ export type UsageQuotaInfo = {
   percentUsed: number;
   quotaExceeded: boolean;
   nearQuota: boolean;
+  retentionDays?: number;
 };
 
 export type BillingHealthInfo = {
@@ -14,6 +15,7 @@ export type BillingHealthInfo = {
   stripeCurrentPeriodEnd: string | null;
   storedPlanTier: string;
   effectivePlanTier: string;
+  hasStripeCustomer: boolean;
   billingAlertVariant:
     | "past_due"
     | "unpaid"
@@ -32,6 +34,8 @@ export type DashboardSessionContext = {
   canCreateProject: boolean;
   /** Invite/change members (org owner only; same gate as API). */
   canManageMembers: boolean;
+  canArchiveOrganization: boolean;
+  canArchiveProject: boolean;
   /** Present when the API could resolve plan + usage for the active project. */
   usageQuota: UsageQuotaInfo | null;
   /** Stripe subscription fields for the active project’s org; null if unknown. */
@@ -65,6 +69,7 @@ function parseUsageQuota(uq: unknown): UsageQuotaInfo | null {
     percentUsed: o.percentUsed,
     quotaExceeded,
     nearQuota: o.nearQuota,
+    retentionDays: typeof o.retentionDays === "number" ? o.retentionDays : undefined,
   };
 }
 
@@ -96,6 +101,7 @@ function parseBillingHealth(bh: unknown): BillingHealthInfo | null {
       o.stripeCurrentPeriodEnd === null ? null : (o.stripeCurrentPeriodEnd as string),
     storedPlanTier: o.storedPlanTier,
     effectivePlanTier: o.effectivePlanTier,
+    hasStripeCustomer: o.hasStripeCustomer === true,
     billingAlertVariant: variant as BillingHealthInfo["billingAlertVariant"],
   };
 }
@@ -122,6 +128,8 @@ function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardS
     canRevokeApiKey: parseSessionBool(data.canRevokeApiKey),
     canCreateProject: parseSessionBool(data.canCreateProject),
     canManageMembers: parseSessionBool(data.canManageMembers),
+    canArchiveOrganization: parseSessionBool(data.canArchiveOrganization),
+    canArchiveProject: parseSessionBool(data.canArchiveProject),
     usageQuota: parseUsageQuota(data.usageQuota),
     billingHealth: parseBillingHealth(data.billingHealth),
   };

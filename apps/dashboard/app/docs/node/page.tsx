@@ -38,6 +38,7 @@ npm install @tacko/telemetry-node`}
 init({
   ingestUrl: process.env.TELEMETRY_INGEST_URL || "https://your-api.example.com",
   app: "my-api",
+  apiKey: process.env.TELEMETRY_API_KEY,
   platform: "node",
 });
 

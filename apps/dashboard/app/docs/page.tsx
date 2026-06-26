@@ -37,6 +37,7 @@ const QUICK_START = `import { init } from "@tacko/telemetry-core";
 init({
   ingestUrl: "https://your-api.example.com",
   app: "my-app",
+  apiKey: "tt_live_<publicId>_<secret>",
 });`;
 
 export default function DocsPage() {

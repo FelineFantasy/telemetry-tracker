@@ -1,8 +1,31 @@
-# Telemetry Tracker MVP
+# Telemetry Tracker
 
-Lightweight internal telemetry: errors, events, sessions, and a simple dashboard.
+Lightweight self-hosted telemetry: errors, events, sessions, and a dashboard.
 
-**Self-hosted:** this repo is not a managed cloud product—you run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)).
+**Self-hosted:** run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)). Production checklist: [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md).
+
+## Quickstart
+
+1. **Run locally** (see Setup below): API on `:3001`, dashboard on `:3000`.
+2. **Sign in** at `/register` → create an **organization** and **project** under Organization settings.
+3. **Create an API key** under Settings → API keys. Copy the `tt_live_…` secret once.
+4. **Instrument your app:**
+
+```ts
+import { init, trackEvent, trackError } from "@tacko/telemetry-core";
+
+init({
+  ingestUrl: "http://localhost:3001",
+  app: "my-app",
+  apiKey: process.env.TELEMETRY_API_KEY!, // tt_live_… from dashboard
+  environment: "development",
+});
+
+trackEvent("hello");
+trackError(new Error("test"));
+```
+
+5. Open **Overview** in the dashboard to see events and errors.
 
 ## Setup
 
@@ -78,7 +101,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, local setup, and what 
 ```ts
 import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
 
-init({ ingestUrl: "http://localhost:3001", app: "my-app" });
+init({ ingestUrl: "http://localhost:3001", app: "my-app", apiKey: process.env.TELEMETRY_API_KEY, environment: "development" });
 trackEvent("click", { button: "submit" });
 trackError(new Error("Something broke"), { page: "/checkout" });
 screen("/home");
