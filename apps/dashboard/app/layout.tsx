@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
+import { socialPreviewImage } from "@/lib/social-image";
 import { resolveMetadataBase } from "@/lib/site-url";
 import "./globals.css";
 
@@ -60,19 +61,13 @@ export const metadata: Metadata = {
     siteName: "Telemetry Tracker",
     title: defaultTitle,
     description: defaultDescription,
-    images: [
-      {
-        url: "/android-chrome-512x512.png",
-        width: 512,
-        height: 512,
-        alt: "Telemetry Tracker",
-      },
-    ],
+    images: [socialPreviewImage],
   },
   twitter: {
     card: "summary_large_image",
     title: defaultTitle,
     description: defaultDescription,
+    images: [socialPreviewImage.url],
   },
 };
 

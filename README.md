@@ -116,10 +116,12 @@ identify("user-123");
 
 The SDK packages are published under the `@tacko` scope (`@tacko/telemetry-core`, `@tacko/telemetry-next`, `@tacko/telemetry-node`, `@tacko/telemetry-react-native`) so others can install them from the public npm registry.
 
-1. **Log in to npm** (one-time): `npm login`
-2. **Update repository URLs** in each `packages/*/package.json` if your GitHub org/username is not `unjica`.
+1. **Log in to npm** (one-time): `npm login` — verify with `npm whoami`
+2. **@tacko scope:** your npm account must be allowed to publish `@tacko/*` (create the org on [npmjs.com](https://www.npmjs.com/org/create) or join it if the scope already exists).
 3. **Dry run** (no publish): `pnpm publish:dry`
-4. **Publish**: `pnpm publish:packages` (if your npm account uses 2FA, append your one-time password: `pnpm publish:packages -- --otp=123456`)
+4. **Publish**: `pnpm publish:packages` (with 2FA: `pnpm publish:packages -- --otp=123456`)
+
+If publish fails with **401 Unauthorized**, run `npm login` again. If it fails with **403** or **version already exists**, bump `version` in all four `packages/*/package.json` files.
 
 **Versioning:** Each new publish must use a version greater than what’s already on npm for that package (e.g. bump `version` in `packages/telemetry-core/package.json` and the other three before running `publish:packages`). Dry-run may fail if you’re not logged in or if the local version is lower than the published one.
 
