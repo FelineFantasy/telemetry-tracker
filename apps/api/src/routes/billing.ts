@@ -7,6 +7,7 @@ import {
   canManageMembers,
   getMembershipRoleForOrganization,
 } from "../lib/org-permissions.js";
+import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -22,11 +23,6 @@ function priceIdForTier(tier: "PRO" | "BUSINESS"): string | null {
     return process.env.STRIPE_PRICE_PRO?.trim() ?? null;
   }
   return process.env.STRIPE_PRICE_BUSINESS?.trim() ?? null;
-}
-
-function dashboardOrigin(): string {
-  const raw = process.env.TELEMETRY_DASHBOARD_ORIGIN?.trim();
-  return raw ? raw.replace(/\/$/, "") : "http://localhost:3000";
 }
 
 function parseUpgradeTier(raw: unknown): "PRO" | "BUSINESS" | null {
@@ -95,7 +91,10 @@ export async function billingRoutes(
         });
       }
 
-      const origin = dashboardOrigin();
+      const origin = dashboardOriginOrNull();
+      if (!origin) {
+        return reply.status(503).send({ error: "Dashboard origin is not configured" });
+      }
       const checkout = await stripe.checkout.sessions.create({
         mode: "subscription",
         customer: customerId,
@@ -147,7 +146,10 @@ export async function billingRoutes(
         return reply.status(400).send({ error: "No Stripe customer for this organization" });
       }
 
-      const origin = dashboardOrigin();
+      const origin = dashboardOriginOrNull();
+      if (!origin) {
+        return reply.status(503).send({ error: "Dashboard origin is not configured" });
+      }
       const portal = await stripe.billingPortal.sessions.create({
         customer: org.stripe_customer_id,
         return_url: `${origin}/dashboard/settings/organization`,

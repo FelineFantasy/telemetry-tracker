@@ -6,14 +6,10 @@ import { getSessionTokenFromRequest, getSessionUser } from "../lib/auth-session.
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { hashPasswordResetToken } from "../lib/password-reset-token.js";
 import { sendTransactionalEmail } from "../lib/email.js";
+import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 
 const SESSION_DAYS = 30;
 const RESET_TOKEN_HOURS = 1;
-
-function dashboardOriginBase(): string {
-  const raw = process.env.TELEMETRY_DASHBOARD_ORIGIN?.trim();
-  return raw ? raw.replace(/\/$/, "") : "";
-}
 
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
@@ -250,9 +246,14 @@ export async function authRoutes(
       },
     });
 
-    const base = dashboardOriginBase();
-    const resetPath = `/reset-password?token=${encodeURIComponent(token)}`;
-    const resetUrl = base ? `${base}${resetPath}` : resetPath;
+    const base = dashboardOriginOrNull();
+    if (!base) {
+      request.log.error(
+        "TELEMETRY_DASHBOARD_ORIGIN is not configured; skipping password reset email"
+      );
+      return reply.send(generic);
+    }
+    const resetUrl = `${base}/reset-password?token=${encodeURIComponent(token)}`;
 
     await sendTransactionalEmail({
       to: email,
