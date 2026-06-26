@@ -15,6 +15,7 @@ export type BillingHealthInfo = {
   stripeCurrentPeriodEnd: string | null;
   storedPlanTier: string;
   effectivePlanTier: string;
+  hasStripeCustomer: boolean;
   billingAlertVariant:
     | "past_due"
     | "unpaid"
@@ -100,6 +101,7 @@ function parseBillingHealth(bh: unknown): BillingHealthInfo | null {
       o.stripeCurrentPeriodEnd === null ? null : (o.stripeCurrentPeriodEnd as string),
     storedPlanTier: o.storedPlanTier,
     effectivePlanTier: o.effectivePlanTier,
+    hasStripeCustomer: o.hasStripeCustomer === true,
     billingAlertVariant: variant as BillingHealthInfo["billingAlertVariant"],
   };
 }

@@ -111,7 +111,7 @@ export async function projectDashboardRoutes(
       return reply.status(401).send({ error: "Unauthorized" });
     }
     const rows = await prisma.organizationMembership.findMany({
-      where: { user_id: session.userId },
+      where: { user_id: session.userId, organization: { deleted_at: null } },
       select: {
         organization: { select: { id: true, name: true } },
       },
@@ -159,7 +159,7 @@ export async function projectDashboardRoutes(
 
     if (session) {
       const orgRows = await prisma.organizationMembership.findMany({
-        where: { user_id: session.userId },
+        where: { user_id: session.userId, organization: { deleted_at: null } },
         select: { organization_id: true },
       });
       const orgIds = [...new Set(orgRows.map((r) => r.organization_id))];
@@ -176,7 +176,11 @@ export async function projectDashboardRoutes(
       }
 
       const projects = await prisma.project.findMany({
-        where: { organization_id: { in: filterIds }, deleted_at: null },
+        where: {
+          organization_id: { in: filterIds },
+          deleted_at: null,
+          organization: { deleted_at: null },
+        },
         select: { id: true, name: true, slug: true, organization_id: true },
         orderBy: { name: "asc" },
       });
@@ -570,6 +574,7 @@ export async function projectDashboardRoutes(
       stripeCurrentPeriodEnd: string | null;
       storedPlanTier: string;
       effectivePlanTier: string;
+      hasStripeCustomer: boolean;
       billingAlertVariant: BillingAlertVariant | null;
     } | null = null;
     if (projectId !== null) {
@@ -595,6 +600,7 @@ export async function projectDashboardRoutes(
             : null,
           storedPlanTier: ctx.storedPlanTier,
           effectivePlanTier: ctx.planTier,
+          hasStripeCustomer: ctx.stripeCustomerId != null,
           billingAlertVariant: billingAlertVariant(ctx.stripeSubscriptionStatus),
         };
       }

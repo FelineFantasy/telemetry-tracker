@@ -10,6 +10,7 @@ export type PlanContext = {
   storedPlanTier: PlanTier;
   /** Tier used for limits (may be FREE when Stripe subscription is canceled/unpaid/etc.). */
   planTier: PlanTier;
+  stripeCustomerId: string | null;
   stripeSubscriptionStatus: string | null;
   stripeCurrentPeriodEnd: Date | null;
   limits: PlanLimits;
@@ -31,6 +32,7 @@ export async function loadPlanContextForProject(
       organization: {
         select: {
           plan_tier: true,
+          stripe_customer_id: true,
           stripe_subscription_status: true,
           stripe_current_period_end: true,
           deleted_at: true,
@@ -46,6 +48,7 @@ export async function loadPlanContextForProject(
     organizationId: row.organization_id,
     storedPlanTier: stored,
     planTier: tier,
+    stripeCustomerId: row.organization.stripe_customer_id,
     stripeSubscriptionStatus: status,
     stripeCurrentPeriodEnd: row.organization.stripe_current_period_end,
     limits: limitsForPlan(tier),

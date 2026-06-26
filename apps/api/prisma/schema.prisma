@@ -96,7 +96,7 @@ model UserSession {
   @@index([expires_at])
 }
 
-/// One-time password reset link (hashed token stored as opaque hex).
+/// One-time password reset link (SHA-256 hex digest of the opaque token; raw secret is emailed only).
 model PasswordResetToken {
   id         String   @id @default(uuid())
   user_id    String   @map("user_id")

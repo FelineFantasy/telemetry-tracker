@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { getSessionTokenFromRequest, getSessionUser } from "../lib/auth-session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
+import { hashPasswordResetToken } from "../lib/password-reset-token.js";
 import { sendTransactionalEmail } from "../lib/email.js";
 
 const SESSION_DAYS = 30;
@@ -244,7 +245,7 @@ export async function authRoutes(
     await prisma.passwordResetToken.create({
       data: {
         user_id: user.id,
-        token,
+        token: hashPasswordResetToken(token),
         expires_at: expiresAt,
       },
     });
@@ -277,7 +278,9 @@ export async function authRoutes(
       return reply.status(400).send({ error: "Password must be at least 8 characters" });
     }
 
-    const row = await prisma.passwordResetToken.findUnique({ where: { token } });
+    const row = await prisma.passwordResetToken.findUnique({
+      where: { token: hashPasswordResetToken(token) },
+    });
     if (!row || row.expires_at.getTime() <= Date.now()) {
       return reply.status(400).send({ error: "Invalid or expired reset link" });
     }
