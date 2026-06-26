@@ -27,6 +27,7 @@ import {
   billingAlertVariant,
 } from "../lib/billing-alert.js";
 import {
+  allowUnauthenticatedReads,
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
   tryResolveReadProjectId,
@@ -191,6 +192,10 @@ export async function projectDashboardRoutes(
     }
 
     if (headerOrg) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    if (!allowUnauthenticatedReads()) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
 
