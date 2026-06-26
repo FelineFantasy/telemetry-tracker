@@ -235,6 +235,14 @@ export async function authRoutes(
       return reply.send(generic);
     }
 
+    const base = dashboardOriginOrNull();
+    if (!base) {
+      request.log.error(
+        "TELEMETRY_DASHBOARD_ORIGIN is not configured; skipping password reset email"
+      );
+      return reply.send(generic);
+    }
+
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + RESET_TOKEN_HOURS * 60 * 60 * 1000);
     await prisma.passwordResetToken.deleteMany({ where: { user_id: user.id } });
@@ -246,13 +254,6 @@ export async function authRoutes(
       },
     });
 
-    const base = dashboardOriginOrNull();
-    if (!base) {
-      request.log.error(
-        "TELEMETRY_DASHBOARD_ORIGIN is not configured; skipping password reset email"
-      );
-      return reply.send(generic);
-    }
     const resetUrl = `${base}/reset-password?token=${encodeURIComponent(token)}`;
 
     await sendTransactionalEmail({

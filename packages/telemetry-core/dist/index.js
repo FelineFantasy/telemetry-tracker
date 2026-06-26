@@ -93,6 +93,14 @@ function postSessionKeepalive(endedAt) {
     }
     catch (_) { }
 }
+/** End the current session via keepalive POST and clear in-memory session state. */
+function closeSessionKeepalive(endedAt) {
+    if (!sessionId)
+        return;
+    postSessionKeepalive(endedAt);
+    sessionId = null;
+    sessionStartedAt = null;
+}
 function startSession() {
     sessionId = generateUUID();
     sessionStartedAt = new Date();
@@ -111,11 +119,19 @@ function installBrowserSessionLifecycle() {
     sessionLifecycleInstalled = true;
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") {
-            postSessionKeepalive(new Date());
+            closeSessionKeepalive(new Date());
+        }
+        else if (document.visibilityState === "visible" && !sessionId) {
+            startSession();
         }
     });
     window.addEventListener("pagehide", () => {
-        postSessionKeepalive(new Date());
+        closeSessionKeepalive(new Date());
+    });
+    window.addEventListener("pageshow", () => {
+        if (!sessionId) {
+            startSession();
+        }
     });
 }
 export function getSessionId() {

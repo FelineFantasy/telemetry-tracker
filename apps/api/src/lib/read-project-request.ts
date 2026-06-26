@@ -77,11 +77,8 @@ export async function resolveReadProjectId(
   }
 
   if (project.orgArchived) {
-    if (session) {
-      await reply.status(403).send({ error: "Organization has been archived" });
-      return null;
-    }
-    return fallback;
+    await reply.status(403).send({ error: "Organization has been archived" });
+    return null;
   }
 
   if (session) {
