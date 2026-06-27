@@ -1,15 +1,123 @@
 # Telemetry Tracker
 
-Lightweight self-hosted telemetry: errors, events, sessions, and a dashboard.
+![License](https://img.shields.io/github/license/Telemetry-Tracker/telemetry-tracker)
+![GitHub Stars](https://img.shields.io/github/stars/Telemetry-Tracker/telemetry-tracker)
+![GitHub Issues](https://img.shields.io/github/issues/Telemetry-Tracker/telemetry-tracker)
+![CI](https://github.com/Telemetry-Tracker/telemetry-tracker/actions/workflows/ci.yml/badge.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
+[![npm version](https://img.shields.io/npm/v/@tacko/telemetry-core)](https://www.npmjs.com/package/@tacko/telemetry-core)
+[![npm downloads](https://img.shields.io/npm/dm/@tacko/telemetry-core)](https://www.npmjs.com/package/@tacko/telemetry-core)
 
-**Self-hosted:** run the API and dashboard yourself (see [DEPLOYMENT.md](DEPLOYMENT.md)). Production checklist: [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md). Releases and deploy runbook: [docs/RELEASE.md](docs/RELEASE.md). **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) · [good first issues](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+<p align="center">
+  <strong>Open-source error tracking, product analytics, and session telemetry.</strong>
+</p>
 
-## Quickstart
+<p align="center">
+  Lightweight and self-hosted—errors, events, and sessions in one place, with full control over your data.<br />
+  <strong>Live demo:</strong> <a href="https://telemetry-tracker.tacko.io">telemetry-tracker.tacko.io</a>
+</p>
 
-1. **Run locally** (see Setup below): API on `:3001`, dashboard on `:3000`.
-2. **Sign in** at `/register` → create an **organization** and **project** under Organization settings.
-3. **Create an API key** under Settings → API keys. Copy the `tt_live_…` secret once.
-4. **Instrument your app:**
+---
+
+## Features
+
+| Feature | Supported |
+|---------|-----------|
+| Errors | ✅ |
+| Events | ✅ |
+| Sessions | ✅ |
+| Organizations | ✅ |
+| Projects | ✅ |
+| API keys | ✅ |
+| Dashboard | ✅ |
+| REST API | ✅ |
+| SDKs (`@tacko/telemetry-*`) | ✅ |
+| Self-hosted | ✅ |
+| Hosted cloud | 🚧 |
+| Alerting | 🚧 |
+| Source maps | 🚧 |
+
+Self-host setup: [DEPLOYMENT.md](DEPLOYMENT.md)
+
+---
+
+## Why Telemetry Tracker?
+
+Telemetry Tracker provides the core building blocks most applications need—error tracking, product analytics events and session telemetry—without the complexity of enterprise observability platforms.
+
+- Self-hosted
+- Lightweight
+- Simple APIs
+- Open source
+- Easy to deploy ([DEPLOYMENT.md](DEPLOYMENT.md))
+
+---
+
+## Architecture
+
+```
+Client SDK
+    ↓  ingest (API key)
+   API  ←──  Dashboard (session auth)
+    ↓
+ PostgreSQL
+```
+
+Apps send errors, events, and sessions to the **API** via `@tacko/telemetry-*`. The **dashboard** reads telemetry through the same API—never directly from the database.
+
+---
+
+## 🚀 Quick Start
+
+Get Telemetry Tracker running locally in under 5 minutes.
+
+**Prerequisites:** Node.js 18+, pnpm 9, PostgreSQL 16 (Docker works).
+
+```bash
+git clone https://github.com/Telemetry-Tracker/telemetry-tracker.git
+cd telemetry-tracker
+pnpm install
+docker compose up -d
+cp apps/api/.env.example apps/api/.env
+cp apps/dashboard/.env.example apps/dashboard/.env
+pnpm db:migrate
+```
+
+In two terminals:
+
+```bash
+pnpm dev:api        # API → http://localhost:3001
+pnpm dev:dashboard  # Dashboard → http://localhost:3000
+```
+
+Then:
+
+1. Open **http://localhost:3000/register** and create an account.
+2. Create an **organization** and **project** in Organization settings.
+3. Create an **API key** under Settings → API keys (copy the `tt_live_…` secret once).
+4. Instrument your app (see SDK example below) and check **Overview** in the dashboard.
+
+---
+
+## SDK
+
+Works with:
+
+- ✓ **React** — `@tacko/telemetry-core`
+- ✓ **Next.js** — `@tacko/telemetry-next`
+- ✓ **Node** — `@tacko/telemetry-node`
+- ✓ **React Native** — `@tacko/telemetry-react-native`
+- ✓ **Vanilla JS** — `@tacko/telemetry-core`
+
+Guides: [core](docs/sdk-core.md) · [Next.js](docs/sdk-next.md) · [Node](docs/sdk-node.md) · [React Native](docs/sdk-react-native.md)
+
+### Example
+
+Install from npm:
+
+```bash
+pnpm add @tacko/telemetry-core
+```
 
 ```ts
 import { init, trackEvent, trackError } from "@tacko/telemetry-core";
@@ -21,108 +129,97 @@ init({
   environment: "development",
 });
 
-trackEvent("hello");
-trackError(new Error("test"));
+trackEvent("user_registered");
+trackError(new Error("Something broke"));
 ```
 
-5. Open **Overview** in the dashboard to see events and errors.
+---
 
-## Setup
+## 🏗 Project Structure
 
-1. **Install dependencies**
+```
+apps/
+  api/          # Fastify ingest + read API, Prisma, auth, billing
+  dashboard/    # Next.js UI
 
-   ```bash
-   pnpm install
-   ```
-
-2. **PostgreSQL**
-
-   Start Postgres (e.g. with Docker):
-
-   ```bash
-   docker compose up -d
-   ```
-
-   Copy env for the API and dashboard (optional):
-
-   ```bash
-   cp apps/api/.env.example apps/api/.env
-   cp apps/dashboard/.env.example apps/dashboard/.env
-   ```
-
-   Run migrations:
-
-   ```bash
-   pnpm db:migrate
-   ```
-
-3. **Build**
-
-   ```bash
-   pnpm build
-   ```
-
-4. **Tests** (optional)
-
-   ```bash
-   pnpm test
-   ```
-
-   Runs Vitest for the API and dashboard. Database-backed integration tests in `apps/api` need Postgres and `RUN_DB_INTEGRATION_TESTS=true`.
-
-## Run
-
-- **API** (ingest + read): `pnpm dev:api` (default port 3001)
-- **Dashboard**: `pnpm dev:dashboard` (default port 3000)
-
-Override `API_URL` in `apps/dashboard/.env` if the dashboard runs against a different API host (server-side only; not exposed to the browser).
-
-## Deployment (Railway)
-
-The repo is set up for **Railway**: Postgres + API (Root Directory `apps/api`, Railpack) + Dashboard (Root Directory repo root, **Dockerfile** builder — see [DEPLOYMENT.md](DEPLOYMENT.md)). Deployment files (`Dockerfile`, `.dockerignore`, `docker-compose.yml`) live at repo root; there is **no** repo-root `railway.toml` that forces Docker on every service (that breaks the API build). See [DEPLOYMENT.md](DEPLOYMENT.md) for env vars (**CORS**, rate limits), per-service Railway settings, and migrations.
-
-## Project layout
-
-- `apps/api` – Fastify ingest API: `POST /ingest/event`, `POST /ingest/error`, `POST /ingest/session`, `POST /ingest/batch`; read API: `GET /api/overview`, `GET /api/errors`, `GET /api/errors/:id`, `GET /api/events`, `GET /api/sessions`, …; session auth under `/api/auth/*`; org/project/API keys under `/api/meta/*` and `/api/project/*`. Self-serve registration does **not** attach users to a seed organization—they create a workspace in the dashboard (or join via invite); see [docs/RBAC.md](docs/RBAC.md) and [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md).
-- `apps/dashboard` – Next.js app: Overview, Errors list/detail, Events list
-- `packages/telemetry-core` – Shared SDK: `init()`, `trackEvent()`, `trackError()`, `screen()`, `identify()`; optional batching; anonymous device id and SDK version on every payload; in the browser, global `window.onerror` and `unhandledrejection` after `init()`
-- `packages/telemetry-next` – Next.js: provider, error boundary, `useTrackPage()`
-- `packages/telemetry-react-native` – React Native: global error handler, session, `trackScreen()`
-- `packages/telemetry-node` – Node: `uncaughtException` / `unhandledRejection`, optional middleware
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, local setup, and what CI runs. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). **Security:** report vulnerabilities privately per [SECURITY.md](SECURITY.md)—do not use public issues for undisclosed security bugs.
-
-## SDK usage
-
-**Core (any app):**
-
-```ts
-import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
-
-init({ ingestUrl: "http://localhost:3001", app: "my-app", apiKey: process.env.TELEMETRY_API_KEY, environment: "development" });
-trackEvent("click", { button: "submit" });
-trackError(new Error("Something broke"), { page: "/checkout" });
-screen("/home");
-identify("user-123");
+packages/
+  telemetry-core/
+  telemetry-node/
+  telemetry-next/
+  telemetry-react-native/
 ```
 
-**Next.js:** Use `TelemetryProvider` with config and `useTrackPage(pathname)` in a layout or page; import `trackEvent`, `screen`, and `identify` from `@tacko/telemetry-next` when needed.
+---
 
-**Node:** `init(config)` then use `trackEvent` / `trackError`; optional `middleware()` for request tracking.
+## Built With
 
-## Publishing SDK packages to npm
+- [Next.js](https://nextjs.org/) — dashboard
+- [Fastify](https://fastify.dev/) — API
+- [Prisma](https://www.prisma.io/) — ORM & migrations
+- [PostgreSQL](https://www.postgresql.org/) — database
+- [TypeScript](https://www.typescriptlang.org/)
+- [pnpm](https://pnpm.io/) — monorepo
+- [Docker](https://www.docker.com/) — local development (Postgres via `docker compose`; dashboard production image)
 
-The SDK packages are published under the `@tacko` scope (`@tacko/telemetry-core`, `@tacko/telemetry-next`, `@tacko/telemetry-node`, `@tacko/telemetry-react-native`) so others can install them from the public npm registry.
+---
 
-1. **Log in to npm** (one-time): `npm login` — verify with `npm whoami`
-2. **@tacko scope:** your npm account must be allowed to publish `@tacko/*` (create the org on [npmjs.com](https://www.npmjs.com/org/create) or join it if the scope already exists).
-3. **Dry run** (no publish): `pnpm publish:dry`
-4. **Publish**: `pnpm publish:packages` (with 2FA: `pnpm publish:packages -- --otp=123456`)
+## Roadmap
 
-If publish fails with **401 Unauthorized**, run `npm login` again. If it fails with **403** or **version already exists**, bump `version` in all four `packages/*/package.json` files.
+- [x] Errors
+- [x] Events
+- [x] Sessions
+- [x] Dashboard
+- [ ] Alerting
+- [ ] Source maps
+- [ ] Performance monitoring
+- [ ] Multi-project dashboards
+- [ ] Team audit logs
+- [ ] Hosted cloud
 
-**Versioning:** Each new publish must use a version greater than what’s already on npm for that package (e.g. bump `version` in `packages/telemetry-core/package.json` and the other three before running `publish:packages`). Dry-run may fail if you’re not logged in or if the local version is lower than the published one.
+---
 
-Publishing order is automatic: `@tacko/telemetry-core` first, then the others. The script temporarily sets each dependent’s core dependency to `^<coreVersion>` for the published tarball, then restores.
+## 🤝 Contributing
+
+Contributions are welcome! Read [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and what CI runs.
+
+Good places to start:
+
+- [**Good first issues**](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+- [help wanted](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) issues
+
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately via [SECURITY.md](SECURITY.md)—not public issues.
+
+---
+
+## 📚 Documentation
+
+| Topic | Doc |
+|-------|-----|
+| Architecture overview | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Deploy (overview) | [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Railway setup & troubleshooting | [docs/RAILWAY.md](docs/RAILWAY.md) |
+| Stripe & Resend (optional) | [docs/BILLING.md](docs/BILLING.md) |
+| Production checklist | [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) |
+| Releases & deploy runbook | [docs/RELEASE.md](docs/RELEASE.md) |
+| RBAC & org model | [docs/RBAC.md](docs/RBAC.md) |
+| Plans & ingest auth | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) |
+| SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
+
+**Publish SDK packages:** `npm login` → `pnpm publish:packages` (see [CONTRIBUTING.md](CONTRIBUTING.md) and root `package.json` scripts).
+
+---
+
+## ❤️ Support the Project
+
+If you find Telemetry Tracker useful:
+
+- ⭐ Star this repository
+- 🐛 [Report bugs](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/new?template=bug_report.md)
+- 💡 [Suggest features](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/new?template=feature_request.md)
+- 🤝 Open a pull request
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).

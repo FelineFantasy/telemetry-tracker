@@ -79,7 +79,7 @@ Prefer one-off or deploy hook if you want explicit control.
 
 ### 4. Environment variables
 
-Set on **each Railway service** (not only a local `.env`). Full list: [DEPLOYMENT.md](../DEPLOYMENT.md).
+Set on **each Railway service** (not only a local `.env`). Core vars: [DEPLOYMENT.md](../DEPLOYMENT.md). Email & Stripe: [BILLING.md](./BILLING.md). Railway setup: [RAILWAY.md](./RAILWAY.md).
 
 **API (required in production):**
 
@@ -108,10 +108,10 @@ Set on **each Railway service** (not only a local `.env`). Full list: [DEPLOYMEN
 Schedule nightly (e.g. `0 3 * * *` UTC):
 
 ```bash
-pnpm exec tsx src/jobs/run-retention.ts
+node dist/jobs/run-retention.js
 ```
 
-Same `DATABASE_URL` as the API. See [DEPLOYMENT.md](../DEPLOYMENT.md).
+Same `DATABASE_URL` as the API. See [RAILWAY.md](./RAILWAY.md#retention-cron).
 
 ---
 
