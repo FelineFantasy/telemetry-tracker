@@ -1,48 +1,95 @@
 # Contributing to Telemetry Tracker
 
-Thanks for helping improve this project. This document matches the monorepo layout and what CI runs on pull requests.
+Thanks for taking the time to contribute! Every contribution—whether it's code, documentation, bug reports, or feedback—is appreciated.
+
+This document matches the monorepo layout and what CI runs on pull requests.
+
+## How can I contribute?
+
+### Ways to contribute
+
+Every contribution, no matter how small, helps improve the project.
+
+Some great first contributions include:
+
+- Fixing bugs
+- Improving documentation
+- Writing tests
+- Improving accessibility
+- Improving developer experience
+- Reviewing documentation
+
+Browse [**good first issues**](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) and [help wanted](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22) on GitHub. Retention and ingest edge cases in [PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) are also good entry points.
+
+Comment on an issue before opening a PR if you want to confirm scope.
 
 ## Prerequisites
 
-- **Node.js** 18 or newer (CI uses Node 20).
+- **Node.js** 18+ supported; 20+ recommended.
 - **pnpm** 9 (see `package.json` / CI).
 - **PostgreSQL** 16 for local development and for API integration tests.
 
 ## Quick start
 
+Install → run API & dashboard → verify → build → lint → tests
+
+### 1. Install
+
 ```bash
 pnpm install
 docker compose up -d
-cp apps/api/.env.example apps/api/.env   # if present; set DATABASE_URL
+cp apps/api/.env.example apps/api/.env
+cp apps/dashboard/.env.example apps/dashboard/.env
 pnpm db:migrate
+```
+
+### 2. Run API & dashboard
+
+In **two terminals**:
+
+```bash
+pnpm dev:api        # http://localhost:3001
+pnpm dev:dashboard  # http://localhost:3000
+```
+
+### 3. Verify
+
+Open **http://localhost:3000** and confirm the dashboard loads (register or sign in if you want to click through the full flow).
+
+### 4. Build, lint & tests
+
+Before opening a PR, run:
+
+```bash
 pnpm build
 pnpm lint
 pnpm test
 ```
 
-Default tests run Vitest smoke/unit suites. To run **database-backed API integration tests** locally (same as CI):
+Default tests run Vitest smoke/unit suites. For **database-backed API integration tests** (same as CI):
 
 ```bash
 export RUN_DB_INTEGRATION_TESTS=true
-# DATABASE_URL must point at a reachable Postgres with migrations applied
 pnpm --filter api test
 ```
 
-## Before you open a PR
-
-1. **Lint:** `pnpm lint`
-2. **Tests:** `pnpm test` (with Postgres + `RUN_DB_INTEGRATION_TESTS=true` if you changed API behavior covered by integration tests)
-3. **Build:** `pnpm build`
-
-CI on `main` runs lint, `prisma migrate deploy`, tests with `RUN_DB_INTEGRATION_TESTS=true`, and a full workspace build (see [.github/workflows/ci.yml](.github/workflows/ci.yml)).
-
 ## Project layout
 
-- `apps/api` — Fastify API, Prisma schema and migrations under `apps/api/prisma/`
-- `apps/dashboard` — Next.js dashboard
-- `packages/*` — SDKs (`@tacko/telemetry-*`)
+```
+apps/
+  api/          # Fastify API, Prisma schema and migrations
+  dashboard/    # Next.js dashboard
 
-Design and entitlement rules are summarized in [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md); deployment in [DEPLOYMENT.md](DEPLOYMENT.md); RBAC in [docs/RBAC.md](docs/RBAC.md).
+packages/
+  telemetry-core/
+  telemetry-next/
+  telemetry-node/
+  telemetry-react-native/
+```
+
+SDKs are published as `@tacko/telemetry-*` on npm.
+
+Design and entitlement rules are summarized in [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md); architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); deployment in [DEPLOYMENT.md](DEPLOYMENT.md) and [docs/RAILWAY.md](docs/RAILWAY.md); RBAC in [docs/RBAC.md](docs/RBAC.md).
 
 ## Database migrations
 
@@ -60,15 +107,54 @@ Use descriptive migration names. For production, only `prisma migrate deploy` is
 - Describe **what** changed and **why** in the PR body (reproduce steps for bugs).
 - If you are unsure about product or security behavior (auth, ingest, billing), open an issue first.
 
-## Good first issues
+### Branch naming
 
-New contributors: look for issues labeled [**good first issue**](https://github.com/Telemetry-Tracker/telemetry-tracker/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22). Suggested starting points:
+Use one branch per pull request.
 
-- Documentation and tests (low risk, helps you learn the repo layout)
-- Retention and ingest edge cases called out in [PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) known limitations
-- Dashboard polish and accessibility
+Use lowercase kebab-case with a type prefix:
 
-Comment on an issue before opening a PR if you want to confirm scope.
+```
+feature/add-slack-webhook
+fix/session-memory-leak
+docs/readme-improvements
+```
+
+Common prefixes: `feature/`, `fix/`, `docs/`, `test/`, `chore/`. Keep names short and descriptive.
+
+### Commit messages
+
+Use the imperative mood.
+
+Good examples:
+
+```
+Fix session filtering
+Improve SDK docs
+Add webhook retry logic
+```
+
+### PR checklist
+
+Before opening a PR, run locally:
+
+```bash
+pnpm lint
+pnpm test
+pnpm build
+```
+
+Use Postgres and `RUN_DB_INTEGRATION_TESTS=true` when you change API behavior covered by integration tests.
+
+When you open the PR, confirm:
+
+- [ ] Tests pass
+- [ ] Lint passes
+- [ ] Build succeeds
+- [ ] Documentation updated (if needed)
+- [ ] New code follows the existing style
+- [ ] No breaking changes (or called out clearly in the PR description)
+
+CI on `main` runs the same checks (see [.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 ## Code of conduct
 
