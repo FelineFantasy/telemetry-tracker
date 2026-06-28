@@ -1,6 +1,8 @@
 # Dashboard design system
 
-Dark-first UI tokens live in **`tailwind.config.ts`**. Prefer Tailwind utilities (`bg-background`, `text-muted-foreground`, `border-border`, `bg-primary`, …) for new UI.
+Dark-first UI tokens live in **`app/globals.css`** (CSS variables) and **`tailwind.config.ts`**. Prefer Tailwind utilities (`bg-background`, `text-muted-foreground`, `border-border`, `bg-brand`, …) for new UI.
+
+Aesthetic: pure black canvas, near-white type, single blue brand accent, subtle 1px hairlines — ported from [pulse-beacon-studio](https://github.com/unjica/pulse-beacon-studio).
 
 ## Semantic colors
 
@@ -8,30 +10,31 @@ Dark-first UI tokens live in **`tailwind.config.ts`**. Prefer Tailwind utilities
 |--------|--------|
 | `background` | App canvas |
 | `foreground` | Primary text |
-| `surface` / `surface-alt` / `surface-raised` | Panels, cards, elevated areas |
-| `muted` / `muted-foreground` | Borders-as-fill, secondary text |
-| `border` / `border-subtle` | Hairlines and dividers |
-| `primary` / `primary-hover` / `primary-foreground` | Brand accent (teal), CTAs |
-| `secondary` | Indigo accent |
-| `danger` / `success` / `warning` | Status + alerts |
-| `code.bg` / `code.border` / `code.foreground` | Code surfaces (teal-tinted; related to but distinct from `primary`) |
+| `surface` / `surface-elevated` | Panels, cards, elevated areas |
+| `muted` / `muted-foreground` | Secondary fills and text |
+| `border` / `border-strong` | Hairlines and dividers |
+| `primary` / `primary-foreground` | Inverted CTAs (light pill on dark) |
+| `secondary` | Subtle filled controls |
+| `brand` / `brand-soft` | Blue accent (links, highlights) |
+| `destructive` / `danger` | Errors and destructive actions |
+| `success` / `warning` | Status |
+| `code.*` | Code surfaces (maps to surface tokens) |
 
-## Legacy CSS
+## shadcn/ui
 
-`globals.css` maps **`--color-*`** variables to the same theme via `theme()` for existing class-based markup (`.card`, `.table`, `.landing-*`, etc.).
+Initialized via **`components.json`**. Primitives live in **`app/components/ui/shadcn/`** (button, card, badge, separator). Legacy dashboard components remain in **`app/components/ui/`** until Phase 3.
 
-## Components
-
-See **`app/components/README.md`** for the folder layout.
-
-- **`app/components/ui/Button.tsx`** — `Button` / `ButtonLink` (`primary` | `secondary` | `ghost` | `outline`).
-- **`app/components/ui/Table.tsx`** — `TableWrap`, `Table`, `TableListLink` (dashboard tables; styles map to `.table`, `.table-wrap`, `.list-link` in `globals.css`).
-- **`app/components/dashboard/`** — `DashboardShell`, `AppSidebar`, `SidebarLink`, `DashboardViewLinks`, `RangeTabs`, `NavBack`.
-- **`app/components/sidebar/`** — `SidebarBrand` (Telemetry Tracker + mobile drawer close), `SidebarCloseIcon`, `MenuIcon`; shared by dashboard and docs rails.
-- **`lib/useMobileDrawer.ts`** — `useMobileDrawer()` hook; matches the `max-width: 767px` drawer breakpoint.
-- **`app/components/docs/`** — `DocsShell`, `DocSidebar`, `DocsArticle`, `CodeBlock`.
-- **Navigation** — **`SidebarLink`** + sidebar classes; **`text-link`** for inline actions where needed.
+- **`lib/utils.ts`** — `cn()` with clsx + tailwind-merge
+- Internal reference page: **`/design-system`**
 
 ## Fonts
 
-`layout.tsx` sets `--font-sans` (DM Sans) and `--font-mono` (JetBrains Mono); Tailwind `font-sans` / `font-mono` use these variables.
+`layout.tsx` sets Geist Sans and Geist Mono via the `geist` package. Tailwind `font-sans` / `font-mono` use `--font-geist-sans` and `--font-geist-mono`.
+
+## Marketing
+
+Landing sections live in **`app/components/marketing/`** — Nav, Hero, Features, SDKs, ProductShots, Pricing, DocsPreview, Cta, Footer.
+
+## Legacy dashboard CSS
+
+`globals.css` still contains class-based dashboard markup (`.card`, `.table`, sidebar, etc.) mapped to the new tokens via CSS variables. These will be migrated to shadcn in Phase 3+.

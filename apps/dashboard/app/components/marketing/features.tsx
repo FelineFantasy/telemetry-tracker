@@ -1,0 +1,117 @@
+import type { ReactNode } from "react";
+
+const features = [
+  {
+    title: "Error tracking",
+    desc: "Group, triage and resolve exceptions with full stack traces and occurrence history.",
+    icon: <path d="M8 2 L14 13 L2 13 Z M8 6.5 v3 M8 11 v0.5" />,
+  },
+  {
+    title: "Event tracking",
+    desc: "Typed events with custom properties. Query by user, route, app or anything you instrument.",
+    icon: <path d="M2 8h3l2-4 2 8 2-4h3" />,
+  },
+  {
+    title: "Session monitoring",
+    desc: "Follow anonymous and identified sessions from first touch through logout.",
+    icon: (
+      <>
+        <circle cx="8" cy="8" r="6" />
+        <path d="M8 4v4l3 2" />
+      </>
+    ),
+  },
+  {
+    title: "Multi-project",
+    desc: "Web, mobile, server — keep environments isolated with their own keys and quotas.",
+    icon: (
+      <>
+        <rect x="2" y="2" width="5" height="5" rx="1" />
+        <rect x="9" y="2" width="5" height="5" rx="1" />
+        <rect x="2" y="9" width="12" height="5" rx="1" />
+      </>
+    ),
+  },
+  {
+    title: "Organizations & roles",
+    desc: "Invite teammates, scope access per project with owner, editor and viewer roles.",
+    icon: (
+      <>
+        <circle cx="6" cy="6" r="2.2" />
+        <circle cx="11.5" cy="7" r="1.8" />
+        <path d="M2 13c0-2 2-3 4-3s4 1 4 3M9 13c0-1.4 1.4-2.4 3-2.4s3 1 3 2.4" />
+      </>
+    ),
+  },
+  {
+    title: "Usage analytics",
+    desc: "See ingestion, retention and per-project quota in real time. No surprise bills.",
+    icon: <path d="M2 13V4M6 13V8M10 13V6M14 13V3" />,
+  },
+];
+
+export function Features() {
+  return (
+    <section id="features" className="relative py-28">
+      <div className="mx-auto max-w-6xl px-6">
+        <SectionHeading
+          eyebrow="Platform"
+          title={<>One platform for the signals you act on.</>}
+          subtitle="Errors, events and sessions in a single store. Query them together, not across three tools."
+        />
+
+        <ul className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <li
+              key={f.title}
+              className="group relative bg-background p-6 transition-colors hover:bg-surface/60"
+            >
+              <span className="inline-grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface text-foreground">
+                <svg
+                  viewBox="0 0 16 16"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {f.icon}
+                </svg>
+              </span>
+              <h3 className="mt-5 text-[15px] font-medium tracking-tight">{f.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+export function SectionHeading({
+  eyebrow,
+  title,
+  subtitle,
+  align = "center",
+}: {
+  eyebrow?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  align?: "center" | "left";
+}) {
+  const a = align === "center" ? "text-center mx-auto" : "text-left";
+  return (
+    <div className={`${a} max-w-2xl`}>
+      {eyebrow && (
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</p>
+      )}
+      <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+        {title}
+      </h2>
+      {subtitle && (
+        <p className="mt-4 text-balance text-base text-muted-foreground">{subtitle}</p>
+      )}
+    </div>
+  );
+}

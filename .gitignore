@@ -10,3 +10,4 @@ apps/dashboard/tsconfig.tsbuildinfo
 apps/api/tsconfig.tsbuildinfo
 dist
 apps/api/node_modules
+.pulse-beacon-studio-ref

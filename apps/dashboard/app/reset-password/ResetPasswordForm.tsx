@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { resetPassword } from "@/app/auth/actions";
 import { Button } from "@/app/components/ui/Button";
+import { PasswordInput } from "@/app/components/ui/PasswordInput";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
@@ -23,7 +24,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         setError(r.error);
         return;
       }
-      router.push("/login");
+      router.push("/?signIn=1");
       router.refresh();
     });
   }
@@ -33,14 +34,12 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <label className="auth-form__label" htmlFor="reset-password">
         New password
       </label>
-      <input
+      <PasswordInput
         id="reset-password"
         name="password"
-        type="password"
         autoComplete="new-password"
         required
         minLength={8}
-        className="filter-input auth-form__input"
         disabled={pending}
       />
       {error ? (
@@ -52,7 +51,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         {pending ? "Updating…" : "Update password"}
       </Button>
       <p className="auth-form__footer">
-        <Link href="/login">Back to sign in</Link>
+        <Link href="/?signIn=1">Back to sign in</Link>
       </p>
     </form>
   );

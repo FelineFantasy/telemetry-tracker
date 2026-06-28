@@ -1,0 +1,165 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { SectionHeading } from "./features";
+
+type Sdk = {
+  id: string;
+  label: string;
+  install: string;
+  code: string;
+  docHref: string;
+};
+
+const sdks: Sdk[] = [
+  {
+    id: "next",
+    label: "Next.js",
+    install: "pnpm add @tacko/telemetry-next",
+    docHref: "/docs/nextjs",
+    code: `// app/layout.tsx
+import { TelemetryProvider } from "@tacko/telemetry-next";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <TelemetryProvider
+      config={{
+        ingestUrl: process.env.NEXT_PUBLIC_TELEMETRY_INGEST_URL ?? "",
+        app: process.env.NEXT_PUBLIC_TELEMETRY_APP ?? "my-next-app",
+        apiKey: process.env.NEXT_PUBLIC_TELEMETRY_API_KEY,
+      }}
+    >
+      {children}
+    </TelemetryProvider>
+  );
+}`,
+  },
+  {
+    id: "node",
+    label: "Node.js",
+    install: "pnpm add @tacko/telemetry-node",
+    docHref: "/docs/node",
+    code: `import { init, middleware } from "@tacko/telemetry-node";
+
+init({
+  ingestUrl: process.env.TELEMETRY_INGEST_URL!,
+  app: "my-api",
+  apiKey: process.env.TELEMETRY_API_KEY,
+});
+
+app.use(middleware());`,
+  },
+  {
+    id: "web",
+    label: "Web / React",
+    install: "pnpm add @tacko/telemetry-core",
+    docHref: "/docs/sdk",
+    code: `import { init, trackEvent } from "@tacko/telemetry-core";
+
+init({
+  ingestUrl: import.meta.env.VITE_TELEMETRY_INGEST_URL,
+  app: "web",
+  apiKey: import.meta.env.VITE_TELEMETRY_API_KEY,
+});
+
+trackEvent("button_click", { id: "submit" });`,
+  },
+  {
+    id: "rn",
+    label: "React Native",
+    install: "pnpm add @tacko/telemetry-react-native",
+    docHref: "/docs/react-native",
+    code: `import { init } from "@tacko/telemetry-react-native";
+
+init({
+  ingestUrl: Config.TELEMETRY_INGEST_URL,
+  app: "mobile",
+  apiKey: Config.TELEMETRY_API_KEY,
+  platform: "react-native",
+});`,
+  },
+];
+
+export function Sdks() {
+  const [active, setActive] = useState<Sdk>(sdks[0]!);
+  return (
+    <section id="sdks" className="relative py-28">
+      <div className="mx-auto max-w-6xl px-6">
+        <SectionHeading
+          eyebrow="SDKs"
+          title={<>Drop-in for the stack you already use.</>}
+          subtitle="Lightweight clients for web, Next.js, Node and React Native — one ingest API, consistent payloads."
+        />
+
+        <div className="mt-12 overflow-hidden rounded-2xl border border-border bg-surface/40">
+          <div className="flex items-center gap-1 border-b border-border bg-background/40 p-1.5">
+            {sdks.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActive(s)}
+                className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${
+                  active.id === s.id
+                    ? "bg-surface-elevated text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+            <div className="tabular ml-auto hidden items-center gap-2 pr-2 text-xs text-muted-foreground sm:flex">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />v1.2.0
+            </div>
+          </div>
+
+          <div className="grid gap-px bg-border md:grid-cols-[1fr_1.4fr]">
+            <div className="bg-background p-6">
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Install</p>
+              <pre className="mt-3 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2.5 font-mono text-[13px] text-foreground">
+                <code>{active.install}</code>
+              </pre>
+              <p className="mt-6 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                Highlights
+              </p>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                {[
+                  "Events, errors & sessions",
+                  "Batch ingest support",
+                  "Anonymous + user ids",
+                  "Self-hosted endpoint",
+                ].map((h) => (
+                  <li key={h} className="flex items-center gap-2">
+                    <svg
+                      viewBox="0 0 16 16"
+                      className="h-3.5 w-3.5 text-brand"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 8.5 6.5 12 13 4.5" />
+                    </svg>
+                    {h}
+                  </li>
+                ))}
+              </ul>
+              <Link href={active.docHref} className="mt-6 inline-block text-sm text-brand hover:underline">
+                View {active.label} docs →
+              </Link>
+            </div>
+            <div className="bg-background p-0">
+              <div className="flex items-center justify-between border-b border-border px-4 py-2.5 text-xs text-muted-foreground">
+                <span className="font-mono">{active.id}.example.ts</span>
+              </div>
+              <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-foreground/90">
+                <code>{active.code}</code>
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
