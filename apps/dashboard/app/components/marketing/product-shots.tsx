@@ -27,7 +27,7 @@ export function ProductShots() {
 
           <div className="grid gap-6 lg:col-span-2">
             <FeatureCard
-              kbd="⌘K"
+              kbd="Esc"
               title="Keyboard-friendly"
               desc="Navigate lists, filters and detail views without leaving the keyboard."
             />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, useEffect, type ReactNode } from "react";
 import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
 import { docsHomeAnchors, docsNavSections } from "./docs-nav";
@@ -18,6 +18,19 @@ export function DocsPageShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const showOnThisPage = pathname === "/docs" || pathname === "/docs/";
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const filteredSections = useMemo(
     () =>
@@ -52,6 +65,7 @@ export function DocsPageShell({ children }: { children: ReactNode }) {
                 <path d="M10.5 10.5L14 14" />
               </svg>
               <input
+                ref={searchInputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search docs"

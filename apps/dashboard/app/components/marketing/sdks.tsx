@@ -18,14 +18,17 @@ const sdks: Sdk[] = [
     label: "Next.js",
     install: "pnpm add @tacko/telemetry-next",
     docHref: "/docs/nextjs",
-    code: `// app/providers.tsx
+    code: `// app/layout.tsx
 import { TelemetryProvider } from "@tacko/telemetry-next";
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <TelemetryProvider
-      apiKey={process.env.NEXT_PUBLIC_TT_API_KEY!}
-      endpoint={process.env.NEXT_PUBLIC_TT_ENDPOINT!}
+      config={{
+        ingestUrl: process.env.NEXT_PUBLIC_TELEMETRY_INGEST_URL ?? "",
+        app: process.env.NEXT_PUBLIC_TELEMETRY_APP ?? "my-next-app",
+        apiKey: process.env.NEXT_PUBLIC_TELEMETRY_API_KEY,
+      }}
     >
       {children}
     </TelemetryProvider>
@@ -37,39 +40,43 @@ export function Providers({ children }: { children: React.ReactNode }) {
     label: "Node.js",
     install: "pnpm add @tacko/telemetry-node",
     docHref: "/docs/node",
-    code: `import { createNodeHandler } from "@tacko/telemetry-node";
+    code: `import { init, middleware } from "@tacko/telemetry-node";
 
-const handler = createNodeHandler({
-  apiKey: process.env.TT_API_KEY!,
-  endpoint: process.env.TT_ENDPOINT!,
+init({
+  ingestUrl: process.env.TELEMETRY_INGEST_URL!,
+  app: "my-api",
+  apiKey: process.env.TELEMETRY_API_KEY,
 });
 
-app.use(handler.middleware());`,
+app.use(middleware());`,
   },
   {
     id: "web",
     label: "Web / React",
     install: "pnpm add @tacko/telemetry-core",
     docHref: "/docs/sdk",
-    code: `import { initTelemetry } from "@tacko/telemetry-core";
+    code: `import { init, trackEvent } from "@tacko/telemetry-core";
 
-initTelemetry({
-  apiKey: import.meta.env.VITE_TT_API_KEY,
-  endpoint: import.meta.env.VITE_TT_ENDPOINT,
+init({
+  ingestUrl: import.meta.env.VITE_TELEMETRY_INGEST_URL,
   app: "web",
-});`,
+  apiKey: import.meta.env.VITE_TELEMETRY_API_KEY,
+});
+
+trackEvent("button_click", { id: "submit" });`,
   },
   {
     id: "rn",
     label: "React Native",
     install: "pnpm add @tacko/telemetry-react-native",
     docHref: "/docs/react-native",
-    code: `import { initTelemetry } from "@tacko/telemetry-react-native";
+    code: `import { init } from "@tacko/telemetry-react-native";
 
-initTelemetry({
-  apiKey: Config.TT_API_KEY,
-  endpoint: Config.TT_ENDPOINT,
+init({
+  ingestUrl: Config.TELEMETRY_INGEST_URL,
   app: "mobile",
+  apiKey: Config.TELEMETRY_API_KEY,
+  platform: "react-native",
 });`,
   },
 ];

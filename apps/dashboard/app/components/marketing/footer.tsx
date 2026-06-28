@@ -17,7 +17,7 @@ const cols: { heading: string; links: { label: string; href: string }[] }[] = [
       { label: "Documentation", href: "/docs" },
       { label: "Next.js SDK", href: "/docs/nextjs" },
       { label: "Node SDK", href: "/docs/node" },
-      { label: "GitHub", href: "https://github.com/unjica/telemetry-tracker" },
+      { label: "GitHub", href: "https://github.com/Telemetry-Tracker/telemetry-tracker" },
     ],
   },
   {

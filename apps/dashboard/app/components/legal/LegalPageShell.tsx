@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 export function LegalExternalLink({
@@ -7,15 +8,22 @@ export function LegalExternalLink({
   href: string;
   children: ReactNode;
 }) {
+  const className = "font-medium text-brand underline-offset-2 hover:underline";
+  const isExternal =
+    href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:");
+
+  if (isExternal) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="font-medium text-brand underline-offset-2 hover:underline"
-    >
+    <Link href={href} className={className}>
       {children}
-    </a>
+    </Link>
   );
 }
 
