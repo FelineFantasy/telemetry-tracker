@@ -217,6 +217,12 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     setSignUpOpen(true);
   }, []);
 
+  useEffect(() => {
+    setSignInOpen(false);
+    setSignUpOpen(false);
+    setInviteToken("");
+  }, [pathname]);
+
   const signUpDescription = inviteToken
     ? "Complete registration to join the organization you were invited to."
     : "Free to start. Set up your organization and API keys in minutes.";

@@ -7,9 +7,12 @@ import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
 import { docsHomeAnchors, docsNavSections } from "./docs-nav";
 
-function isNavItemActive(href: string, pathname: string): boolean {
+function isNavItemActive(href: string, pathname: string, hash: string): boolean {
   if (href.startsWith("/docs#")) {
-    return pathname === "/docs" || pathname === "/docs/";
+    if (pathname !== "/docs" && pathname !== "/docs/") return false;
+    const itemHash = href.slice("/docs".length);
+    const activeHash = hash || "#introduction";
+    return activeHash === itemHash;
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -18,7 +21,15 @@ export function DocsPageShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
   const showOnThisPage = pathname === "/docs" || pathname === "/docs/";
   const [query, setQuery] = useState("");
+  const [hash, setHash] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash);
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, [pathname]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -84,7 +95,7 @@ export function DocsPageShell({ children }: { children: ReactNode }) {
                   </p>
                   <ul className="space-y-0.5 border-l border-border">
                     {s.items.map((i) => {
-                      const active = isNavItemActive(i.href, pathname);
+                      const active = isNavItemActive(i.href, pathname, hash);
                       return (
                         <li key={i.id}>
                           <Link
