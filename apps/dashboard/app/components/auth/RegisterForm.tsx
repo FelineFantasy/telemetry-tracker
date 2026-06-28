@@ -1,24 +1,23 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { register } from "@/app/auth/actions";
 import { LegalExternalLink } from "@/app/components/legal/LegalPageShell";
 import { Button } from "@/app/components/ui/Button";
 import { PasswordInput } from "@/app/components/ui/PasswordInput";
-import Link from "next/link";
 
 export function RegisterForm({
   inviteToken = "",
   onSwitchToSignIn,
-  requireTerms = false,
+  onSuccess,
+  requireTerms = true,
 }: {
   inviteToken?: string;
-  onSwitchToSignIn?: () => void;
+  onSwitchToSignIn: () => void;
+  onSuccess: (destination: string) => void;
   requireTerms?: boolean;
 }) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,10 +38,9 @@ export function RegisterForm({
         setError(r.error);
         return;
       }
-      router.push(
+      onSuccess(
         inviteToken ? "/dashboard/overview" : "/dashboard/settings/organization",
       );
-      router.refresh();
     });
   }
 
@@ -127,17 +125,13 @@ export function RegisterForm({
         {pending ? "Creating account…" : "Create account"}
       </Button>
       <p className="auth-form__footer">
-        {onSwitchToSignIn ? (
-          <button
-            type="button"
-            className="cursor-pointer border-0 bg-transparent p-0 text-link"
-            onClick={onSwitchToSignIn}
-          >
-            Already have an account?
-          </button>
-        ) : (
-          <Link href="/login">Already have an account?</Link>
-        )}
+        <button
+          type="button"
+          className="cursor-pointer border-0 bg-transparent p-0 text-link"
+          onClick={onSwitchToSignIn}
+        >
+          Already have an account?
+        </button>
       </p>
     </form>
   );

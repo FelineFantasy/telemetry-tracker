@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense, type ReactNode } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { AuthModalProvider } from "@/app/components/marketing/auth-modals";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
 import { socialPreviewImage } from "@/lib/social-image";
 import { resolveMetadataBase } from "@/lib/site-url";
@@ -61,6 +63,14 @@ export const metadata: Metadata = {
   },
 };
 
+function AuthModals({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <AuthModalProvider>{children}</AuthModalProvider>
+    </Suspense>
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -73,7 +83,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ToasterProvider />
-        {children}
+        <AuthModals>{children}</AuthModals>
       </body>
     </html>
   );

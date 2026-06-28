@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { LegalPageShell, LegalSection } from "@/app/components/legal/LegalPageShell";
+import { ContactEmailLink } from "@/app/components/legal/ContactEmailLink";
+import { LegalArticle, LegalSection } from "@/app/components/legal/LegalPageShell";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -8,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPageShell title="Privacy Policy" updated="June 28, 2026">
-      <LegalSection title="Overview">
+    <LegalArticle title="Privacy Policy" updated="June 28, 2026">
+      <LegalSection id="overview" title="Overview" first>
         <p>
           Telemetry Tracker is self-hosted software. Your operator — you or your organization —
           controls what data is collected, how long it is retained, and who can access the
@@ -21,12 +22,12 @@ export default function PrivacyPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Data we help you collect">
+      <LegalSection id="data-collected" title="Data we help you collect">
         <p>
           SDKs send errors, events, and sessions to your configured ingest API. Payloads may
           include:
         </p>
-        <ul className="list-disc space-y-2 pl-5">
+        <ul>
           <li>Stack traces, error messages, and fingerprints</li>
           <li>Custom event names and properties you define</li>
           <li>Session start/end timestamps and identifiers</li>
@@ -35,30 +36,26 @@ export default function PrivacyPage() {
         </ul>
       </LegalSection>
 
-      <LegalSection title="Account data">
+      <LegalSection id="account-data" title="Account data">
         <p>
           Dashboard accounts store email addresses, hashed passwords, organization membership, and
           audit-relevant settings. Billing identifiers are stored when Stripe is configured.
         </p>
       </LegalSection>
 
-      <LegalSection title="Retention and deletion">
+      <LegalSection id="retention" title="Retention and deletion">
         <p>
           Retention periods depend on your plan and retention job configuration. Because you host
           the database, you can delete projects, rotate API keys, and purge telemetry at any time.
         </p>
       </LegalSection>
 
-      <LegalSection title="Contact">
+      <LegalSection id="contact" title="Contact">
         <p>
           Questions about privacy for a hosted deployment should be directed to your organization.
-          For the open-source project, contact{" "}
-          <a href="mailto:info@tacko.io" className="text-brand hover:underline">
-            info@tacko.io
-          </a>
-          .
+          For the open-source project, contact <ContactEmailLink />.
         </p>
       </LegalSection>
-    </LegalPageShell>
+    </LegalArticle>
   );
 }

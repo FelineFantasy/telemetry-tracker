@@ -1,6 +1,4 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { Logo } from "@/app/components/marketing/logo";
 
 export function LegalExternalLink({
   href,
@@ -21,55 +19,49 @@ export function LegalExternalLink({
   );
 }
 
-export function LegalPageShell({
+export function LegalArticle({
   title,
   updated,
   children,
+  eyebrow = "Legal",
 }: {
   title: string;
-  updated: string;
+  updated?: string;
   children: ReactNode;
+  eyebrow?: string;
 }) {
   return (
-    <main id="main-content" className="min-h-screen bg-background text-foreground">
-      <div className="border-b border-border bg-surface/30">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-6">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <Link
-            href="/"
-            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            ← Back to home
-          </Link>
-        </div>
-      </div>
-
-      <article className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
-        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Legal</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Last updated {updated}</p>
-
-        <div className="mt-10 space-y-8 text-sm leading-relaxed text-muted-foreground sm:text-base">
-          {children}
-        </div>
-      </article>
-    </main>
+    <article className="min-w-0 pb-24">
+      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{eyebrow}</p>
+      <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
+      {updated ? (
+        <p className="mt-4 text-sm text-muted-foreground">Last updated {updated}</p>
+      ) : null}
+      <div className={updated ? "mt-10" : "mt-6"}>{children}</div>
+    </article>
   );
 }
 
 export function LegalSection({
+  id,
   title,
   children,
+  first = false,
 }: {
+  id: string;
   title: string;
   children: ReactNode;
+  first?: boolean;
 }) {
   return (
-    <section>
-      <h2 className="text-lg font-medium tracking-tight text-foreground">{title}</h2>
-      <div className="mt-3 space-y-3">{children}</div>
+    <section
+      id={id}
+      className={`scroll-mt-32 ${first ? "mt-0" : "mt-16 border-t border-border pt-10"}`}
+    >
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-[28px]">{title}</h2>
+      <div className="mt-5 space-y-4 text-[15px] leading-relaxed text-foreground/85 [&_li]:text-foreground/85 [&_p]:max-w-2xl [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5">
+        {children}
+      </div>
     </section>
   );
 }

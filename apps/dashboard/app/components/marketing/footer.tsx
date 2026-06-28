@@ -23,7 +23,7 @@ const cols: { heading: string; links: { label: string; href: string }[] }[] = [
   {
     heading: "Company",
     links: [
-      { label: "Contact", href: "mailto:info@tacko.io" },
+      { label: "Contact", href: "/contact" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
     ],
@@ -60,6 +60,9 @@ export function Footer() {
                     {l.href.startsWith("mailto:") || l.href.startsWith("http") ? (
                       <a
                         href={l.href}
+                        {...(l.href.startsWith("http")
+                          ? { target: "_blank", rel: "noopener noreferrer" }
+                          : {})}
                         className="text-sm text-foreground/85 hover:text-foreground"
                       >
                         {l.label}

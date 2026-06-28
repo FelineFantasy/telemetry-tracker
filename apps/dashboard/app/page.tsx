@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { AuthModalProvider } from "@/app/components/marketing/auth-modals";
 import { Nav } from "@/app/components/marketing/nav";
 import { Hero } from "@/app/components/marketing/hero";
 import { LogoStrip } from "@/app/components/marketing/logo-strip";
@@ -41,19 +40,17 @@ export function generateMetadata(): Metadata {
 
 export default function LandingPage() {
   return (
-    <AuthModalProvider>
-      <main id="main-content" className="min-h-screen bg-background text-foreground">
-        <Nav />
-        <Hero />
-        <LogoStrip />
-        <Features />
-        <Sdks />
-        <ProductShots />
-        <Pricing />
-        <DocsPreview />
-        <Cta />
-        <Footer />
-      </main>
-    </AuthModalProvider>
+    <main id="main-content" className="min-h-screen bg-background text-foreground">
+      <Nav />
+      <Hero />
+      <LogoStrip />
+      <Features />
+      <Sdks />
+      <ProductShots />
+      <Pricing />
+      <DocsPreview />
+      <Cta />
+      <Footer />
+    </main>
   );
 }

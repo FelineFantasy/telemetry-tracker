@@ -41,7 +41,7 @@ const tiers = [
     cadence: "annual",
     desc: "For organizations with higher volume needs.",
     cta: "Contact us",
-    href: "mailto:info@tacko.io",
+    href: "/contact",
     features: [
       "50M+ ingest units / month",
       "365-day retention",

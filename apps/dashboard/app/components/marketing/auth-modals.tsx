@@ -10,14 +10,15 @@ import {
   type ReactNode,
   Suspense,
 } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
-import { LoginForm } from "@/app/login/LoginForm";
-import { RegisterForm } from "@/app/register/RegisterForm";
+import { LoginForm } from "@/app/components/auth/LoginForm";
+import { RegisterForm } from "@/app/components/auth/RegisterForm";
 import { Logo } from "./logo";
 
 type AuthModalsContextValue = {
   openSignIn: () => void;
-  openSignUp: () => void;
+  openSignUp: (opts?: { inviteToken?: string }) => void;
   closeModals: () => void;
 };
 
@@ -146,27 +147,85 @@ function AuthModalShell({
   );
 }
 
+function AuthModalUrlHandler({
+  onOpenSignIn,
+  onOpenSignUp,
+}: {
+  onOpenSignIn: () => void;
+  onOpenSignUp: (opts?: { inviteToken?: string }) => void;
+}) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const invite = searchParams.get("invite");
+    if (searchParams.get("signUp") === "1" || invite) {
+      onOpenSignUp(invite ? { inviteToken: invite } : undefined);
+      return;
+    }
+    if (searchParams.get("signIn") === "1") {
+      onOpenSignIn();
+    }
+  }, [searchParams, onOpenSignIn, onOpenSignUp]);
+
+  return null;
+}
+
 export function AuthModalProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [signInOpen, setSignInOpen] = useState(false);
   const [signUpOpen, setSignUpOpen] = useState(false);
+  const [inviteToken, setInviteToken] = useState("");
+
+  const clearAuthParams = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("signIn");
+    params.delete("signUp");
+    params.delete("invite");
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
 
   const closeModals = useCallback(() => {
     setSignInOpen(false);
     setSignUpOpen(false);
-  }, []);
+    setInviteToken("");
+    clearAuthParams();
+  }, [clearAuthParams]);
+
+  const completeAuth = useCallback(
+    (destination: string) => {
+      setSignInOpen(false);
+      setSignUpOpen(false);
+      setInviteToken("");
+      router.push(destination);
+      router.refresh();
+    },
+    [router],
+  );
 
   const openSignIn = useCallback(() => {
     setSignUpOpen(false);
+    setInviteToken("");
     setSignInOpen(true);
   }, []);
 
-  const openSignUp = useCallback(() => {
+  const openSignUp = useCallback((opts?: { inviteToken?: string }) => {
     setSignInOpen(false);
+    setInviteToken(opts?.inviteToken ?? "");
     setSignUpOpen(true);
   }, []);
 
+  const signUpDescription = inviteToken
+    ? "Complete registration to join the organization you were invited to."
+    : "Free to start. Set up your organization and API keys in minutes.";
+
   return (
     <AuthModalsContext value={{ openSignIn, openSignUp, closeModals }}>
+      <Suspense fallback={null}>
+        <AuthModalUrlHandler onOpenSignIn={openSignIn} onOpenSignUp={openSignUp} />
+      </Suspense>
       {children}
 
       <AuthModalShell
@@ -179,7 +238,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
         closeLabel="Close sign in"
       >
         <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
-          <LoginForm onSwitchToSignUp={openSignUp} inModal />
+          <LoginForm onSwitchToSignUp={() => openSignUp()} onSuccess={completeAuth} />
         </Suspense>
       </AuthModalShell>
 
@@ -189,10 +248,15 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
         titleId="sign-up-title"
         eyebrow="Get started"
         title="Create account"
-        description="Free to start. Set up your organization and API keys in minutes."
+        description={signUpDescription}
         closeLabel="Close create account"
       >
-        <RegisterForm onSwitchToSignIn={openSignIn} requireTerms />
+        <RegisterForm
+          inviteToken={inviteToken}
+          onSwitchToSignIn={openSignIn}
+          onSuccess={completeAuth}
+          requireTerms
+        />
       </AuthModalShell>
     </AuthModalsContext>
   );
@@ -205,7 +269,7 @@ export function SignUpButton({
 }: ComponentPropsWithoutRef<"button">) {
   const { openSignUp } = useAuthModals();
   return (
-    <button type="button" className={className} onClick={openSignUp} {...props}>
+    <button type="button" className={className} onClick={() => openSignUp()} {...props}>
       {children}
     </button>
   );

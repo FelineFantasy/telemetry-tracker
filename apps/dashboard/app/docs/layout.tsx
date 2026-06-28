@@ -1,4 +1,3 @@
-import { AuthModalProvider } from "@/app/components/marketing/auth-modals";
 import { DocsPageShell } from "@/app/components/docs/DocsPageShell";
 
 export default function DocsLayout({
@@ -6,9 +5,5 @@ export default function DocsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <AuthModalProvider>
-      <DocsPageShell>{children}</DocsPageShell>
-    </AuthModalProvider>
-  );
+  return <DocsPageShell>{children}</DocsPageShell>;
 }
