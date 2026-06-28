@@ -185,7 +185,6 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   const replaceAuthParams = useCallback(
     (mode: "closed" | "signIn" | "signUp", invite?: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      const preservedInvite = params.get("invite");
       params.delete("signIn");
       params.delete("signUp");
       if (mode === "signIn") {
@@ -196,8 +195,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
         params.set("signUp", "1");
         if (invite) params.set("invite", invite);
       } else {
-        if (preservedInvite) params.set("invite", preservedInvite);
-        else params.delete("invite");
+        params.delete("invite");
       }
       const q = params.toString();
       const next = q ? `${pathname}?${q}` : pathname;
@@ -213,6 +211,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   const closeModalState = useCallback(() => {
     setSignInOpen(false);
     setSignUpOpen(false);
+    setInviteToken("");
   }, []);
 
   const clearAuthParams = useCallback(() => {
@@ -252,11 +251,11 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
 
   const openSignUp = useCallback(
     (opts?: { inviteToken?: string }) => {
-      const token = opts?.inviteToken ?? searchParams.get("invite") ?? "";
+      const token = opts?.inviteToken?.trim() ?? "";
       showSignUp({ inviteToken: token || undefined });
       replaceAuthParams("signUp", token || undefined);
     },
-    [replaceAuthParams, searchParams, showSignUp],
+    [replaceAuthParams, showSignUp],
   );
 
   const signUpDescription = inviteToken
