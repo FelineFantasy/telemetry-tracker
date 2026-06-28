@@ -160,12 +160,12 @@ function AuthModalUrlHandler({
 
   useEffect(() => {
     const invite = searchParams.get("invite");
-    if (searchParams.get("signIn") === "1") {
-      showSignIn();
-      return;
-    }
     if (searchParams.get("signUp") === "1" || invite) {
       showSignUp(invite ? { inviteToken: invite } : undefined);
+      return;
+    }
+    if (searchParams.get("signIn") === "1") {
+      showSignIn();
       return;
     }
     closeModalState();
