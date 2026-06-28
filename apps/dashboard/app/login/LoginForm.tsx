@@ -4,10 +4,18 @@ import type { FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { login } from "@/app/auth/actions";
+import { LegalExternalLink } from "@/app/components/legal/LegalPageShell";
 import { Button } from "@/app/components/ui/Button";
+import { PasswordInput } from "@/app/components/ui/PasswordInput";
 import Link from "next/link";
 
-export function LoginForm() {
+export function LoginForm({
+  onSwitchToSignUp,
+  inModal = false,
+}: {
+  onSwitchToSignUp?: () => void;
+  inModal?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next")?.startsWith("/")
@@ -31,6 +39,12 @@ export function LoginForm() {
     });
   }
 
+  const ForgotPasswordLink = inModal ? (
+    <LegalExternalLink href="/forgot-password">Forgot password?</LegalExternalLink>
+  ) : (
+    <Link href="/forgot-password">Forgot password?</Link>
+  );
+
   return (
     <form onSubmit={handleSubmit} className="auth-form">
       <label className="auth-form__label" htmlFor="login-email">
@@ -48,13 +62,11 @@ export function LoginForm() {
       <label className="auth-form__label" htmlFor="login-password">
         Password
       </label>
-      <input
+      <PasswordInput
         id="login-password"
         name="password"
-        type="password"
         autoComplete="current-password"
         required
-        className="filter-input auth-form__input"
         disabled={pending}
       />
       {error ? (
@@ -66,10 +78,27 @@ export function LoginForm() {
         {pending ? "Signing in…" : "Sign in"}
       </Button>
       <p className="auth-form__footer">
-        <Link href="/register">Create an account</Link>
+        {onSwitchToSignUp ? (
+          <button
+            type="button"
+            className="cursor-pointer border-0 bg-transparent p-0 text-link"
+            onClick={onSwitchToSignUp}
+          >
+            Create an account
+          </button>
+        ) : (
+          <Link href="/register">Create an account</Link>
+        )}
         {" · "}
-        <Link href="/forgot-password">Forgot password?</Link>
+        {ForgotPasswordLink}
       </p>
+      {inModal ? (
+        <p className="text-center text-xs text-muted-foreground">
+          By signing in you agree to our{" "}
+          <LegalExternalLink href="/terms">Terms</LegalExternalLink> and{" "}
+          <LegalExternalLink href="/privacy">Privacy Policy</LegalExternalLink>.
+        </p>
+      ) : null}
     </form>
   );
 }

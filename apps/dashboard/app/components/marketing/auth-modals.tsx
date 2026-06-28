@@ -1,0 +1,212 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+  Suspense,
+} from "react";
+import { X } from "lucide-react";
+import { LoginForm } from "@/app/login/LoginForm";
+import { RegisterForm } from "@/app/register/RegisterForm";
+import { Logo } from "./logo";
+
+type AuthModalsContextValue = {
+  openSignIn: () => void;
+  openSignUp: () => void;
+  closeModals: () => void;
+};
+
+const AuthModalsContext = createContext<AuthModalsContextValue | null>(null);
+
+export function useAuthModals() {
+  const ctx = useContext(AuthModalsContext);
+  if (!ctx) {
+    throw new Error("useAuthModals must be used within AuthModalProvider");
+  }
+  return ctx;
+}
+
+function AuthModalMark() {
+  return (
+    <div
+      aria-hidden
+      className="grid h-12 w-12 place-items-center rounded-xl border border-border-strong bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+    >
+      <svg
+        viewBox="0 0 16 16"
+        className="h-6 w-6 text-foreground"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M1 9 L4 9 L6 3 L10 13 L12 7 L15 7" />
+      </svg>
+    </div>
+  );
+}
+
+function AuthModalShell({
+  open,
+  onClose,
+  titleId,
+  eyebrow,
+  title,
+  description,
+  closeLabel,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  titleId: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  closeLabel: string;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <button
+        type="button"
+        aria-label={closeLabel}
+        className="absolute inset-0 bg-background/70 backdrop-blur-md"
+        onClick={onClose}
+      />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border-strong bg-surface/95 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.65)] backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div aria-hidden className="glow-blue pointer-events-none absolute inset-x-0 top-0 h-40 opacity-70" />
+        <div
+          aria-hidden
+          className="grid-bg pointer-events-none absolute inset-x-0 top-0 h-40 opacity-[0.2] [mask-image:linear-gradient(to_bottom,#000,transparent)]"
+        />
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground backdrop-blur transition-colors hover:bg-surface hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="relative max-h-[min(90vh,760px)] overflow-y-auto px-6 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-10">
+          <div className="flex flex-col items-center text-center">
+            <AuthModalMark />
+            <p className="mt-5 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              {eyebrow}
+            </p>
+            <h2 id={titleId} className="mt-2 text-2xl font-semibold tracking-tight">
+              {title}
+            </h2>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+            <div className="mt-5">
+              <Logo />
+            </div>
+          </div>
+
+          <div className="mt-8 border-t border-border pt-6">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AuthModalProvider({ children }: { children: ReactNode }) {
+  const [signInOpen, setSignInOpen] = useState(false);
+  const [signUpOpen, setSignUpOpen] = useState(false);
+
+  const closeModals = useCallback(() => {
+    setSignInOpen(false);
+    setSignUpOpen(false);
+  }, []);
+
+  const openSignIn = useCallback(() => {
+    setSignUpOpen(false);
+    setSignInOpen(true);
+  }, []);
+
+  const openSignUp = useCallback(() => {
+    setSignInOpen(false);
+    setSignUpOpen(true);
+  }, []);
+
+  return (
+    <AuthModalsContext value={{ openSignIn, openSignUp, closeModals }}>
+      {children}
+
+      <AuthModalShell
+        open={signInOpen}
+        onClose={closeModals}
+        titleId="sign-in-title"
+        eyebrow="Welcome back"
+        title="Sign in"
+        description="Access your dashboard, organizations, and telemetry in one place."
+        closeLabel="Close sign in"
+      >
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+          <LoginForm onSwitchToSignUp={openSignUp} inModal />
+        </Suspense>
+      </AuthModalShell>
+
+      <AuthModalShell
+        open={signUpOpen}
+        onClose={closeModals}
+        titleId="sign-up-title"
+        eyebrow="Get started"
+        title="Create account"
+        description="Free to start. Set up your organization and API keys in minutes."
+        closeLabel="Close create account"
+      >
+        <RegisterForm onSwitchToSignIn={openSignIn} requireTerms />
+      </AuthModalShell>
+    </AuthModalsContext>
+  );
+}
+
+export function SignUpButton({
+  className,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<"button">) {
+  const { openSignUp } = useAuthModals();
+  return (
+    <button type="button" className={className} onClick={openSignUp} {...props}>
+      {children}
+    </button>
+  );
+}

@@ -1,25 +1,64 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LegalPageShell, LegalSection } from "@/app/components/legal/LegalPageShell";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
+  description: "How Telemetry Tracker handles data when you self-host the platform.",
 };
 
 export default function PrivacyPage() {
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16 prose prose-invert">
-      <h1>Privacy Policy</h1>
-      <p>
-        Telemetry Tracker is self-hosted software. Your operator (you or your organization) controls
-        what data is collected, how long it is retained, and who can access the dashboard.
-      </p>
-      <p>
-        SDKs send errors, events, and sessions to your configured ingest API. Payloads may include
-        user ids, anonymous device ids, stack traces, and custom properties you choose to attach.
-      </p>
-      <p>
-        <Link href="/">Back to home</Link>
-      </p>
-    </main>
+    <LegalPageShell title="Privacy Policy" updated="June 28, 2026">
+      <LegalSection title="Overview">
+        <p>
+          Telemetry Tracker is self-hosted software. Your operator — you or your organization —
+          controls what data is collected, how long it is retained, and who can access the
+          dashboard.
+        </p>
+        <p>
+          This policy describes the kinds of data the product can process when you run it. It does
+          not replace your own privacy notices to your end users.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Data we help you collect">
+        <p>
+          SDKs send errors, events, and sessions to your configured ingest API. Payloads may
+          include:
+        </p>
+        <ul className="list-disc space-y-2 pl-5">
+          <li>Stack traces, error messages, and fingerprints</li>
+          <li>Custom event names and properties you define</li>
+          <li>Session start/end timestamps and identifiers</li>
+          <li>User ids and anonymous device ids when you choose to attach them</li>
+          <li>App name, SDK version, and environment metadata</li>
+        </ul>
+      </LegalSection>
+
+      <LegalSection title="Account data">
+        <p>
+          Dashboard accounts store email addresses, hashed passwords, organization membership, and
+          audit-relevant settings. Billing identifiers are stored when Stripe is configured.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Retention and deletion">
+        <p>
+          Retention periods depend on your plan and retention job configuration. Because you host
+          the database, you can delete projects, rotate API keys, and purge telemetry at any time.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="Contact">
+        <p>
+          Questions about privacy for a hosted deployment should be directed to your organization.
+          For the open-source project, contact{" "}
+          <a href="mailto:info@tacko.io" className="text-brand hover:underline">
+            info@tacko.io
+          </a>
+          .
+        </p>
+      </LegalSection>
+    </LegalPageShell>
   );
 }

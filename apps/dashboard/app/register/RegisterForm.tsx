@@ -4,16 +4,31 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { register } from "@/app/auth/actions";
+import { LegalExternalLink } from "@/app/components/legal/LegalPageShell";
 import { Button } from "@/app/components/ui/Button";
+import { PasswordInput } from "@/app/components/ui/PasswordInput";
 import Link from "next/link";
 
-export function RegisterForm({ inviteToken = "" }: { inviteToken?: string }) {
+export function RegisterForm({
+  inviteToken = "",
+  onSwitchToSignIn,
+  requireTerms = false,
+}: {
+  inviteToken?: string;
+  onSwitchToSignIn?: () => void;
+  requireTerms?: boolean;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (requireTerms && !termsAccepted) {
+      setError("Please accept the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     const formData = new FormData(e.currentTarget);
     setError(null);
     startTransition(async () => {
@@ -23,11 +38,13 @@ export function RegisterForm({ inviteToken = "" }: { inviteToken?: string }) {
         return;
       }
       router.push(
-        inviteToken ? "/dashboard/overview" : "/dashboard/settings/organization"
+        inviteToken ? "/dashboard/overview" : "/dashboard/settings/organization",
       );
       router.refresh();
     });
   }
+
+  const submitDisabled = pending || (requireTerms && !termsAccepted);
 
   return (
     <form onSubmit={handleSubmit} className="auth-form">
@@ -59,27 +76,58 @@ export function RegisterForm({ inviteToken = "" }: { inviteToken?: string }) {
       <label className="auth-form__label" htmlFor="reg-password">
         Password
       </label>
-      <input
+      <PasswordInput
         id="reg-password"
         name="password"
-        type="password"
         autoComplete="new-password"
         required
         minLength={8}
-        className="filter-input auth-form__input"
         disabled={pending}
       />
       <p className="auth-form__hint text-muted-foreground">At least 8 characters.</p>
+
+      {requireTerms ? (
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background/50 px-3 py-3 text-sm leading-relaxed text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            disabled={pending}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-brand"
+          />
+          <span>
+            I agree to the{" "}
+            <LegalExternalLink href="/terms">Terms of Service</LegalExternalLink> and{" "}
+            <LegalExternalLink href="/privacy">Privacy Policy</LegalExternalLink>.
+          </span>
+        </label>
+      ) : null}
+
       {error ? (
         <p className="auth-form__error" role="alert">
           {error}
         </p>
       ) : null}
-      <Button type="submit" variant="primary" disabled={pending} className="auth-form__submit">
+      <Button
+        type="submit"
+        variant="primary"
+        disabled={submitDisabled}
+        className="auth-form__submit"
+      >
         {pending ? "Creating account…" : "Create account"}
       </Button>
       <p className="auth-form__footer">
-        <Link href="/login">Already have an account?</Link>
+        {onSwitchToSignIn ? (
+          <button
+            type="button"
+            className="cursor-pointer border-0 bg-transparent p-0 text-link"
+            onClick={onSwitchToSignIn}
+          >
+            Already have an account?
+          </button>
+        ) : (
+          <Link href="/login">Already have an account?</Link>
+        )}
       </p>
     </form>
   );

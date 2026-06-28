@@ -2,6 +2,7 @@ node_modules
 .env
 # pnpm monorepo; ignore npm lockfiles so Next doesn't see multiple roots
 .pnpm-store
+pnpm-lock.yaml
 package-lock.json
 **/package-lock.json
 .next
@@ -10,3 +11,4 @@ apps/dashboard/tsconfig.tsbuildinfo
 apps/api/tsconfig.tsbuildinfo
 dist
 apps/api/node_modules
+.pulse-beacon-studio-ref

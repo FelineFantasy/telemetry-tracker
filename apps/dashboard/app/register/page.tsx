@@ -23,7 +23,7 @@ export default async function RegisterPage({
             ? "Complete registration to join the organization you were invited to."
             : "After you sign in, create your first organization (workspace). Add projects under Organization settings, then create API keys so your SDK can send telemetry. Invited users skip this and land in the host organization."}
         </p>
-        <RegisterForm inviteToken={inviteToken} />
+        <RegisterForm inviteToken={inviteToken} requireTerms />
         <p className="auth-page__hint text-muted-foreground">
           <Link href="/">← Back to home</Link>
         </p>
