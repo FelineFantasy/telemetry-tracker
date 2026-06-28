@@ -85,7 +85,9 @@ export function LoginForm({
           Create an account
         </button>
         {" · "}
-        <LegalExternalLink href="/forgot-password">Forgot password?</LegalExternalLink>
+        <LegalExternalLink href="/forgot-password" sameTab>
+          Forgot password?
+        </LegalExternalLink>
       </p>
       <p className="text-center text-xs text-muted-foreground">
         By signing in you agree to our{" "}

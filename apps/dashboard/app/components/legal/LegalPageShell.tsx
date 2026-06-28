@@ -4,26 +4,34 @@ import type { ReactNode } from "react";
 export function LegalExternalLink({
   href,
   children,
+  sameTab = false,
 }: {
   href: string;
   children: ReactNode;
+  /** Keep in-app navigation in the current tab (e.g. forgot password from a modal). */
+  sameTab?: boolean;
 }) {
   const className = "font-medium text-brand underline-offset-2 hover:underline";
   const isExternal =
     href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:");
 
-  if (isExternal) {
+  if (sameTab && !isExternal) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+      <Link href={href} className={className}>
         {children}
-      </a>
+      </Link>
     );
   }
 
   return (
-    <Link href={href} className={className}>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+    >
       {children}
-    </Link>
+    </a>
   );
 }
 
