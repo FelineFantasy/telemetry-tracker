@@ -148,24 +148,24 @@ function AuthModalShell({
 }
 
 function AuthModalUrlHandler({
-  onOpenSignIn,
-  onOpenSignUp,
+  showSignIn,
+  showSignUp,
 }: {
-  onOpenSignIn: () => void;
-  onOpenSignUp: (opts?: { inviteToken?: string }) => void;
+  showSignIn: () => void;
+  showSignUp: (opts?: { inviteToken?: string }) => void;
 }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
     const invite = searchParams.get("invite");
-    if (searchParams.get("signUp") === "1" || invite) {
-      onOpenSignUp(invite ? { inviteToken: invite } : undefined);
+    if (searchParams.get("signIn") === "1") {
+      showSignIn();
       return;
     }
-    if (searchParams.get("signIn") === "1") {
-      onOpenSignIn();
+    if (searchParams.get("signUp") === "1" || invite) {
+      showSignUp(invite ? { inviteToken: invite } : undefined);
     }
-  }, [searchParams, onOpenSignIn, onOpenSignUp]);
+  }, [searchParams, showSignIn, showSignUp]);
 
   return null;
 }
@@ -178,14 +178,32 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState("");
 
+  const replaceAuthParams = useCallback(
+    (mode: "closed" | "signIn" | "signUp", invite?: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("signIn");
+      params.delete("signUp");
+      params.delete("invite");
+      if (mode === "signIn") {
+        params.set("signIn", "1");
+      } else if (mode === "signUp") {
+        params.set("signUp", "1");
+        if (invite) params.set("invite", invite);
+      }
+      const q = params.toString();
+      const next = q ? `${pathname}?${q}` : pathname;
+      const currentQ = searchParams.toString();
+      const current = currentQ ? `${pathname}?${currentQ}` : pathname;
+      if (next !== current) {
+        router.replace(next, { scroll: false });
+      }
+    },
+    [pathname, router, searchParams],
+  );
+
   const clearAuthParams = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("signIn");
-    params.delete("signUp");
-    params.delete("invite");
-    const q = params.toString();
-    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams]);
+    replaceAuthParams("closed");
+  }, [replaceAuthParams]);
 
   const closeModals = useCallback(() => {
     setSignInOpen(false);
@@ -205,17 +223,31 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
-  const openSignIn = useCallback(() => {
+  const showSignIn = useCallback(() => {
     setSignUpOpen(false);
     setInviteToken("");
     setSignInOpen(true);
   }, []);
 
-  const openSignUp = useCallback((opts?: { inviteToken?: string }) => {
+  const showSignUp = useCallback((opts?: { inviteToken?: string }) => {
     setSignInOpen(false);
     setInviteToken(opts?.inviteToken ?? "");
     setSignUpOpen(true);
   }, []);
+
+  const openSignIn = useCallback(() => {
+    showSignIn();
+    replaceAuthParams("signIn");
+  }, [replaceAuthParams, showSignIn]);
+
+  const openSignUp = useCallback(
+    (opts?: { inviteToken?: string }) => {
+      const token = opts?.inviteToken ?? "";
+      showSignUp(opts);
+      replaceAuthParams("signUp", token || undefined);
+    },
+    [replaceAuthParams, showSignUp],
+  );
 
   useEffect(() => {
     setSignInOpen(false);
@@ -230,7 +262,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   return (
     <AuthModalsContext value={{ openSignIn, openSignUp, closeModals }}>
       <Suspense fallback={null}>
-        <AuthModalUrlHandler onOpenSignIn={openSignIn} onOpenSignUp={openSignUp} />
+        <AuthModalUrlHandler showSignIn={showSignIn} showSignUp={showSignUp} />
       </Suspense>
       {children}
 

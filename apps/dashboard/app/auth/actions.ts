@@ -130,6 +130,14 @@ export async function register(
   const displayNameRaw = String(formData.get("displayName") ?? "").trim();
   const displayName = displayNameRaw ? displayNameRaw.slice(0, 120) : undefined;
   const inviteToken = String(formData.get("inviteToken") ?? "").trim();
+  const requireTerms = formData.get("requireTerms") === "1";
+  const termsAccepted = formData.get("termsAccepted");
+  if (requireTerms && termsAccepted !== "yes") {
+    return {
+      ok: false,
+      error: "Please accept the Terms of Service and Privacy Policy to continue.",
+    };
+  }
   if (!email || !password) {
     return { ok: false, error: "Email and password are required" };
   }

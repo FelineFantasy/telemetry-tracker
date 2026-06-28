@@ -95,20 +95,25 @@ export function RegisterForm({
       <p className="auth-form__hint text-muted-foreground">At least 8 characters.</p>
 
       {requireTerms ? (
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background/50 px-3 py-3 text-sm leading-relaxed text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={termsAccepted}
-            onChange={(e) => setTermsAccepted(e.target.checked)}
-            disabled={pending}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-brand"
-          />
+        <>
+          <input type="hidden" name="requireTerms" value="1" />
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background/50 px-3 py-3 text-sm leading-relaxed text-muted-foreground">
+            <input
+              type="checkbox"
+              name="termsAccepted"
+              value="yes"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              disabled={pending}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-brand"
+            />
           <span>
             I agree to the{" "}
             <LegalExternalLink href="/terms">Terms of Service</LegalExternalLink> and{" "}
             <LegalExternalLink href="/privacy">Privacy Policy</LegalExternalLink>.
           </span>
         </label>
+        </>
       ) : null}
 
       {error ? (
