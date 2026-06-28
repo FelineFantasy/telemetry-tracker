@@ -13,6 +13,9 @@ const PUBLIC_PATHS = [
   "/docs/node",
   "/docs/nuxt",
   "/docs/react-native",
+  "/contact",
+  "/privacy",
+  "/terms",
 ] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {

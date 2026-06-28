@@ -1,20 +1,30 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { login } from "@/app/auth/actions";
+import { LegalExternalLink } from "@/app/components/legal/LegalPageShell";
 import { Button } from "@/app/components/ui/Button";
-import Link from "next/link";
+import { PasswordInput } from "@/app/components/ui/PasswordInput";
 
-export function LoginForm() {
-  const router = useRouter();
+export function LoginForm({
+  onSwitchToSignUp,
+  onSuccess,
+}: {
+  onSwitchToSignUp: () => void;
+  onSuccess: (destination: string) => void;
+}) {
   const searchParams = useSearchParams();
   const next = searchParams.get("next")?.startsWith("/")
     ? searchParams.get("next")!
     : "/dashboard/overview";
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [pending, startTransition] = useTransition();
+
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !pending;
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -26,8 +36,7 @@ export function LoginForm() {
         setError(r.error);
         return;
       }
-      router.push(next);
-      router.refresh();
+      onSuccess(next);
     });
   }
 
@@ -42,19 +51,21 @@ export function LoginForm() {
         type="email"
         autoComplete="email"
         required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         className="filter-input auth-form__input"
         disabled={pending}
       />
       <label className="auth-form__label" htmlFor="login-password">
         Password
       </label>
-      <input
+      <PasswordInput
         id="login-password"
         name="password"
-        type="password"
         autoComplete="current-password"
         required
-        className="filter-input auth-form__input"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
         disabled={pending}
       />
       {error ? (
@@ -62,13 +73,26 @@ export function LoginForm() {
           {error}
         </p>
       ) : null}
-      <Button type="submit" variant="primary" disabled={pending} className="auth-form__submit">
+      <Button type="submit" variant="primary" disabled={!canSubmit} className="auth-form__submit">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
       <p className="auth-form__footer">
-        <Link href="/register">Create an account</Link>
+        <button
+          type="button"
+          className="cursor-pointer border-0 bg-transparent p-0 text-link"
+          onClick={onSwitchToSignUp}
+        >
+          Create an account
+        </button>
         {" · "}
-        <Link href="/forgot-password">Forgot password?</Link>
+        <LegalExternalLink href="/forgot-password" sameTab>
+          Forgot password?
+        </LegalExternalLink>
+      </p>
+      <p className="text-center text-xs text-muted-foreground">
+        By signing in you agree to our{" "}
+        <LegalExternalLink href="/terms">Terms</LegalExternalLink> and{" "}
+        <LegalExternalLink href="/privacy">Privacy Policy</LegalExternalLink>.
       </p>
     </form>
   );

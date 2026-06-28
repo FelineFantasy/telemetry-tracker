@@ -1,17 +1,17 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Dark-first design tokens — brand palette (8-digit sources: #674fdcfc #8a7de4fe #b6abebfe #c0b9e128, transparent #00000000).
- * Solid: primary #674fdc, mid #8a7de4, light #b6abeb, muted #c0b9e1.
- * Use semantic utilities: bg-background, text-foreground, border-border, bg-primary, etc.
+ * Pulse-beacon design tokens — pure black canvas, near-white type, blue brand accent.
+ * shadcn semantic colors map to CSS variables in globals.css.
  */
 const config: Config = {
   content: ["./app/**/*.{js,ts,jsx,tsx,mdx}"],
+  darkMode: ["class"],
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        sans: ["var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
       },
       fontSize: {
         "2xs": ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.02em" }],
@@ -21,72 +21,89 @@ const config: Config = {
         22: "5.5rem",
       },
       borderRadius: {
-        lg: "0.75rem",
-        md: "0.5rem",
-        sm: "0.375rem",
-        xl: "1rem",
-        "2xl": "1.25rem",
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 4px)",
+        "2xl": "calc(var(--radius) + 8px)",
       },
       boxShadow: {
-        xs: "0 1px 2px 0 rgb(15 10 35 / 0.12)",
-        sm: "0 1px 3px 0 rgb(15 10 35 / 0.14), 0 1px 2px -1px rgb(15 10 35 / 0.1)",
-        md: "0 4px 6px -1px rgb(15 10 35 / 0.18), 0 2px 4px -2px rgb(15 10 35 / 0.12)",
-        lg: "0 10px 15px -3px rgb(15 10 35 / 0.22), 0 4px 6px -4px rgb(15 10 35 / 0.16)",
-        glow: "0 0 0 1px rgb(103 79 220 / 0.2), 0 8px 32px rgb(138 125 228 / 0.14)",
+        xs: "0 1px 2px 0 rgb(0 0 0 / 0.24)",
+        sm: "0 1px 3px 0 rgb(0 0 0 / 0.28)",
+        md: "0 4px 6px -1px rgb(0 0 0 / 0.32)",
+        lg: "0 10px 15px -3px rgb(0 0 0 / 0.36)",
         "inner-soft": "inset 0 1px 0 0 rgb(255 255 255 / 0.04)",
       },
       colors: {
-        /* Soft purple-gray canvas (aligned with brand — not near-black) */
-        background: "#06060f",
-        foreground: "#ffffff",
-        surface: {
-          DEFAULT: "#3d3758",
-          alt: "#45406a",
-          raised: "#4e4878",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        card: {
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)",
         },
-        muted: {
-          DEFAULT: "#4a4565",
-          foreground: "#d4d0e8",
-        },
-        border: {
-          DEFAULT: "#5c5678",
-          subtle: "#6a6488",
+        popover: {
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
         },
         primary: {
-          DEFAULT: "#674fdc",
-          foreground: "#ffffff",
-          hover: "#8a7de4",
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
+          hover: "var(--brand)",
         },
         secondary: {
-          DEFAULT: "#8a7de4",
-          foreground: "#1a1428",
-          hover: "#b6abeb",
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
+          hover: "var(--secondary)",
+        },
+        muted: {
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
         },
         accent: {
-          DEFAULT: "#b6abeb",
-          foreground: "#161632",
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
         },
-        danger: {
-          DEFAULT: "#f87171",
-          foreground: "#450a0a",
-          muted: "rgba(248, 113, 113, 0.12)",
+        destructive: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
         },
+        brand: {
+          DEFAULT: "var(--brand)",
+          soft: "var(--brand-soft)",
+        },
+        surface: {
+          DEFAULT: "var(--surface)",
+          elevated: "var(--surface-elevated)",
+          alt: "var(--surface-elevated)",
+          raised: "var(--surface-elevated)",
+        },
+        border: {
+          DEFAULT: "var(--border)",
+          strong: "var(--border-strong)",
+          subtle: "var(--border-strong)",
+        },
+        input: "var(--input)",
+        ring: "var(--ring)",
         success: {
-          DEFAULT: "#34d399",
-          foreground: "#022c22",
-          muted: "rgba(52, 211, 153, 0.12)",
+          DEFAULT: "var(--success)",
+          foreground: "var(--foreground)",
+          muted: "oklch(0.78 0.16 150 / 14%)",
         },
         warning: {
-          DEFAULT: "#fbbf24",
-          foreground: "#422006",
-          muted: "rgba(251, 191, 36, 0.12)",
+          DEFAULT: "var(--warning)",
+          foreground: "var(--foreground)",
+          muted: "oklch(0.82 0.16 75 / 14%)",
+        },
+        danger: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
+          muted: "oklch(0.66 0.22 22 / 14%)",
         },
         code: {
-          bg: "#353050",
-          border: "#5c5690",
-          foreground: "#c0b9e1",
+          bg: "var(--surface)",
+          border: "var(--border-strong)",
+          foreground: "var(--foreground)",
         },
-        ring: "#8a7de4",
       },
       maxWidth: {
         prose: "65ch",
@@ -97,6 +114,20 @@ const config: Config = {
       },
       transitionTimingFunction: {
         smooth: "cubic-bezier(0.4, 0, 0.2, 1)",
+      },
+      keyframes: {
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "pulse-dot": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.55", transform: "scale(0.9)" },
+        },
+      },
+      animation: {
+        "fade-up": "fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both",
+        "pulse-dot": "pulse-dot 2s ease-in-out infinite",
       },
     },
   },

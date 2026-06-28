@@ -130,6 +130,12 @@ export async function register(
   const displayNameRaw = String(formData.get("displayName") ?? "").trim();
   const displayName = displayNameRaw ? displayNameRaw.slice(0, 120) : undefined;
   const inviteToken = String(formData.get("inviteToken") ?? "").trim();
+  if (formData.get("termsAccepted") !== "yes") {
+    return {
+      ok: false,
+      error: "Please accept the Terms of Service and Privacy Policy to continue.",
+    };
+  }
   if (!email || !password) {
     return { ok: false, error: "Email and password are required" };
   }
@@ -203,7 +209,7 @@ export async function logout(): Promise<void> {
 
 export async function logoutAction(): Promise<void> {
   await logout();
-  redirect("/login");
+  redirect("/?signIn=1");
 }
 
 export async function requestPasswordReset(

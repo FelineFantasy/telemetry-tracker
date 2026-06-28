@@ -17,6 +17,24 @@
   <strong>Live demo:</strong> <a href="https://telemetry-tracker.tacko.io">telemetry-tracker.tacko.io</a>
 </p>
 
+<p align="center">
+  <a href="https://telemetry-tracker.tacko.io">
+    <img src="apps/dashboard/public/screenshot-dashboard.jpg" alt="Dashboard overview with requests, error rate, top errors, and recent sessions" width="920" />
+  </a>
+</p>
+
+<p align="center">
+  <sub><strong>Overview</strong> — trend charts, top errors, and recent sessions filtered by app and time range.</sub>
+</p>
+
+<p align="center">
+  <img src="apps/dashboard/public/screenshot-errors.jpg" alt="Error detail with stack trace, occurrence history, and metadata" width="920" />
+</p>
+
+<p align="center">
+  <sub><strong>Error detail</strong> — grouped exceptions with stack traces, occurrence context, and release tags.</sub>
+</p>
+
 ---
 
 ## Features
@@ -92,7 +110,7 @@ pnpm dev:dashboard  # Dashboard → http://localhost:3000
 
 Then:
 
-1. Open **http://localhost:3000/register** and create an account.
+1. Open **http://localhost:3000**, click **Start tracking**, and create an account.
 2. Create an **organization** and **project** in Organization settings.
 3. Create an **API key** under Settings → API keys (copy the `tt_live_…` secret once).
 4. Instrument your app (see SDK example below) and check **Overview** in the dashboard.
