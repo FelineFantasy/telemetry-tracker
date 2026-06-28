@@ -150,9 +150,11 @@ function AuthModalShell({
 function AuthModalUrlHandler({
   showSignIn,
   showSignUp,
+  closeModalState,
 }: {
   showSignIn: () => void;
   showSignUp: (opts?: { inviteToken?: string }) => void;
+  closeModalState: () => void;
 }) {
   const searchParams = useSearchParams();
 
@@ -164,8 +166,10 @@ function AuthModalUrlHandler({
     }
     if (searchParams.get("signUp") === "1" || invite) {
       showSignUp(invite ? { inviteToken: invite } : undefined);
+      return;
     }
-  }, [searchParams, showSignIn, showSignUp]);
+    closeModalState();
+  }, [searchParams, showSignIn, showSignUp, closeModalState]);
 
   return null;
 }
@@ -201,26 +205,28 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     [pathname, router, searchParams],
   );
 
+  const closeModalState = useCallback(() => {
+    setSignInOpen(false);
+    setSignUpOpen(false);
+    setInviteToken("");
+  }, []);
+
   const clearAuthParams = useCallback(() => {
     replaceAuthParams("closed");
   }, [replaceAuthParams]);
 
   const closeModals = useCallback(() => {
-    setSignInOpen(false);
-    setSignUpOpen(false);
-    setInviteToken("");
+    closeModalState();
     clearAuthParams();
-  }, [clearAuthParams]);
+  }, [clearAuthParams, closeModalState]);
 
   const completeAuth = useCallback(
     (destination: string) => {
-      setSignInOpen(false);
-      setSignUpOpen(false);
-      setInviteToken("");
+      closeModalState();
       router.push(destination);
       router.refresh();
     },
-    [router],
+    [closeModalState, router],
   );
 
   const showSignIn = useCallback(() => {
@@ -249,12 +255,6 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     [replaceAuthParams, showSignUp],
   );
 
-  useEffect(() => {
-    setSignInOpen(false);
-    setSignUpOpen(false);
-    setInviteToken("");
-  }, [pathname]);
-
   const signUpDescription = inviteToken
     ? "Complete registration to join the organization you were invited to."
     : "Free to start. Set up your organization and API keys in minutes.";
@@ -262,7 +262,11 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   return (
     <AuthModalsContext value={{ openSignIn, openSignUp, closeModals }}>
       <Suspense fallback={null}>
-        <AuthModalUrlHandler showSignIn={showSignIn} showSignUp={showSignUp} />
+        <AuthModalUrlHandler
+          showSignIn={showSignIn}
+          showSignUp={showSignUp}
+          closeModalState={closeModalState}
+        />
       </Suspense>
       {children}
 
