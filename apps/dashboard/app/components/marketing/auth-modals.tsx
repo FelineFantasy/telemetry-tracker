@@ -152,7 +152,7 @@ function AuthModalUrlHandler({
   showSignUp,
   closeModalState,
 }: {
-  showSignIn: () => void;
+  showSignIn: (opts?: { inviteToken?: string }) => void;
   showSignUp: (opts?: { inviteToken?: string }) => void;
   closeModalState: () => void;
 }) {
@@ -165,7 +165,7 @@ function AuthModalUrlHandler({
       return;
     }
     if (searchParams.get("signIn") === "1") {
-      showSignIn();
+      showSignIn({ inviteToken: invite ?? "" });
       return;
     }
     closeModalState();
@@ -188,8 +188,9 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
       params.delete("signIn");
       params.delete("signUp");
       if (mode === "signIn") {
-        params.delete("invite");
         params.set("signIn", "1");
+        if (invite) params.set("invite", invite);
+        else params.delete("invite");
       } else if (mode === "signUp") {
         params.delete("invite");
         params.set("signUp", "1");
@@ -232,9 +233,11 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     [closeModalState, router],
   );
 
-  const showSignIn = useCallback(() => {
+  const showSignIn = useCallback((opts?: { inviteToken?: string }) => {
     setSignUpOpen(false);
-    setInviteToken("");
+    if (opts !== undefined) {
+      setInviteToken(opts.inviteToken ?? "");
+    }
     setSignInOpen(true);
   }, []);
 
@@ -245,17 +248,18 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openSignIn = useCallback(() => {
-    showSignIn();
-    replaceAuthParams("signIn");
-  }, [replaceAuthParams, showSignIn]);
+    const token = inviteToken.trim();
+    showSignIn({ inviteToken: token });
+    replaceAuthParams("signIn", token || undefined);
+  }, [inviteToken, replaceAuthParams, showSignIn]);
 
   const openSignUp = useCallback(
     (opts?: { inviteToken?: string }) => {
-      const token = opts?.inviteToken?.trim() ?? "";
+      const token = (opts?.inviteToken ?? inviteToken).trim();
       showSignUp({ inviteToken: token || undefined });
       replaceAuthParams("signUp", token || undefined);
     },
-    [replaceAuthParams, showSignUp],
+    [inviteToken, replaceAuthParams, showSignUp],
   );
 
   const signUpDescription = inviteToken
