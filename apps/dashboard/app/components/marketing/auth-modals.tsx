@@ -5,9 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ComponentPropsWithoutRef,
   type ReactNode,
+  type RefObject,
   Suspense,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -151,25 +153,38 @@ function AuthModalUrlHandler({
   showSignIn,
   showSignUp,
   closeModalState,
+  suppressOpenRef,
 }: {
   showSignIn: (opts?: { inviteToken?: string }) => void;
   showSignUp: (opts?: { inviteToken?: string }) => void;
   closeModalState: () => void;
+  suppressOpenRef: RefObject<boolean>;
 }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
     const invite = searchParams.get("invite");
-    if (searchParams.get("signUp") === "1") {
+    const signUp = searchParams.get("signUp") === "1";
+    const signIn = searchParams.get("signIn") === "1";
+
+    if (suppressOpenRef.current) {
+      if (!signUp && !signIn) {
+        suppressOpenRef.current = false;
+      }
+      closeModalState();
+      return;
+    }
+
+    if (signUp) {
       showSignUp(invite ? { inviteToken: invite } : undefined);
       return;
     }
-    if (searchParams.get("signIn") === "1") {
+    if (signIn) {
       showSignIn({ inviteToken: invite ?? "" });
       return;
     }
     closeModalState();
-  }, [searchParams, showSignIn, showSignUp, closeModalState]);
+  }, [searchParams, showSignIn, showSignUp, closeModalState, suppressOpenRef]);
 
   return null;
 }
@@ -181,6 +196,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   const [signInOpen, setSignInOpen] = useState(false);
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState("");
+  const suppressAuthModalOpenRef = useRef(false);
 
   const replaceAuthParams = useCallback(
     (mode: "closed" | "signIn" | "signUp", invite?: string) => {
@@ -220,6 +236,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   }, [replaceAuthParams]);
 
   const closeModals = useCallback(() => {
+    suppressAuthModalOpenRef.current = true;
     closeModalState();
     clearAuthParams();
   }, [clearAuthParams, closeModalState]);
@@ -248,6 +265,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openSignIn = useCallback(() => {
+    suppressAuthModalOpenRef.current = false;
     const token = inviteToken.trim();
     showSignIn({ inviteToken: token });
     replaceAuthParams("signIn", token || undefined);
@@ -255,6 +273,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
 
   const openSignUp = useCallback(
     (opts?: { inviteToken?: string }) => {
+      suppressAuthModalOpenRef.current = false;
       const token = (opts?.inviteToken ?? inviteToken).trim();
       showSignUp({ inviteToken: token || undefined });
       replaceAuthParams("signUp", token || undefined);
@@ -273,6 +292,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
           showSignIn={showSignIn}
           showSignUp={showSignUp}
           closeModalState={closeModalState}
+          suppressOpenRef={suppressAuthModalOpenRef}
         />
       </Suspense>
       {children}
