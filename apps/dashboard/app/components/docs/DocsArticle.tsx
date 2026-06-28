@@ -12,15 +12,15 @@ type DocsArticleProps = {
  */
 export function DocsArticle({ title, lede, children }: DocsArticleProps) {
   return (
-    <article className="mx-auto max-w-3xl">
+    <article className="max-w-2xl">
       <header className="mb-10 border-b border-border pb-8">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-          Documentation
-        </p>
-        <h1>{title}</h1>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Documentation</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
         <div className="mt-4 text-base leading-relaxed text-muted-foreground">{lede}</div>
       </header>
-      {children}
+      <div className="prose-docs space-y-6 text-[15px] leading-relaxed text-foreground/85 [&_h2]:mt-10 [&_h2]:scroll-mt-32 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_p]:text-foreground/85">
+        {children}
+      </div>
     </article>
   );
 }

@@ -5,9 +5,9 @@ const cols: { heading: string; links: { label: string; href: string }[] }[] = [
   {
     heading: "Product",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "SDKs", href: "#sdks" },
-      { label: "Pricing", href: "#pricing" },
+      { label: "Features", href: "/#features" },
+      { label: "SDKs", href: "/#sdks" },
+      { label: "Pricing", href: "/#pricing" },
       { label: "Dashboard", href: "/dashboard/overview" },
     ],
   },
@@ -57,7 +57,7 @@ export function Footer() {
               <ul className="mt-4 space-y-2.5">
                 {c.links.map((l) => (
                   <li key={l.label}>
-                    {l.href.startsWith("#") || l.href.startsWith("mailto:") ? (
+                    {l.href.startsWith("mailto:") || l.href.startsWith("http") ? (
                       <a
                         href={l.href}
                         className="text-sm text-foreground/85 hover:text-foreground"

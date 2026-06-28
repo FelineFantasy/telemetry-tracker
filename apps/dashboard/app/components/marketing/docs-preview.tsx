@@ -6,37 +6,31 @@ const guides = [
     title: "Quickstart",
     desc: "Install an SDK and capture your first event in under a minute.",
     time: "2 min",
-    href: "/docs/sdk",
   },
   {
     title: "Capturing errors",
     desc: "Group, fingerprint and resolve exceptions across your apps.",
     time: "5 min",
-    href: "/docs/sdk",
   },
   {
     title: "Sessions",
     desc: "Track session start and end events with user context.",
     time: "4 min",
-    href: "/docs/sdk",
   },
   {
     title: "Next.js integration",
     desc: "Provider, error boundary, and server-side capture.",
     time: "5 min",
-    href: "/docs/nextjs",
   },
   {
     title: "Self-hosting",
     desc: "Run the API and dashboard on your own infrastructure.",
     time: "10 min",
-    href: "/docs/dashboard",
   },
   {
     title: "Dashboard guide",
     desc: "Overview, filters, orgs, projects and API keys.",
     time: "6 min",
-    href: "/docs/dashboard",
   },
 ];
 
@@ -54,7 +48,7 @@ export function DocsPreview() {
           {guides.map((g) => (
             <li key={g.title}>
               <Link
-                href={g.href}
+                href="/docs"
                 className="group flex h-full flex-col justify-between bg-background p-6 transition-colors hover:bg-surface/60"
               >
                 <div>

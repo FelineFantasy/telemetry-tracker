@@ -20,6 +20,8 @@ export function RegisterForm({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -44,7 +46,11 @@ export function RegisterForm({
     });
   }
 
-  const submitDisabled = pending || (requireTerms && !termsAccepted);
+  const canSubmit =
+    email.trim().length > 0 &&
+    password.length >= 8 &&
+    (!requireTerms || termsAccepted) &&
+    !pending;
 
   return (
     <form onSubmit={handleSubmit} className="auth-form">
@@ -58,6 +64,8 @@ export function RegisterForm({
         type="email"
         autoComplete="email"
         required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         className="filter-input auth-form__input"
         disabled={pending}
       />
@@ -82,6 +90,8 @@ export function RegisterForm({
         autoComplete="new-password"
         required
         minLength={8}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
         disabled={pending}
       />
       <p className="auth-form__hint text-muted-foreground">At least 8 characters.</p>
@@ -111,7 +121,7 @@ export function RegisterForm({
       <Button
         type="submit"
         variant="primary"
-        disabled={submitDisabled}
+        disabled={!canSubmit}
         className="auth-form__submit"
       >
         {pending ? "Creating account…" : "Create account"}

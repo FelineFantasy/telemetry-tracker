@@ -22,7 +22,11 @@ export function LoginForm({
     ? searchParams.get("next")!
     : "/dashboard/overview";
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [pending, startTransition] = useTransition();
+
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !pending;
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -56,6 +60,8 @@ export function LoginForm({
         type="email"
         autoComplete="email"
         required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         className="filter-input auth-form__input"
         disabled={pending}
       />
@@ -67,6 +73,8 @@ export function LoginForm({
         name="password"
         autoComplete="current-password"
         required
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
         disabled={pending}
       />
       {error ? (
@@ -74,7 +82,7 @@ export function LoginForm({
           {error}
         </p>
       ) : null}
-      <Button type="submit" variant="primary" disabled={pending} className="auth-form__submit">
+      <Button type="submit" variant="primary" disabled={!canSubmit} className="auth-form__submit">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
       <p className="auth-form__footer">

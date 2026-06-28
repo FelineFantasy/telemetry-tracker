@@ -7,11 +7,11 @@ import { useAuthModals } from "./auth-modals";
 import { Logo } from "./logo";
 
 const links = [
-  { href: "#features", label: "Features" },
-  { href: "#sdks", label: "SDKs" },
-  { href: "#product", label: "Product" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#docs", label: "Docs" },
+  { href: "/#features", label: "Features" },
+  { href: "/#sdks", label: "SDKs" },
+  { href: "/#product", label: "Product" },
+  { href: "/#pricing", label: "Pricing" },
+  { href: "/#docs", label: "Docs" },
 ];
 
 export function Nav() {
@@ -63,12 +63,12 @@ export function Nav() {
           <ul className="hidden items-center gap-0.5 lg:flex xl:gap-1">
             {links.map((l) => (
               <li key={l.href}>
-                <a
+                <Link
                   href={l.href}
                   className="rounded-full px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-surface hover:text-foreground xl:px-3"
                 >
                   {l.label}
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -130,13 +130,13 @@ export function Nav() {
               <ul className="flex flex-col p-2">
                 {links.map((l) => (
                   <li key={l.href}>
-                    <a
+                    <Link
                       href={l.href}
                       className="block rounded-xl px-4 py-3 text-sm text-foreground transition-colors hover:bg-surface"
                       onClick={closeMenu}
                     >
                       {l.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
