@@ -1,10 +1,4 @@
 import { cookies } from "next/headers";
-import { API_BASE_URL } from "@/lib/api-url";
-import {
-  fetchDashboardOrganizationsList,
-  getDashboardOrganizationId,
-  resolveActiveOrganizationId,
-} from "@/lib/dashboard-org";
 
 /** Cookie storing the active dashboard project (matches API `X-Project-Id`). */
 export const TELEMETRY_PROJECT_COOKIE = "telemetry_project_id";
@@ -37,34 +31,14 @@ export function resolveEffectiveProjectId(
 }
 
 export async function getDashboardProjectId(): Promise<string> {
-  const cookieProjectId = await getDashboardProjectCookie();
-  if (cookieProjectId) return cookieProjectId;
-
   const sessionId = await getDashboardSessionId();
   if (!sessionId) return DEFAULT_PROJECT_ID;
 
-  const [cookieOrgId, organizations] = await Promise.all([
-    getDashboardOrganizationId(),
-    fetchDashboardOrganizationsList(),
-  ]);
-  const resolvedOrgId = resolveActiveOrganizationId(cookieOrgId, organizations);
-
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${sessionId}`,
-  };
-  if (resolvedOrgId) {
-    headers["X-Organization-Id"] = resolvedOrgId;
-  }
-
-  const res = await fetch(`${API_BASE_URL}/api/meta/projects`, {
-    cache: "no-store",
-    headers,
-  });
-  if (!res.ok) return DEFAULT_PROJECT_ID;
-
-  const data = (await res.json()) as { projects?: { id: string }[] };
-  const projects = data.projects ?? [];
-  return resolveEffectiveProjectId(undefined, projects) || DEFAULT_PROJECT_ID;
+  const { getDashboardWorkspaceForRequest } = await import(
+    "@/lib/dashboard-workspace-request"
+  );
+  const { effectiveProjectId } = await getDashboardWorkspaceForRequest();
+  return effectiveProjectId;
 }
 
 export async function getDashboardSessionId(): Promise<string | undefined> {
