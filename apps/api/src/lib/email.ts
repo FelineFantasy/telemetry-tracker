@@ -7,7 +7,7 @@ export async function sendTransactionalEmail(opts: {
   subject: string;
   html: string;
   replyTo?: string;
-}): Promise<{ sent: boolean; devLogged?: boolean }> {
+}): Promise<{ sent: boolean; devLogged?: boolean; status?: number; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.TELEMETRY_EMAIL_FROM?.trim();
 
@@ -19,24 +19,39 @@ export async function sendTransactionalEmail(opts: {
     return { sent: false };
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: Array.isArray(opts.to) ? opts.to : [opts.to],
-      subject: opts.subject,
-      html: opts.html,
-      ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: Array.isArray(opts.to) ? opts.to : [opts.to],
+        subject: opts.subject,
+        html: opts.html,
+        ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Network error";
+    console.warn("[email] Resend request failed:", message);
+    return { sent: false, error: message };
+  }
 
   if (!res.ok) {
-    console.warn("[email] Resend failed:", res.status, await res.text());
-    return { sent: false };
+    const text = await res.text();
+    let message = text;
+    try {
+      const json = JSON.parse(text) as { message?: string };
+      if (json.message) message = json.message;
+    } catch {
+      // keep raw body
+    }
+    console.warn("[email] Resend failed:", res.status, message);
+    return { sent: false, status: res.status, error: message };
   }
   return { sent: true };
 }

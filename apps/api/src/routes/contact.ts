@@ -66,6 +66,26 @@ function emailConfigured(): boolean {
   );
 }
 
+function contactDeliveryError(result: { status?: number; error?: string }): string {
+  const resendMessage = result.error?.toLowerCase() ?? "";
+  if (
+    result.status === 403 ||
+    resendMessage.includes("verify a domain") ||
+    resendMessage.includes("domain is not") ||
+    resendMessage.includes("resend.dev")
+  ) {
+    return (
+      `Email delivery is blocked by Resend: verify tacko.io (or your sending domain) in the Resend dashboard ` +
+      `and set TELEMETRY_EMAIL_FROM to an address on that domain (e.g. Telemetry <noreply@tacko.io>). ` +
+      `Until then, email ${CONTACT_INBOX} directly.`
+    );
+  }
+  if (process.env.NODE_ENV !== "production" && result.error) {
+    return `Could not deliver your message (${result.error}). Email ${CONTACT_INBOX} directly.`;
+  }
+  return `Could not deliver your message. Try emailing ${CONTACT_INBOX} directly.`;
+}
+
 export async function contactRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions
@@ -117,7 +137,7 @@ export async function contactRoutes(
 
     if (!inboxResult.sent) {
       return reply.status(502).send({
-        error: `Could not deliver your message. Try emailing ${CONTACT_INBOX} directly.`,
+        error: contactDeliveryError(inboxResult),
       });
     }
 
