@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { CookiesPageContent } from "@/app/components/marketing/cookies/CookiesPageContent";
 
 export const metadata: Metadata = {
