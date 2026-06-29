@@ -1,12 +1,12 @@
 import { API_BASE_URL } from "@/lib/api-url";
 import { getResolvedDashboardOrganizationId } from "@/lib/dashboard-org";
 import {
+  PROJECT_UUID_RE,
   dashboardApiHeaders,
   getDashboardProjectId,
   getDashboardSessionId,
+  isValidDashboardProjectId,
 } from "@/lib/dashboard-project";
-
-const PROJECT_UUID_RE = /^[0-9a-f-]{36}$/i;
 
 export type DashboardApiFetchOptions = {
   /** When true, do not send `X-Organization-Id` (avoids 403 from a stale org cookie on `/meta/projects`). */
@@ -49,7 +49,7 @@ export async function dashboardApiFetch(
     ? pathAndQuery
     : `${API_BASE_URL}${pathAndQuery.startsWith("/") ? "" : "/"}${pathAndQuery}`;
   const baseHeaders: Record<string, string> = {
-    ...(projectId ? dashboardApiHeaders(projectId) : {}),
+    ...(isValidDashboardProjectId(projectId) ? dashboardApiHeaders(projectId) : {}),
     ...(sessionId ? { Authorization: `Bearer ${sessionId}` } : {}),
     ...(orgId ? { "X-Organization-Id": orgId } : {}),
   };

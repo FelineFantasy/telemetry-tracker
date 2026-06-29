@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import {
   COOKIE_CONSENT_STORAGE_KEY,
+  COOKIE_CONSENT_MAX_AGE_SECONDS,
   PREFERENCE_COOKIES_REJECTED_MSG,
   PREFERENCE_COOKIES_REQUIRED_MSG,
   isCookieConsentChoice,
@@ -34,6 +35,26 @@ async function readDashboardOrganizationCookieValue(): Promise<string | undefine
 export async function getCookieConsentChoiceFromCookies(): Promise<CookieConsentChoice | null> {
   const value = (await cookies()).get(COOKIE_CONSENT_STORAGE_KEY)?.value;
   return isCookieConsentChoice(value) ? value : null;
+}
+
+const consentCookieBase = {
+  path: "/",
+  sameSite: "lax" as const,
+  maxAge: COOKIE_CONSENT_MAX_AGE_SECONDS,
+  httpOnly: false,
+  secure: process.env.NODE_ENV === "production",
+};
+
+export async function setCookieConsentChoice(choice: CookieConsentChoice): Promise<void> {
+  (await cookies()).set(COOKIE_CONSENT_STORAGE_KEY, choice, consentCookieBase);
+}
+
+/** Apply consent from auth FormData so login/register bootstrap sees the same choice as localStorage. */
+export async function applyCookieConsentFromForm(formData: FormData): Promise<void> {
+  const raw = String(formData.get("cookieConsent") ?? "").trim();
+  if (isCookieConsentChoice(raw)) {
+    await setCookieConsentChoice(raw);
+  }
 }
 
 export async function preferenceCookiesAllowedFromCookies(): Promise<boolean> {

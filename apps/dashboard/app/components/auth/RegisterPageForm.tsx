@@ -12,6 +12,7 @@ import {
 } from "@/app/components/auth/AuthPageShell";
 import { PasswordInput } from "@/app/components/ui/PasswordInput";
 import { crossAuthHref } from "@/lib/auth-href";
+import { appendCookieConsentToFormData } from "@/lib/cookie-consent-client";
 import {
   fieldErrorsFromZod,
   registerPageSchema,
@@ -56,6 +57,7 @@ export function RegisterPageForm() {
     formData.set("displayName", parsed.data.name);
     formData.set("termsAccepted", "yes");
     if (inviteToken) formData.set("inviteToken", inviteToken);
+    appendCookieConsentToFormData(formData);
 
     startTransition(async () => {
       const result = await register(formData);

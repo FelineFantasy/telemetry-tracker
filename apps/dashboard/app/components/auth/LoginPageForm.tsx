@@ -11,6 +11,7 @@ import {
 } from "@/app/components/auth/AuthPageShell";
 import { PasswordInput } from "@/app/components/ui/PasswordInput";
 import { crossAuthHref } from "@/lib/auth-href";
+import { appendCookieConsentToFormData } from "@/lib/cookie-consent-client";
 import {
   fieldErrorsFromZod,
   loginSchema,
@@ -48,6 +49,7 @@ export function LoginPageForm() {
     const formData = new FormData();
     formData.set("email", parsed.data.email);
     formData.set("password", parsed.data.password);
+    appendCookieConsentToFormData(formData);
 
     startTransition(async () => {
       const result = await login(formData);

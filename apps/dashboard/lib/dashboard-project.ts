@@ -11,6 +11,35 @@ export const DEFAULT_PROJECT_ID =
   process.env.TELEMETRY_PROJECT_ID?.trim() ||
   "a0000000-0000-4000-8000-000000000002";
 
+export const PROJECT_UUID_RE = /^[0-9a-f-]{36}$/i;
+
+export function isValidDashboardProjectId(
+  projectId: string | undefined | null
+): projectId is string {
+  const trimmed = projectId?.trim();
+  return !!trimmed && PROJECT_UUID_RE.test(trimmed);
+}
+
+/** Omit `X-Project-Id` when empty or invalid so the API does not fall back to the env default project. */
+export function optionalDashboardProjectHeader(
+  projectId: string | undefined | null
+): Record<string, string> {
+  if (!isValidDashboardProjectId(projectId)) return {};
+  return { "X-Project-Id": projectId.trim().toLowerCase() };
+}
+
+export function sessionScopedMetaHeaders(
+  sessionId: string,
+  options?: { projectId?: string; organizationId?: string }
+): Record<string, string> {
+  const org = options?.organizationId?.trim().toLowerCase();
+  return {
+    Authorization: `Bearer ${sessionId}`,
+    ...optionalDashboardProjectHeader(options?.projectId),
+    ...(org && PROJECT_UUID_RE.test(org) ? { "X-Organization-Id": org } : {}),
+  };
+}
+
 export async function getDashboardProjectCookie(): Promise<string | undefined> {
   const { getAllowedDashboardProjectCookie } = await import("./cookie-consent-server");
   return getAllowedDashboardProjectCookie();
@@ -51,5 +80,5 @@ export async function getDashboardSessionId(): Promise<string | undefined> {
 }
 
 export function dashboardApiHeaders(projectId: string): Record<string, string> {
-  return { "X-Project-Id": projectId };
+  return optionalDashboardProjectHeader(projectId);
 }

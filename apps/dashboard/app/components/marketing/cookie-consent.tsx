@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { clearPreferenceCookiesAction } from "@/app/cookie-consent/actions";
+import { syncCookieConsentAction } from "@/app/cookie-consent/actions";
 import {
   COOKIE_CONSENT_STORAGE_KEY,
   cookieConsentDocumentCookie,
@@ -21,6 +21,7 @@ export function CookieConsent() {
       const value = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
       if (isCookieConsentChoice(value)) {
         document.cookie = cookieConsentDocumentCookie(value);
+        void syncCookieConsentAction(value);
         setChoice(value);
         setExpanded(false);
       } else {
@@ -42,11 +43,9 @@ export function CookieConsent() {
     }
     setChoice(next);
     setExpanded(false);
-    if (next === "rejected") {
-      startTransition(() => {
-        void clearPreferenceCookiesAction();
-      });
-    }
+    startTransition(() => {
+      void syncCookieConsentAction(next);
+    });
   }
 
   if (!ready) return null;

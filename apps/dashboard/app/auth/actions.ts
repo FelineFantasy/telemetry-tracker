@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { API_BASE_URL } from "@/lib/api-url";
-import { clearPreferenceCookies, preferenceCookiesAllowedFromCookies } from "@/lib/cookie-consent-server";
+import { clearPreferenceCookies, preferenceCookiesAllowedFromCookies, applyCookieConsentFromForm } from "@/lib/cookie-consent-server";
 import { TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
 import {
   TELEMETRY_PROJECT_COOKIE,
@@ -99,6 +99,7 @@ export async function login(
   if (!email || !password) {
     return { ok: false, error: "Email and password are required" };
   }
+  await applyCookieConsentFromForm(formData);
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -152,6 +153,7 @@ export async function register(
   if (!email || !password) {
     return { ok: false, error: "Email and password are required" };
   }
+  await applyCookieConsentFromForm(formData);
   const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

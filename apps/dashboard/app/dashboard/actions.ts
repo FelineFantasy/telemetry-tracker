@@ -11,6 +11,8 @@ import {
   TELEMETRY_PROJECT_COOKIE,
   getDashboardProjectId,
   getDashboardSessionId,
+  isValidDashboardProjectId,
+  sessionScopedMetaHeaders,
 } from "@/lib/dashboard-project";
 
 export async function setDashboardProjectId(projectId: string): Promise<
@@ -59,10 +61,25 @@ const cookieOpts = {
   secure: process.env.NODE_ENV === "production",
 };
 
+function applyProjectCookieForOrganizationSwitch(
+  c: Awaited<ReturnType<typeof cookies>>,
+  currentProjectId: string,
+  nextProject: string
+): void {
+  const currentNorm = currentProjectId.trim().toLowerCase();
+  const nextNorm = nextProject.trim().toLowerCase();
+  if (nextNorm === currentNorm) return;
+  if (isValidDashboardProjectId(nextProject)) {
+    c.set(TELEMETRY_PROJECT_COOKIE, nextNorm, cookieOpts);
+  } else {
+    c.set(TELEMETRY_PROJECT_COOKIE, "", { ...cookieOpts, maxAge: 0 });
+  }
+}
+
 /**
  * After switching active org (or creating one), choose a `telemetry_project_id` that is valid for
- * session-context: prefer a project in `orgId`; if that org has no projects, fall back to any
- * project the user can access so we do not keep a stale project from another org.
+ * the target org. When that org has no projects, return empty so we do not scope API reads to
+ * another org's project or the env default.
  */
 async function resolveProjectCookieForOrganization(
   sessionId: string,
@@ -78,35 +95,25 @@ async function resolveProjectCookieForOrganization(
   } else {
     const res = await fetch(`${API_BASE_URL}/api/meta/projects`, {
       cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${sessionId}`,
-        "X-Project-Id": currentProjectId,
-        "X-Organization-Id": trimmedOrg,
-      },
+      headers: sessionScopedMetaHeaders(sessionId, {
+        projectId: currentProjectId,
+        organizationId: trimmedOrg,
+      }),
     });
-    if (!res.ok) return currentProjectId;
+    if (!res.ok) {
+      return isValidDashboardProjectId(currentProjectId) ? currentProjectId : "";
+    }
     data = (await res.json()) as { projects?: { id: string }[] };
   }
   const inOrgIds = data.projects?.map((p) => p.id) ?? [];
-  const current = currentProjectId.toLowerCase();
-  if (inOrgIds.some((id) => id.toLowerCase() === current)) {
+  const current = currentProjectId.trim().toLowerCase();
+  if (current && inOrgIds.some((id) => id.toLowerCase() === current)) {
     return currentProjectId;
   }
   if (inOrgIds.length > 0) {
-    return inOrgIds[0];
+    return inOrgIds[0]!;
   }
-  const resAll = await fetch(`${API_BASE_URL}/api/meta/projects`, {
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${sessionId}`,
-      "X-Project-Id": currentProjectId,
-    },
-  });
-  if (!resAll.ok) return DEFAULT_PROJECT_ID;
-  const allData = (await resAll.json()) as { projects?: { id: string }[] };
-  const all = allData.projects ?? [];
-  const first = all[0]?.id;
-  return first ?? DEFAULT_PROJECT_ID;
+  return "";
 }
 
 export async function setDashboardOrganizationId(
@@ -123,11 +130,10 @@ export async function setDashboardOrganizationId(
   const projectId = await getDashboardProjectId();
   const verify = await fetch(`${API_BASE_URL}/api/meta/projects`, {
     cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${sessionId}`,
-      "X-Project-Id": projectId,
-      "X-Organization-Id": trimmed,
-    },
+    headers: sessionScopedMetaHeaders(sessionId, {
+      projectId,
+      organizationId: trimmed,
+    }),
   });
   if (!verify.ok) {
     const t = await verify.text();
@@ -145,9 +151,7 @@ export async function setDashboardOrganizationId(
   }
   const c = await cookies();
   c.set(TELEMETRY_ORG_COOKIE, trimmed, cookieOpts);
-  if (nextProject.toLowerCase() !== projectId.toLowerCase()) {
-    c.set(TELEMETRY_PROJECT_COOKIE, nextProject.toLowerCase(), cookieOpts);
-  }
+  applyProjectCookieForOrganizationSwitch(c, projectId, nextProject);
   revalidatePath("/dashboard", "layout");
   return { ok: true };
 }
@@ -183,9 +187,7 @@ export async function createOrganizationAction(
     const projectId = await getDashboardProjectId();
     if (sessionId) {
       const nextProject = await resolveProjectCookieForOrganization(sessionId, orgId, projectId);
-      if (nextProject.toLowerCase() !== projectId.toLowerCase()) {
-        c.set(TELEMETRY_PROJECT_COOKIE, nextProject.toLowerCase(), cookieOpts);
-      }
+      applyProjectCookieForOrganizationSwitch(c, projectId, nextProject);
     }
   }
   revalidatePath("/dashboard", "layout");
