@@ -69,7 +69,6 @@ function emailConfigured(): boolean {
 function contactDeliveryError(result: { status?: number; error?: string }): string {
   const resendMessage = result.error?.toLowerCase() ?? "";
   if (
-    result.status === 403 ||
     resendMessage.includes("verify a domain") ||
     resendMessage.includes("domain is not") ||
     resendMessage.includes("resend.dev")
