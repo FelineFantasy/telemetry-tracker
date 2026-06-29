@@ -103,9 +103,10 @@ const topicLabels: Record<ContactTopic, string> = {
 
 function validate(values: ContactValues): Partial<Record<keyof ContactValues, string>> {
   const errors: Partial<Record<keyof ContactValues, string>> = {};
+  const name = values.name.trim();
   const email = values.email.trim();
-  if (!values.name.trim()) errors.name = "Required";
-  else if (values.name.length > 100) errors.name = "Too long";
+  if (!name) errors.name = "Required";
+  else if (name.length > 100) errors.name = "Too long";
   if (!email) errors.email = "Required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Invalid email";
   if (values.company.length > 120) errors.company = "Too long";
@@ -144,7 +145,11 @@ export function ContactPageContent() {
     setStatus("submitting");
     setSubmitError(null);
 
-    const result = await submitContactForm({ ...values, email: values.email.trim() });
+    const result = await submitContactForm({
+      ...values,
+      name: values.name.trim(),
+      email: values.email.trim(),
+    });
     if (!result.ok) {
       setStatus("idle");
       setSubmitError(result.error);

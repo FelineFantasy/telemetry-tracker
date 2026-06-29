@@ -26,6 +26,10 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function stripHeaderUnsafeChars(value: string): string {
+  return value.replace(/[\r\n\0]/g, "");
+}
+
 type ContactBody = {
   name?: string;
   email?: string;
@@ -35,7 +39,9 @@ type ContactBody = {
 };
 
 function parseContactBody(body: ContactBody) {
-  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const name = stripHeaderUnsafeChars(
+    typeof body.name === "string" ? body.name.trim() : ""
+  );
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const company = typeof body.company === "string" ? body.company.trim() : "";
   const topic = typeof body.topic === "string" ? body.topic.trim() : "general";
