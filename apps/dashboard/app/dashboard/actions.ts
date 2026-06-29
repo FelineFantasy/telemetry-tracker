@@ -152,10 +152,15 @@ export async function setDashboardOrganizationId(
   return { ok: true };
 }
 
-export async function createOrganizationAction(formData: FormData): Promise<void> {
+export async function createOrganizationAction(
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
-    return;
+    return { ok: false, error: "Name is required" };
+  }
+  if (!(await preferenceCookiesAllowedFromCookies())) {
+    return { ok: false, error: await preferenceCookiesDeniedMessage() };
   }
   const res = await dashboardApiFetch("/api/meta/organizations", {
     method: "POST",
@@ -163,26 +168,26 @@ export async function createOrganizationAction(formData: FormData): Promise<void
     body: JSON.stringify({ name: name.slice(0, 120) }),
   });
   if (!res.ok) {
-    return;
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 200) || "Could not create organization" };
   }
   const data = (await res.json()) as { id?: string };
   if (data.id) {
-    if (await preferenceCookiesAllowedFromCookies()) {
-      const orgId = data.id.toLowerCase();
-      const c = await cookies();
-      c.set(TELEMETRY_ORG_COOKIE, orgId, cookieOpts);
-      const sessionId = await getDashboardSessionId();
-      const projectId = await getDashboardProjectId();
-      if (sessionId) {
-        const nextProject = await resolveProjectCookieForOrganization(sessionId, orgId, projectId);
-        if (nextProject.toLowerCase() !== projectId.toLowerCase()) {
-          c.set(TELEMETRY_PROJECT_COOKIE, nextProject.toLowerCase(), cookieOpts);
-        }
+    const orgId = data.id.toLowerCase();
+    const c = await cookies();
+    c.set(TELEMETRY_ORG_COOKIE, orgId, cookieOpts);
+    const sessionId = await getDashboardSessionId();
+    const projectId = await getDashboardProjectId();
+    if (sessionId) {
+      const nextProject = await resolveProjectCookieForOrganization(sessionId, orgId, projectId);
+      if (nextProject.toLowerCase() !== projectId.toLowerCase()) {
+        c.set(TELEMETRY_PROJECT_COOKIE, nextProject.toLowerCase(), cookieOpts);
       }
     }
   }
   revalidatePath("/dashboard", "layout");
   revalidatePath("/dashboard/settings/organization");
+  return { ok: true };
 }
 
 export async function createProjectAction(formData: FormData): Promise<void> {
