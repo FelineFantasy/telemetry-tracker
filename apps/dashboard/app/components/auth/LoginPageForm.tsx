@@ -10,7 +10,7 @@ import {
   authInputCls,
 } from "@/app/components/auth/AuthPageShell";
 import { PasswordInput } from "@/app/components/ui/PasswordInput";
-import { crossAuthHref } from "@/lib/auth-href";
+import { crossAuthHref, resolvePostLoginPath } from "@/lib/auth-href";
 import { appendCookieConsentToFormData } from "@/lib/cookie-consent-client";
 import {
   fieldErrorsFromZod,
@@ -21,9 +21,7 @@ import {
 export function LoginPageForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next")?.startsWith("/")
-    ? searchParams.get("next")!
-    : "/dashboard/overview";
+  const next = resolvePostLoginPath(searchParams.get("next"));
 
   const [values, setValues] = useState<LoginFormValues>({ email: "", password: "" });
   const [errors, setErrors] = useState<Partial<Record<keyof LoginFormValues, string>>>({});

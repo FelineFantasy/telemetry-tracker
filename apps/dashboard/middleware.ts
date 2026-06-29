@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isPostLoginRedirectPath, resolvePostLoginPath } from "@/lib/auth-href";
 
 /** Keep in sync with `TELEMETRY_SESSION_COOKIE` in `lib/dashboard-project.ts`. */
 const SESSION_COOKIE = "telemetry_session";
@@ -13,7 +14,7 @@ function redirectToLogin(request: NextRequest, next?: string) {
   const url = request.nextUrl.clone();
   url.pathname = "/login";
   url.search = "";
-  if (next?.startsWith("/")) {
+  if (isPostLoginRedirectPath(next)) {
     url.searchParams.set("next", next);
   }
   return NextResponse.redirect(url);
@@ -23,15 +24,17 @@ function legacySignInNextParam(
   request: NextRequest,
   explicitNext: string | null
 ): string | undefined {
-  if (explicitNext?.startsWith("/")) return explicitNext;
+  if (isPostLoginRedirectPath(explicitNext)) return explicitNext;
   const { pathname } = request.nextUrl;
-  if (pathname === "/login" || pathname === "/register") return undefined;
+  if (pathname === "/login" || pathname === "/register" || pathname === "/") {
+    return undefined;
+  }
   const params = new URLSearchParams(request.nextUrl.searchParams);
   params.delete("signIn");
   params.delete("signUp");
   const qs = params.toString();
   const destination = qs ? `${pathname}?${qs}` : pathname;
-  return destination.startsWith("/") ? destination : undefined;
+  return isPostLoginRedirectPath(destination) ? destination : undefined;
 }
 
 function redirectLegacyAuthQueryParams(request: NextRequest) {
@@ -70,8 +73,7 @@ export function middleware(request: NextRequest) {
       }
       const url = request.nextUrl.clone();
       if (pathname === "/login") {
-        const next = request.nextUrl.searchParams.get("next");
-        url.pathname = next?.startsWith("/") ? next : "/dashboard/overview";
+        url.pathname = resolvePostLoginPath(request.nextUrl.searchParams.get("next"));
       } else {
         url.pathname = "/dashboard/overview";
       }
