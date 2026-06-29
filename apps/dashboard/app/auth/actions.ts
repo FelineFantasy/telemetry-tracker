@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { API_BASE_URL } from "@/lib/api-url";
-import { preferenceCookiesAllowedFromCookies } from "@/lib/cookie-consent-server";
+import { clearPreferenceCookies, preferenceCookiesAllowedFromCookies } from "@/lib/cookie-consent-server";
 import { TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
 import {
   TELEMETRY_PROJECT_COOKIE,
@@ -71,7 +71,10 @@ async function setBootstrapPreferenceCookies(
   projectId: string | undefined,
   organizationId: string | undefined
 ): Promise<void> {
-  if (!(await preferenceCookiesAllowedFromCookies())) return;
+  if (!(await preferenceCookiesAllowedFromCookies())) {
+    await clearPreferenceCookies();
+    return;
+  }
   if (projectId) {
     c.set(TELEMETRY_PROJECT_COOKIE, projectId, {
       ...cookieBase(),

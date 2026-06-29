@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
 import { preferenceCookiesAllowedFromCookies, preferenceCookiesDeniedMessage } from "@/lib/cookie-consent-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import { TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
+import { fetchDashboardOrganizationsList, TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
 import {
   DEFAULT_PROJECT_ID,
   TELEMETRY_PROJECT_COOKIE,
@@ -159,7 +159,10 @@ export async function createOrganizationAction(
   if (!name) {
     return { ok: false, error: "Name is required" };
   }
-  if (!(await preferenceCookiesAllowedFromCookies())) {
+  const existingOrganizations = await fetchDashboardOrganizationsList();
+  const isFirstOrganization = existingOrganizations.length === 0;
+  const cookiesAllowed = await preferenceCookiesAllowedFromCookies();
+  if (!cookiesAllowed && !isFirstOrganization) {
     return { ok: false, error: await preferenceCookiesDeniedMessage() };
   }
   const res = await dashboardApiFetch("/api/meta/organizations", {
@@ -172,7 +175,7 @@ export async function createOrganizationAction(
     return { ok: false, error: t.slice(0, 200) || "Could not create organization" };
   }
   const data = (await res.json()) as { id?: string };
-  if (data.id) {
+  if (data.id && cookiesAllowed) {
     const orgId = data.id.toLowerCase();
     const c = await cookies();
     c.set(TELEMETRY_ORG_COOKIE, orgId, cookieOpts);
