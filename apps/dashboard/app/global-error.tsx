@@ -1,20 +1,15 @@
 "use client";
 
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
-import { ErrorPageShell } from "@/app/components/error-pages/ErrorPageShell";
+import Link from "next/link";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import {
+  ErrorPageShell,
+  ErrorRetryIcon,
+  errorPrimaryBtn,
+  errorSecondaryBtn,
+} from "@/app/components/error-pages/ErrorPageShell";
 import "./globals.css";
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-});
 
 /**
  * Root-level error UI when the root layout fails. Must define html/body (replaces root layout).
@@ -27,35 +22,35 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const detail =
+    process.env.NODE_ENV === "development" && error.message
+      ? `${error.name ?? "Error"}: ${error.message}`
+      : undefined;
+
   return (
-    <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ErrorPageShell
-          code="ROOT LAYOUT"
-          eyebrow="Fatal · shell"
-          title="Hard stop—we never left the hangar"
-          description={
+          eyebrow="Something went wrong"
+          code="500"
+          title="Something went sideways."
+          description="We couldn't load the app properly. Please try again in a moment, or go home and come back. If it keeps happening, contact support and we'll help."
+          detail={detail}
+          actions={
             <>
-              The root layout failed, so no routes could mount. This one&apos;s on us or the build—not
-              your data. Reload the page; if the sky stays dark, check the console and redeploy.
+              <button type="button" onClick={() => reset()} className={errorPrimaryBtn}>
+                Try again
+                <ErrorRetryIcon />
+              </button>
+              <Link href="/" className={errorSecondaryBtn}>
+                Go home
+              </Link>
+              <Link href="/contact" className={errorSecondaryBtn}>
+                Contact support
+              </Link>
             </>
           }
-          footer={
-            process.env.NODE_ENV === "development" && error.message ? (
-              <pre className="mx-auto max-h-36 max-w-full overflow-auto rounded-lg border border-border bg-code-bg p-3 text-left font-mono text-[11px] leading-relaxed text-code-foreground">
-                {error.message}
-              </pre>
-            ) : null
-          }
-        >
-          <button
-            type="button"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-white/10 bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-inner-soft transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            onClick={() => reset()}
-          >
-            Reload app
-          </button>
-        </ErrorPageShell>
+        />
       </body>
     </html>
   );

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { useAuthModals } from "./auth-modals";
 import { Logo } from "./logo";
 
 const links = [
@@ -17,19 +16,8 @@ const links = [
 export function Nav() {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { openSignIn, openSignUp } = useAuthModals();
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
-
-  const handleOpenSignIn = useCallback(() => {
-    closeMenu();
-    openSignIn();
-  }, [closeMenu, openSignIn]);
-
-  const handleOpenSignUp = useCallback(() => {
-    closeMenu();
-    openSignUp();
-  }, [closeMenu, openSignUp]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -74,16 +62,14 @@ export function Nav() {
           </ul>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-            <button
-              type="button"
-              onClick={handleOpenSignIn}
+            <Link
+              href="/login"
               className="hidden rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground lg:inline-block"
             >
               Sign in
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenSignUp}
+            </Link>
+            <Link
+              href="/register"
               aria-label="Start tracking"
               className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.02] sm:px-3.5"
             >
@@ -101,7 +87,7 @@ export function Nav() {
               >
                 <path d="M3 8h10M9 4l4 4-4 4" />
               </svg>
-            </button>
+            </Link>
             <button
               type="button"
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-foreground transition-colors hover:bg-surface-elevated lg:hidden"
@@ -141,20 +127,20 @@ export function Nav() {
                 ))}
               </ul>
               <div className="border-t border-border p-2">
-                <button
-                  type="button"
-                  className="block w-full rounded-xl px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-                  onClick={handleOpenSignIn}
+                <Link
+                  href="/login"
+                  className="block rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+                  onClick={closeMenu}
                 >
                   Sign in
-                </button>
-                <button
-                  type="button"
-                  className="mt-1 block w-full rounded-xl px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-surface"
-                  onClick={handleOpenSignUp}
+                </Link>
+                <Link
+                  href="/register"
+                  className="mt-1 block rounded-xl px-4 py-3 text-sm text-foreground transition-colors hover:bg-surface"
+                  onClick={closeMenu}
                 >
                   Create account
-                </button>
+                </Link>
               </div>
             </div>
           </>

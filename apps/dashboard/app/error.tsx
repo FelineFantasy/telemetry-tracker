@@ -1,8 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
-import { ErrorPageShell } from "@/app/components/error-pages/ErrorPageShell";
-import { Button, ButtonLink } from "@/app/components/ui/Button";
+import {
+  ErrorPageShell,
+  ErrorRetryIcon,
+  errorPrimaryBtn,
+  errorSecondaryBtn,
+} from "@/app/components/error-pages/ErrorPageShell";
 
 export default function AppError({
   error,
@@ -15,37 +20,32 @@ export default function AppError({
     console.error(error);
   }, [error]);
 
-  const digest = error.digest;
-  const codeLine = digest ? `TRACE ${digest.slice(0, 10)}…` : "RUNTIME";
+  const detail =
+    process.env.NODE_ENV === "development" && error.message
+      ? `${error.name ?? "Error"}: ${error.message}`
+      : undefined;
 
   return (
-    <div id="main-content">
-      <ErrorPageShell
-        code={codeLine}
-        eyebrow="Render interrupted"
-        title="The view crashed mid-flight"
-        description={
-          <>
-            Something threw before we could paint this screen—think of it as a spike on the error graph.
-            Retry usually smooths the curve; if it keeps spiking, grab the message below (in dev) and we
-            can chase it down.
-          </>
-        }
-        footer={
-          process.env.NODE_ENV === "development" && error.message ? (
-            <pre className="mx-auto max-h-36 max-w-full overflow-auto rounded-lg border border-border bg-code-bg p-3 text-left font-mono text-[11px] leading-relaxed text-code-foreground">
-              {error.message}
-            </pre>
-          ) : null
-        }
-      >
-        <Button type="button" onClick={() => reset()}>
-          Retry render
-        </Button>
-        <ButtonLink href="/dashboard/overview" variant="secondary">
-          Mission control
-        </ButtonLink>
-      </ErrorPageShell>
-    </div>
+    <ErrorPageShell
+      eyebrow="Runtime error"
+      code="500"
+      title="Something went sideways."
+      description="An unexpected error interrupted this page. The incident has been logged — you can retry, or jump back to a stable route."
+      detail={detail}
+      actions={
+        <>
+          <button type="button" onClick={() => reset()} className={errorPrimaryBtn}>
+            Try again
+            <ErrorRetryIcon />
+          </button>
+          <Link href="/" className={errorSecondaryBtn}>
+            Go home
+          </Link>
+          <Link href="/contact" className={errorSecondaryBtn}>
+            Contact support
+          </Link>
+        </>
+      }
+    />
   );
 }

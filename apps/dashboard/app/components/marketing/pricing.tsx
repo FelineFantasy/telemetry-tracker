@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { SignUpButton } from "@/app/components/marketing/auth-modals";
 import { SectionHeading } from "./features";
 
 const tiers = [
@@ -95,7 +92,9 @@ export function Pricing() {
                 <p className="mt-2 text-sm text-muted-foreground">{t.desc}</p>
 
                 {t.signup ? (
-                  <SignUpButton className={ctaClassName}>{t.cta}</SignUpButton>
+                  <Link href="/register" className={ctaClassName}>
+                    {t.cta}
+                  </Link>
                 ) : (
                   <Link href={t.href!} className={ctaClassName}>
                     {t.cta}

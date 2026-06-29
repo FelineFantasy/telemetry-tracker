@@ -209,7 +209,7 @@ export async function logout(): Promise<void> {
 
 export async function logoutAction(): Promise<void> {
   await logout();
-  redirect("/?signIn=1");
+  redirect("/login");
 }
 
 export async function requestPasswordReset(

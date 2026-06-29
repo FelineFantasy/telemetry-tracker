@@ -16,6 +16,7 @@ const PUBLIC_PATHS = [
   "/contact",
   "/privacy",
   "/terms",
+  "/cookies",
 ] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
