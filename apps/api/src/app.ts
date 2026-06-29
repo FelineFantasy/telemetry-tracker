@@ -81,6 +81,16 @@ export async function createApp(): Promise<FastifyInstance> {
         timeWindow: RATE_LIMIT_WINDOW_MS,
       });
       await f.register(authRoutes);
+    },
+    { prefix: "/api" }
+  );
+
+  await app.register(
+    async function contactScope(f) {
+      await f.register(rateLimit, {
+        max: rateLimitMaxPublic(isTest),
+        timeWindow: RATE_LIMIT_WINDOW_MS,
+      });
       await f.register(contactRoutes);
     },
     { prefix: "/api" }
