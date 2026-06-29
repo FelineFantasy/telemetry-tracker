@@ -24,7 +24,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         setError(r.error);
         return;
       }
-      router.push("/?signIn=1");
+      router.push("/login");
       router.refresh();
     });
   }
@@ -51,7 +51,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         {pending ? "Updating…" : "Update password"}
       </Button>
       <p className="auth-form__footer">
-        <Link href="/?signIn=1">Back to sign in</Link>
+        <Link href="/login">Back to sign in</Link>
       </p>
     </form>
   );

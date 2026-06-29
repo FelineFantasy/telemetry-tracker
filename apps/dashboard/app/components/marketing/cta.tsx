@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { SignUpButton } from "@/app/components/marketing/auth-modals";
 
 export function Cta() {
   return (
@@ -20,7 +19,10 @@ export function Cta() {
               Bring the signals you need into one tool your team will actually open.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-2">
-              <SignUpButton className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.02]">
+              <Link
+                href="/register"
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.02]"
+              >
                 Start free
                 <svg
                   viewBox="0 0 16 16"
@@ -33,7 +35,7 @@ export function Cta() {
                 >
                   <path d="M3 8h10M9 4l4 4-4 4" />
                 </svg>
-              </SignUpButton>
+              </Link>
               <Link
                 href="/docs"
                 className="inline-flex items-center rounded-full border border-border bg-background px-5 py-2.5 text-sm text-foreground hover:bg-surface"

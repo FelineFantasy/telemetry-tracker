@@ -1,40 +1,38 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ErrorPageShell } from "@/app/components/error-pages/ErrorPageShell";
-import { ButtonLink } from "@/app/components/ui/Button";
+import {
+  ErrorArrowIcon,
+  ErrorPageShell,
+  errorPrimaryBtn,
+  errorSecondaryBtn,
+} from "@/app/components/error-pages/ErrorPageShell";
 
 export const metadata: Metadata = {
-  title: "Nothing here — Telemetry Tracker",
+  title: "Not found",
+  description: "The page you requested could not be found.",
 };
 
 export default function NotFound() {
   return (
-    <div id="main-content">
-      <ErrorPageShell
-        code="HTTP 404"
-        eyebrow="No matching route"
-        title="This path has zero telemetry"
-        description={
-          <>
-            We scanned the route table—crickets. Wrong URL, a stale bookmark, or a typo sneaked in. The
-            rest of the product is happily emitting events; this address just isn&apos;t one of them.
-          </>
-        }
-        footer={
-          <p className="text-pretty text-xs leading-relaxed text-muted-foreground">
-            Ship faster with the{" "}
-            <Link href="/docs" className="text-link font-medium text-primary hover:text-primary-hover">
-              SDK docs
-            </Link>
-            —or head home and plot a new course.
-          </p>
-        }
-      >
-        <ButtonLink href="/">Back to launch</ButtonLink>
-        <ButtonLink href="/dashboard/overview" variant="secondary">
-          Open dashboard
-        </ButtonLink>
-      </ErrorPageShell>
-    </div>
+    <ErrorPageShell
+      eyebrow="Not found"
+      code="404"
+      title="This route isn't being tracked."
+      description="The page you're looking for doesn't exist, was moved, or never shipped. Check the URL or head back to a known surface."
+      actions={
+        <>
+          <Link href="/" className={errorPrimaryBtn}>
+            Back to home
+            <ErrorArrowIcon />
+          </Link>
+          <Link href="/docs" className={errorSecondaryBtn}>
+            Read the docs
+          </Link>
+          <Link href="/contact" className={errorSecondaryBtn}>
+            Report broken link
+          </Link>
+        </>
+      }
+    />
   );
 }

@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Suspense, type ReactNode } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { AuthModalProvider } from "@/app/components/marketing/auth-modals";
+import { CookieConsent } from "@/app/components/marketing/cookie-consent";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
+import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
 import { socialPreviewImage } from "@/lib/social-image";
 import { resolveMetadataBase } from "@/lib/site-url";
 import "./globals.css";
@@ -63,19 +63,12 @@ export const metadata: Metadata = {
   },
 };
 
-function AuthModals({ children }: { children: ReactNode }) {
-  return (
-    <Suspense fallback={null}>
-      <AuthModalProvider>{children}</AuthModalProvider>
-    </Suspense>
-  );
-}
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const serverChoice = await getCookieConsentChoiceFromCookies();
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
@@ -83,7 +76,8 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ToasterProvider />
-        <AuthModals>{children}</AuthModals>
+        {children}
+        <CookieConsent serverChoice={serverChoice} />
       </body>
     </html>
   );

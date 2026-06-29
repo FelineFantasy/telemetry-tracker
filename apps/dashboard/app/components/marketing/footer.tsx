@@ -26,6 +26,7 @@ const cols: { heading: string; links: { label: string; href: string }[] }[] = [
       { label: "Contact", href: "/contact" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
+      { label: "Cookies", href: "/cookies" },
     ],
   },
 ];

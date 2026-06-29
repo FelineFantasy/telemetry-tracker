@@ -65,7 +65,7 @@ export function ForgotPasswordForm() {
         {pending ? "Sending…" : "Send reset link"}
       </Button>
       <p className="auth-form__footer">
-        <Link href="/?signIn=1">Back to sign in</Link>
+        <Link href="/login">Back to sign in</Link>
       </p>
     </form>
   );

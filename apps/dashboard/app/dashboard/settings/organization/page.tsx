@@ -9,9 +9,9 @@ import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
 import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
 import { getDashboardUser } from "@/lib/dashboard-user";
 import {
-  createOrganizationAction,
   createProjectAction,
 } from "@/app/dashboard/actions";
+import { CreateOrganizationForm } from "@/app/dashboard/settings/organization/CreateOrganizationForm";
 import { Button } from "@/app/components/ui/Button";
 import { OrganizationArchiveSection } from "@/app/dashboard/settings/organization/OrganizationArchiveSection";
 import { OrganizationUsageCard } from "@/app/dashboard/settings/organization/OrganizationUsageCard";
@@ -76,26 +76,7 @@ export default async function OrganizationSettingsPage() {
       ? (organizations.find((o) => o.id === effectiveOrgId)?.name ?? "Selected organization")
       : null;
 
-  const createOrganizationFields = (
-    <>
-      <label className="text-sm text-muted-foreground" htmlFor="org-name">
-        Name
-      </label>
-      <input
-        id="org-name"
-        name="name"
-        type="text"
-        required
-        maxLength={120}
-        className="filter-input"
-        placeholder="Acme Inc."
-        autoComplete="organization"
-      />
-      <Button type="submit" variant="primary">
-        Create organization
-      </Button>
-    </>
-  );
+  const createOrganizationFields = <CreateOrganizationForm />;
 
   return (
     <>
@@ -252,9 +233,7 @@ export default async function OrganizationSettingsPage() {
               </span>
             </summary>
             <div className="border-t border-border/60 px-4 py-4">
-              <form action={createOrganizationAction} className="flex flex-col gap-3">
-                {createOrganizationFields}
-              </form>
+              {createOrganizationFields}
             </div>
           </details>
         ) : (
@@ -265,9 +244,7 @@ export default async function OrganizationSettingsPage() {
             <p className="text-xs text-muted-foreground m-0 mb-3">
               You become the owner. After this, use Add a project to attach apps and API keys.
             </p>
-            <form action={createOrganizationAction} className="flex flex-col gap-3">
-              {createOrganizationFields}
-            </form>
+            {createOrganizationFields}
           </section>
         )}
       </div>

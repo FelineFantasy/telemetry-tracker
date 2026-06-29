@@ -1,11 +1,6 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
-import {
-  dashboardApiHeaders,
-  getDashboardProjectId,
-  getDashboardSessionId,
-} from "@/lib/dashboard-project";
+import { getDashboardSessionId } from "@/lib/dashboard-project";
 
 /** Cookie storing the active dashboard organization (matches API `X-Organization-Id`). */
 export const TELEMETRY_ORG_COOKIE = "telemetry_organization_id";
@@ -23,11 +18,9 @@ type MetaOrganizationsPayload =
 const getMetaOrganizationsPayload = cache(async (): Promise<MetaOrganizationsPayload> => {
   const sessionId = await getDashboardSessionId();
   if (!sessionId) return { ok: true, organizations: [] };
-  const projectId = await getDashboardProjectId();
   const res = await fetch(`${API_BASE_URL}/api/meta/organizations`, {
     cache: "no-store",
     headers: {
-      ...dashboardApiHeaders(projectId),
       Authorization: `Bearer ${sessionId}`,
     },
   });
@@ -43,18 +36,18 @@ const getMetaOrganizationsPayload = cache(async (): Promise<MetaOrganizationsPay
   return { ok: true, organizations };
 });
 
+export async function fetchDashboardOrganizationsPayload(): Promise<MetaOrganizationsPayload> {
+  return getMetaOrganizationsPayload();
+}
+
 export async function fetchDashboardOrganizationsList(): Promise<DashboardOrganizationRow[]> {
   const p = await getMetaOrganizationsPayload();
   return p.ok ? p.organizations : [];
 }
 
 export async function getDashboardOrganizationId(): Promise<string | undefined> {
-  const c = await cookies();
-  const v = c.get(TELEMETRY_ORG_COOKIE)?.value?.trim();
-  if (v && /^[0-9a-f-]{36}$/i.test(v)) {
-    return v.toLowerCase();
-  }
-  return undefined;
+  const { getAllowedDashboardOrganizationCookie } = await import("./cookie-consent-server");
+  return getAllowedDashboardOrganizationCookie();
 }
 
 /**
