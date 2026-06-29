@@ -48,6 +48,10 @@ export function middleware(request: NextRequest) {
 
   if (pathname === "/login" || pathname === "/register") {
     if (hasValidSession(request)) {
+      const invite = request.nextUrl.searchParams.get("invite")?.trim();
+      if (pathname === "/register" && invite) {
+        return NextResponse.next();
+      }
       const url = request.nextUrl.clone();
       if (pathname === "/login") {
         const next = request.nextUrl.searchParams.get("next");
