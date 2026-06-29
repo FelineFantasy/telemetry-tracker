@@ -5,7 +5,10 @@ import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
 import { preferenceCookiesAllowedFromCookies, preferenceCookiesDeniedMessage } from "@/lib/cookie-consent-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import { fetchDashboardOrganizationsList, TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
+import {
+  fetchDashboardOrganizationsPayload,
+  TELEMETRY_ORG_COOKIE,
+} from "@/lib/dashboard-org";
 import {
   DEFAULT_PROJECT_ID,
   TELEMETRY_PROJECT_COOKIE,
@@ -163,8 +166,14 @@ export async function createOrganizationAction(
   if (!name) {
     return { ok: false, error: "Name is required" };
   }
-  const existingOrganizations = await fetchDashboardOrganizationsList();
-  const isFirstOrganization = existingOrganizations.length === 0;
+  const orgPayload = await fetchDashboardOrganizationsPayload();
+  if (!orgPayload.ok) {
+    return {
+      ok: false,
+      error: "Could not load your organizations. Try again.",
+    };
+  }
+  const isFirstOrganization = orgPayload.organizations.length === 0;
   const cookiesAllowed = await preferenceCookiesAllowedFromCookies();
   if (!cookiesAllowed && !isFirstOrganization) {
     return { ok: false, error: await preferenceCookiesDeniedMessage() };

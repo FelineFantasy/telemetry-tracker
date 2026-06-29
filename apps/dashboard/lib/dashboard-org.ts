@@ -36,6 +36,10 @@ const getMetaOrganizationsPayload = cache(async (): Promise<MetaOrganizationsPay
   return { ok: true, organizations };
 });
 
+export async function fetchDashboardOrganizationsPayload(): Promise<MetaOrganizationsPayload> {
+  return getMetaOrganizationsPayload();
+}
+
 export async function fetchDashboardOrganizationsList(): Promise<DashboardOrganizationRow[]> {
   const p = await getMetaOrganizationsPayload();
   return p.ok ? p.organizations : [];

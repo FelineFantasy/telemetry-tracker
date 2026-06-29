@@ -19,6 +19,21 @@ function redirectToLogin(request: NextRequest, next?: string) {
   return NextResponse.redirect(url);
 }
 
+function legacySignInNextParam(
+  request: NextRequest,
+  explicitNext: string | null
+): string | undefined {
+  if (explicitNext?.startsWith("/")) return explicitNext;
+  const { pathname } = request.nextUrl;
+  if (pathname === "/login" || pathname === "/register") return undefined;
+  const params = new URLSearchParams(request.nextUrl.searchParams);
+  params.delete("signIn");
+  params.delete("signUp");
+  const qs = params.toString();
+  const destination = qs ? `${pathname}?${qs}` : pathname;
+  return destination.startsWith("/") ? destination : undefined;
+}
+
 function redirectLegacyAuthQueryParams(request: NextRequest) {
   const signUp = request.nextUrl.searchParams.get("signUp") === "1";
   const signIn = request.nextUrl.searchParams.get("signIn") === "1";
@@ -36,7 +51,8 @@ function redirectLegacyAuthQueryParams(request: NextRequest) {
   }
 
   url.pathname = "/login";
-  if (next?.startsWith("/")) url.searchParams.set("next", next);
+  const nextDest = legacySignInNextParam(request, next);
+  if (nextDest) url.searchParams.set("next", nextDest);
   return NextResponse.redirect(url);
 }
 
