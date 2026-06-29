@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { API_BASE_URL } from "@/lib/api-url";
+import { preferenceCookiesAllowedFromCookies } from "@/lib/cookie-consent-server";
 import { TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
 import {
   TELEMETRY_PROJECT_COOKIE,
@@ -65,6 +66,28 @@ function cookieBase() {
   };
 }
 
+async function setBootstrapPreferenceCookies(
+  c: Awaited<ReturnType<typeof cookies>>,
+  projectId: string | undefined,
+  organizationId: string | undefined
+): Promise<void> {
+  if (!(await preferenceCookiesAllowedFromCookies())) return;
+  if (projectId) {
+    c.set(TELEMETRY_PROJECT_COOKIE, projectId, {
+      ...cookieBase(),
+      maxAge: PROJECT_MAX_AGE,
+    });
+  }
+  if (organizationId) {
+    c.set(TELEMETRY_ORG_COOKIE, organizationId.toLowerCase(), {
+      ...cookieBase(),
+      maxAge: PROJECT_MAX_AGE,
+    });
+  } else {
+    c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+  }
+}
+
 export async function login(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -105,20 +128,7 @@ export async function login(
   if (!organizationId) {
     organizationId = await fetchFirstOrganizationId(sessionId);
   }
-  if (projectId) {
-    c.set(TELEMETRY_PROJECT_COOKIE, projectId, {
-      ...cookieBase(),
-      maxAge: PROJECT_MAX_AGE,
-    });
-  }
-  if (organizationId) {
-    c.set(TELEMETRY_ORG_COOKIE, organizationId.toLowerCase(), {
-      ...cookieBase(),
-      maxAge: PROJECT_MAX_AGE,
-    });
-  } else {
-    c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
-  }
+  await setBootstrapPreferenceCookies(c, projectId, organizationId);
   return { ok: true };
 }
 
@@ -176,20 +186,7 @@ export async function register(
   if (!organizationId) {
     organizationId = await fetchFirstOrganizationId(sessionId);
   }
-  if (projectId) {
-    c.set(TELEMETRY_PROJECT_COOKIE, projectId, {
-      ...cookieBase(),
-      maxAge: PROJECT_MAX_AGE,
-    });
-  }
-  if (organizationId) {
-    c.set(TELEMETRY_ORG_COOKIE, organizationId.toLowerCase(), {
-      ...cookieBase(),
-      maxAge: PROJECT_MAX_AGE,
-    });
-  } else {
-    c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
-  }
+  await setBootstrapPreferenceCookies(c, projectId, organizationId);
   return { ok: true };
 }
 

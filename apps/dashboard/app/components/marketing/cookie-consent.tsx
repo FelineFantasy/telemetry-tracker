@@ -1,20 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { clearPreferenceCookiesAction } from "@/app/cookie-consent/actions";
 import {
   COOKIE_CONSENT_STORAGE_KEY,
+  cookieConsentDocumentCookie,
   isCookieConsentChoice,
   type CookieConsentChoice,
 } from "@/lib/cookie-consent";
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     try {
       const value = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
-      if (!isCookieConsentChoice(value)) setVisible(true);
+      if (isCookieConsentChoice(value)) {
+        document.cookie = cookieConsentDocumentCookie(value);
+        setVisible(false);
+        return;
+      }
+      setVisible(true);
     } catch {
       setVisible(true);
     }
@@ -23,8 +31,14 @@ export function CookieConsent() {
   function decide(choice: CookieConsentChoice) {
     try {
       localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, choice);
+      document.cookie = cookieConsentDocumentCookie(choice);
     } catch {
       /* ignore */
+    }
+    if (choice === "rejected") {
+      startTransition(() => {
+        void clearPreferenceCookiesAction();
+      });
     }
     setVisible(false);
   }

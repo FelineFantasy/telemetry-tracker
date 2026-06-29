@@ -11,6 +11,7 @@ import {
   authInputCls,
 } from "@/app/components/auth/AuthPageShell";
 import { PasswordInput } from "@/app/components/ui/PasswordInput";
+import { crossAuthHref } from "@/lib/auth-href";
 import {
   fieldErrorsFromZod,
   registerPageSchema,
@@ -181,7 +182,7 @@ export function RegisterPageForm() {
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href={crossAuthHref("/login", searchParams)}
             className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
           >
             Sign in

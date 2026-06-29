@@ -19,7 +19,7 @@ const rows: Row[] = [
     name: COOKIE_CONSENT_STORAGE_KEY,
     purpose: "Remembers your accept / reject choice for optional storage.",
     type: "Essential",
-    retention: "12 months (localStorage)",
+    retention: "12 months (localStorage + cookie)",
   },
   {
     name: "telemetry_session",
