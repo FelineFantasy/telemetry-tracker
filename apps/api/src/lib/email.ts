@@ -3,9 +3,10 @@
  * sends via Resend API. Otherwise logs in non-production and no-ops in production.
  */
 export async function sendTransactionalEmail(opts: {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
+  replyTo?: string;
 }): Promise<{ sent: boolean; devLogged?: boolean }> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.TELEMETRY_EMAIL_FROM?.trim();
@@ -26,9 +27,10 @@ export async function sendTransactionalEmail(opts: {
     },
     body: JSON.stringify({
       from,
-      to: [opts.to],
+      to: Array.isArray(opts.to) ? opts.to : [opts.to],
       subject: opts.subject,
       html: opts.html,
+      ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
     }),
   });
 
