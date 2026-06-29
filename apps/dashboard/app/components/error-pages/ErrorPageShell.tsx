@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Logo } from "@/app/components/marketing/logo";
 
 export const errorPrimaryBtn =
@@ -27,10 +27,11 @@ export function ErrorPageShell({
   detail,
   actions,
 }: ErrorPageShellProps) {
-  const traceId = useMemo(
-    () => Math.random().toString(36).slice(2, 10),
-    []
-  );
+  const [traceId, setTraceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTraceId(Math.random().toString(36).slice(2, 10));
+  }, []);
 
   return (
     <main
@@ -100,7 +101,7 @@ export function ErrorPageShell({
 
         <footer className="flex flex-col gap-2 border-t border-border py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} Telemetry Tracker</p>
-          <p className="font-mono">incident logged · trace_id {traceId}</p>
+          <p className="font-mono">incident logged · trace_id {traceId ?? "pending"}</p>
         </footer>
       </div>
     </main>

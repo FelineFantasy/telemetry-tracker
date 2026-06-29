@@ -21,3 +21,6 @@ export function cookieConsentDocumentCookie(choice: CookieConsentChoice): string
       : "";
   return `${COOKIE_CONSENT_STORAGE_KEY}=${choice}; Path=/; Max-Age=${COOKIE_CONSENT_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
 }
+
+export const PREFERENCE_COOKIES_REQUIRED_MSG =
+  "Accept cookies in the banner to save your workspace selection.";

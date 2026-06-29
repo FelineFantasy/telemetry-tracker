@@ -23,9 +23,11 @@ export function ProjectSwitcher({
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState(currentProjectId);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   useEffect(() => {
     setValue(currentProjectId);
+    setSwitchError(null);
   }, [currentProjectId]);
 
   if (projects.length <= 1) {
@@ -67,13 +69,18 @@ export function ProjectSwitcher({
         disabled={pending}
         onChange={(e) => {
           const id = e.target.value;
+          const previousSelection = value;
+          setSwitchError(null);
           setValue(id);
           startTransition(async () => {
             const r = await setDashboardProjectId(id);
             if (r.ok) {
               router.replace(hrefWithoutAppSearchParam(pathname, searchParams));
               router.refresh();
+              return;
             }
+            setValue(previousSelection);
+            setSwitchError(r.error);
           });
         }}
       >
@@ -83,6 +90,11 @@ export function ProjectSwitcher({
           </option>
         ))}
       </select>
+      {switchError ? (
+        <p className="project-switcher__error" role="alert">
+          {switchError}
+        </p>
+      ) : null}
     </div>
   );
 }
