@@ -95,10 +95,11 @@ function Field({
 
 function validate(values: ContactValues): Partial<Record<keyof ContactValues, string>> {
   const errors: Partial<Record<keyof ContactValues, string>> = {};
+  const email = values.email.trim();
   if (!values.name.trim()) errors.name = "Required";
   else if (values.name.length > 100) errors.name = "Too long";
-  if (!values.email.trim()) errors.email = "Required";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) errors.email = "Invalid email";
+  if (!email) errors.email = "Required";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Invalid email";
   if (values.company.length > 120) errors.company = "Too long";
   if (values.message.trim().length < 10) errors.message = "Tell us a bit more";
   else if (values.message.length > 2000) errors.message = "Too long";
@@ -144,7 +145,7 @@ export function ContactPageContent() {
     setStatus("submitting");
     setSubmitError(null);
 
-    const result = await submitContactForm(values);
+    const result = await submitContactForm({ ...values, email: values.email.trim() });
     if (!result.ok) {
       setStatus("idle");
       setSubmitError(result.error);
