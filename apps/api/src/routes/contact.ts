@@ -84,7 +84,7 @@ export async function contactRoutes(
         });
       }
       return reply.status(503).send({
-        error: "Contact email is not configured. Email us directly at info@tacko.io.",
+        error: `Contact email is not configured. Email us directly at ${CONTACT_INBOX}.`,
       });
     }
 
@@ -112,7 +112,7 @@ export async function contactRoutes(
 
     if (!inboxResult.sent) {
       return reply.status(502).send({
-        error: "Could not deliver your message. Try emailing info@tacko.io directly.",
+        error: `Could not deliver your message. Try emailing ${CONTACT_INBOX} directly.`,
       });
     }
 
