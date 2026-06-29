@@ -11,7 +11,9 @@ import {
 } from "@/lib/cookie-consent";
 
 export function CookieConsent() {
-  const [visible, setVisible] = useState(false);
+  const [choice, setChoice] = useState<CookieConsentChoice | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [ready, setReady] = useState(false);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -19,31 +21,67 @@ export function CookieConsent() {
       const value = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
       if (isCookieConsentChoice(value)) {
         document.cookie = cookieConsentDocumentCookie(value);
-        setVisible(false);
-        return;
+        setChoice(value);
+        setExpanded(false);
+      } else {
+        setExpanded(true);
       }
-      setVisible(true);
     } catch {
-      setVisible(true);
+      setExpanded(true);
+    } finally {
+      setReady(true);
     }
   }, []);
 
-  function decide(choice: CookieConsentChoice) {
+  function decide(next: CookieConsentChoice) {
     try {
-      localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, choice);
-      document.cookie = cookieConsentDocumentCookie(choice);
+      localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, next);
+      document.cookie = cookieConsentDocumentCookie(next);
     } catch {
       /* ignore */
     }
-    if (choice === "rejected") {
+    setChoice(next);
+    setExpanded(false);
+    if (next === "rejected") {
       startTransition(() => {
         void clearPreferenceCookiesAction();
       });
     }
-    setVisible(false);
   }
 
-  if (!visible) return null;
+  if (!ready) return null;
+  if (choice === "accepted") return null;
+
+  if (choice === "rejected" && !expanded) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed inset-x-0 bottom-0 z-[60] flex justify-center px-4 pb-4 sm:pb-6"
+      >
+        <div className="flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-border bg-surface/90 px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <p className="text-sm text-muted-foreground">
+            Optional cookies are off. Workspace selections are not saved between visits.
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/cookies"
+              className="rounded-full border border-border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-surface-elevated"
+            >
+              Cookie policy
+            </Link>
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.02]"
+            >
+              Change preferences
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -71,6 +109,15 @@ export function CookieConsent() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+            {choice === "rejected" ? (
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="rounded-full border border-border px-4 py-1.5 text-sm text-foreground transition-colors hover:bg-surface-elevated"
+              >
+                Cancel
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => decide("rejected")}

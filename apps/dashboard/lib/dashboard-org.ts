@@ -1,5 +1,4 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
 import { getDashboardSessionId } from "@/lib/dashboard-project";
 
@@ -43,12 +42,8 @@ export async function fetchDashboardOrganizationsList(): Promise<DashboardOrgani
 }
 
 export async function getDashboardOrganizationId(): Promise<string | undefined> {
-  const c = await cookies();
-  const v = c.get(TELEMETRY_ORG_COOKIE)?.value?.trim();
-  if (v && /^[0-9a-f-]{36}$/i.test(v)) {
-    return v.toLowerCase();
-  }
-  return undefined;
+  const { getAllowedDashboardOrganizationCookie } = await import("./cookie-consent-server");
+  return getAllowedDashboardOrganizationCookie();
 }
 
 /**

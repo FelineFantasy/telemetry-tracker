@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
-import { preferenceCookiesAllowedFromCookies } from "@/lib/cookie-consent-server";
-import { PREFERENCE_COOKIES_REQUIRED_MSG } from "@/lib/cookie-consent";
+import { preferenceCookiesAllowedFromCookies, preferenceCookiesDeniedMessage } from "@/lib/cookie-consent-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
 import {
@@ -22,7 +21,7 @@ export async function setDashboardProjectId(projectId: string): Promise<
     return { ok: false, error: "Invalid project id" };
   }
   if (!(await preferenceCookiesAllowedFromCookies())) {
-    return { ok: false, error: PREFERENCE_COOKIES_REQUIRED_MSG };
+    return { ok: false, error: await preferenceCookiesDeniedMessage() };
   }
   const c = await cookies();
   c.set(TELEMETRY_PROJECT_COOKIE, trimmed.toLowerCase(), {
@@ -142,7 +141,7 @@ export async function setDashboardOrganizationId(
     verifyData
   );
   if (!(await preferenceCookiesAllowedFromCookies())) {
-    return { ok: false, error: PREFERENCE_COOKIES_REQUIRED_MSG };
+    return { ok: false, error: await preferenceCookiesDeniedMessage() };
   }
   const c = await cookies();
   c.set(TELEMETRY_ORG_COOKIE, trimmed, cookieOpts);

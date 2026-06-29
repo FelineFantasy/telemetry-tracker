@@ -24,3 +24,6 @@ export function cookieConsentDocumentCookie(choice: CookieConsentChoice): string
 
 export const PREFERENCE_COOKIES_REQUIRED_MSG =
   "Accept cookies in the banner to save your workspace selection.";
+
+export const PREFERENCE_COOKIES_REJECTED_MSG =
+  "Optional cookies are off, so your workspace selection is not saved. Change preferences below to enable saving.";

@@ -18,12 +18,8 @@ export const DEFAULT_PROJECT_ID =
   "a0000000-0000-4000-8000-000000000002";
 
 export async function getDashboardProjectCookie(): Promise<string | undefined> {
-  const c = await cookies();
-  const v = c.get(TELEMETRY_PROJECT_COOKIE)?.value?.trim();
-  if (v && /^[0-9a-f-]{36}$/i.test(v)) {
-    return v.toLowerCase();
-  }
-  return undefined;
+  const { getAllowedDashboardProjectCookie } = await import("./cookie-consent-server");
+  return getAllowedDashboardProjectCookie();
 }
 
 export function resolveEffectiveProjectId(
