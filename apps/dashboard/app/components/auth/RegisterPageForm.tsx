@@ -53,6 +53,7 @@ export function RegisterPageForm() {
     formData.set("email", parsed.data.email);
     formData.set("password", parsed.data.password);
     formData.set("displayName", parsed.data.name);
+    formData.set("termsAccepted", "yes");
     if (inviteToken) formData.set("inviteToken", inviteToken);
 
     startTransition(async () => {

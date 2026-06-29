@@ -43,10 +43,8 @@ function redirectLegacyAuthQueryParams(request: NextRequest) {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/") {
-    const legacy = redirectLegacyAuthQueryParams(request);
-    if (legacy) return legacy;
-  }
+  const legacy = redirectLegacyAuthQueryParams(request);
+  if (legacy) return legacy;
 
   if (pathname === "/login" || pathname === "/register") {
     if (hasValidSession(request)) {
@@ -82,5 +80,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/dashboard", "/dashboard/:path*", "/login", "/register"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };

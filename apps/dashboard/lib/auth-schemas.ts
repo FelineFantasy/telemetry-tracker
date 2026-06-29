@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email").max(255),
-  password: z.string().min(8, "At least 8 characters").max(256),
+  password: z.string().min(1, "Required").max(256),
 });
 
 export const registerPageSchema = z
