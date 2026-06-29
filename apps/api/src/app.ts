@@ -14,6 +14,7 @@ import {
 import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
 import { authRoutes } from "./routes/auth.js";
+import { contactRoutes } from "./routes/contact.js";
 import { projectDashboardRoutes } from "./routes/project-dashboard.js";
 import { billingRoutes } from "./routes/billing.js";
 import { registerStripeWebhookIfConfigured } from "./routes/stripe-webhook.js";
@@ -80,6 +81,7 @@ export async function createApp(): Promise<FastifyInstance> {
         timeWindow: RATE_LIMIT_WINDOW_MS,
       });
       await f.register(authRoutes);
+      await f.register(contactRoutes);
     },
     { prefix: "/api" }
   );
