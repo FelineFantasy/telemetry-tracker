@@ -15,6 +15,19 @@ Without email configured, admins must share invite or reset links manually.
 
 Both are required for outbound email. Verify your domain in Resend for production.
 
+Optional for the marketing contact form (`POST /api/contact`):
+
+| Variable | Description |
+|----------|-------------|
+| `CONTACT_INBOX_EMAIL` | Inbox for form submissions (default `info@tacko.io`) |
+
+The contact form uses the same Resend credentials as password reset. Resend will reject sends when:
+
+- `TELEMETRY_EMAIL_FROM` uses `onboarding@resend.dev` but the recipient is not your Resend account email
+- the domain in `TELEMETRY_EMAIL_FROM` is not verified in [Resend → Domains](https://resend.com/domains)
+
+Check API logs for `[email] Resend failed:` for the exact rejection reason.
+
 ---
 
 ## Stripe (paid plans)

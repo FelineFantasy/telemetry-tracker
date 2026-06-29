@@ -74,22 +74,31 @@ function Field({
   label,
   hint,
   error,
+  htmlFor,
   children,
 }: {
   label: string;
   hint?: string;
   error?: string;
+  htmlFor?: string;
   children: ReactNode;
 }) {
+  const LabelTag = htmlFor ? "label" : "span";
+
   return (
-    <label className="block">
+    <div className="block">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs font-medium text-foreground">{label}</span>
+        <LabelTag
+          {...(htmlFor ? { htmlFor } : {})}
+          className="text-xs font-medium text-foreground"
+        >
+          {label}
+        </LabelTag>
         {hint && !error ? <span className="text-[11px] text-muted-foreground">{hint}</span> : null}
         {error ? <span className="text-[11px] text-destructive">{error}</span> : null}
       </div>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -267,8 +276,9 @@ export function ContactPageContent() {
                     </p>
                   ) : null}
                   <div className="grid gap-5 sm:grid-cols-2">
-                    <Field label="Name" error={errors.name}>
+                    <Field label="Name" htmlFor="contact-name" error={errors.name}>
                       <input
+                        id="contact-name"
                         type="text"
                         value={values.name}
                         onChange={(e) => update("name", e.target.value)}
@@ -277,8 +287,9 @@ export function ContactPageContent() {
                         className={inputCls}
                       />
                     </Field>
-                    <Field label="Work email" error={errors.email}>
+                    <Field label="Work email" htmlFor="contact-email" error={errors.email}>
                       <input
+                        id="contact-email"
                         type="email"
                         value={values.email}
                         onChange={(e) => update("email", e.target.value)}
@@ -289,8 +300,9 @@ export function ContactPageContent() {
                     </Field>
                   </div>
 
-                  <Field label="Company" hint="Optional" error={errors.company}>
+                  <Field label="Company" hint="Optional" htmlFor="contact-company" error={errors.company}>
                     <input
+                      id="contact-company"
                       type="text"
                       value={values.company}
                       onChange={(e) => update("company", e.target.value)}
@@ -319,8 +331,9 @@ export function ContactPageContent() {
                     </div>
                   </Field>
 
-                  <Field label="Message" error={errors.message}>
+                  <Field label="Message" htmlFor="contact-message" error={errors.message}>
                     <textarea
+                      id="contact-message"
                       value={values.message}
                       onChange={(e) => update("message", e.target.value)}
                       rows={6}
