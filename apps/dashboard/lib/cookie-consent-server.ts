@@ -49,8 +49,18 @@ export async function setCookieConsentChoice(choice: CookieConsentChoice): Promi
   (await cookies()).set(COOKIE_CONSENT_STORAGE_KEY, choice, consentCookieBase);
 }
 
-/** Apply consent from auth FormData so login/register bootstrap sees the same choice as localStorage. */
+/** Fill in the consent cookie only when the server has no prior choice (e.g. localStorage ahead of banner sync). */
+export async function restoreCookieConsentChoiceIfUnset(
+  choice: CookieConsentChoice
+): Promise<boolean> {
+  if (await getCookieConsentChoiceFromCookies()) return false;
+  await setCookieConsentChoice(choice);
+  return true;
+}
+
+/** Apply consent from auth FormData when the server has no choice yet — never override an existing cookie. */
 export async function applyCookieConsentFromForm(formData: FormData): Promise<void> {
+  if (await getCookieConsentChoiceFromCookies()) return;
   const raw = String(formData.get("cookieConsent") ?? "").trim();
   if (isCookieConsentChoice(raw)) {
     await setCookieConsentChoice(raw);

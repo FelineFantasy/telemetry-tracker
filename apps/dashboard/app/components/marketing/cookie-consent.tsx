@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { syncCookieConsentAction } from "@/app/cookie-consent/actions";
+import { restoreCookieConsentAction, syncCookieConsentAction } from "@/app/cookie-consent/actions";
 import {
   COOKIE_CONSENT_STORAGE_KEY,
   cookieConsentDocumentCookie,
@@ -21,7 +21,7 @@ export function CookieConsent() {
       const value = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
       if (isCookieConsentChoice(value)) {
         document.cookie = cookieConsentDocumentCookie(value);
-        void syncCookieConsentAction(value);
+        void restoreCookieConsentAction(value);
         setChoice(value);
         setExpanded(false);
       } else {
