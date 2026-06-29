@@ -1,3 +1,7 @@
 "use server";
 
-export { clearPreferenceCookies as clearPreferenceCookiesAction } from "@/lib/cookie-consent-server";
+import { clearPreferenceCookies } from "@/lib/cookie-consent-server";
+
+export async function clearPreferenceCookiesAction(): Promise<void> {
+  await clearPreferenceCookies();
+}

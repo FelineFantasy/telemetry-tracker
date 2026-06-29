@@ -4,7 +4,9 @@ export const COOKIE_CONSENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 export type CookieConsentChoice = "accepted" | "rejected";
 
-export function isCookieConsentChoice(value: string | null): value is CookieConsentChoice {
+export function isCookieConsentChoice(
+  value: string | null | undefined
+): value is CookieConsentChoice {
   return value === "accepted" || value === "rejected";
 }
 
