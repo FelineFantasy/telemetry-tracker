@@ -11,6 +11,8 @@ const PROJECT_UUID_RE = /^[0-9a-f-]{36}$/i;
 export type DashboardApiFetchOptions = {
   /** When true, do not send `X-Organization-Id` (avoids 403 from a stale org cookie on `/meta/projects`). */
   omitOrganizationHeader?: boolean;
+  /** When true, do not send `X-Project-Id` (for session-scoped meta reads during workspace bootstrap). */
+  omitProjectHeader?: boolean;
   /**
    * Use this exact organization id as `X-Organization-Id` instead of calling `getResolvedDashboardOrganizationId`
    * (which fetches `/api/meta/organizations`). Prefer when the layout or a server action already knows the sidebar org.
@@ -31,7 +33,11 @@ export async function dashboardApiFetch(
 ): Promise<Response> {
   const override = options?.projectIdOverride?.trim();
   const projectId =
-    override && PROJECT_UUID_RE.test(override) ? override : await getDashboardProjectId();
+    options?.omitProjectHeader
+      ? undefined
+      : override && PROJECT_UUID_RE.test(override)
+        ? override
+        : await getDashboardProjectId();
   const sessionId = await getDashboardSessionId();
   const orgOverride = options?.organizationIdOverride?.trim();
   const orgId = options?.omitOrganizationHeader
@@ -43,7 +49,7 @@ export async function dashboardApiFetch(
     ? pathAndQuery
     : `${API_BASE_URL}${pathAndQuery.startsWith("/") ? "" : "/"}${pathAndQuery}`;
   const baseHeaders: Record<string, string> = {
-    ...dashboardApiHeaders(projectId),
+    ...(projectId ? dashboardApiHeaders(projectId) : {}),
     ...(sessionId ? { Authorization: `Bearer ${sessionId}` } : {}),
     ...(orgId ? { "X-Organization-Id": orgId } : {}),
   };

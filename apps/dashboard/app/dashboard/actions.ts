@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
+import { preferenceCookiesAllowedFromCookies, preferenceCookiesDeniedMessage } from "@/lib/cookie-consent-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { TELEMETRY_ORG_COOKIE } from "@/lib/dashboard-org";
 import {
@@ -19,6 +20,9 @@ export async function setDashboardProjectId(projectId: string): Promise<
   if (!/^[0-9a-f-]{36}$/i.test(trimmed)) {
     return { ok: false, error: "Invalid project id" };
   }
+  if (!(await preferenceCookiesAllowedFromCookies())) {
+    return { ok: false, error: await preferenceCookiesDeniedMessage() };
+  }
   const c = await cookies();
   c.set(TELEMETRY_PROJECT_COOKIE, trimmed.toLowerCase(), {
     path: "/",
@@ -33,6 +37,9 @@ export async function setDashboardProjectId(projectId: string): Promise<
 
 /** Clear cookie → API falls back to default project. */
 export async function resetDashboardProjectId(): Promise<void> {
+  if (!(await preferenceCookiesAllowedFromCookies())) {
+    return;
+  }
   const c = await cookies();
   c.set(TELEMETRY_PROJECT_COOKIE, DEFAULT_PROJECT_ID, {
     path: "/",
@@ -133,6 +140,9 @@ export async function setDashboardOrganizationId(
     projectId,
     verifyData
   );
+  if (!(await preferenceCookiesAllowedFromCookies())) {
+    return { ok: false, error: await preferenceCookiesDeniedMessage() };
+  }
   const c = await cookies();
   c.set(TELEMETRY_ORG_COOKIE, trimmed, cookieOpts);
   if (nextProject.toLowerCase() !== projectId.toLowerCase()) {
@@ -157,15 +167,17 @@ export async function createOrganizationAction(formData: FormData): Promise<void
   }
   const data = (await res.json()) as { id?: string };
   if (data.id) {
-    const orgId = data.id.toLowerCase();
-    const c = await cookies();
-    c.set(TELEMETRY_ORG_COOKIE, orgId, cookieOpts);
-    const sessionId = await getDashboardSessionId();
-    const projectId = await getDashboardProjectId();
-    if (sessionId) {
-      const nextProject = await resolveProjectCookieForOrganization(sessionId, orgId, projectId);
-      if (nextProject.toLowerCase() !== projectId.toLowerCase()) {
-        c.set(TELEMETRY_PROJECT_COOKIE, nextProject.toLowerCase(), cookieOpts);
+    if (await preferenceCookiesAllowedFromCookies()) {
+      const orgId = data.id.toLowerCase();
+      const c = await cookies();
+      c.set(TELEMETRY_ORG_COOKIE, orgId, cookieOpts);
+      const sessionId = await getDashboardSessionId();
+      const projectId = await getDashboardProjectId();
+      if (sessionId) {
+        const nextProject = await resolveProjectCookieForOrganization(sessionId, orgId, projectId);
+        if (nextProject.toLowerCase() !== projectId.toLowerCase()) {
+          c.set(TELEMETRY_PROJECT_COOKIE, nextProject.toLowerCase(), cookieOpts);
+        }
       }
     }
   }
@@ -196,7 +208,7 @@ export async function createProjectAction(formData: FormData): Promise<void> {
     return;
   }
   const data = (await res.json()) as { id?: string };
-  if (data.id) {
+  if (data.id && (await preferenceCookiesAllowedFromCookies())) {
     const c = await cookies();
     c.set(TELEMETRY_PROJECT_COOKIE, data.id.toLowerCase(), cookieOpts);
   }

@@ -4,39 +4,61 @@ import type { NextRequest } from "next/server";
 /** Keep in sync with `TELEMETRY_SESSION_COOKIE` in `lib/dashboard-project.ts`. */
 const SESSION_COOKIE = "telemetry_session";
 
-function redirectToHomeSignIn(request: NextRequest, next?: string) {
+function hasValidSession(request: NextRequest): boolean {
+  const session = request.cookies.get(SESSION_COOKIE);
+  return Boolean(session?.value && /^[0-9a-f-]{36}$/i.test(session.value));
+}
+
+function redirectToLogin(request: NextRequest, next?: string) {
   const url = request.nextUrl.clone();
-  url.pathname = "/";
+  url.pathname = "/login";
   url.search = "";
-  url.searchParams.set("signIn", "1");
   if (next?.startsWith("/")) {
     url.searchParams.set("next", next);
   }
   return NextResponse.redirect(url);
 }
 
-function redirectToHomeSignUp(request: NextRequest) {
-  const url = request.nextUrl.clone();
+function redirectLegacyAuthQueryParams(request: NextRequest) {
+  const signUp = request.nextUrl.searchParams.get("signUp") === "1";
+  const signIn = request.nextUrl.searchParams.get("signIn") === "1";
+  if (!signUp && !signIn) return null;
+
   const invite = request.nextUrl.searchParams.get("invite");
-  url.pathname = "/";
+  const next = request.nextUrl.searchParams.get("next");
+  const url = request.nextUrl.clone();
   url.search = "";
-  url.searchParams.set("signUp", "1");
-  if (invite) {
-    url.searchParams.set("invite", invite);
+
+  if (signUp) {
+    url.pathname = "/register";
+    if (invite) url.searchParams.set("invite", invite);
+    return NextResponse.redirect(url);
   }
+
+  url.pathname = "/login";
+  if (next?.startsWith("/")) url.searchParams.set("next", next);
   return NextResponse.redirect(url);
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/login") {
-    const next = request.nextUrl.searchParams.get("next") ?? undefined;
-    return redirectToHomeSignIn(request, next);
-  }
+  const legacy = redirectLegacyAuthQueryParams(request);
+  if (legacy) return legacy;
 
-  if (pathname === "/register") {
-    return redirectToHomeSignUp(request);
+  if (pathname === "/login" || pathname === "/register") {
+    if (hasValidSession(request)) {
+      const url = request.nextUrl.clone();
+      if (pathname === "/login") {
+        const next = request.nextUrl.searchParams.get("next");
+        url.pathname = next?.startsWith("/") ? next : "/dashboard/overview";
+      } else {
+        url.pathname = "/dashboard/overview";
+      }
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
   }
 
   if (process.env.NEXT_PUBLIC_TELEMETRY_PUBLIC_DASHBOARD === "true") {
@@ -47,17 +69,18 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = request.cookies.get(SESSION_COOKIE);
-  if (session?.value && /^[0-9a-f-]{36}$/i.test(session.value)) {
+  if (hasValidSession(request)) {
     return NextResponse.next();
   }
 
-  return redirectToHomeSignIn(
+  return redirectToLogin(
     request,
     request.nextUrl.pathname + request.nextUrl.search,
   );
 }
 
 export const config = {
-  matcher: ["/dashboard", "/dashboard/:path*", "/login", "/register"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };
