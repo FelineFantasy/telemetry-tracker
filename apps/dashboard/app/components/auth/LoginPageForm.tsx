@@ -17,8 +17,13 @@ import {
   loginSchema,
   type LoginFormValues,
 } from "@/lib/auth-schemas";
+import type { CookieConsentChoice } from "@/lib/cookie-consent";
 
-export function LoginPageForm() {
+type LoginPageFormProps = {
+  serverChoice: CookieConsentChoice | null;
+};
+
+export function LoginPageForm({ serverChoice }: LoginPageFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = resolvePostLoginPath(searchParams.get("next"));
@@ -47,7 +52,7 @@ export function LoginPageForm() {
     const formData = new FormData();
     formData.set("email", parsed.data.email);
     formData.set("password", parsed.data.password);
-    appendCookieConsentToFormData(formData);
+    appendCookieConsentToFormData(formData, serverChoice);
 
     startTransition(async () => {
       const result = await login(formData);

@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { CookieConsent } from "@/app/components/marketing/cookie-consent";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
+import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
 import { socialPreviewImage } from "@/lib/social-image";
 import { resolveMetadataBase } from "@/lib/site-url";
 import "./globals.css";
@@ -62,11 +63,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const serverChoice = await getCookieConsentChoiceFromCookies();
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
@@ -75,7 +77,7 @@ export default function RootLayout({
         </a>
         <ToasterProvider />
         {children}
-        <CookieConsent />
+        <CookieConsent serverChoice={serverChoice} />
       </body>
     </html>
   );

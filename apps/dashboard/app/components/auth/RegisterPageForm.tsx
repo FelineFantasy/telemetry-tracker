@@ -18,8 +18,13 @@ import {
   registerPageSchema,
   type RegisterPageValues,
 } from "@/lib/auth-schemas";
+import type { CookieConsentChoice } from "@/lib/cookie-consent";
 
-export function RegisterPageForm() {
+type RegisterPageFormProps = {
+  serverChoice: CookieConsentChoice | null;
+};
+
+export function RegisterPageForm({ serverChoice }: RegisterPageFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite")?.trim() ?? "";
@@ -57,7 +62,7 @@ export function RegisterPageForm() {
     formData.set("displayName", parsed.data.name);
     formData.set("termsAccepted", "yes");
     if (inviteToken) formData.set("inviteToken", inviteToken);
-    appendCookieConsentToFormData(formData);
+    appendCookieConsentToFormData(formData, serverChoice);
 
     startTransition(async () => {
       const result = await register(formData);

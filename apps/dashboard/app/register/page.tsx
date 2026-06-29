@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { RegisterPageForm } from "@/app/components/auth/RegisterPageForm";
+import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
 
 export const metadata: Metadata = {
   title: "Create account",
@@ -9,10 +10,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  const serverChoice = await getCookieConsentChoiceFromCookies();
   return (
     <Suspense fallback={null}>
-      <RegisterPageForm />
+      <RegisterPageForm serverChoice={serverChoice} />
     </Suspense>
   );
 }

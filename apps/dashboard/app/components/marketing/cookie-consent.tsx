@@ -9,20 +9,31 @@ import {
   isCookieConsentChoice,
   type CookieConsentChoice,
 } from "@/lib/cookie-consent";
+import { syncClientCookieConsentStorage } from "@/lib/cookie-consent-client";
 
-export function CookieConsent() {
-  const [choice, setChoice] = useState<CookieConsentChoice | null>(null);
-  const [expanded, setExpanded] = useState(false);
+type CookieConsentProps = {
+  serverChoice: CookieConsentChoice | null;
+};
+
+export function CookieConsent({ serverChoice }: CookieConsentProps) {
+  const [choice, setChoice] = useState<CookieConsentChoice | null>(serverChoice);
+  const [expanded, setExpanded] = useState(serverChoice == null);
   const [ready, setReady] = useState(false);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
     try {
-      const value = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
-      if (isCookieConsentChoice(value)) {
-        document.cookie = cookieConsentDocumentCookie(value);
-        void restoreCookieConsentAction(value);
-        setChoice(value);
+      if (serverChoice) {
+        syncClientCookieConsentStorage(serverChoice);
+        setChoice(serverChoice);
+        setExpanded(false);
+        return;
+      }
+      const localValue = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
+      if (isCookieConsentChoice(localValue)) {
+        document.cookie = cookieConsentDocumentCookie(localValue);
+        void restoreCookieConsentAction(localValue);
+        setChoice(localValue);
         setExpanded(false);
       } else {
         setExpanded(true);
@@ -32,12 +43,11 @@ export function CookieConsent() {
     } finally {
       setReady(true);
     }
-  }, []);
+  }, [serverChoice]);
 
   function decide(next: CookieConsentChoice) {
     try {
-      localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, next);
-      document.cookie = cookieConsentDocumentCookie(next);
+      syncClientCookieConsentStorage(next);
     } catch {
       /* ignore */
     }
