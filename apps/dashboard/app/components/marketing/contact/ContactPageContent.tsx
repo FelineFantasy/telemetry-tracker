@@ -93,6 +93,14 @@ function Field({
   );
 }
 
+const topicLabels: Record<ContactTopic, string> = {
+  general: "General",
+  support: "Support",
+  security: "Security",
+  business: "Business",
+  other: "Other",
+};
+
 function validate(values: ContactValues): Partial<Record<keyof ContactValues, string>> {
   const errors: Partial<Record<keyof ContactValues, string>> = {};
   const email = values.email.trim();
@@ -101,18 +109,11 @@ function validate(values: ContactValues): Partial<Record<keyof ContactValues, st
   if (!email) errors.email = "Required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Invalid email";
   if (values.company.length > 120) errors.company = "Too long";
+  if (!(values.topic in topicLabels)) errors.topic = "Invalid topic";
   if (values.message.trim().length < 10) errors.message = "Tell us a bit more";
   else if (values.message.length > 2000) errors.message = "Too long";
   return errors;
 }
-
-const topicLabels: Record<ContactTopic, string> = {
-  general: "General",
-  support: "Support",
-  security: "Security",
-  business: "Business",
-  other: "Other",
-};
 
 export function ContactPageContent() {
   const [values, setValues] = useState<ContactValues>({
@@ -125,9 +126,7 @@ export function ContactPageContent() {
   const [errors, setErrors] = useState<Partial<Record<keyof ContactValues, string>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "submitting" | "sent">("idle");
-  const [delivery, setDelivery] = useState<{ confirmationSent: boolean; devLogged?: boolean }>({
-    confirmationSent: false,
-  });
+  const [devLogged, setDevLogged] = useState(false);
 
   function update<K extends keyof ContactValues>(key: K, val: ContactValues[K]) {
     setValues((v) => ({ ...v, [key]: val }));
@@ -153,10 +152,7 @@ export function ContactPageContent() {
       return;
     }
 
-    setDelivery({
-      confirmationSent: result.confirmationSent,
-      devLogged: result.devLogged,
-    });
+    setDevLogged(Boolean(result.devLogged));
     setStatus("sent");
   }
 
@@ -215,15 +211,10 @@ export function ContactPageContent() {
                   </div>
                   <h3 className="mt-4 text-base font-semibold">Message received</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {delivery.devLogged ? (
+                    {devLogged ? (
                       <>
                         Email is not configured in this environment — your message was logged for
                         development only. Use the Gmail link below to reach us.
-                      </>
-                    ) : delivery.confirmationSent ? (
-                      <>
-                        We sent a confirmation to {values.email}. Expect a reply within one business
-                        day.
                       </>
                     ) : (
                       <>
@@ -304,7 +295,7 @@ export function ContactPageContent() {
                     />
                   </Field>
 
-                  <Field label="Topic">
+                  <Field label="Topic" error={errors.topic}>
                     <div className="flex flex-wrap gap-2">
                       {(Object.keys(topicLabels) as ContactTopic[]).map((t) => (
                         <button

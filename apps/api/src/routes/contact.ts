@@ -80,7 +80,6 @@ export async function contactRoutes(
           ok: true,
           devLogged: true,
           inboxSent: false,
-          confirmationSent: false,
         });
       }
       return reply.status(503).send({
@@ -116,16 +115,9 @@ export async function contactRoutes(
       });
     }
 
-    const confirmationResult = await sendTransactionalEmail({
-      to: email,
-      subject: "We received your message — Telemetry Tracker",
-      html: `<p>Hi ${safeName},</p><p>Thanks for reaching out about <strong>${escapeHtml(topicLabel)}</strong>. We received your message and will reply within one business day.</p><p>— Telemetry Tracker</p>`,
-    });
-
     return reply.send({
       ok: true,
       inboxSent: inboxResult.sent,
-      confirmationSent: confirmationResult.sent,
     });
   });
 }

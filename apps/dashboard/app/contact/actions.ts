@@ -16,7 +16,6 @@ export type ContactSubmitResult =
   | {
       ok: true;
       inboxSent: boolean;
-      confirmationSent: boolean;
       devLogged?: boolean;
     }
   | {
@@ -47,7 +46,6 @@ export async function submitContactForm(
     error?: string;
     fields?: Partial<Record<keyof ContactFormInput, string>>;
     inboxSent?: boolean;
-    confirmationSent?: boolean;
     devLogged?: boolean;
   };
 
@@ -62,7 +60,6 @@ export async function submitContactForm(
   return {
     ok: true,
     inboxSent: Boolean(data.inboxSent),
-    confirmationSent: Boolean(data.confirmationSent),
     devLogged: data.devLogged,
   };
 }
