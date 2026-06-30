@@ -1,6 +1,12 @@
 import Link from "next/link";
+import { MarketingNavLink } from "@/app/components/marketing/MarketingNavLink";
 
-export function Cta() {
+const DASHBOARD_HREF = "/dashboard/overview";
+
+export function Cta({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
+  const primaryHref = isAuthenticated ? DASHBOARD_HREF : "/register";
+  const primaryLabel = isAuthenticated ? "Open dashboard" : "Start free";
+
   return (
     <section className="relative py-28">
       <div className="mx-auto max-w-5xl px-6">
@@ -19,11 +25,12 @@ export function Cta() {
               Bring the signals you need into one tool your team will actually open.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-2">
-              <Link
-                href="/register"
+              <MarketingNavLink
+                href={primaryHref}
+                pendingLabel={isAuthenticated ? "Opening dashboard…" : "Loading…"}
                 className="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.02]"
               >
-                Start free
+                {primaryLabel}
                 <svg
                   viewBox="0 0 16 16"
                   className="h-3.5 w-3.5"
@@ -35,7 +42,7 @@ export function Cta() {
                 >
                   <path d="M3 8h10M9 4l4 4-4 4" />
                 </svg>
-              </Link>
+              </MarketingNavLink>
               <Link
                 href="/docs"
                 className="inline-flex items-center rounded-full border border-border bg-background px-5 py-2.5 text-sm text-foreground hover:bg-surface"

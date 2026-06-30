@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeOverviewHealth, errorGroupDetailHref, resolveCompareWindow } from "./overview-stats.js";
+import {
+  buildWorkspaceTelemetry,
+  computeOverviewHealth,
+  errorGroupDetailHref,
+  resolveCompareWindow,
+} from "./overview-stats.js";
 
 describe("resolveCompareWindow", () => {
   it("offsets week-ago comparison for 7d range", () => {
@@ -53,6 +58,17 @@ describe("errorGroupDetailHref", () => {
 
   it("omits query string when no scope filters are set", () => {
     expect(errorGroupDetailHref("eg_1", {})).toBe("/dashboard/errors/eg_1");
+  });
+});
+
+describe("buildWorkspaceTelemetry", () => {
+  it("derives ingest totals and breakdown from precomputed counts", () => {
+    expect(buildWorkspaceTelemetry(1000, 50, 3, 2)).toEqual({
+      ingestRequests: 1050,
+      sdkEventRows: 1000,
+      distinctApps: 3,
+      distinctSdkVersions: 2,
+    });
   });
 });
 

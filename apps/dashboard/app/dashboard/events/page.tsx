@@ -95,11 +95,6 @@ export default async function EventsPage({
   const currentParams = buildEventsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
-  const filterOptions = await getFilterOptions(appFilter || undefined);
-  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
-  if (rawEnv !== environment) {
-    redirect(mergeListQuery(EVENTS_PATH, currentParams, { environment }));
-  }
 
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
@@ -132,7 +127,7 @@ export default async function EventsPage({
   if (from) apiQuery.set("from", from);
   if (to) apiQuery.set("to", to);
   if (name) apiQuery.set("name", name);
-  if (environment) apiQuery.set("environment", environment);
+  if (rawEnv) apiQuery.set("environment", rawEnv);
   if (platform) apiQuery.set("platform", platform);
   if (release) apiQuery.set("release", release);
   if (propertiesContains) apiQuery.set("propertiesContains", propertiesContains);
@@ -141,8 +136,18 @@ export default async function EventsPage({
 
   let items: EventRow[] = [];
   let total = 0;
+  let filterOptions = {
+    environments: [] as string[],
+    platforms: [] as string[],
+    releases: [] as string[],
+  };
+
   try {
-    const data = await getEvents(apiQuery);
+    const [opts, data] = await Promise.all([
+      getFilterOptions(appFilter || undefined),
+      getEvents(apiQuery),
+    ]);
+    filterOptions = opts;
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
   } catch (e) {
@@ -152,6 +157,11 @@ export default async function EventsPage({
         <ErrorState message={String(e instanceof Error ? e.message : e)} />
       </>
     );
+  }
+
+  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
+  if (rawEnv !== environment) {
+    redirect(mergeListQuery(EVENTS_PATH, currentParams, { environment }));
   }
 
   const hrefForPage = (p: number) =>

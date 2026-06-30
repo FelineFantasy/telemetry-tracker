@@ -5,34 +5,28 @@ import { prisma } from "../lib/db.js";
 import {
   createApiKeyWithPlanLimitCheck,
   createProjectWithPlanLimitCheck,
-  getMonthlyIngestUsed,
-  loadPlanContextForOrganization,
-  loadPlanContextForProject,
 } from "../lib/plan-enforcement.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
 import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
 import { getProjectNavSummaries } from "../lib/project-nav-summary.js";
+import { loadNavScopeForProject, loadWorkspaceMetaForUser } from "../lib/workspace-meta.js";
+import { buildDashboardBootstrap } from "../lib/dashboard-bootstrap.js";
+import { buildDashboardSessionContext } from "../lib/dashboard-session-context.js";
 import {
   canCreateApiKey,
   canCreateProject,
   canManageMembers,
   canArchiveOrganization,
   canArchiveProject,
-  canResolveErrors,
   canRevokeApiKey,
   getMembershipRoleForOrganization,
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import {
-  type BillingHealthSnapshot,
-  billingHealthFromPlanContext,
-} from "../lib/billing-alert.js";
-import {
   allowUnauthenticatedReads,
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
-  tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
 import { sendTransactionalEmail } from "../lib/email.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
@@ -109,19 +103,8 @@ export async function projectDashboardRoutes(
     if (!session) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
-    const rows = await prisma.organizationMembership.findMany({
-      where: { user_id: session.userId, organization: { deleted_at: null } },
-      select: {
-        organization: { select: { id: true, name: true } },
-      },
-      orderBy: { created_at: "asc" },
-    });
-    return reply.send({
-      organizations: rows.map((r) => ({
-        id: r.organization.id,
-        name: r.organization.name,
-      })),
-    });
+    const workspace = await loadWorkspaceMetaForUser(prisma, session.userId);
+    return reply.send({ organizations: workspace.organizations });
   });
 
   app.post("/meta/organizations", async (request, reply) => {
@@ -152,45 +135,73 @@ export async function projectDashboardRoutes(
     return reply.status(201).send({ id: org.id, name: org.name });
   });
 
+  app.get("/meta/dashboard-bootstrap", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const headerOrg = readOrganizationIdHeader(request);
+    const result = await buildDashboardBootstrap(prisma, session, request, headerOrg);
+    if (!result.ok) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    return reply.send(result.payload);
+  });
+
+  app.get("/meta/workspace", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const headerOrg = readOrganizationIdHeader(request);
+    const workspace = await loadWorkspaceMetaForUser(prisma, session.userId, headerOrg);
+    if (workspace.forbiddenOrg) {
+      return reply.status(403).send({ error: "Not a member of this organization" });
+    }
+
+    const query = request.query as { includeNavScope?: string; app?: string | string[] };
+    const includeNavScope =
+      query.includeNavScope === "1" || query.includeNavScope === "true";
+    let navScope: { apps: string[]; environments: string[] } | undefined;
+
+    if (includeNavScope) {
+      const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+      if (projectId === null) return;
+      const appFilter = typeof query.app === "string" ? query.app.trim() || undefined : undefined;
+      navScope = await loadNavScopeForProject(prisma, projectId, appFilter);
+    }
+
+    return reply.send({
+      organizations: workspace.organizations,
+      projects: workspace.projects,
+      ...(navScope ? { navScope } : {}),
+    });
+  });
+
+  app.get("/meta/nav-scope", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const query = request.query as { app?: string | string[] };
+    const raw = Array.isArray(query.app) ? query.app[0] : query.app;
+    const appFilter = typeof raw === "string" && raw.trim() !== "" ? raw.trim() : undefined;
+    const navScope = await loadNavScopeForProject(prisma, projectId, appFilter);
+    return reply.send(navScope);
+  });
+
   app.get("/meta/projects", async (request, reply) => {
     const session = await getSessionUser(request);
     const headerOrg = readOrganizationIdHeader(request);
 
     if (session) {
-      const orgRows = await prisma.organizationMembership.findMany({
-        where: { user_id: session.userId, organization: { deleted_at: null } },
-        select: { organization_id: true },
-      });
-      const orgIds = [...new Set(orgRows.map((r) => r.organization_id))];
-      if (orgIds.length === 0) {
-        return reply.send({ projects: [] });
+      const workspace = await loadWorkspaceMetaForUser(prisma, session.userId, headerOrg);
+      if (workspace.forbiddenOrg) {
+        return reply.status(403).send({ error: "Not a member of this organization" });
       }
-
-      let filterIds = orgIds;
-      if (headerOrg) {
-        if (!orgIds.includes(headerOrg)) {
-          return reply.status(403).send({ error: "Not a member of this organization" });
-        }
-        filterIds = [headerOrg];
-      }
-
-      const projects = await prisma.project.findMany({
-        where: {
-          organization_id: { in: filterIds },
-          deleted_at: null,
-          organization: { deleted_at: null },
-        },
-        select: { id: true, name: true, slug: true, organization_id: true },
-        orderBy: { name: "asc" },
-      });
-      return reply.send({
-        projects: projects.map((p) => ({
-          id: p.id,
-          name: p.name,
-          slug: p.slug,
-          organizationId: p.organization_id,
-        })),
-      });
+      return reply.send({ projects: workspace.projects });
     }
 
     if (headerOrg) {
@@ -623,71 +634,11 @@ export async function projectDashboardRoutes(
     if (!session) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
-    const headerOrg = readOrganizationIdHeader(request);
-    const projectId = await tryResolveReadProjectId(request);
-    const projRole =
-      projectId !== null
-        ? await getMembershipRoleForProject(session.userId, projectId)
-        : null;
-
-    const orgRoleFromHeader = headerOrg
-      ? await getMembershipRoleForOrganization(session.userId, headerOrg)
-      : null;
-    /** Org-scoped UI (sidebar org): explicit membership for `X-Organization-Id`; if absent, project org role only (never another org’s role). */
-    const orgCapabilityRole = orgRoleFromHeader ?? projRole;
-
-    if (projRole === null && orgCapabilityRole === null) {
+    const sessionContext = await buildDashboardSessionContext(prisma, session, request);
+    if (sessionContext === null) {
       return reply.status(403).send({ error: "Forbidden" });
     }
-
-    let usageQuota: {
-      planTier: string;
-      monthlyIngestUsed: number;
-      monthlyIngestLimit: number;
-      percentUsed: number;
-      quotaExceeded: boolean;
-      nearQuota: boolean;
-      retentionDays: number;
-    } | null = null;
-    let billingHealth: BillingHealthSnapshot | null = null;
-    if (projectId !== null) {
-      const ctx = await loadPlanContextForProject(prisma, projectId);
-      if (ctx) {
-        const used = await getMonthlyIngestUsed(prisma, projectId);
-        const limit = ctx.limits.monthlyIngestUnits;
-        const ratio = limit > 0 ? used / limit : 0;
-        const quotaExceeded = limit > 0 && used >= limit;
-        usageQuota = {
-          planTier: ctx.planTier,
-          monthlyIngestUsed: used,
-          monthlyIngestLimit: limit,
-          percentUsed: Math.round(ratio * 100),
-          quotaExceeded,
-          nearQuota: ratio >= 0.9,
-          retentionDays: ctx.limits.retentionDays,
-        };
-        billingHealth = billingHealthFromPlanContext(ctx);
-      }
-    } else if (headerOrg) {
-      const ctx = await loadPlanContextForOrganization(prisma, headerOrg);
-      if (ctx) {
-        billingHealth = billingHealthFromPlanContext(ctx);
-      }
-    }
-
-    return reply.send({
-      projectId: projectId ?? "",
-      role: projRole ?? orgCapabilityRole ?? OrgRole.VIEWER,
-      canResolveErrors: canResolveErrors(projRole),
-      canCreateApiKey: canCreateApiKey(projRole),
-      canRevokeApiKey: canRevokeApiKey(projRole),
-      canCreateProject: canCreateProject(orgCapabilityRole),
-      canManageMembers: canManageMembers(orgCapabilityRole),
-      canArchiveOrganization: canArchiveOrganization(orgCapabilityRole),
-      canArchiveProject: canArchiveProject(orgCapabilityRole),
-      usageQuota,
-      billingHealth,
-    });
+    return reply.send(sessionContext);
   });
 
   app.get("/meta/members", async (request, reply) => {

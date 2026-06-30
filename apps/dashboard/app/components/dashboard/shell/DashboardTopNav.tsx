@@ -1,57 +1,12 @@
-"use client";
-
 import Link from "next/link";
 import { Suspense } from "react";
-import { BookOpen } from "lucide-react";
 import { Logo } from "@/app/components/marketing/logo";
-import type { OrgOption } from "@/lib/dashboard-workspace-types";
-import type { ProjectOption } from "@/lib/dashboard-workspace-types";
+import type { OrgOption, ProjectOption } from "@/lib/dashboard-workspace-types";
 import type { DashboardUser } from "@/lib/dashboard-user";
 import { DashboardNavTabs } from "./DashboardNavTabs";
-import { DashboardNotifications } from "./DashboardNotifications";
-import { DashboardQuickActions } from "./DashboardQuickActions";
-import { DashboardCommandPalette } from "./DashboardCommandPalette";
-import { DashboardUserMenu } from "./DashboardUserMenu";
-import { DashboardEnvSelector } from "./DashboardEnvSelector";
-import { TopNavAppSwitcher } from "./TopNavAppSwitcher";
-import { TopNavOrgSwitcher } from "./TopNavOrgSwitcher";
-import { TopNavProjectSwitcher } from "./TopNavProjectSwitcher";
-
-function NavScopePickers({
-  organizations,
-  currentOrganizationId,
-  projects,
-  currentProjectId,
-  environments,
-  apps,
-}: {
-  organizations: OrgOption[];
-  currentOrganizationId: string | null;
-  projects: ProjectOption[];
-  currentProjectId: string;
-  environments: string[];
-  apps: string[];
-}) {
-  return (
-    <>
-      <TopNavOrgSwitcher
-        organizations={organizations}
-        currentOrganizationId={currentOrganizationId}
-      />
-      <TopNavProjectSwitcher
-        projects={projects}
-        currentProjectId={currentProjectId}
-        organizationId={currentOrganizationId}
-      />
-      <TopNavAppSwitcher
-        apps={apps}
-        projectId={currentProjectId}
-        organizationId={currentOrganizationId}
-      />
-      <DashboardEnvSelector environments={environments} />
-    </>
-  );
-}
+import { DashboardTopNavActions } from "./DashboardTopNavActions";
+import { NavScopePickersLoader } from "./NavScopePickersLoader";
+import { NavScopePickersSkeleton } from "./NavScopePickersSkeleton";
 
 export function DashboardTopNav({
   organizations,
@@ -82,12 +37,8 @@ export function DashboardTopNav({
         </Link>
 
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-visible">
-          <Suspense
-            fallback={
-              <div className="h-9 w-48 animate-pulse rounded-md border border-border bg-surface/40" />
-            }
-          >
-            <NavScopePickers
+          <Suspense fallback={<NavScopePickersSkeleton />}>
+            <NavScopePickersLoader
               organizations={organizations}
               currentOrganizationId={currentOrganizationId}
               projects={projects}
@@ -98,19 +49,7 @@ export function DashboardTopNav({
           </Suspense>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          <DashboardCommandPalette />
-          <DashboardQuickActions />
-          <DashboardNotifications />
-          <Link
-            href="/docs"
-            aria-label="Documentation"
-            className="hidden h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-surface/60 hover:text-foreground sm:grid"
-          >
-            <BookOpen className="h-4 w-4" />
-          </Link>
-          <DashboardUserMenu user={user} />
-        </div>
+        <DashboardTopNavActions user={user} />
       </div>
       <div className="relative z-10">
         <DashboardNavTabs />

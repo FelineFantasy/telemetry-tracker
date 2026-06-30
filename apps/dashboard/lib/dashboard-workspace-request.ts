@@ -1,8 +1,9 @@
 import { cache } from "react";
+import { fetchDashboardBootstrap } from "@/lib/dashboard-bootstrap-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import {
-  fetchDashboardOrganizationsList,
   getDashboardOrganizationId,
+  organizationCookieDiffersFromResolved,
   resolveActiveOrganizationId,
 } from "@/lib/dashboard-org";
 import {
@@ -19,30 +20,80 @@ export type DashboardProjectRow = {
   organizationId: string;
 };
 
-async function fetchAllProjects(): Promise<DashboardProjectRow[]> {
+export type DashboardNavScope = {
+  apps: string[];
+  environments: string[];
+};
+
+/** One API call for org list + all accessible projects (replaces separate org + project fetches). */
+export const fetchDashboardWorkspaceMeta = cache(async function fetchDashboardWorkspaceMeta(): Promise<{
+  organizations: DashboardOrgRow[];
+  allProjects: DashboardProjectRow[];
+}> {
+  const bootstrap = await fetchDashboardBootstrap();
+  if (!bootstrap) return { organizations: [], allProjects: [] };
+  return {
+    organizations: bootstrap.organizations,
+    allProjects: bootstrap.projects,
+  };
+});
+
+/** Apps + environments for nav pickers (replaces separate /api/apps + /api/filter-options). */
+export const fetchDashboardNavScope = cache(async function fetchDashboardNavScope(
+  projectId: string,
+  organizationId: string | null,
+  app?: string | null
+): Promise<DashboardNavScope> {
+  const empty: DashboardNavScope = { apps: [], environments: [] };
+  if (!projectId) return empty;
+
+  const appFilter = app?.trim() || null;
+  const path = appFilter
+    ? `/api/meta/nav-scope?app=${encodeURIComponent(appFilter)}`
+    : "/api/meta/nav-scope";
+
+  const res = await dashboardApiFetch(path, undefined, {
+    projectIdOverride: projectId,
+    ...(organizationId ? { organizationIdOverride: organizationId } : {}),
+  });
+  if (!res.ok) return empty;
+
+  const data = (await res.json()) as { apps?: string[]; environments?: string[] };
+  return {
+    apps: Array.isArray(data.apps) ? data.apps : [],
+    environments: Array.isArray(data.environments) ? data.environments : [],
+  };
+});
+
+const fetchProjectsForOrganization = cache(async function fetchProjectsForOrganization(
+  organizationId: string
+): Promise<DashboardProjectRow[]> {
   const res = await dashboardApiFetch("/api/meta/projects", undefined, {
-    omitOrganizationHeader: true,
-    omitProjectHeader: true,
+    organizationIdOverride: organizationId,
   });
   if (!res.ok) return [];
-  const data = await res.json();
-  const raw = Array.isArray(data.projects) ? data.projects : [];
-  return raw.map(
-    (p: { id: string; name: string; slug: string; organizationId?: string }) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      organizationId: p.organizationId ?? "",
-    })
-  );
-}
+
+  const data = (await res.json()) as {
+    projects?: {
+      id: string;
+      name: string;
+      slug: string;
+      organizationId?: string;
+    }[];
+  };
+
+  if (!Array.isArray(data.projects)) return [];
+  return data.projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+    organizationId: project.organizationId ?? organizationId,
+  }));
+});
 
 /**
  * Resolves sidebar org, project list for that org, and `effectiveProjectId` aligned with the
  * selected organization when the project cookie points at another org’s project.
- * Does not mutate cookies — Next.js Server Components cannot call `cookies().set()`; pass
- * `effectiveProjectId` / `resolvedOrgId` into `dashboardApiFetch` via overrides instead.
- * Wrapped in `cache` so the dashboard layout and nested pages share one resolution per request.
  */
 export const getDashboardWorkspaceForRequest = cache(async function getDashboardWorkspaceForRequest(): Promise<{
   organizations: DashboardOrgRow[];
@@ -50,17 +101,24 @@ export const getDashboardWorkspaceForRequest = cache(async function getDashboard
   resolvedOrgId: string | null;
   effectiveProjectId: string;
 }> {
-  const [cookieOrgId, cookieProjectId] = await Promise.all([
+  const [cookieOrgId, cookieProjectId, bootstrap] = await Promise.all([
     getDashboardOrganizationId(),
     getDashboardProjectCookie(),
+    fetchDashboardBootstrap(),
   ]);
 
-  const [organizations, allProjects] = await Promise.all([
-    fetchDashboardOrganizationsList(),
-    fetchAllProjects(),
-  ]);
+  const organizations = bootstrap?.organizations ?? [];
+  let allProjects = bootstrap?.projects ?? [];
 
   const resolvedOrgId = resolveActiveOrganizationId(cookieOrgId, organizations);
+
+  if (
+    allProjects.length === 0 &&
+    resolvedOrgId !== null &&
+    organizationCookieDiffersFromResolved(cookieOrgId, resolvedOrgId)
+  ) {
+    allProjects = await fetchProjectsForOrganization(resolvedOrgId);
+  }
 
   const projects =
     resolvedOrgId !== null
@@ -74,34 +132,19 @@ export const getDashboardWorkspaceForRequest = cache(async function getDashboard
   return { organizations, projects, resolvedOrgId, effectiveProjectId };
 });
 
-export async function fetchDashboardAppsList(
+export const fetchDashboardAppsList = cache(async function fetchDashboardAppsList(
   projectId: string,
   organizationId: string | null
 ): Promise<string[]> {
-  const res = await dashboardApiFetch("/api/apps", undefined, {
-    projectIdOverride: projectId,
-    ...(organizationId ? { organizationIdOverride: organizationId } : {}),
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return Array.isArray(data.apps) ? data.apps : [];
-}
+  const scope = await fetchDashboardNavScope(projectId, organizationId);
+  return scope.apps;
+});
 
-export async function fetchDashboardEnvironments(
+export const fetchDashboardEnvironments = cache(async function fetchDashboardEnvironments(
   projectId: string,
   organizationId: string | null,
   app?: string | null
 ): Promise<string[]> {
-  const params = new URLSearchParams();
-  const appFilter = app?.trim();
-  if (appFilter) params.set("app", appFilter);
-  const query = params.toString();
-  const path = query ? `/api/filter-options?${query}` : "/api/filter-options";
-  const res = await dashboardApiFetch(path, undefined, {
-    projectIdOverride: projectId,
-    ...(organizationId ? { organizationIdOverride: organizationId } : {}),
-  });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { environments?: string[] };
-  return Array.isArray(data.environments) ? data.environments : [];
-}
+  const scope = await fetchDashboardNavScope(projectId, organizationId, app);
+  return scope.environments;
+});

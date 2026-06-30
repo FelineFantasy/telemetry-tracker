@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
+import { MarketingNavLink } from "@/app/components/marketing/MarketingNavLink";
 import { Logo } from "./logo";
 
 const links = [
@@ -13,9 +14,16 @@ const links = [
   { href: "/#docs", label: "Docs" },
 ];
 
-export function Nav() {
+const DASHBOARD_HREF = "/dashboard/overview";
+
+export function Nav({ isAuthenticated = false }: { isAuthenticated?: boolean }) {
   const menuId = useId();
   const [menuOpen, setMenuOpen] = useState(false);
+  const primaryHref = isAuthenticated ? DASHBOARD_HREF : "/register";
+  const primaryLabel = isAuthenticated ? "Open dashboard" : "Start tracking";
+  const primaryPendingLabel = isAuthenticated ? "Opening dashboard…" : "Loading…";
+  const signInHref = isAuthenticated ? DASHBOARD_HREF : "/login";
+  const signInLabel = isAuthenticated ? "Dashboard" : "Sign in";
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
@@ -62,19 +70,21 @@ export function Nav() {
           </ul>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-            <Link
-              href="/login"
+            <MarketingNavLink
+              href={signInHref}
+              pendingLabel={isAuthenticated ? "Opening dashboard…" : "Loading…"}
               className="hidden rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground lg:inline-block"
             >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              aria-label="Start tracking"
+              {signInLabel}
+            </MarketingNavLink>
+            <MarketingNavLink
+              href={primaryHref}
+              aria-label={primaryLabel}
+              pendingLabel={primaryPendingLabel}
               className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.02] sm:px-3.5"
             >
-              <span className="hidden sm:inline">Start tracking</span>
-              <span className="sm:hidden">Start</span>
+              <span className="hidden sm:inline">{primaryLabel}</span>
+              <span className="sm:hidden">{isAuthenticated ? "Dashboard" : "Start"}</span>
               <svg
                 viewBox="0 0 16 16"
                 className="h-3.5 w-3.5"
@@ -87,7 +97,7 @@ export function Nav() {
               >
                 <path d="M3 8h10M9 4l4 4-4 4" />
               </svg>
-            </Link>
+            </MarketingNavLink>
             <button
               type="button"
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-foreground transition-colors hover:bg-surface-elevated lg:hidden"
@@ -127,20 +137,23 @@ export function Nav() {
                 ))}
               </ul>
               <div className="border-t border-border p-2">
-                <Link
-                  href="/login"
+                <MarketingNavLink
+                  href={signInHref}
+                  pendingLabel={isAuthenticated ? "Opening dashboard…" : "Loading…"}
                   className="block rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
                   onClick={closeMenu}
                 >
-                  Sign in
-                </Link>
-                <Link
-                  href="/register"
-                  className="mt-1 block rounded-xl px-4 py-3 text-sm text-foreground transition-colors hover:bg-surface"
-                  onClick={closeMenu}
-                >
-                  Create account
-                </Link>
+                  {signInLabel}
+                </MarketingNavLink>
+                {!isAuthenticated ? (
+                  <MarketingNavLink
+                    href="/register"
+                    className="mt-1 block rounded-xl px-4 py-3 text-sm text-foreground transition-colors hover:bg-surface"
+                    onClick={closeMenu}
+                  >
+                    Create account
+                  </MarketingNavLink>
+                ) : null}
               </div>
             </div>
           </>

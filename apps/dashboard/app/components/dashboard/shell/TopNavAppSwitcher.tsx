@@ -8,7 +8,6 @@ import {
   buildDashboardHrefWithApp,
   dashboardPathForAppFilter,
 } from "@/lib/dashboard-app-href";
-import { fetchAppNavSummaries } from "@/lib/app-nav-summary-client";
 import type { AppNavSummary } from "@/lib/app-nav-summary-types";
 import {
   appNavSections,
@@ -16,8 +15,7 @@ import {
   recordRecentApp,
   togglePinnedApp,
 } from "@/lib/app-picker-prefs";
-import { fetchProjectNavSummaries } from "@/lib/project-nav-summary-client";
-import type { ProjectNavHealthStatus } from "@/lib/project-nav-summary-types";
+import type { ProjectNavHealthStatus, ProjectNavSummary } from "@/lib/project-nav-summary-types";
 import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { searchInputClassName } from "@/lib/input-classes";
 import { cn } from "@/lib/utils";
@@ -37,11 +35,13 @@ const IDLE_APP_SUMMARY = (app: string): AppNavSummary => ({
 export function TopNavAppSwitcher({
   apps,
   projectId,
-  organizationId,
+  appNavSummaries,
+  projectNavSummaries,
 }: {
   apps: string[];
   projectId: string;
-  organizationId: string | null;
+  appNavSummaries: Record<string, AppNavSummary>;
+  projectNavSummaries: Record<string, ProjectNavSummary>;
 }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
@@ -55,9 +55,10 @@ export function TopNavAppSwitcher({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState(() => getAppPickerPrefs(projectId));
-  const [summaries, setSummaries] = useState<Record<string, AppNavSummary>>({});
-  const [allAppsStatus, setAllAppsStatus] = useState<ProjectNavHealthStatus>(IDLE_STATUS);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const allAppsStatus: ProjectNavHealthStatus =
+    projectNavSummaries[projectId]?.status ?? IDLE_STATUS;
 
   useEffect(() => {
     if (apps.length === 0) return;
@@ -68,22 +69,6 @@ export function TopNavAppSwitcher({
   useEffect(() => {
     setPrefs(getAppPickerPrefs(projectId));
   }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) return;
-    let cancelled = false;
-    void fetchAppNavSummaries(projectId, organizationId).then((next) => {
-      if (!cancelled) setSummaries(next);
-    });
-    void fetchProjectNavSummaries(organizationId).then((next) => {
-      if (!cancelled) {
-        setAllAppsStatus(next[projectId]?.status ?? IDLE_STATUS);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [organizationId, projectId]);
 
   useEffect(() => {
     if (!open) {
@@ -111,8 +96,8 @@ export function TopNavAppSwitcher({
   );
 
   const summaryFor = useCallback(
-    (app: string): AppNavSummary => summaries[app] ?? IDLE_APP_SUMMARY(app),
-    [summaries]
+    (app: string): AppNavSummary => appNavSummaries[app] ?? IDLE_APP_SUMMARY(app),
+    [appNavSummaries]
   );
 
   const triggerStatus = appValue ? summaryFor(appValue).status : allAppsStatus;

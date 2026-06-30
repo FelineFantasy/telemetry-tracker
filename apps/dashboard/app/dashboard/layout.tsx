@@ -1,49 +1,9 @@
-import { DashboardShell } from "@/app/components/dashboard/DashboardShell";
-import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
-import {
-  fetchDashboardAppsList,
-  fetchDashboardEnvironments,
-  getDashboardWorkspaceForRequest,
-} from "@/lib/dashboard-workspace-request";
-import { getDashboardUser } from "@/lib/dashboard-user";
+import { DashboardLayoutShell } from "./DashboardLayoutShell";
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [workspace, user] = await Promise.all([
-    getDashboardWorkspaceForRequest(),
-    getDashboardUser(),
-  ]);
-
-  const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
-
-  const [apps, environments, capabilities] = await Promise.all([
-    effectiveProjectId === ""
-      ? Promise.resolve([] as string[])
-      : fetchDashboardAppsList(effectiveProjectId, resolvedOrgId),
-    effectiveProjectId === ""
-      ? Promise.resolve([] as string[])
-      : fetchDashboardEnvironments(effectiveProjectId, resolvedOrgId),
-    getDashboardSessionContext(
-      effectiveProjectId === "" ? null : effectiveProjectId,
-      resolvedOrgId
-    ),
-  ]);
-
-  return (
-    <DashboardShell
-      apps={apps}
-      environments={environments}
-      organizations={organizations}
-      currentOrganizationId={resolvedOrgId}
-      projects={projects}
-      currentProjectId={effectiveProjectId}
-      user={user}
-      capabilities={capabilities}
-    >
-      {children}
-    </DashboardShell>
-  );
+  return <DashboardLayoutShell>{children}</DashboardLayoutShell>;
 }

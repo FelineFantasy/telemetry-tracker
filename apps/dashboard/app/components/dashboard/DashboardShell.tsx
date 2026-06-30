@@ -1,14 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { DashboardCapabilitiesProvider } from "./DashboardCapabilitiesContext";
-import { DashboardTopNav } from "./shell/DashboardTopNav";
+import { DashboardCapabilitiesSetterContext } from "./shell/DashboardCapabilitiesSetterContext";
 import { DashboardKeyboardShortcuts } from "./shell/DashboardKeyboardShortcuts";
-import type { OrgOption } from "@/lib/dashboard-workspace-types";
-import type { ProjectOption } from "@/lib/dashboard-workspace-types";
 import type { DashboardSessionContext } from "@/lib/dashboard-capabilities";
-import type { DashboardUser } from "@/lib/dashboard-user";
 
 const BILLING_TOAST_SESSION_KEY = "tt_dashboard_billing_toast_v1";
 
@@ -22,26 +19,13 @@ function formatPeriodEnd(iso: string | null): string | null {
 }
 
 export function DashboardShell({
-  apps,
   children,
-  organizations = [],
-  currentOrganizationId = null,
-  projects = [],
-  currentProjectId = "",
-  user = null,
-  capabilities = null,
-  environments = [],
+  capabilitiesLoader,
 }: {
-  apps: string[];
   children: React.ReactNode;
-  organizations?: OrgOption[];
-  currentOrganizationId?: string | null;
-  projects?: ProjectOption[];
-  currentProjectId?: string;
-  user?: DashboardUser | null;
-  capabilities?: DashboardSessionContext | null;
-  environments?: string[];
+  capabilitiesLoader: React.ReactNode;
 }) {
+  const [capabilities, setCapabilities] = useState<DashboardSessionContext | null>(null);
   const billingToastShownRef = useRef(false);
 
   useEffect(() => {
@@ -65,18 +49,10 @@ export function DashboardShell({
   }, [capabilities]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <DashboardCapabilitiesSetterContext.Provider value={setCapabilities}>
       <DashboardKeyboardShortcuts />
-      <DashboardTopNav
-        organizations={organizations}
-        currentOrganizationId={currentOrganizationId}
-        projects={projects}
-        currentProjectId={currentProjectId}
-        user={user}
-        environments={environments}
-        apps={apps}
-      />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="main-content">
+        {capabilitiesLoader}
         <DashboardCapabilitiesProvider value={capabilities}>
           {capabilities?.billingHealth?.billingAlertVariant ? (
             <BillingAlert capabilities={capabilities} />
@@ -87,7 +63,7 @@ export function DashboardShell({
           {children}
         </DashboardCapabilitiesProvider>
       </main>
-    </div>
+    </DashboardCapabilitiesSetterContext.Provider>
   );
 }
 

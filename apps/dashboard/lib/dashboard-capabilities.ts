@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { dashboardApiFetch, type DashboardApiFetchOptions } from "@/lib/dashboard-api";
 
 export type UsageQuotaInfo = {
@@ -119,7 +120,7 @@ function parseSessionBool(value: unknown): boolean {
  * Build session context from API JSON without discarding the whole payload when a field is
  * missing or mistyped (older API builds, proxies). Booleans default false; role defaults VIEWER.
  */
-function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardSessionContext {
+export function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardSessionContext {
   return {
     projectId: typeof data.projectId === "string" ? data.projectId : "",
     role: parseSessionRole(data.role),
@@ -139,7 +140,7 @@ function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardS
  * @param projectIdForRequest When a non-empty UUID, sent as `X-Project-Id` instead of the cookie (same request as `cookies().set` does not update reads). When `null` and `organizationIdForRequest` is set, fetches org-scoped session context without a project (billing/settings with no projects). When `null` with no org id, returns `null`. When omitted, use the project cookie.
  * @param organizationIdForRequest When a non-empty UUID, sent as `X-Organization-Id` instead of resolving org via an extra `/api/meta/organizations` fetch.
  */
-export async function getDashboardSessionContext(
+export const getDashboardSessionContext = cache(async function getDashboardSessionContext(
   projectIdForRequest?: string | null,
   organizationIdForRequest?: string | null
 ): Promise<DashboardSessionContext | null> {
@@ -180,4 +181,4 @@ export async function getDashboardSessionContext(
     return null;
   }
   return parseDashboardSessionPayload(data);
-}
+});

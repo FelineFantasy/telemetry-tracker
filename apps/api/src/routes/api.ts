@@ -15,19 +15,26 @@ import {
 } from "../lib/errors-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
+import { fetchLatestEventsByName } from "../lib/latest-events-by-name.js";
 import { getOverviewTimeSeries } from "../lib/overview-timeseries.js";
 import {
+  buildWorkspaceTelemetry,
   computeOverviewHealth,
-  countActiveUsers,
-  countSessions,
+  getOverviewActiveUsersPair,
+  getOverviewErrorCountsPair,
+  getOverviewEventWindowStats,
+  getOverviewSessionsPair,
   getSessionDurationSeries,
-  getWorkspaceTelemetry,
   listActiveIssues,
   listDistinctEnvironments,
   resolveCompareWindow,
   type OverviewCompareMode,
 } from "../lib/overview-stats.js";
 import { getAppNavSummariesForProject } from "../lib/app-nav-summary.js";
+import {
+  distinctAppsForProject,
+  distinctEnvironmentsForProject,
+} from "../lib/project-scope-labels.js";
 import {
   whereErrorGroupById,
   whereErrorGroupProject,
@@ -74,35 +81,6 @@ function parseListPageSize(
   const n = Math.floor(Number(raw));
   const v = Number.isFinite(n) && n >= 1 ? n : fallback;
   return Math.min(MAX_LIST_PAGE_SIZE, Math.max(1, v));
-}
-
-async function countDistinctEventNames(
-  since: Date,
-  appFilter: string | undefined,
-  projectId: string,
-  environment?: string
-): Promise<number> {
-  const envClause = environment
-    ? Prisma.sql`AND "environment" = ${environment}`
-    : Prisma.empty;
-  if (appFilter) {
-    const r = await prisma.$queryRaw<[{ c: bigint }]>(
-      Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
-        SELECT name FROM "Event" WHERE project_id = ${projectId} AND created_at >= ${since} AND app = ${appFilter}
-        ${envClause}
-        GROUP BY name
-      ) t`
-    );
-    return Number(r[0]?.c ?? 0);
-  }
-  const r = await prisma.$queryRaw<[{ c: bigint }]>(
-    Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
-      SELECT name FROM "Event" WHERE project_id = ${projectId} AND created_at >= ${since}
-      ${envClause}
-      GROUP BY name
-    ) t`
-  );
-  return Number(r[0]?.c ?? 0);
 }
 
 /** Fastify can expose repeated query keys as `string[]`; normalize to a single trimmed app id. */
@@ -208,57 +186,34 @@ export async function apiRoutes(
       ...(appFilter ? { app: appFilter } : {}),
       ...(environment ? { environment } : {}),
     };
-    const errorOccurrenceWhere = {
-      created_at: { gte: since },
-      error_group: {
-        project_id: projectId,
-        ...(appFilter ? { app: appFilter } : {}),
-        ...(environment ? { environment } : {}),
-      },
-    } as Prisma.ErrorOccurrenceWhereInput;
-    const previousErrorWhere = {
-      created_at: { gte: compareWindow.previousSince, ...(compareWindow.previousUntil ? { lt: compareWindow.previousUntil } : { lt: since }) },
-      error_group: {
-        project_id: projectId,
-        ...(appFilter ? { app: appFilter } : {}),
-        ...(environment ? { environment } : {}),
-      },
-    } as Prisma.ErrorOccurrenceWhereInput;
-    const previousEventWhere = {
-      ...whereEventProject(projectId),
-      created_at: {
-        gte: compareWindow.previousSince,
-        ...(compareWindow.previousUntil ? { lt: compareWindow.previousUntil } : { lt: since }),
-      },
-      ...(appFilter ? { app: appFilter } : {}),
-      ...(environment ? { environment } : {}),
-    };
 
     const rangeKey = range === "7d" ? "7d" : "24h";
+    const previousUntil = compareWindow.previousUntil ?? since;
+    const windowParams = {
+      projectId,
+      since,
+      previousSince: compareWindow.previousSince,
+      previousUntil,
+      app: appFilter,
+      environment,
+    };
 
     const [
-      errorsCount,
-      eventsCount,
+      errorCounts,
+      eventStats,
       errorsListTotal,
-      eventsListTotal,
       errorGroups,
       eventCounts,
-      errorsPrevious,
-      eventsPrevious,
       series,
-      sessionsCount,
-      sessionsPrevious,
-      activeUsers,
-      activeUsersPrevious,
+      sessionCounts,
+      activeUserCounts,
       environments,
       sessionDurationSeries,
-      workspaceTelemetry,
       activeIssues,
     ] = await Promise.all([
-      prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
-      prisma.event.count({ where: eventWhere }),
+      getOverviewErrorCountsPair(prisma, windowParams),
+      getOverviewEventWindowStats(prisma, windowParams),
       prisma.errorGroup.count({ where: errorGroupWhere }),
-      countDistinctEventNames(since, appFilter, projectId, environment),
       prisma.errorGroup.findMany({
         where: errorGroupWhere,
         skip: errorsSkip,
@@ -274,25 +229,34 @@ export async function apiRoutes(
         skip: eventsSkip,
         take: listPageSize,
       }),
-      prisma.errorOccurrence.count({ where: previousErrorWhere }),
-      prisma.event.count({ where: previousEventWhere }),
       getOverviewTimeSeries(prisma, projectId, rangeKey, since, appFilter, environment),
-      countSessions(prisma, scope),
-      countSessions(prisma, {
-        ...scope,
-        since: compareWindow.previousSince,
-      }, compareWindow.previousUntil ?? since),
-      countActiveUsers(prisma, scope),
-      countActiveUsers(
+      getOverviewSessionsPair(
         prisma,
-        { ...scope, since: compareWindow.previousSince },
-        compareWindow.previousUntil ?? since
+        scope,
+        compareWindow.previousSince,
+        previousUntil
       ),
+      getOverviewActiveUsersPair(prisma, windowParams),
       listDistinctEnvironments(prisma, projectId, appFilter),
       getSessionDurationSeries(prisma, projectId, rangeKey, since, appFilter, environment),
-      getWorkspaceTelemetry(prisma, projectId, since, appFilter, environment),
       listActiveIssues(prisma, scope),
     ]);
+
+    const errorsCount = errorCounts.current;
+    const errorsPrevious = errorCounts.previous;
+    const eventsCount = eventStats.eventsCount;
+    const eventsPrevious = eventStats.eventsPrevious;
+    const eventsListTotal = eventStats.distinctEventNames;
+    const workspaceTelemetry = buildWorkspaceTelemetry(
+      eventsCount,
+      errorsCount,
+      eventStats.distinctApps,
+      eventStats.distinctSdkVersions
+    );
+    const sessionsCount = sessionCounts.current;
+    const sessionsPrevious = sessionCounts.previous;
+    const activeUsers = activeUserCounts.current;
+    const activeUsersPrevious = activeUserCounts.previous;
 
     const health = computeOverviewHealth(
       eventsCount,
@@ -303,30 +267,26 @@ export async function apiRoutes(
       rangeKey
     );
 
-    const topEvents = await Promise.all(
-      eventCounts.map(async (row: { name: string; _count: { name: number } }) => {
-        const latest = await prisma.event.findFirst({
-          where: { ...eventWhere, name: row.name },
-          orderBy: { created_at: "desc" },
-          select: {
-            app: true,
-            platform: true,
-            environment: true,
-            release: true,
-            created_at: true,
-          },
-        });
-        return {
-          name: row.name,
-          count: row._count.name,
-          app: latest?.app ?? "",
-          platform: latest?.platform ?? null,
-          environment: latest?.environment ?? null,
-          release: latest?.release ?? null,
-          lastSeen: latest?.created_at.toISOString() ?? null,
-        };
-      })
-    );
+    const latestByName = await fetchLatestEventsByName(prisma, {
+      projectId,
+      since,
+      app: appFilter,
+      environment,
+      names: eventCounts.map((row) => row.name),
+    });
+
+    const topEvents = eventCounts.map((row: { name: string; _count: { name: number } }) => {
+      const latest = latestByName.get(row.name);
+      return {
+        name: row.name,
+        count: row._count.name,
+        app: latest?.app ?? "",
+        platform: latest?.platform ?? null,
+        environment: latest?.environment ?? null,
+        release: latest?.release ?? null,
+        lastSeen: latest?.created_at.toISOString() ?? null,
+      };
+    });
 
     return reply.send({
       range: label,
@@ -675,25 +635,9 @@ export async function apiRoutes(
     const baseSession: Prisma.SessionWhereInput = appFilter
       ? { ...whereSessionProject(projectId), app: appFilter }
       : whereSessionProject(projectId);
-    const baseError: Prisma.ErrorGroupWhereInput = appFilter
-      ? { ...whereErrorGroupProject(projectId), app: appFilter }
-      : whereErrorGroupProject(projectId);
 
-    const [
-      envEvents,
-      envErrors,
-      platEvents,
-      platSessions,
-      relEvents,
-    ] = await Promise.all([
-      prisma.event.groupBy({
-        by: ["environment"],
-        where: { ...baseEvent, environment: { not: null } },
-      }),
-      prisma.errorGroup.groupBy({
-        by: ["environment"],
-        where: { ...baseError, environment: { not: null } },
-      }),
+    const [environments, platEvents, platSessions, relEvents] = await Promise.all([
+      distinctEnvironmentsForProject(prisma, projectId, appFilter),
       prisma.event.groupBy({
         by: ["platform"],
         where: { ...baseEvent, platform: { not: null } },
@@ -708,12 +652,6 @@ export async function apiRoutes(
       }),
     ]);
 
-    const environments = [
-      ...new Set([
-        ...envEvents.map((r) => r.environment).filter(Boolean) as string[],
-        ...envErrors.map((r) => r.environment).filter(Boolean) as string[],
-      ]),
-    ].sort();
     const platforms = [
       ...new Set([
         ...platEvents.map((r) => r.platform).filter(Boolean) as string[],
@@ -737,31 +675,11 @@ export async function apiRoutes(
         where: { id: projectId, deleted_at: null },
         select: { organization_id: true },
       });
-      if (!row || row.organization_id.toLowerCase() !== headerOrg) {
+      if (!row || row.organization_id.toLowerCase() !== headerOrg.toLowerCase()) {
         return reply.status(403).send({ error: "Project is not in the selected organization" });
       }
     }
-    const [eventsApps, errorsApps, sessionsApps] = await Promise.all([
-      prisma.event.groupBy({
-        by: ["app"],
-        where: whereEventProject(projectId),
-      }),
-      prisma.errorGroup.groupBy({
-        by: ["app"],
-        where: whereErrorGroupProject(projectId),
-      }),
-      prisma.session.groupBy({
-        by: ["app"],
-        where: whereSessionProject(projectId),
-      }),
-    ]);
-    const apps = [
-      ...new Set([
-        ...eventsApps.map((e) => e.app),
-        ...errorsApps.map((e) => e.app),
-        ...sessionsApps.map((s) => s.app),
-      ]),
-    ].sort();
+    const apps = await distinctAppsForProject(prisma, projectId);
     return reply.send({ apps });
   });
 

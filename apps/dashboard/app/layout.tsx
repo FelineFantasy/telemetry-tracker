@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { CookieConsent } from "@/app/components/marketing/cookie-consent";
+import { NavigationProgress } from "@/app/components/ui/NavigationProgress";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
 import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
 import { socialPreviewImage } from "@/lib/social-image";
@@ -77,6 +79,9 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <ToasterProvider />
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         {children}
         <CookieConsent serverChoice={serverChoice} />
       </body>
