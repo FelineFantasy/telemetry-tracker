@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import type { OverviewSeries, OverviewTimeSeriesPoint } from "@/lib/overview-api";
+import { chartHasNoData } from "@/lib/overview-chart-series";
 import { DashboardPanel } from "@/app/components/dashboard/dashboard-ui";
 
 function formatBucketLabel(iso: string, bucket: "hour" | "day"): string {
@@ -105,7 +106,7 @@ export function OverviewExtraCharts({
               <p className="text-[11px] text-muted-foreground">{c.subtitle}</p>
             </div>
             <div className="h-[140px] w-full">
-              {c.data.length === 0 || c.data.every((row) => (row as { value?: number; pct?: number }).value === 0 && (row as { pct?: number }).pct === 0) ? (
+              {chartHasNoData(c.data, c.dataKey) ? (
                 <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
                   No data in this period
                 </p>
