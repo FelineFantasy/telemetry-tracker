@@ -2,11 +2,11 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";
+import { DetailMetaItem, DetailMetaPanel } from "@/app/components/dashboard/DetailMetaPanel";
 import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import type { ReactNode } from "react";
 
 type EventDetail = {
   id: string;
@@ -31,16 +31,6 @@ async function getEvent(id: string): Promise<EventDetail | null> {
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
   }
   return res.json();
-}
-
-function MetaRow({ label, value }: { label: string; value: ReactNode }) {
-  if (value == null || value === "") return null;
-  return (
-    <div className="event-detail__meta-row">
-      <span className="event-detail__meta-label">{label}</span>
-      <span className="event-detail__meta-value">{value}</span>
-    </div>
-  );
 }
 
 export default async function EventDetailPage({
@@ -85,30 +75,27 @@ export default async function EventDetailPage({
 
   return (
     <>
-      <NavBack href={`/dashboard/events${appQuery}`}>← Events</NavBack>
+      <NavBack href={`/dashboard/events${appQuery}`}>Events</NavBack>
       <PageTitle title={event.name} context={context} />
 
-      <div className="card event-detail__meta">
-        <h2 className="event-detail__meta-title">Details</h2>
-        <MetaRow label="App" value={event.app} />
-        <MetaRow label="Platform" value={event.platform} />
-        <MetaRow label="Environment" value={event.environment} />
-        <MetaRow label="Release" value={event.release} />
-        <MetaRow label="Identity" value={identity} />
-        <MetaRow label="Session ID" value={event.session_id} />
-        <MetaRow label="SDK version" value={event.sdk_version} />
-        <MetaRow label="Created" value={<TimeAgo iso={event.created_at} />} />
-      </div>
+      <div className="space-y-6">
+        <DetailMetaPanel title="Details">
+          <DetailMetaItem label="App" value={event.app} />
+          <DetailMetaItem label="Platform" value={event.platform} />
+          <DetailMetaItem label="Environment" value={event.environment} />
+          <DetailMetaItem label="Release" value={event.release} />
+          <DetailMetaItem label="Identity" value={identity} />
+          <DetailMetaItem label="Session ID" value={event.session_id} />
+          <DetailMetaItem label="SDK version" value={event.sdk_version} />
+          <DetailMetaItem label="Created" value={<TimeAgo iso={event.created_at} />} />
+        </DetailMetaPanel>
 
-      {hasProperties && (
-        <div className="card event-detail__properties mt-md">
+        {hasProperties ? (
           <JsonContextView data={event.properties} title="Properties" />
-        </div>
-      )}
-
-      {!hasProperties && (
-        <p className="page-context">No properties recorded for this event.</p>
-      )}
+        ) : (
+          <p className="text-sm text-muted-foreground">No properties recorded for this event.</p>
+        )}
+      </div>
     </>
   );
 }

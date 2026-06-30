@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export type DashboardSelectOption = {
   value: string;
@@ -8,7 +9,7 @@ export type DashboardSelectOption = {
 };
 
 /**
- * Same UX as errors filters: list opens **below** the field, spaced chevron, theme styling.
+ * Custom select aligned with list filter fields — opens below the trigger.
  * - **Form**: pass `name` — renders `<input type="hidden" />` for GET/POST.
  * - **Navigation**: pass `onValueChange` — e.g. app scope `router.push` (no `name`).
  */
@@ -63,27 +64,30 @@ export function DashboardCustomSelect({
   }
 
   return (
-    <div className="errors-filters__select-wrap" ref={wrapRef}>
+    <div className="relative min-w-[8rem]" ref={wrapRef}>
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <button
         type="button"
         id={triggerId}
-        className="errors-filters__select-trigger"
+        className={cn(
+          "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-left text-[13px]",
+          "hover:border-muted-foreground/30 focus:border-brand/50 focus:outline-none focus:ring-1 focus:ring-brand/30"
+        )}
         aria-haspopup="listbox"
         aria-expanded={open ? "true" : "false"}
         aria-controls={open ? listId : undefined}
         aria-labelledby={listLabelledBy}
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="errors-filters__select-value">{selected?.label ?? ""}</span>
-        <span className="errors-filters__select-chevron" aria-hidden>
+        <span className="truncate text-foreground">{selected?.label ?? ""}</span>
+        <span className="shrink-0 text-muted-foreground" aria-hidden>
           <ChevronDownIcon />
         </span>
       </button>
       {open ? (
         <ul
           id={listId}
-          className="errors-filters__select-list"
+          className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-60 overflow-auto rounded-md border border-border bg-popover py-1 shadow-lg"
           role="listbox"
           aria-labelledby={listLabelledBy}
         >
@@ -93,7 +97,12 @@ export function DashboardCustomSelect({
                 type="button"
                 role="option"
                 aria-selected={opt.value === value ? "true" : "false"}
-                className="errors-filters__select-option"
+                className={cn(
+                  "flex w-full px-3 py-2 text-left text-[13px] transition-colors",
+                  opt.value === value
+                    ? "bg-brand/10 text-foreground"
+                    : "text-muted-foreground hover:bg-surface/60 hover:text-foreground"
+                )}
                 onClick={() => pick(opt.value)}
               >
                 {opt.label}

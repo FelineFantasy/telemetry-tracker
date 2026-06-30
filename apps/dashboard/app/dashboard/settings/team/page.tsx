@@ -1,4 +1,4 @@
-import { PageTitle } from "@/app/components/PageTitle";
+import { SettingsPageHeader } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import {
@@ -54,9 +54,9 @@ export default async function TeamSettingsPage() {
   if (!loaded.ok) {
     return (
       <>
-        <PageTitle
-          title="Team"
-          context="Everyone listed here belongs to the organization selected in the sidebar. Roles apply across all projects in that organization—they are not per-project accounts."
+        <SettingsPageHeader
+          title="Team members"
+          description="Everyone listed here belongs to the organization selected in the header. Roles apply across all projects in that organization."
         />
         <ErrorState message={loaded.message} />
       </>
@@ -73,9 +73,9 @@ export default async function TeamSettingsPage() {
 
   return (
     <>
-      <PageTitle
-        title="Team"
-        context="Everyone listed here belongs to the organization selected in the sidebar. Roles apply across all projects in that organization—they are not per-project accounts."
+      <SettingsPageHeader
+        title="Team members"
+        description="Everyone listed here belongs to the organization selected in the header. Roles apply across all projects in that organization."
       />
       {organizationId && user ? (
         <TeamMembersClient

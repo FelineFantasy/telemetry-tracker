@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { resetPassword } from "@/app/auth/actions";
-import { Button } from "@/app/components/ui/Button";
+import {
+  AuthSubmitButton,
+  authInputCls,
+} from "@/app/components/auth/AuthPageShell";
 import { PasswordInput } from "@/app/components/ui/PasswordInput";
 
 export function ResetPasswordForm({ token }: { token: string }) {
@@ -30,28 +33,42 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="auth-form">
-      <label className="auth-form__label" htmlFor="reset-password">
-        New password
-      </label>
-      <PasswordInput
-        id="reset-password"
-        name="password"
-        autoComplete="new-password"
-        required
-        minLength={8}
-        disabled={pending}
-      />
+    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <div>
+        <label
+          htmlFor="reset-password"
+          className="mb-1.5 block text-xs uppercase tracking-[0.14em] text-muted-foreground"
+        >
+          New password
+        </label>
+        <PasswordInput
+          id="reset-password"
+          name="password"
+          autoComplete="new-password"
+          required
+          minLength={8}
+          disabled={pending}
+          className={authInputCls}
+        />
+      </div>
+
       {error ? (
-        <p className="auth-form__error" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       ) : null}
-      <Button type="submit" variant="primary" disabled={pending} className="auth-form__submit">
+
+      <AuthSubmitButton pending={pending}>
         {pending ? "Updating…" : "Update password"}
-      </Button>
-      <p className="auth-form__footer">
-        <Link href="/login">Back to sign in</Link>
+      </AuthSubmitButton>
+
+      <p className="text-center text-sm text-muted-foreground">
+        <Link
+          href="/login"
+          className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+        >
+          Back to sign in
+        </Link>
       </p>
     </form>
   );

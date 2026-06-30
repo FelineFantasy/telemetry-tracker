@@ -1,14 +1,18 @@
 import { PageTitle } from "@/app/components/PageTitle";
-import { Badge } from "@/app/components/Badge";
+import { Badge, ResolvedBadge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { NavBack } from "@/app/components/dashboard/NavBack";
+import {
+  DetailMetaChip,
+  DetailSummaryPanel,
+  OccurrencePanel,
+} from "@/app/components/dashboard/DetailMetaPanel";
 import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
 import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import type { ReactNode } from "react";
 
 type Occurrence = {
   id: string;
@@ -44,15 +48,6 @@ async function getErrorGroup(id: string): Promise<ErrorGroup | null> {
   return res.json();
 }
 
-function MetaChip({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="error-detail-meta__chip">
-      <span className="error-detail-meta__chip-label">{label}</span>
-      <span className="error-detail-meta__chip-value">{children}</span>
-    </div>
-  );
-}
-
 export default async function ErrorDetailPage({
   params,
   searchParams,
@@ -70,7 +65,7 @@ export default async function ErrorDetailPage({
   } catch (e) {
     return (
       <>
-        <PageTitle title="Error detail" />
+        <PageTitle title="Issue detail" />
         <ErrorState message={String(e instanceof Error ? e.message : e)} />
       </>
     );
@@ -78,7 +73,7 @@ export default async function ErrorDetailPage({
   if (!group) {
     return (
       <>
-        <PageTitle title="Error not found" />
+        <PageTitle title="Issue not found" />
         <EmptyState title="Not found" message="This error group could not be found." />
       </>
     );
@@ -98,87 +93,100 @@ export default async function ErrorDetailPage({
 
   return (
     <>
-      <NavBack href={`/dashboard/errors${appQuery}`}>← Errors</NavBack>
-      <div className="error-detail__head">
-        <PageTitle title={title} context={contextLine} />
-        <div className="error-detail__actions">
-          <ErrorResolveButton errorGroupId={group.id} resolved={resolved} />
+      <NavBack href={`/dashboard/errors${appQuery}`}>Issues</NavBack>
+      <PageTitle
+        title={title}
+        context={contextLine}
+        actions={<ErrorResolveButton errorGroupId={group.id} resolved={resolved} />}
+      />
+
+      <div className="space-y-6">
+        <DetailSummaryPanel
+          title={group.message}
+          badges={
+            <>
+              <Badge>{group.app}</Badge>
+              {group.environment ? <Badge>{group.environment}</Badge> : null}
+              {resolved ? <ResolvedBadge /> : null}
+            </>
+          }
+          meta={
+            <>
+              <DetailMetaChip label="First seen">
+                <TimeAgo iso={group.first_seen} />
+              </DetailMetaChip>
+              <DetailMetaChip label="Last seen">
+                <TimeAgo iso={group.last_seen} />
+              </DetailMetaChip>
+              <DetailMetaChip label="Total">{group.occurrences.toLocaleString()}</DetailMetaChip>
+            </>
+          }
+        />
+
+        {group.top_stack ? <StackTraceView source={group.top_stack} title="Top stack (group)" /> : null}
+
+        <div>
+          <h2 className="mb-3 text-sm font-medium">Recent occurrences</h2>
+          {group.occurrences_list?.length ? (
+            <ul className="space-y-3">
+              {group.occurrences_list.map((o: Occurrence) => (
+                <OccurrencePanel key={o.id}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Occurred
+                      </div>
+                      <TimeAgo iso={o.created_at} className="text-sm font-medium" />
+                    </div>
+                    <dl className="grid gap-2 text-[12px] sm:text-right">
+                      {(() => {
+                        const uid = o.user_id ?? o.anonymous_id;
+                        return uid != null && uid !== "" ? (
+                          <div>
+                            <dt className="text-muted-foreground">Identity</dt>
+                            <dd className="font-mono" title={uid}>
+                              {uid.length > 24 ? uid.slice(0, 24) + "\u2026" : uid}
+                            </dd>
+                          </div>
+                        ) : null;
+                      })()}
+                      {o.session_id != null && o.session_id !== "" ? (
+                        <div>
+                          <dt className="text-muted-foreground">Session</dt>
+                          <dd className="font-mono text-xs">{o.session_id}</dd>
+                        </div>
+                      ) : null}
+                      {o.sdk_version != null && o.sdk_version !== "" ? (
+                        <div>
+                          <dt className="text-muted-foreground">SDK</dt>
+                          <dd>{o.sdk_version}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  </div>
+                  {o.stack ? (
+                    <div className="mt-4">
+                      <StackTraceView source={o.stack} title="Stack trace" />
+                    </div>
+                  ) : null}
+                  {o.context != null &&
+                  typeof o.context === "object" &&
+                  Object.keys(o.context as object).length > 0 ? (
+                    <div className="mt-4">
+                      <JsonContextView data={o.context} title="Context" />
+                    </div>
+                  ) : null}
+                </OccurrencePanel>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState
+              title="No occurrences yet"
+              message="No occurrences recorded for this error group in the loaded window."
+            />
+          )}
         </div>
       </div>
-
-      <section className="error-detail-summary card" aria-labelledby="error-message-heading">
-        <h2 id="error-message-heading" className="error-detail-summary__message">
-          {group.message}
-        </h2>
-        <div className="error-detail-summary__badges">
-          <Badge>{group.app}</Badge>
-          {group.environment ? <Badge>{group.environment}</Badge> : null}
-          {resolved ? <span className="badge badge--resolved">Resolved</span> : null}
-        </div>
-        <div className="error-detail-meta">
-          <MetaChip label="First seen">
-            <TimeAgo iso={group.first_seen} />
-          </MetaChip>
-          <MetaChip label="Last seen">
-            <TimeAgo iso={group.last_seen} />
-          </MetaChip>
-          <MetaChip label="Total">{group.occurrences.toLocaleString()}</MetaChip>
-        </div>
-      </section>
-
-      {group.top_stack ? (
-        <StackTraceView source={group.top_stack} title="Top stack (group)" />
-      ) : null}
-
-      <h2 className="section-title error-detail-occurrences-title">Recent occurrences</h2>
-      {group.occurrences_list?.length ? (
-        <ul className="unstyled-list error-detail-occurrence-list">
-          {group.occurrences_list.map((o: Occurrence) => (
-            <li key={o.id} className="occurrence-card occurrence-card--detail">
-              <div className="occurrence-card__toolbar">
-                <div className="occurrence-card__when">
-                  <span className="occurrence-card__when-label">Occurred</span>
-                  <TimeAgo iso={o.created_at} className="occurrence-card__when-rel" />
-                </div>
-                <dl className="occurrence-card__ids">
-                  {(() => {
-                    const uid = o.user_id ?? o.anonymous_id;
-                    return uid != null && uid !== "" ? (
-                      <div className="occurrence-card__id-row">
-                        <dt>Identity</dt>
-                        <dd title={uid}>{uid.length > 24 ? uid.slice(0, 24) + "\u2026" : uid}</dd>
-                      </div>
-                    ) : null;
-                  })()}
-                  {o.session_id != null && o.session_id !== "" ? (
-                    <div className="occurrence-card__id-row">
-                      <dt>Session</dt>
-                      <dd className="font-mono text-xs">{o.session_id}</dd>
-                    </div>
-                  ) : null}
-                  {o.sdk_version != null && o.sdk_version !== "" ? (
-                    <div className="occurrence-card__id-row">
-                      <dt>SDK</dt>
-                      <dd>{o.sdk_version}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </div>
-              {o.stack ? <StackTraceView source={o.stack} title="Stack trace" /> : null}
-              {o.context != null &&
-              typeof o.context === "object" &&
-              Object.keys(o.context as object).length > 0 ? (
-                <JsonContextView data={o.context} title="Context" />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState
-          title="No occurrences yet"
-          message="No occurrences recorded for this error group in the loaded window. Adjust filters or check back after new errors are reported."
-        />
-      )}
     </>
   );
 }

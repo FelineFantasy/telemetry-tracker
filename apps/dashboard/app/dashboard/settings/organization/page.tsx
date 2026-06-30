@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { PageTitle } from "@/app/components/PageTitle";
+import { SettingsPageHeader } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { OrganizationSettingsNewProjectParam } from "@/app/components/OrganizationSettingsNewProjectParam";
 import { ScrollToHash } from "@/app/components/ScrollToHash";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -12,7 +12,7 @@ import {
   createProjectAction,
 } from "@/app/dashboard/actions";
 import { CreateOrganizationForm } from "@/app/dashboard/settings/organization/CreateOrganizationForm";
-import { Button } from "@/app/components/ui/Button";
+import { SettingsBtn, SettingsInput, Section } from "@/app/components/dashboard/settings/settings-ui";
 import { OrganizationArchiveSection } from "@/app/dashboard/settings/organization/OrganizationArchiveSection";
 import { OrganizationUsageCard } from "@/app/dashboard/settings/organization/OrganizationUsageCard";
 
@@ -56,7 +56,10 @@ export default async function OrganizationSettingsPage() {
   if (!user) {
     return (
       <>
-        <PageTitle title="Organization" context="Sign in to manage organizations and projects." />
+        <SettingsPageHeader
+          title="Organization"
+          description="Sign in to manage organizations and projects."
+        />
         <ErrorState message="You must be signed in to view this page." />
       </>
     );
@@ -84,9 +87,9 @@ export default async function OrganizationSettingsPage() {
         <OrganizationSettingsNewProjectParam />
       </Suspense>
       <ScrollToHash />
-      <PageTitle
+      <SettingsPageHeader
         title="Organization"
-        context="An organization is the top-level workspace: members (Team), billing, and one or more projects. Use the sidebar to switch organizations. Here you add projects to the selected organization (owners only) or create another organization when you need a separate workspace."
+        description="An organization is the top-level workspace: members, billing, and projects. Switch organizations from the header. Add projects here or create another organization when you need a separate workspace."
       />
 
       {permissionsUnknown ? (
@@ -117,10 +120,10 @@ export default async function OrganizationSettingsPage() {
       ) : null}
 
       {effectiveOrgId ? (
-        <div className="mb-6 flex max-w-2xl flex-col gap-3 rounded-lg border border-border/70 bg-card/35 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="mb-6 flex max-w-2xl flex-col gap-3 rounded-xl border border-border bg-surface/40 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="m-0 text-sm text-muted-foreground">
             Use this page to <strong className="text-foreground">add projects</strong> to the
-            organization selected in the sidebar.{" "}
+            organization selected in the header.{" "}
             <strong className="text-foreground">Team</strong> and <strong className="text-foreground">API keys</strong>{" "}
             live under separate settings — open them from here when you need people or ingestion
             keys.
@@ -148,104 +151,83 @@ export default async function OrganizationSettingsPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-10 max-w-md">
+      <div className="flex max-w-lg flex-col gap-6">
         {effectiveOrgId ? (
-          <section
-            className="card scroll-mt-24 border border-primary/25 bg-primary/[0.04] p-6"
-            aria-labelledby="create-project-heading"
-            id="create-project-section"
+          <div id="create-project-section">
+          <Section
+            title="Add a project"
+            description={`New projects are created in ${activeOrgName ?? "this organization"}. Only organization owners can create projects.`}
+            className="scroll-mt-24"
           >
-            <p className="m-0 mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Selected in sidebar
-            </p>
-            <p className="mb-4 text-base font-semibold text-foreground">{activeOrgName}</p>
-            <h2 id="create-project-heading" className="card__label mb-2">
-              Add a project
-            </h2>
-            <p className="m-0 mb-4 text-sm text-muted-foreground">
-              New projects are created only in <strong className="text-foreground">{activeOrgName}</strong>.
-              Fill in the fields, then press <strong className="text-foreground">Create project</strong>
-              — that is the submit button for this form (not the section title above).
+            <p className="mb-4 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+              Selected: {activeOrgName}
             </p>
             {canCreateProject ? (
               <form action={createProjectAction} className="flex flex-col gap-3">
                 <input type="hidden" name="organizationId" value={effectiveOrgId} />
-                <label className="text-sm text-muted-foreground" htmlFor="proj-name">
+                <label className="text-[13px] text-muted-foreground" htmlFor="proj-name">
                   Project name
                 </label>
-                <input
+                <SettingsInput
                   id="proj-name"
                   name="name"
                   type="text"
                   required
                   maxLength={120}
-                  className="filter-input"
                   placeholder="Mobile app"
                 />
-                <label className="text-sm text-muted-foreground" htmlFor="proj-slug">
+                <label className="text-[13px] text-muted-foreground" htmlFor="proj-slug">
                   Slug <span className="text-muted-foreground">(optional)</span>
                 </label>
-                <input
+                <SettingsInput
                   id="proj-slug"
                   name="slug"
                   type="text"
                   maxLength={120}
-                  className="filter-input"
                   placeholder="mobile-app"
                   autoComplete="off"
                 />
-                <Button type="submit" variant="primary">
+                <SettingsBtn type="submit" variant="primary">
                   Create project
-                </Button>
+                </SettingsBtn>
               </form>
             ) : membersRes.ok ? (
-              <p className="text-muted-foreground m-0 text-sm">
-                Only an organization owner can create projects. Ask an owner for access or to
-                transfer ownership.
+              <p className="text-sm text-muted-foreground">
+                Only an organization owner can create projects.
               </p>
             ) : permissionsUnknown ? (
-              <p className="text-muted-foreground m-0 text-sm">
-                We could not verify your role for this organization. Try a refresh, sign out and
-                back in, or switch organization in the sidebar and return here.
+              <p className="text-sm text-muted-foreground">
+                We could not verify your role. Try refreshing or switch organization in the header.
               </p>
             ) : (
-              <p className="text-muted-foreground m-0 text-sm">
-                Could not load members for this organization. Check your connection or try again
-                later.
+              <p className="text-sm text-muted-foreground">
+                Could not load members for this organization.
               </p>
             )}
-          </section>
+          </Section>
+          </div>
         ) : (
-          <p className="text-muted-foreground m-0 text-sm" role="status">
+          <p className="text-sm text-muted-foreground" role="status">
             Create an organization first—then you can add projects to it.
           </p>
         )}
 
         {organizations.length > 0 ? (
-          <details className="group rounded-lg border border-border/80 bg-card/40 open:border-primary/25">
+          <details className="group overflow-hidden rounded-xl border border-border bg-surface/40 open:border-brand/30">
             <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
               <span className="underline decoration-muted-foreground/50 underline-offset-2 group-open:no-underline">
                 Create another organization
               </span>
               <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                Optional — use this when you need a separate workspace (billing and members are per
-                organization).
+                Optional — separate workspace with its own billing and members.
               </span>
             </summary>
-            <div className="border-t border-border/60 px-4 py-4">
-              {createOrganizationFields}
-            </div>
+            <div className="border-t border-border px-4 py-4">{createOrganizationFields}</div>
           </details>
         ) : (
-          <section className="card p-6" aria-labelledby="create-org-heading">
-            <h2 id="create-org-heading" className="card__label mb-4">
-              Your first organization
-            </h2>
-            <p className="text-xs text-muted-foreground m-0 mb-3">
-              You become the owner. After this, use Add a project to attach apps and API keys.
-            </p>
+          <Section title="Your first organization" description="You become the owner. Then add a project for API keys and ingest.">
             {createOrganizationFields}
-          </section>
+          </Section>
         )}
       </div>
 

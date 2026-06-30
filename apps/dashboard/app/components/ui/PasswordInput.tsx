@@ -2,6 +2,7 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { useState, type ComponentPropsWithoutRef } from "react";
+import { authInputCls } from "@/app/components/auth/AuthPageShell";
 import { cn } from "@/lib/utils";
 
 type PasswordInputProps = Omit<ComponentPropsWithoutRef<"input">, "type">;
@@ -15,7 +16,7 @@ export function PasswordInput({ className, disabled, ...props }: PasswordInputPr
         {...props}
         type={visible ? "text" : "password"}
         disabled={disabled}
-        className={cn("filter-input auth-form__input w-full pr-11", className)}
+        className={cn(authInputCls, "pr-11", className)}
       />
       <button
         type="button"

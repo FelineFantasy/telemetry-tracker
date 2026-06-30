@@ -1,12 +1,12 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListToolbar";
-import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
+import { effectiveListRange } from "@/lib/list-filters-url";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
+import { Table, TableListLink, TableViewLink, TableWrap } from "@/app/components/ui/Table";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -16,7 +16,6 @@ import {
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import Link from "next/link";
 
 const SESSIONS_PATH = "/dashboard/sessions";
 
@@ -152,11 +151,16 @@ export default async function SessionsPage({
               ? "Last 90 days"
               : "Last 24 hours";
 
-  const context = appFilter ? `${rangeLabel} · App: ${appFilter}` : rangeLabel;
-
   return (
     <>
-      <PageTitle title="Sessions" context={context} />
+      <PageTitle
+        title="Sessions"
+        context={
+          appFilter
+            ? `${rangeLabel} · App: ${appFilter}`
+            : `${rangeLabel} · User sessions with device and duration metadata.`
+        }
+      />
 
       <SessionsListToolbar
         path={SESSIONS_PATH}
@@ -212,16 +216,14 @@ export default async function SessionsPage({
                     <TimeAgo iso={s.started_at} />
                   </td>
                   <td>{s.ended_at ? <TimeAgo iso={s.ended_at} /> : "—"}</td>
-                  <td className="table-cell-view">
-                    <Link
+                  <td>
+                    <TableViewLink
                       href={
                         appFilter
                           ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}`
                           : `/dashboard/sessions/${s.id}`
                       }
-                    >
-                      View
-                    </Link>
+                    />
                   </td>
                 </tr>
               ))}

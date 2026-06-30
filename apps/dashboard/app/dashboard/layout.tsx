@@ -2,6 +2,7 @@ import { DashboardShell } from "@/app/components/dashboard/DashboardShell";
 import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
 import {
   fetchDashboardAppsList,
+  fetchDashboardEnvironments,
   getDashboardWorkspaceForRequest,
 } from "@/lib/dashboard-workspace-request";
 import { getDashboardUser } from "@/lib/dashboard-user";
@@ -18,10 +19,13 @@ export default async function DashboardLayout({
 
   const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
 
-  const [apps, capabilities] = await Promise.all([
+  const [apps, environments, capabilities] = await Promise.all([
     effectiveProjectId === ""
       ? Promise.resolve([] as string[])
       : fetchDashboardAppsList(effectiveProjectId, resolvedOrgId),
+    effectiveProjectId === ""
+      ? Promise.resolve([] as string[])
+      : fetchDashboardEnvironments(effectiveProjectId, resolvedOrgId),
     getDashboardSessionContext(
       effectiveProjectId === "" ? null : effectiveProjectId,
       resolvedOrgId
@@ -31,6 +35,7 @@ export default async function DashboardLayout({
   return (
     <DashboardShell
       apps={apps}
+      environments={environments}
       organizations={organizations}
       currentOrganizationId={resolvedOrgId}
       projects={projects}

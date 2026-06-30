@@ -5,6 +5,16 @@ import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCusto
 import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
 import { FiltersSortPanel } from "@/app/components/dashboard/FiltersSortPanel";
 import {
+  FilterField,
+  FilterForm,
+  FilterLabel,
+  FilterRow,
+  FilterSegment,
+  FilterSegmentItem,
+  FilterSubmitBtn,
+  FilterSubmitWrap,
+} from "@/app/components/dashboard/list-filters-ui";
+import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
@@ -75,7 +85,7 @@ export function SessionsListToolbar({
         to={to}
       />
 
-      <form method="get" action={path} className="errors-filters__form">
+      <FilterForm method="get" action={path}>
         {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
         {rangePreset && !customRange ? (
           <input type="hidden" name="range" value={rangePreset} />
@@ -86,11 +96,9 @@ export function SessionsListToolbar({
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}
 
-        <div className="errors-filters__row errors-filters__row--search">
-          <label className="errors-filters__field errors-filters__field--grow">
-            <span className="errors-filters__label" id={id("plat-l")}>
-              Platform
-            </span>
+        <FilterRow>
+          <FilterField grow>
+            <FilterLabel id={id("plat-l")}>Platform</FilterLabel>
             <DashboardCustomSelect
               name="platform"
               value={platform}
@@ -98,14 +106,12 @@ export function SessionsListToolbar({
               triggerId={id("plat-t")}
               listLabelledBy={id("plat-l")}
             />
-          </label>
-        </div>
+          </FilterField>
+        </FilterRow>
 
-        <div className="errors-filters__row errors-filters__row--sort">
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("sort-l")}>
-              Sort by
-            </span>
+        <FilterRow>
+          <FilterField>
+            <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
             <DashboardCustomSelect
               name="sort"
               value={sort || "started_at"}
@@ -113,32 +119,26 @@ export function SessionsListToolbar({
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}
             />
-          </label>
+          </FilterField>
 
-          <fieldset
-            className="errors-filters__fieldset"
+          <FilterSegment
+            legend="Order"
             title="Descending vs ascending order for the selected column."
+            ariaLabel="Sort order"
           >
-            <legend className="errors-filters__label">Order</legend>
-            <div className="errors-filters__segment" role="group" aria-label="Sort order">
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="order" value="desc" defaultChecked={order !== "asc"} />
-                <span>Desc</span>
-              </label>
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="order" value="asc" defaultChecked={order === "asc"} />
-                <span>Asc</span>
-              </label>
-            </div>
-          </fieldset>
+            <FilterSegmentItem name="order" value="desc" defaultChecked={order !== "asc"}>
+              Desc
+            </FilterSegmentItem>
+            <FilterSegmentItem name="order" value="asc" defaultChecked={order === "asc"}>
+              Asc
+            </FilterSegmentItem>
+          </FilterSegment>
 
-          <div className="errors-filters__submit-wrap">
-            <button type="submit" className="errors-filters__btn errors-filters__btn--primary errors-filters__btn--submit">
-              Apply
-            </button>
-          </div>
-        </div>
-      </form>
+          <FilterSubmitWrap>
+            <FilterSubmitBtn>Apply</FilterSubmitBtn>
+          </FilterSubmitWrap>
+        </FilterRow>
+      </FilterForm>
     </FiltersSortPanel>
   );
 }

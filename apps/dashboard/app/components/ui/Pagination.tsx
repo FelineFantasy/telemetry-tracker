@@ -10,7 +10,6 @@ function normalizeTotalCount(total: unknown, pageSize: number): number {
   return Math.floor(n);
 }
 
-/** Merges page 1, last page, and `current ± NEIGHBOR_PAGES`, then inserts ellipses for gaps. */
 function buildPageItems(
   totalPages: number,
   page: number
@@ -25,18 +24,14 @@ function buildPageItems(
   const out: (number | "ellipsis")[] = [];
   for (let i = 0; i < sorted.length; i++) {
     const n = sorted[i];
-    if (i > 0 && n - sorted[i - 1] > 1) {
+    if (i > 0 && n - sorted[i - 1]! > 1) {
       out.push("ellipsis");
     }
-    out.push(n);
+    out.push(n!);
   }
   return out;
 }
 
-/**
- * Range summary + First / Prev / numbered pages (±2 around current) / Next / Last.
- * Renders nothing when there are no rows or only a single page.
- */
 export function Pagination({
   total,
   page,
@@ -59,35 +54,37 @@ export function Pagination({
   const pageItems = buildPageItems(totalPages, page);
 
   return (
-    <nav className="pagination" aria-label="Pagination">
-      <div className="pagination__info">
-        <span className="pagination__range">
-          {from}–{to} of {totalCount}
-        </span>
-        <span className="pagination__pages" aria-hidden>
-          {" "}
-          · Page {page} of {totalPages}
-        </span>
+    <nav className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination">
+      <div className="font-mono text-[12px] text-muted-foreground">
+        <span className="text-foreground tabular-nums">
+          {from}–{to}
+        </span>{" "}
+        of <span className="tabular-nums">{totalCount}</span>
+        <span className="hidden sm:inline"> · Page {page} of {totalPages}</span>
       </div>
-      <div className="pagination__bar" role="group" aria-label="Page navigation">
-        <ol className="pagination__nums">
+      <div className="flex items-center gap-1" role="group" aria-label="Page navigation">
+        <ol className="flex items-center gap-1">
           {pageItems.map((item, i) =>
             item === "ellipsis" ? (
-              <li key={`e-${i}`} className="pagination__nums-item" aria-hidden>
-                <span className="pagination__ellipsis">…</span>
+              <li key={`e-${i}`} aria-hidden>
+                <span className="px-2 text-muted-foreground">…</span>
               </li>
             ) : (
-              <li key={item} className="pagination__nums-item">
+              <li key={item}>
                 {item === page ? (
                   <span
-                    className="pagination__num pagination__num--current"
+                    className="grid h-8 min-w-8 place-items-center rounded-md bg-foreground px-2 font-mono text-[12px] text-background"
                     aria-current="page"
                     aria-label={`Page ${item}`}
                   >
                     {item}
                   </span>
                 ) : (
-                  <Link href={hrefForPage(item)} className="pagination__num" aria-label={`Page ${item}`}>
+                  <Link
+                    href={hrefForPage(item)}
+                    className="grid h-8 min-w-8 place-items-center rounded-md border border-border px-2 font-mono text-[12px] text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+                    aria-label={`Page ${item}`}
+                  >
                     {item}
                   </Link>
                 )}

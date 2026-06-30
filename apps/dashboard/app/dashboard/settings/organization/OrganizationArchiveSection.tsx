@@ -6,7 +6,7 @@ import {
   archiveOrganizationAction,
   archiveProjectAction,
 } from "@/app/dashboard/actions";
-import { Button } from "@/app/components/ui/Button";
+import { Section, SettingsBtn } from "@/app/components/dashboard/settings/settings-ui";
 import { toast } from "sonner";
 
 export function OrganizationArchiveSection({
@@ -71,50 +71,42 @@ export function OrganizationArchiveSection({
   }
 
   return (
-    <section
-      className="card mt-10 max-w-md border border-destructive/25 p-6"
-      aria-labelledby="archive-workspace-heading"
+    <Section
+      title="Archive workspace"
+      description="Soft-delete hides projects from the dashboard and rejects new ingest. Telemetry history is retained for audit. Owner only."
+      className="mt-10 max-w-lg border-destructive/25"
     >
-      <h2 id="archive-workspace-heading" className="card__label mb-2 text-destructive">
-        Archive workspace
-      </h2>
-      <p className="m-0 mb-4 text-sm text-muted-foreground">
-        Soft-delete hides projects from the dashboard and rejects new ingest. Telemetry history is
-        retained for audit. Owner only.
-      </p>
-
       {canArchiveProject && projects.length > 0 ? (
-        <ul className="m-0 mb-4 list-none space-y-2 p-0">
+        <ul className="mb-4 list-none space-y-2 p-0">
           {projects.map((p) => (
             <li
               key={p.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
             >
               <span className="text-sm font-medium text-foreground">{p.name}</span>
-              <Button
+              <SettingsBtn
                 type="button"
-                variant="secondary"
+                variant="outline"
                 disabled={pending || projectPending === p.id}
                 onClick={() => onArchiveProject(p.id, p.name)}
               >
                 {projectPending === p.id ? "Archiving…" : "Archive project"}
-              </Button>
+              </SettingsBtn>
             </li>
           ))}
         </ul>
       ) : null}
 
       {canArchiveOrganization ? (
-        <Button
+        <SettingsBtn
           type="button"
-          variant="secondary"
-          className="border-destructive/40 text-destructive hover:bg-destructive/10"
+          variant="danger"
           disabled={pending}
           onClick={onArchiveOrganization}
         >
           {pending ? "Archiving…" : "Archive organization"}
-        </Button>
+        </SettingsBtn>
       ) : null}
-    </section>
+    </Section>
   );
 }

@@ -33,7 +33,7 @@ export function OverviewTopBars({ title, subtitle, rows, accent, emptyMessage }:
 
   if (!rows.length) {
     return (
-      <section className="overview-top-bars card mb-6 rounded-lg border border-border bg-surface p-4 shadow-sm">
+      <section className="overview-top-bars mb-6 overflow-hidden rounded-xl border border-border bg-surface/40 p-4">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{emptyMessage}</p>
       </section>
@@ -45,7 +45,7 @@ export function OverviewTopBars({ title, subtitle, rows, accent, emptyMessage }:
 
   return (
     <section
-      className="overview-top-bars card mb-6 rounded-lg border border-border bg-surface p-4 shadow-sm"
+      className="overview-top-bars mb-6 overflow-hidden rounded-xl border border-border bg-surface/40 p-4"
       aria-label={title}
     >
       <div className="mb-2">

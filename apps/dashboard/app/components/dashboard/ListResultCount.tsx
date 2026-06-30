@@ -1,4 +1,3 @@
-/** Total count above the list (not tied to pagination footer). */
 export function ListResultCount({
   total,
   noun = "results",
@@ -7,9 +6,8 @@ export function ListResultCount({
   noun?: string;
 }) {
   return (
-    <p className="list-result-count" role="status" aria-live="polite">
-      <span className="list-result-count__num">{total.toLocaleString()}</span>{" "}
-      {noun}
+    <p className="mb-4 font-mono text-[13px] text-muted-foreground" role="status" aria-live="polite">
+      <span className="text-foreground tabular-nums">{total.toLocaleString()}</span> {noun}
     </p>
   );
 }

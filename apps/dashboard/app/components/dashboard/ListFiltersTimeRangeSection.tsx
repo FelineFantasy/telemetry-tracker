@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
@@ -14,6 +13,13 @@ import { type DateRange, DayPicker } from "react-day-picker";
 import { format, parseISO } from "date-fns";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { DATE_RANGE_PRESETS } from "@/lib/date-range-presets";
+import {
+  FilterGhostBtn,
+  FilterPill,
+  FilterPopover,
+  FilterSection,
+  FilterSubmitBtn,
+} from "@/app/components/dashboard/list-filters-ui";
 
 import "react-day-picker/style.css";
 
@@ -146,9 +152,8 @@ export function ListFiltersTimeRangeSection({
   }, [path, currentParams, router]);
 
   return (
-    <div className="errors-filters__section">
-      <span className="errors-filters__section-label">Time range</span>
-      <div className="errors-filters__presets">
+    <FilterSection label="Time range">
+      <div className="flex flex-wrap items-center gap-2">
         {DATE_RANGE_PRESETS.map(({ range, label }) => {
           const href = mergeListQuery(path, currentParams, {
             range,
@@ -157,20 +162,20 @@ export function ListFiltersTimeRangeSection({
           });
           const isCurrent = !customRange && activePreset === range;
           return (
-            <Link
-              key={range}
-              href={href}
-              className={`errors-filters__pill${isCurrent ? " errors-filters__pill--active" : ""}`}
-            >
+            <FilterPill key={range} href={href} active={isCurrent}>
               {label}
-            </Link>
+            </FilterPill>
           );
         })}
-        <div className="errors-filters__calendar-wrap">
+        <div className="relative">
           <button
             ref={triggerRef}
             type="button"
-            className={`errors-filters__pill errors-filters__pill--trigger${customRange ? " errors-filters__pill--active" : ""}`}
+            className={
+              customRange
+                ? "inline-flex min-h-9 items-center justify-center rounded-md border border-brand/45 bg-brand/10 px-3 text-[13px] font-medium text-foreground shadow-[0_0_0_1px_rgba(var(--brand-rgb,103,79,220),0.12)]"
+                : "inline-flex min-h-9 items-center justify-center rounded-md border border-border bg-transparent px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:border-muted-foreground/30 hover:bg-surface/60 hover:text-foreground"
+            }
             onClick={() => setRangeOpen((o) => !o)}
             aria-expanded={rangeOpen ? "true" : "false"}
             aria-haspopup="dialog"
@@ -181,13 +186,12 @@ export function ListFiltersTimeRangeSection({
             ? createPortal(
                 <>
                   <div
-                    className="errors-filters__date-backdrop"
+                    className="fixed inset-0 z-[199] bg-background/40 backdrop-blur-[1px]"
                     aria-hidden
                     onPointerDown={() => setRangeOpen(false)}
                   />
-                  <div
-                    className="errors-filters__popover"
-                    role="dialog"
+                  <FilterPopover
+                    className="filter-day-picker-popover"
                     aria-label="Choose date range"
                     style={{
                       position: "fixed",
@@ -199,7 +203,7 @@ export function ListFiltersTimeRangeSection({
                       zIndex: 200,
                     }}
                   >
-                    <p className="errors-filters__popover-hint">
+                    <p className="mb-3 text-[13px] text-muted-foreground">
                       Select a start date, then an end date. One day is OK.
                     </p>
                     <DayPicker
@@ -208,33 +212,26 @@ export function ListFiltersTimeRangeSection({
                       selected={draftRange}
                       onSelect={setDraftRange}
                       numberOfMonths={useTwoMonths ? 2 : 1}
-                      className="errors-filters__day-picker"
+                      className="filter-day-picker"
                     />
-                    <div className="errors-filters__popover-actions">
-                      <button
+                    <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                      <FilterGhostBtn onClick={clearCustomRange}>Clear dates</FilterGhostBtn>
+                      <FilterSubmitBtn
                         type="button"
-                        className="errors-filters__btn errors-filters__btn--ghost"
-                        onClick={clearCustomRange}
-                      >
-                        Clear dates
-                      </button>
-                      <button
-                        type="button"
-                        className="errors-filters__btn errors-filters__btn--primary"
                         onClick={applyCustomRange}
                         disabled={!draftRange?.from}
                       >
                         Apply range
-                      </button>
+                      </FilterSubmitBtn>
                     </div>
-                  </div>
+                  </FilterPopover>
                 </>,
                 document.body
               )
             : null}
         </div>
       </div>
-    </div>
+    </FilterSection>
   );
 }
 

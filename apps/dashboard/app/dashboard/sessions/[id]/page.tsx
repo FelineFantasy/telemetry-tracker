@@ -2,10 +2,10 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";
+import { DetailMetaItem, DetailMetaPanel } from "@/app/components/dashboard/DetailMetaPanel";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import type { ReactNode } from "react";
 
 type SessionDetail = {
   id: string;
@@ -27,16 +27,6 @@ async function getSession(id: string): Promise<SessionDetail | null> {
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
   }
   return res.json();
-}
-
-function MetaRow({ label, value }: { label: string; value: ReactNode }) {
-  if (value == null || value === "") return null;
-  return (
-    <div className="event-detail__meta-row">
-      <span className="event-detail__meta-label">{label}</span>
-      <span className="event-detail__meta-value">{value}</span>
-    </div>
-  );
 }
 
 export default async function SessionDetailPage({
@@ -76,19 +66,21 @@ export default async function SessionDetailPage({
 
   return (
     <>
-      <NavBack href={`/dashboard/sessions${appQuery}`}>← Sessions</NavBack>
+      <NavBack href={`/dashboard/sessions${appQuery}`}>Sessions</NavBack>
       <PageTitle title={session.session_id} context={context} />
 
-      <div className="card event-detail__meta">
-        <h2 className="event-detail__meta-title">Details</h2>
-        <MetaRow label="Session ID" value={session.session_id} />
-        <MetaRow label="App" value={session.app} />
-        <MetaRow label="Platform" value={session.platform} />
-        <MetaRow label="Identity" value={identity} />
-        <MetaRow label="SDK version" value={session.sdk_version} />
-        <MetaRow label="Started" value={<TimeAgo iso={session.started_at} />} />
-        <MetaRow label="Ended" value={session.ended_at ? <TimeAgo iso={session.ended_at} /> : null} />
-      </div>
+      <DetailMetaPanel title="Details">
+        <DetailMetaItem label="Session ID" value={session.session_id} />
+        <DetailMetaItem label="App" value={session.app} />
+        <DetailMetaItem label="Platform" value={session.platform} />
+        <DetailMetaItem label="Identity" value={identity} />
+        <DetailMetaItem label="SDK version" value={session.sdk_version} />
+        <DetailMetaItem label="Started" value={<TimeAgo iso={session.started_at} />} />
+        <DetailMetaItem
+          label="Ended"
+          value={session.ended_at ? <TimeAgo iso={session.ended_at} /> : null}
+        />
+      </DetailMetaPanel>
     </>
   );
 }

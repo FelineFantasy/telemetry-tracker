@@ -1,5 +1,4 @@
-import { PageTitle } from "@/app/components/PageTitle";
-import { Card } from "@/app/components/Card";
+import { Suspense } from "react";
 import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
@@ -13,12 +12,27 @@ import { OverviewSortControls } from "@/app/components/dashboard/OverviewSortCon
 import { OverviewTrendsChart } from "@/app/components/dashboard/OverviewTrendsChart";
 import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
 import { Pagination } from "@/app/components/ui/Pagination";
+import { DashboardSection, StatCard } from "@/app/components/dashboard/dashboard-ui";
+import { IssueList, OverviewListItem } from "@/app/components/dashboard/IssueList";
+import { OverviewGreeting } from "@/app/components/dashboard/overview/OverviewGreeting";
+import { OverviewAppHealth } from "@/app/components/dashboard/overview/OverviewAppHealth";
+import { OverviewActiveIncidents } from "@/app/components/dashboard/overview/OverviewActiveIncidents";
+import { OverviewMetricsSection } from "@/app/components/dashboard/overview/OverviewMetricsSection";
+import { OverviewExtraCharts } from "@/app/components/dashboard/overview/OverviewExtraCharts";
+import { DashboardScopeBar } from "@/app/components/dashboard/shell/DashboardScopeBar";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
-import type { OverviewApiResponse } from "@/lib/overview-api";
+import type { OverviewApiResponse, OverviewHealth, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
+import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
+import { parseOverviewCompare } from "@/lib/overview-scope-url";
 import { firstQueryValue } from "@/lib/search-params";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import Link from "next/link";
+import { getDashboardUser } from "@/lib/dashboard-user";
+import {
+  fetchDashboardAppsList,
+  getDashboardWorkspaceForRequest,
+} from "@/lib/dashboard-workspace-request";
+import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +41,8 @@ const OVERVIEW_PATH = "/dashboard/overview";
 async function getOverview(
   range: string,
   app: string | undefined,
+  environment: string | undefined,
+  compare: string,
   list: {
     errorsPage: number;
     eventsPage: number;
@@ -40,6 +56,8 @@ async function getOverview(
   const params = new URLSearchParams();
   if (range) params.set("range", range);
   if (app) params.set("app", app);
+  if (environment) params.set("environment", environment);
+  if (compare === "week-ago") params.set("compare", "week-ago");
   params.set("errorsPage", String(list.errorsPage));
   params.set("eventsPage", String(list.eventsPage));
   params.set("listPageSize", String(list.listPageSize));
@@ -69,6 +87,8 @@ function buildOverviewParamsRecord(
   const keys = [
     "range",
     "app",
+    "environment",
+    "compare",
     "errorsPage",
     "eventsPage",
     "listPageSize",
@@ -85,10 +105,11 @@ function buildOverviewParamsRecord(
   return out;
 }
 
-function eventListHref(eventName: string, app: string | null): string {
+function eventListHref(eventName: string, app: string | null, environment: string | null): string {
   const params = new URLSearchParams();
   params.set("name", eventName);
   if (app) params.set("app", app);
+  if (environment) params.set("environment", environment);
   return `/dashboard/events?${params.toString()}`;
 }
 
@@ -121,6 +142,8 @@ export default async function OverviewPage({
   searchParams: Promise<{
     range?: string | string[];
     app?: string | string[];
+    environment?: string | string[];
+    compare?: string | string[];
     errorsPage?: string | string[];
     eventsPage?: string | string[];
     listPageSize?: string | string[];
@@ -134,6 +157,8 @@ export default async function OverviewPage({
   const rangeRaw = firstQueryValue(params.range);
   const range = rangeRaw === "7d" ? "7d" : "24h";
   const app = firstQueryValue(params.app)?.trim() || null;
+  const environment = firstQueryValue(params.environment)?.trim() || null;
+  const compare = parseOverviewCompare(firstQueryValue(params.compare));
   const errorsPage = parsePageParam(firstQueryValue(params.errorsPage));
   const eventsPage = parsePageParam(firstQueryValue(params.eventsPage));
   const listPageSize = parseOverviewListPageSize(params.listPageSize);
@@ -141,12 +166,36 @@ export default async function OverviewPage({
   const errorsOrder = firstQueryValue(params.errorsOrder) ?? "desc";
   const topEventsSort = firstQueryValue(params.topEventsSort) ?? "count";
   const topEventsOrder = firstQueryValue(params.topEventsOrder) ?? "desc";
-  const rangeLabel = range === "7d" ? "Last 7 days" : "Last 24 hours";
+  const rangeLabel = range === "7d" ? "7d" : "24h";
+  const rangeLabelLong = range === "7d" ? "Last 7 days" : "Last 24 hours";
   const currentOverviewParams = buildOverviewParamsRecord(params);
+
+  const [user, workspace] = await Promise.all([
+    getDashboardUser(),
+    getDashboardWorkspaceForRequest(),
+  ]);
+  const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
+  const organizationName =
+    organizations.find((o) => o.id === resolvedOrgId)?.name ?? null;
+  const projectName = projects.find((p) => p.id === effectiveProjectId)?.name ?? null;
+  const displayOrgName = organizationName
+    ? formatOrganizationRailName(organizationName)
+    : null;
+
+  const apps =
+    effectiveProjectId === ""
+      ? []
+      : await fetchDashboardAppsList(effectiveProjectId, resolvedOrgId);
+
+  const workspaceStats = buildOverviewWorkspaceStats(
+    organizations,
+    projects,
+    resolvedOrgId
+  );
 
   let data: OverviewApiResponse;
   try {
-    data = await getOverview(range, app ?? undefined, {
+    data = await getOverview(range, app ?? undefined, environment ?? undefined, compare, {
       errorsPage,
       eventsPage,
       listPageSize,
@@ -161,7 +210,7 @@ export default async function OverviewPage({
   } catch (e) {
     return (
       <>
-        <PageTitle title="Overview" />
+        <OverviewGreeting user={user} />
         <ErrorState message={String(e instanceof Error ? e.message : e)} />
       </>
     );
@@ -171,94 +220,152 @@ export default async function OverviewPage({
   const eventsDelta = data.eventsLast24h - data.eventsPrevious;
   const errDeltaFmt = formatDeltaLine(errorsDelta, "errors");
   const evDeltaFmt = formatDeltaLine(eventsDelta, "events");
-  const contextParts = [rangeLabel];
+
+  const health: OverviewHealth =
+    data.health ?? {
+      status: "operational",
+      statusLabel: "Operational",
+      subtitle: "No health metrics returned",
+      errorRatePct: 0,
+      errorRateDeltaPct: 0,
+      successRatePct: 100,
+      throughputPerSec: 0,
+      peakThroughputPerSec: 0,
+    };
+  const activeIssues = data.activeIssues ?? [];
+  const environments = data.environments ?? [];
+  const sessionDurationSeries = data.sessionDurationSeries ?? [];
+  const workspaceTelemetry: OverviewWorkspaceTelemetry = data.workspaceTelemetry ?? {
+    ingestRequests: data.eventsLast24h + data.errorsLast24h,
+    sdkEventRows: data.eventsLast24h,
+    distinctApps: apps.length,
+    distinctSdkVersions: 0,
+  };
+
+  const contextParts = [rangeLabelLong];
   if (app) contextParts.push(`App: ${app}`);
-  contextParts.push(
-    "Charts reflect the project selected in the sidebar; App scope narrows to one SDK app name or All apps.",
-  );
-  const context = contextParts.join(" · ");
+  if (environment) contextParts.push(`Env: ${environment}`);
 
   return (
     <>
-      <PageTitle title="Overview" context={context} />
-      <RangeTabs
-        tabs={[
-          {
-            href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
-              range: null,
-              errorsPage: null,
-              eventsPage: null,
-            }),
-            label: "Last 24 hours",
-            current: range === "24h",
-          },
-          {
-            href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
-              range: "7d",
-              errorsPage: null,
-              eventsPage: null,
-            }),
-            label: "Last 7 days",
-            current: range === "7d",
-          },
-        ]}
+      <OverviewGreeting
+        user={user}
+        actions={
+          <RangeTabs
+            tabs={[
+              {
+                href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
+                  range: null,
+                  errorsPage: null,
+                  eventsPage: null,
+                }),
+                label: "24h",
+                current: range === "24h",
+              },
+              {
+                href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
+                  range: "7d",
+                  errorsPage: null,
+                  eventsPage: null,
+                }),
+                label: "7d",
+                current: range === "7d",
+              },
+            ]}
+          />
+        }
       />
 
-      <p className="page-context overview-compare text-muted-foreground">
-        vs previous period (same length window immediately before)
-      </p>
+      <Suspense fallback={null}>
+        <DashboardScopeBar
+          organizationName={displayOrgName}
+          projectName={projectName}
+          apps={apps}
+          environments={environments}
+          rangeLabel={rangeLabel}
+        />
+      </Suspense>
 
-      <OverviewSortControls
-        path={OVERVIEW_PATH}
-        currentParams={currentOverviewParams}
-        errorsSort={errorsSort}
-        errorsOrder={errorsOrder}
-        topEventsSort={topEventsSort}
-        topEventsOrder={topEventsOrder}
+      <OverviewAppHealth health={health} />
+      <OverviewActiveIncidents issues={activeIssues} />
+
+      <Suspense fallback={null}>
+        <OverviewMetricsSection
+          range={range}
+          overviewPath={OVERVIEW_PATH}
+          currentParams={currentOverviewParams}
+          eventsCount={data.eventsLast24h}
+          eventsPrevious={data.eventsPrevious}
+          errorsCount={data.errorsLast24h}
+          errorsPrevious={data.errorsPrevious}
+          sessionsCount={data.sessionsCount ?? 0}
+          sessionsPrevious={data.sessionsPrevious ?? 0}
+          activeUsers={data.activeUsers ?? 0}
+          activeUsersPrevious={data.activeUsersPrevious ?? 0}
+          workspaceStats={workspaceStats}
+          workspaceTelemetry={workspaceTelemetry}
+        />
+      </Suspense>
+
+      <OverviewExtraCharts
+        series={data.series}
+        sessionDurationSeries={sessionDurationSeries}
+        rangeLabel={rangeLabelLong}
       />
 
-      <OverviewTrendsChart series={data.series} rangeLabel={rangeLabel} />
-
-      <div className="overview-bar-grid mb-2 grid gap-6 md:grid-cols-2">
-        <OverviewTopBars
-          title="Top errors (this page)"
-          subtitle="Occurrences in the current table page — compare at a glance"
-          rows={mapErrorGroupsToBarRows(data.topErrorGroups ?? [])}
-          accent="errors"
-          emptyMessage="No error groups recorded on this page."
+      <DashboardSection
+        kicker="Live telemetry"
+        title="Trends & breakdown"
+        description={`Project-scoped data from your telemetry API · ${contextParts.join(" · ")}`}
+        className="mb-8"
+      >
+        <OverviewSortControls
+          path={OVERVIEW_PATH}
+          currentParams={currentOverviewParams}
+          errorsSort={errorsSort}
+          errorsOrder={errorsOrder}
+          topEventsSort={topEventsSort}
+          topEventsOrder={topEventsOrder}
         />
-        <OverviewTopBars
-          title="Top events (this page)"
-          subtitle="Event name counts on the current table page"
-          rows={mapTopEventsToBarRows(data.topEvents ?? [])}
-          accent="events"
-          emptyMessage="No events recorded on this page."
-        />
-      </div>
 
-      <section className="overview-region overview-region--errors" aria-labelledby="overview-errors-heading">
-        <header className="overview-region__header">
-          <p className="overview-region__kicker" id="overview-errors-kicker">
-            Errors
-          </p>
-          <h2 className="overview-region__title" id="overview-errors-heading">
-            Exception & crash signals
-          </h2>
-          <p className="overview-region__lede">
-            Error occurrences grouped by fingerprint. Higher counts usually mean more user impact.
-          </p>
-        </header>
+        <OverviewTrendsChart series={data.series} rangeLabel={rangeLabelLong} />
 
-        <div className="overview-region__stats">
-          <Card label={`Total error occurrences · ${rangeLabel}`}>
-            {data.errorsLast24h}
-            <span className={errDeltaFmt.className}>{errDeltaFmt.text}</span>
-          </Card>
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <OverviewTopBars
+            title="Top errors (this page)"
+            subtitle="Occurrences in the current table page — compare at a glance"
+            rows={mapErrorGroupsToBarRows(data.topErrorGroups ?? [])}
+            accent="errors"
+            emptyMessage="No error groups recorded on this page."
+          />
+          <OverviewTopBars
+            title="Top events (this page)"
+            subtitle="Event name counts on the current table page"
+            rows={mapTopEventsToBarRows(data.topEvents ?? [])}
+            accent="events"
+            emptyMessage="No events recorded on this page."
+          />
         </div>
+      </DashboardSection>
 
-        <h3 className="overview-region__subtitle">Top error groups</h3>
+      <DashboardSection
+        kicker="Errors"
+        title="Exception & crash signals"
+        description="Error occurrences grouped by fingerprint. Higher counts usually mean more user impact."
+        className="mb-10"
+      >
+        <StatCard
+          label={`Total error occurrences · ${rangeLabelLong}`}
+          value={data.errorsLast24h}
+          delta={errDeltaFmt.text}
+          deltaTone={
+            errorsDelta > 0 ? "danger" : errorsDelta < 0 ? "success" : "muted"
+          }
+        />
+
+        <h3 className="text-sm font-medium">Top error groups</h3>
         {data.topErrorGroups?.length ? (
-          <ul className="unstyled-list cards-list">
+          <IssueList>
             {data.topErrorGroups.map(
               (g: {
                 id: string;
@@ -267,26 +374,30 @@ export default async function OverviewPage({
                 occurrences: number;
                 last_seen: string;
               }) => (
-                <li key={g.id}>
-                  <Badge>{g.app}</Badge>{" "}
-                  <Link
-                    href={app ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(app)}` : `/dashboard/errors/${g.id}`}
-                    className="list-link !text-danger"
-                  >
-                    {g.message}
-                  </Link>{" "}
-                  <span className="text-muted-foreground text-sm">
-                    — {g.occurrences} occurrences · last{" "}
-                    <TimeAgo iso={g.last_seen} className="text-muted-foreground" />
-                  </span>
-                </li>
+                <OverviewListItem
+                  key={g.id}
+                  href={
+                    app
+                      ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(app)}`
+                      : `/dashboard/errors/${g.id}`
+                  }
+                  title={g.message}
+                  titleClassName="font-medium text-destructive"
+                  badges={<Badge>{g.app}</Badge>}
+                  meta={
+                    <>
+                      {g.occurrences} occurrences · last{" "}
+                      <TimeAgo iso={g.last_seen} className="text-muted-foreground" />
+                    </>
+                  }
+                />
               )
             )}
-          </ul>
+          </IssueList>
         ) : (
           <EmptyState
             title="No errors recorded"
-            message={`Nothing matched for ${rangeLabel}. Try another range or app filter.`}
+            message={`Nothing matched for ${rangeLabelLong}. Try another range or app filter.`}
           />
         )}
         <Pagination
@@ -299,32 +410,25 @@ export default async function OverviewPage({
             })
           }
         />
-      </section>
+      </DashboardSection>
 
-      <section className="overview-region overview-region--events" aria-labelledby="overview-events-heading">
-        <header className="overview-region__header">
-          <p className="overview-region__kicker" id="overview-events-kicker">
-            Events
-          </p>
-          <h2 className="overview-region__title" id="overview-events-heading">
-            Product & analytics events
-          </h2>
-          <p className="overview-region__lede">
-            Named events your SDK recorded (screen views, actions, custom metrics). Separate from errors
-            above.
-          </p>
-        </header>
+      <DashboardSection
+        kicker="Events"
+        title="Product & analytics events"
+        description="Named events your SDK recorded. Separate from errors above."
+      >
+        <StatCard
+          label={`Total event rows · ${rangeLabelLong}`}
+          value={data.eventsLast24h}
+          delta={evDeltaFmt.text}
+          deltaTone={
+            eventsDelta > 0 ? "success" : eventsDelta < 0 ? "danger" : "muted"
+          }
+        />
 
-        <div className="overview-region__stats">
-          <Card label={`Total event rows · ${rangeLabel}`}>
-            {data.eventsLast24h}
-            <span className={evDeltaFmt.className}>{evDeltaFmt.text}</span>
-          </Card>
-        </div>
-
-        <h3 className="overview-region__subtitle">Top event names</h3>
+        <h3 className="text-sm font-medium">Top event names</h3>
         {data.topEvents?.length ? (
-          <ul className="unstyled-list cards-list">
+          <IssueList>
             {data.topEvents.map(
               (e: {
                 name: string;
@@ -335,36 +439,33 @@ export default async function OverviewPage({
                 release: string | null;
                 lastSeen: string | null;
               }) => (
-                <li key={e.name} className="overview-event-row">
-                  <div className="overview-event-row__main">
-                    <Link
-                      href={eventListHref(e.name, app)}
-                      className="list-link font-semibold text-foreground"
-                    >
-                      {e.name}
-                    </Link>
-                    <span className="overview-event-row__count">{e.count} in period</span>
-                  </div>
-                  <div className="overview-event-row__meta">
-                    {e.app ? <Badge>{e.app}</Badge> : null}
-                    <span className="text-muted-foreground text-sm">
+                <OverviewListItem
+                  key={e.name}
+                  href={eventListHref(e.name, app, environment)}
+                  title={e.name}
+                  badges={e.app ? <Badge>{e.app}</Badge> : null}
+                  meta={
+                    <>
+                      <span className="tabular-nums">{e.count} in period</span>
+                      {" · "}
                       {e.platform ?? "—"} · {e.environment ?? "—"}
                       {e.release ? ` · ${e.release}` : ""}
-                    </span>
-                    {e.lastSeen ? (
-                      <span className="text-muted-foreground text-sm">
-                        Last seen <TimeAgo iso={e.lastSeen} className="text-muted-foreground" />
-                      </span>
-                    ) : null}
-                  </div>
-                </li>
+                      {e.lastSeen ? (
+                        <>
+                          {" · "}Last seen{" "}
+                          <TimeAgo iso={e.lastSeen} className="text-muted-foreground" />
+                        </>
+                      ) : null}
+                    </>
+                  }
+                />
               )
             )}
-          </ul>
+          </IssueList>
         ) : (
           <EmptyState
             title="No events recorded"
-            message={`Nothing matched for ${rangeLabel}. Try another range or app filter.`}
+            message={`Nothing matched for ${rangeLabelLong}. Try another range or app filter.`}
           />
         )}
         <Pagination
@@ -377,7 +478,7 @@ export default async function OverviewPage({
             })
           }
         />
-      </section>
+      </DashboardSection>
     </>
   );
 }
