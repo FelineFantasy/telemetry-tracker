@@ -241,10 +241,24 @@ If you find Telemetry Tracker useful:
 
 ---
 
-## 📄 License & hosting
+## 📄 License, trademark & hosting
 
-This project is licensed under the [MIT License](LICENSE). You may **self-host** Telemetry Tracker for your own applications and infrastructure, and contribute improvements back to the project.
+### Software (MIT)
 
-The **official managed service** at [telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io) is operated by [Tacko](https://tacko.io). Paid **Pro** and **Business** plans are billed in **EUR** through Stripe on that hosted offering.
+This project’s **source code** is licensed under the [MIT License](LICENSE). You may use, modify, self-host, and distribute the software under those terms, including the copyright notice in copies you distribute.
 
-Running a **competing multi-tenant hosted service** that uses the **Telemetry Tracker** name, branding, or marketing to resell the product to third parties is **not permitted**. For partnerships, white-label, or enterprise hosting, contact [info@tacko.io](mailto:info@tacko.io).
+MIT covers **copyright on the code**. It does not grant rights to use the **Telemetry Tracker** name or branding in ways that suggest Tacko operates or endorses your service. See [TRADEMARK.md](TRADEMARK.md).
+
+### Self-hosting
+
+You may run Telemetry Tracker on infrastructure you control for your own applications — no separate permission required under MIT.
+
+### Official hosted cloud
+
+The **managed service** at [telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io) is operated by [Tacko](https://tacko.io). **Pro** and **Business** plans there are billed in **EUR** via Stripe.
+
+### Brand & competing hosted services
+
+Do not offer a multi-tenant hosted service **to third parties** using the **Telemetry Tracker** name, logo, or marketing as if it were the official product. Forks and internal deployments should use a **distinct name** unless you have written permission from Tacko.
+
+Details and examples: **[TRADEMARK.md](TRADEMARK.md)** · Partnerships: [info@tacko.io](mailto:info@tacko.io)
