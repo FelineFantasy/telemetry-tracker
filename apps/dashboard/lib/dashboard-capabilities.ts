@@ -136,23 +136,32 @@ function parseDashboardSessionPayload(data: Record<string, unknown>): DashboardS
 }
 
 /** Role and mutation flags: project-scoped fields follow `X-Project-Id`; org-scoped fields follow `X-Organization-Id` when set.
- * @param projectIdForRequest When a non-empty UUID, sent as `X-Project-Id` instead of the cookie (same request as `cookies().set` does not update reads). When `null`, skip the fetch and return `null` (e.g. org selected but no projects). When omitted, use the project cookie.
+ * @param projectIdForRequest When a non-empty UUID, sent as `X-Project-Id` instead of the cookie (same request as `cookies().set` does not update reads). When `null` and `organizationIdForRequest` is set, fetches org-scoped session context without a project (billing/settings with no projects). When `null` with no org id, returns `null`. When omitted, use the project cookie.
  * @param organizationIdForRequest When a non-empty UUID, sent as `X-Organization-Id` instead of resolving org via an extra `/api/meta/organizations` fetch.
  */
 export async function getDashboardSessionContext(
   projectIdForRequest?: string | null,
   organizationIdForRequest?: string | null
 ): Promise<DashboardSessionContext | null> {
-  if (projectIdForRequest === null) {
+  const uuidRe = /^[0-9a-f-]{36}$/i;
+  const orgTrimmed = organizationIdForRequest?.trim();
+  const hasOrg = Boolean(orgTrimmed && uuidRe.test(orgTrimmed));
+  const orgOnlyRequest = projectIdForRequest === null && hasOrg;
+
+  if (projectIdForRequest === null && !orgOnlyRequest) {
     return null;
   }
-  const trimmed = projectIdForRequest?.trim();
-  const orgTrimmed = organizationIdForRequest?.trim();
+
   const fetchOpts: DashboardApiFetchOptions = {};
-  if (trimmed && /^[0-9a-f-]{36}$/i.test(trimmed)) {
-    fetchOpts.projectIdOverride = trimmed;
+  if (orgOnlyRequest) {
+    fetchOpts.omitProjectHeader = true;
+  } else {
+    const trimmed = projectIdForRequest?.trim();
+    if (trimmed && uuidRe.test(trimmed)) {
+      fetchOpts.projectIdOverride = trimmed;
+    }
   }
-  if (orgTrimmed && /^[0-9a-f-]{36}$/i.test(orgTrimmed)) {
+  if (hasOrg && orgTrimmed) {
     fetchOpts.organizationIdOverride = orgTrimmed.toLowerCase();
   }
   const res = await dashboardApiFetch(

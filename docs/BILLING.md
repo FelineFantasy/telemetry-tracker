@@ -30,7 +30,7 @@ Check API logs for `[email] Resend failed:` for the exact rejection reason.
 
 ---
 
-## Stripe (paid plans)
+## Stripe (paid plans, EUR)
 
 Set these on the **API** service to enable checkout, billing portal, and webhooks:
 
@@ -38,8 +38,9 @@ Set these on the **API** service to enable checkout, billing portal, and webhook
 |----------|-------------|
 | `STRIPE_SECRET_KEY` | `sk_live_…` or test key |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` for `POST /webhooks/stripe` |
-| `STRIPE_PRICE_PRO` | Stripe Price id for Pro |
-| `STRIPE_PRICE_BUSINESS` | Stripe Price id for Business |
+| `STRIPE_PRICE_PRO` | Stripe Price id for Pro (**EUR**, list price €29/mo) |
+| `STRIPE_PRICE_BUSINESS` | Stripe Price id for Business (**EUR**, list price €99/mo) |
+| `TELEMETRY_DASHBOARD_ORIGIN` or `DASHBOARD_ORIGIN` | Dashboard URL for checkout return links |
 
 ### Stripe Dashboard setup
 

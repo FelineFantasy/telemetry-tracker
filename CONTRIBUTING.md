@@ -163,3 +163,7 @@ Participation is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md). Ple
 ## Security
 
 Do **not** open public issues for undisclosed vulnerabilities. See [SECURITY.md](SECURITY.md).
+
+## License & trademark
+
+Contributions are licensed under the project’s [MIT License](LICENSE). Using the **Telemetry Tracker** name or branding for a public hosted offering is governed separately — see [TRADEMARK.md](TRADEMARK.md).

@@ -7,6 +7,7 @@ import {
   createBillingPortalAction,
 } from "@/app/dashboard/actions";
 import { SettingsBtn } from "@/app/components/dashboard/settings/settings-ui";
+import { formatPlanPriceEur, PLAN_LIST_PRICES_EUR } from "@/lib/plan-pricing";
 
 export function OrganizationBillingActions({
   organizationId,
@@ -51,7 +52,7 @@ export function OrganizationBillingActions({
         disabled={pending}
         onClick={() => goCheckout("PRO")}
       >
-        Upgrade to Pro
+        Upgrade to Pro ({formatPlanPriceEur(PLAN_LIST_PRICES_EUR.PRO)}/mo)
       </SettingsBtn>
       <SettingsBtn
         type="button"
@@ -59,7 +60,7 @@ export function OrganizationBillingActions({
         disabled={pending}
         onClick={() => goCheckout("BUSINESS")}
       >
-        Upgrade to Business
+        Upgrade to Business ({formatPlanPriceEur(PLAN_LIST_PRICES_EUR.BUSINESS)}/mo)
       </SettingsBtn>
       {hasStripeCustomer ? (
         <SettingsBtn type="button" variant="outline" disabled={pending} onClick={goPortal}>

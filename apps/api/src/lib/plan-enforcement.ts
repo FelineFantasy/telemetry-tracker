@@ -55,6 +55,34 @@ export async function loadPlanContextForProject(
   };
 }
 
+export async function loadPlanContextForOrganization(
+  prisma: PrismaClient,
+  organizationId: string
+): Promise<PlanContext | null> {
+  const row = await prisma.organization.findFirst({
+    where: { id: organizationId, deleted_at: null },
+    select: {
+      plan_tier: true,
+      stripe_customer_id: true,
+      stripe_subscription_status: true,
+      stripe_current_period_end: true,
+    },
+  });
+  if (!row) return null;
+  const stored = row.plan_tier;
+  const status = row.stripe_subscription_status;
+  const tier = effectivePlanTierForLimits(stored, status);
+  return {
+    organizationId,
+    storedPlanTier: stored,
+    planTier: tier,
+    stripeCustomerId: row.stripe_customer_id,
+    stripeSubscriptionStatus: status,
+    stripeCurrentPeriodEnd: row.stripe_current_period_end,
+    limits: limitsForPlan(tier),
+  };
+}
+
 export async function getMonthlyIngestUsed(
   prisma: PrismaClient,
   projectId: string
