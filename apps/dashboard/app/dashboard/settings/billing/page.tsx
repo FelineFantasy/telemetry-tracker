@@ -1,49 +1,188 @@
-"use client";
-
 import Link from "next/link";
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
+import { ErrorState } from "@/app/components/ErrorState";
+import { Section, SettingsStat } from "@/app/components/dashboard/settings/settings-ui";
+import { OrganizationUsageCard } from "@/app/dashboard/settings/organization/OrganizationUsageCard";
+import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
+import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
 import {
-  Section,
-  SettingsBtn,
-  SettingsStat,
-  UsageBar,
-} from "@/app/components/dashboard/settings/settings-ui";
+  billingStatusLabel,
+  formatPeriodEnd,
+  formatPlanPriceEur,
+  PLAN_LIST_PRICES_EUR,
+} from "@/lib/plan-pricing";
+import { BillingPortalButton } from "./BillingPortalButton";
 
-export default function BillingSettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function BillingSettingsPage() {
+  const workspace = await getDashboardWorkspaceForRequest();
+  const { organizations, resolvedOrgId, effectiveProjectId } = workspace;
+
+  if (resolvedOrgId === null) {
+    return (
+      <>
+        <SettingsPageHeader
+          title="Billing & usage"
+          description="Create an organization to view plan limits and manage Stripe billing."
+        />
+        <ErrorState message="No organization selected. Create one under Organization settings first." />
+        <p className="mt-4 text-sm">
+          <Link href="/dashboard/settings/organization" className="text-brand hover:underline">
+            Go to Organization settings →
+          </Link>
+        </p>
+      </>
+    );
+  }
+
+  const orgName = organizations.find((o) => o.id === resolvedOrgId)?.name ?? "Organization";
+
+  const capabilities = await getDashboardSessionContext(
+    effectiveProjectId === "" ? null : effectiveProjectId,
+    resolvedOrgId
+  );
+
+  const usage = capabilities?.usageQuota ?? null;
+  const billing = capabilities?.billingHealth ?? null;
+  const canManageBilling = capabilities?.canManageMembers === true;
+  const hasStripeCustomer = billing?.hasStripeCustomer === true;
+  const periodEnd = formatPeriodEnd(billing?.stripeCurrentPeriodEnd ?? null);
+
   return (
     <>
       <SettingsPageHeader
         title="Billing & usage"
-        description="Plan, usage, and payment settings for your organization."
-        actions={<SettingsBtn variant="primary">Open billing portal</SettingsBtn>}
+        description={`Plan, monthly ingest, and Stripe billing for ${orgName}.`}
+        actions={
+          canManageBilling && hasStripeCustomer ? (
+            <BillingPortalButton organizationId={resolvedOrgId} />
+          ) : null
+        }
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
-        <Section title="Current plan">
+        {capabilities === null && effectiveProjectId !== "" ? (
+          <p
+            className="rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-foreground"
+            role="status"
+          >
+            Usage and billing details could not be loaded for this session. Try refreshing or
+            selecting a project in the header.
+          </p>
+        ) : null}
+
+        <Section title="Current subscription">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <SettingsStat label="Plan" value="Self-hosted" hint="Open source · no cloud billing" />
-            <SettingsStat label="Billing status" value="—" hint="Configure Stripe in your API deployment" />
-            <SettingsStat label="Seats" value="Unlimited" hint="Members in your organization" />
+            <SettingsStat
+              label="Effective plan"
+              value={billing?.effectivePlanTier ?? usage?.planTier ?? "—"}
+              hint={
+                billing && billing.storedPlanTier !== billing.effectivePlanTier
+                  ? `Stored tier: ${billing.storedPlanTier}`
+                  : "Limits applied to ingest and retention"
+              }
+            />
+            <SettingsStat
+              label="Billing status"
+              value={billingStatusLabel(billing)}
+              hint={
+                billing?.billingAlertVariant
+                  ? "Update payment method in the Stripe portal"
+                  : hasStripeCustomer
+                    ? "Managed via Stripe"
+                    : "Upgrade below to start a subscription"
+              }
+            />
+            <SettingsStat
+              label="Current period ends"
+              value={periodEnd ?? "—"}
+              hint={hasStripeCustomer ? "From Stripe subscription" : "No active subscription"}
+            />
+          </div>
+        </Section>
+
+        {usage ? (
+          <OrganizationUsageCard
+            usage={usage}
+            organizationId={resolvedOrgId}
+            canManageBilling={canManageBilling}
+            hasStripeCustomer={hasStripeCustomer}
+          />
+        ) : (
+          <Section title="Usage">
+            <p className="text-sm text-muted-foreground">
+              Select a project in the header to load monthly ingest usage for this organization.
+            </p>
+          </Section>
+        )}
+
+        <Section
+          title="Plans (EUR)"
+          description="Prices billed per organization through Stripe on the official hosted cloud."
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            <PlanPriceCard
+              name="Free"
+              price={formatPlanPriceEur(PLAN_LIST_PRICES_EUR.FREE)}
+              detail="250K ingest units / month · 14-day retention"
+              current={billing?.effectivePlanTier === "FREE"}
+            />
+            <PlanPriceCard
+              name="Pro"
+              price={`${formatPlanPriceEur(PLAN_LIST_PRICES_EUR.PRO)} / mo`}
+              detail="5M ingest units / month · 90-day retention"
+              current={billing?.effectivePlanTier === "PRO"}
+            />
+            <PlanPriceCard
+              name="Business"
+              price={`${formatPlanPriceEur(PLAN_LIST_PRICES_EUR.BUSINESS)} / mo`}
+              detail="50M ingest units / month · 365-day retention"
+              current={billing?.effectivePlanTier === "BUSINESS"}
+            />
           </div>
           <p className="mt-4 text-[13px] text-muted-foreground">
-            For live Stripe billing and usage limits, manage your organization under{" "}
-            <Link href="/dashboard/settings/organization" className="text-brand hover:underline">
-              General settings
+            Need higher volume or a custom SLA?{" "}
+            <Link href="/contact" className="text-brand hover:underline">
+              Contact us
             </Link>
             .
           </p>
         </Section>
-        <Section title="Usage preview">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <UsageBar used={1_240_000} total={10_000_000} unit="events" />
-            <UsageBar used={12_400} total={100_000} unit="errors" tone="brand" />
-          </div>
-        </Section>
       </SettingsPageBody>
     </>
+  );
+}
+
+function PlanPriceCard({
+  name,
+  price,
+  detail,
+  current,
+}: {
+  name: string;
+  price: string;
+  detail: string;
+  current?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg border px-4 py-3 ${
+        current ? "border-brand/40 bg-brand/5" : "border-border bg-surface/30"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">{name}</p>
+        {current ? (
+          <span className="rounded border border-border px-1.5 py-px text-[10px] uppercase text-muted-foreground">
+            Current
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1 text-lg font-semibold tabular-nums">{price}</p>
+      <p className="mt-1 text-[12px] text-muted-foreground">{detail}</p>
+    </div>
   );
 }

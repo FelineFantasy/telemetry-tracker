@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { SectionHeading } from "./features";
+import { formatPlanPriceEur, PLAN_LIST_PRICES_EUR } from "@/lib/plan-pricing";
 
 const tiers = [
   {
     name: "Free",
-    price: "$0",
+    price: formatPlanPriceEur(PLAN_LIST_PRICES_EUR.FREE),
     cadence: "forever",
     desc: "For solo developers and side projects.",
     cta: "Start free",
@@ -18,7 +19,7 @@ const tiers = [
   },
   {
     name: "Pro",
-    price: "$29",
+    price: formatPlanPriceEur(PLAN_LIST_PRICES_EUR.PRO),
     cadence: "per org / month",
     desc: "For shipping teams that need reliable signal.",
     cta: "Start free, upgrade later",
@@ -28,23 +29,38 @@ const tiers = [
       "5M ingest units / month",
       "90-day retention",
       "Up to 10 projects",
-      "Stripe billing",
+      "Stripe billing (EUR)",
       "Priority email support",
     ],
   },
   {
     name: "Business",
-    price: "Custom",
-    cadence: "annual",
-    desc: "For organizations with higher volume needs.",
+    price: formatPlanPriceEur(PLAN_LIST_PRICES_EUR.BUSINESS),
+    cadence: "per org / month",
+    desc: "For organizations with higher volume and longer retention.",
+    cta: "Start free, upgrade later",
+    signup: true,
+    features: [
+      "50M ingest units / month",
+      "365-day retention",
+      "Up to 50 projects",
+      "Stripe billing (EUR)",
+      "Dedicated support",
+    ],
+  },
+  {
+    name: "Custom",
+    price: "Let's talk",
+    cadence: "annual or bespoke",
+    desc: "Enterprise volume, compliance, or on-prem requirements.",
     cta: "Contact us",
     href: "/contact",
     features: [
-      "50M+ ingest units / month",
-      "365-day retention",
-      "Up to 50 projects",
-      "Dedicated support",
+      "Custom ingest & retention",
+      "Multiple organizations",
       "Custom SLA options",
+      "Security review support",
+      "Dedicated onboarding",
     ],
   },
 ];
@@ -56,10 +72,10 @@ export function Pricing() {
         <SectionHeading
           eyebrow="Pricing"
           title={<>Honest pricing that scales with your traffic.</>}
-          subtitle="Pay for events you actually keep. Ingest stops at your cap — never a surprise bill."
+          subtitle="All prices in EUR. Ingest stops at your plan cap — never a surprise bill."
         />
 
-        <div className="mt-14 grid gap-4 md:grid-cols-3">
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {tiers.map((t) => {
             const ctaClassName = `mt-6 inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition-transform hover:scale-[1.01] ${
               t.highlight
@@ -76,12 +92,12 @@ export function Pricing() {
                     : "border-border bg-surface/40"
                 }`}
               >
-                {t.highlight && (
+                {t.highlight ? (
                   <span className="absolute -top-2.5 left-7 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] text-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-brand" />
                     Most popular
                   </span>
-                )}
+                ) : null}
                 <div className="flex items-baseline justify-between">
                   <h3 className="text-[15px] font-medium tracking-tight">{t.name}</h3>
                 </div>

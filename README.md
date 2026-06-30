@@ -13,8 +13,8 @@
 </p>
 
 <p align="center">
-  Lightweight and self-hosted—errors, events, and sessions in one place, with full control over your data.<br />
-  <strong>Live demo:</strong> <a href="https://telemetry-tracker.tacko.io">telemetry-tracker.tacko.io</a>
+  Lightweight and self-hosted for your own infrastructure—or use the <strong>official hosted cloud</strong> at
+  <a href="https://telemetry-tracker.tacko.io">telemetry-tracker.tacko.io</a> with Stripe billing (EUR).
 </p>
 
 <p align="center">
@@ -51,7 +51,8 @@
 | REST API | ✅ |
 | SDKs (`@tacko/telemetry-*`) | ✅ |
 | Self-hosted | ✅ |
-| Hosted cloud | 🚧 |
+| Hosted cloud ([telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io)) | ✅ |
+| Paid plans (Free / Pro / Business, EUR via Stripe) | ✅ |
 | Alerting | 🚧 |
 | Source maps | 🚧 |
 
@@ -63,10 +64,11 @@ Self-host setup: [DEPLOYMENT.md](DEPLOYMENT.md)
 
 Telemetry Tracker provides the core building blocks most applications need—error tracking, product analytics events and session telemetry—without the complexity of enterprise observability platforms.
 
-- Self-hosted
+- Self-hosted for your own products
+- Official hosted cloud with EUR billing
 - Lightweight
 - Simple APIs
-- Open source
+- Open source ([MIT](LICENSE))
 - Easy to deploy ([DEPLOYMENT.md](DEPLOYMENT.md))
 
 ---
@@ -192,7 +194,8 @@ packages/
 - [ ] Performance monitoring
 - [ ] Multi-project dashboards
 - [ ] Team audit logs
-- [ ] Hosted cloud
+- [x] Hosted cloud ([telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io))
+- [x] Paid plans (Stripe, EUR)
 
 ---
 
@@ -238,6 +241,10 @@ If you find Telemetry Tracker useful:
 
 ---
 
-## 📄 License
+## 📄 License & hosting
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE). You may **self-host** Telemetry Tracker for your own applications and infrastructure, and contribute improvements back to the project.
+
+The **official managed service** at [telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io) is operated by [Tacko](https://tacko.io). Paid **Pro** and **Business** plans are billed in **EUR** through Stripe on that hosted offering.
+
+Running a **competing multi-tenant hosted service** that uses the **Telemetry Tracker** name, branding, or marketing to resell the product to third parties is **not permitted**. For partnerships, white-label, or enterprise hosting, contact [info@tacko.io](mailto:info@tacko.io).
