@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { Section, SettingsPill } from "@/app/components/dashboard/settings/settings-ui";
 
@@ -19,7 +19,7 @@ export default function ChangelogSettingsPage() {
     <>
       <SettingsPageHeader title="What's new" description="Recent product updates." />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Release notes">
           <ul className="space-y-6">
             {ENTRIES.map((e) => (

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ComingSoonBanner } from "./coming-soon-ui";
 
 export function SettingsPageHeader({
   title,
@@ -26,10 +27,10 @@ export function SettingsPageBody({ children }: { children: ReactNode }) {
   return <div className="space-y-6 pb-24">{children}</div>;
 }
 
-export function SettingsPreviewNote() {
-  return (
-    <p className="rounded-lg border border-border bg-surface/40 px-4 py-3 text-[13px] text-muted-foreground">
-      Preview UI — data and actions on this page are not connected to the backend yet.
-    </p>
-  );
+/** Banner for settings pages that are not wired to the backend yet. */
+export function SettingsComingSoonNote() {
+  return <ComingSoonBanner />;
 }
+
+/** @deprecated Use SettingsComingSoonNote */
+export const SettingsPreviewNote = SettingsComingSoonNote;

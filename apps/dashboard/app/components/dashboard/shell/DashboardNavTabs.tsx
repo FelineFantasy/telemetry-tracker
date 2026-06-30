@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { ComingSoonBadge } from "@/app/components/dashboard/coming-soon-ui";
 import { buildDashboardNavTabHref } from "@/lib/overview-scope-url";
 import { DASHBOARD_NAV } from "./dashboard-nav";
 
@@ -28,11 +29,7 @@ export function DashboardNavTabs() {
                   }`}
                 >
                   {item.label}
-                  {item.comingSoon ? (
-                    <span className="rounded border border-border px-1 py-px font-mono text-[9px] uppercase text-muted-foreground">
-                      Soon
-                    </span>
-                  ) : null}
+                  {item.comingSoon ? <ComingSoonBadge /> : null}
                   {active ? (
                     <span className="absolute inset-x-3 -bottom-px h-px bg-foreground" />
                   ) : null}

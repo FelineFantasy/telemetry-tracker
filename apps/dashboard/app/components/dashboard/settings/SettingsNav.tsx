@@ -2,20 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ComingSoonBadge } from "@/app/components/dashboard/coming-soon-ui";
 
-type Item = { href: string; label: string; badge?: string };
+type Item = { href: string; label: string; badge?: string; comingSoon?: boolean };
 type Group = { label: string; items: Item[] };
 
 const GROUPS: Group[] = [
   {
     label: "Account",
     items: [
-      { href: "/dashboard/settings/profile", label: "Profile" },
-      { href: "/dashboard/settings/preferences", label: "Preferences" },
-      { href: "/dashboard/settings/appearance", label: "Appearance" },
-      { href: "/dashboard/settings/notifications", label: "Notifications" },
+      { href: "/dashboard/settings/profile", label: "Profile", comingSoon: true },
+      { href: "/dashboard/settings/preferences", label: "Preferences", comingSoon: true },
+      { href: "/dashboard/settings/appearance", label: "Appearance", comingSoon: true },
+      { href: "/dashboard/settings/notifications", label: "Notifications", comingSoon: true },
       { href: "/dashboard/settings/shortcuts", label: "Keyboard shortcuts" },
-      { href: "/dashboard/settings/security", label: "Security" },
+      { href: "/dashboard/settings/security", label: "Security", comingSoon: true },
       { href: "/dashboard/settings/keys", label: "API keys" },
     ],
   },
@@ -25,16 +26,16 @@ const GROUPS: Group[] = [
       { href: "/dashboard/settings/organization", label: "General" },
       { href: "/dashboard/settings/team", label: "Team members" },
       { href: "/dashboard/settings/billing", label: "Billing & usage" },
-      { href: "/dashboard/settings/audit", label: "Audit log" },
-      { href: "/dashboard/settings/integrations", label: "Integrations" },
-      { href: "/dashboard/settings/labs", label: "Labs", badge: "NEW" },
+      { href: "/dashboard/settings/audit", label: "Audit log", comingSoon: true },
+      { href: "/dashboard/settings/integrations", label: "Integrations", comingSoon: true },
+      { href: "/dashboard/settings/labs", label: "Labs", comingSoon: true },
     ],
   },
   {
     label: "Resources",
     items: [
       { href: "/docs", label: "Documentation" },
-      { href: "/dashboard/settings/changelog", label: "What's new" },
+      { href: "/dashboard/settings/changelog", label: "What's new", comingSoon: true },
       { href: "/dashboard/settings/support", label: "Contact support" },
     ],
   },
@@ -61,15 +62,17 @@ export function SettingsNav() {
                   <li key={i.href}>
                     <Link
                       href={i.href}
-                      className={`flex items-center justify-between rounded-md px-2 py-1.5 transition-colors ${
+                      className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors ${
                         active
                           ? "bg-surface text-foreground"
                           : "text-muted-foreground hover:bg-surface/60 hover:text-foreground"
                       }`}
                     >
-                      <span>{i.label}</span>
-                      {i.badge ? (
-                        <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+                      <span className="min-w-0 truncate">{i.label}</span>
+                      {i.comingSoon ? (
+                        <ComingSoonBadge />
+                      ) : i.badge ? (
+                        <span className="shrink-0 rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
                           {i.badge}
                         </span>
                       ) : null}

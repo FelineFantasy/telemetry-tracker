@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { Section, SettingsBtn } from "@/app/components/dashboard/settings/settings-ui";
 
@@ -16,11 +15,9 @@ export default function SupportSettingsPage() {
         description="Get help with Telemetry Tracker — self-hosted or cloud."
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
-        <Section title="Self-hosted support">
+        <Section title="Get help">
           <p className="text-[13px] text-muted-foreground">
-            Telemetry Tracker is open source. Check the docs, open a GitHub issue, or email us for
-            product questions.
+            Browse the docs, use the contact form, or open a GitHub issue for product questions.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/docs">
