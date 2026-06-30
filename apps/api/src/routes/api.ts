@@ -27,6 +27,7 @@ import {
   resolveCompareWindow,
   type OverviewCompareMode,
 } from "../lib/overview-stats.js";
+import { getAppNavSummariesForProject } from "../lib/app-nav-summary.js";
 import {
   whereErrorGroupById,
   whereErrorGroupProject,
@@ -762,5 +763,24 @@ export async function apiRoutes(
       ]),
     ].sort();
     return reply.send({ apps });
+  });
+
+  app.get("/apps/nav-summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const headerOrg = readOrganizationIdHeader(request);
+    if (headerOrg) {
+      const row = await prisma.project.findFirst({
+        where: { id: projectId, deleted_at: null },
+        select: { organization_id: true },
+      });
+      if (!row || row.organization_id.toLowerCase() !== headerOrg) {
+        return reply.status(403).send({ error: "Project is not in the selected organization" });
+      }
+    }
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const summaries = await getAppNavSummariesForProject(prisma, projectId, since);
+    return reply.send({ summaries });
   });
 }

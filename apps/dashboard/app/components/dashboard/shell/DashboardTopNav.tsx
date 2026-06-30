@@ -43,7 +43,11 @@ function NavScopePickers({
         currentProjectId={currentProjectId}
         organizationId={currentOrganizationId}
       />
-      <TopNavAppSwitcher apps={apps} />
+      <TopNavAppSwitcher
+        apps={apps}
+        projectId={currentProjectId}
+        organizationId={currentOrganizationId}
+      />
       <DashboardEnvSelector environments={environments} />
     </>
   );
