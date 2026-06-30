@@ -70,3 +70,39 @@ export function buildDashboardHrefWithEnvironment(
   const q = params.toString();
   return q ? `${path}?${q}` : path;
 }
+
+export function buildErrorGroupDetailHref(
+  id: string,
+  scope: { app?: string | null; environment?: string | null }
+): string {
+  const params = new URLSearchParams();
+  if (scope.app) params.set("app", scope.app);
+  if (scope.environment) params.set("environment", scope.environment);
+  const q = params.toString();
+  return q ? `/dashboard/errors/${id}?${q}` : `/dashboard/errors/${id}`;
+}
+
+export function formatOverviewDeltaLine(
+  delta: number,
+  kind: "errors" | "events",
+  compareLabel: string
+): { className: string; text: string } {
+  const baseline = compareLabel.replace(/^vs /, "");
+  if (delta === 0) {
+    return { className: "vs-previous", text: `Same as ${baseline}` };
+  }
+  const sign = delta > 0 ? "+" : "";
+  const text = `${sign}${delta} ${compareLabel}`;
+  if (kind === "errors") {
+    return {
+      className:
+        delta > 0 ? "vs-previous positive" : delta < 0 ? "vs-previous negative" : "vs-previous",
+      text,
+    };
+  }
+  return {
+    className:
+      delta > 0 ? "vs-previous negative" : delta < 0 ? "vs-previous positive" : "vs-previous",
+    text,
+  };
+}

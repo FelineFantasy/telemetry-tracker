@@ -1,4 +1,5 @@
 import { PageTitle } from "@/app/components/PageTitle";
+import { redirect } from "next/navigation";
 import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
 import { effectiveListRange } from "@/lib/list-filters-url";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -15,6 +16,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const ERRORS_PATH = "/dashboard/errors";
@@ -119,7 +121,15 @@ export default async function ErrorsListPage({
   }>;
 }) {
   const sp = await searchParams;
+  const currentParams = buildErrorsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
+  const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
+  const filterOptions = await getFilterOptions(appFilter || undefined);
+  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
+  if (rawEnv !== environment) {
+    redirect(mergeListQuery(ERRORS_PATH, currentParams, { environment }));
+  }
+
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
     firstQueryValue(sp.pageSize),
@@ -141,7 +151,6 @@ export default async function ErrorsListPage({
   const r = firstQueryValue(sp.range);
   const from = firstQueryValue(sp.from);
   const to = firstQueryValue(sp.to);
-  const env = firstQueryValue(sp.environment);
   const q = firstQueryValue(sp.q);
   const status = firstQueryValue(sp.status);
   const sort = firstQueryValue(sp.sort);
@@ -150,7 +159,7 @@ export default async function ErrorsListPage({
   if (r) apiQuery.set("range", r);
   if (from) apiQuery.set("from", from);
   if (to) apiQuery.set("to", to);
-  if (env) apiQuery.set("environment", env);
+  if (environment) apiQuery.set("environment", environment);
   if (q) apiQuery.set("q", q);
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
@@ -159,15 +168,10 @@ export default async function ErrorsListPage({
 
   let items: ErrorGroupRow[] = [];
   let total = 0;
-  let filterOptions = { environments: [] as string[] };
   try {
-    const [data, opts] = await Promise.all([
-      getErrors(apiQuery),
-      getFilterOptions(appFilter || undefined),
-    ]);
+    const data = await getErrors(apiQuery);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
-    filterOptions = opts;
   } catch (e) {
     return (
       <>
@@ -177,7 +181,6 @@ export default async function ErrorsListPage({
     );
   }
 
-  const currentParams = buildErrorsParamsRecord(sp);
   const hrefForPage = (p: number) =>
     mergeListQuery(ERRORS_PATH, currentParams, { page: String(p) });
 
@@ -204,7 +207,7 @@ export default async function ErrorsListPage({
         from={from ?? ""}
         to={to ?? ""}
         q={q ?? ""}
-        environment={env ?? ""}
+        environment={environment ?? ""}
         status={status ?? "all"}
         sort={sort ?? "last_seen"}
         order={order ?? "desc"}

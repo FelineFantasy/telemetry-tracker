@@ -25,7 +25,7 @@ import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
-import { parseOverviewCompare, resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { parseOverviewCompare, resolveScopedQueryValue, compareLabelFor, buildErrorGroupDetailHref, formatOverviewDeltaLine } from "@/lib/overview-scope-url";
 import { firstQueryValue } from "@/lib/search-params";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { getDashboardUser } from "@/lib/dashboard-user";
@@ -117,25 +117,10 @@ function eventListHref(eventName: string, app: string | null, environment: strin
 
 function formatDeltaLine(
   delta: number,
-  kind: "errors" | "events"
+  kind: "errors" | "events",
+  compareLabel: string
 ): { className: string; text: string } {
-  if (delta === 0) {
-    return { className: "vs-previous", text: "Same as previous period" };
-  }
-  const sign = delta > 0 ? "+" : "";
-  const text = `${sign}${delta} vs previous period`;
-  if (kind === "errors") {
-    return {
-      className:
-        delta > 0 ? "vs-previous positive" : delta < 0 ? "vs-previous negative" : "vs-previous",
-      text,
-    };
-  }
-  return {
-    className:
-      delta > 0 ? "vs-previous negative" : delta < 0 ? "vs-previous positive" : "vs-previous",
-    text,
-  };
+  return formatOverviewDeltaLine(delta, kind, compareLabel);
 }
 
 export default async function OverviewPage({
@@ -234,8 +219,9 @@ export default async function OverviewPage({
 
   const errorsDelta = data.errorsLast24h - data.errorsPrevious;
   const eventsDelta = data.eventsLast24h - data.eventsPrevious;
-  const errDeltaFmt = formatDeltaLine(errorsDelta, "errors");
-  const evDeltaFmt = formatDeltaLine(eventsDelta, "events");
+  const compareLabel = compareLabelFor(compare, range);
+  const errDeltaFmt = formatDeltaLine(errorsDelta, "errors", compareLabel);
+  const evDeltaFmt = formatDeltaLine(eventsDelta, "events", compareLabel);
 
   const health: OverviewHealth =
     data.health ?? {
@@ -392,11 +378,7 @@ export default async function OverviewPage({
               }) => (
                 <OverviewListItem
                   key={g.id}
-                  href={
-                    app
-                      ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(app)}`
-                      : `/dashboard/errors/${g.id}`
-                  }
+                  href={buildErrorGroupDetailHref(g.id, { app, environment })}
                   title={g.message}
                   titleClassName="font-medium text-destructive"
                   badges={<Badge>{g.app}</Badge>}

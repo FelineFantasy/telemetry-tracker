@@ -1,4 +1,5 @@
 import { PageTitle } from "@/app/components/PageTitle";
+import { redirect } from "next/navigation";
 import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar";
 import { effectiveListRange } from "@/lib/list-filters-url";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -15,6 +16,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const EVENTS_PATH = "/dashboard/events";
@@ -90,7 +92,15 @@ export default async function EventsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const currentParams = buildEventsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
+  const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
+  const filterOptions = await getFilterOptions(appFilter || undefined);
+  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
+  if (rawEnv !== environment) {
+    redirect(mergeListQuery(EVENTS_PATH, currentParams, { environment }));
+  }
+
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
     firstQueryValue(sp.pageSize),
@@ -113,7 +123,6 @@ export default async function EventsPage({
   const from = firstQueryValue(sp.from);
   const to = firstQueryValue(sp.to);
   const name = firstQueryValue(sp.name);
-  const environment = firstQueryValue(sp.environment);
   const platform = firstQueryValue(sp.platform);
   const release = firstQueryValue(sp.release);
   const propertiesContains = firstQueryValue(sp.propertiesContains);
@@ -132,15 +141,10 @@ export default async function EventsPage({
 
   let items: EventRow[] = [];
   let total = 0;
-  let opts = { environments: [] as string[], platforms: [] as string[], releases: [] as string[] };
   try {
-    const [data, filterOpts] = await Promise.all([
-      getEvents(apiQuery),
-      getFilterOptions(appFilter || undefined),
-    ]);
+    const data = await getEvents(apiQuery);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
-    opts = filterOpts;
   } catch (e) {
     return (
       <>
@@ -150,7 +154,6 @@ export default async function EventsPage({
     );
   }
 
-  const currentParams = buildEventsParamsRecord(sp);
   const hrefForPage = (p: number) =>
     mergeListQuery(EVENTS_PATH, currentParams, { page: String(p) });
 
@@ -187,9 +190,9 @@ export default async function EventsPage({
         propertiesContains={propertiesContains ?? ""}
         sort={sort ?? "created_at"}
         order={order ?? "desc"}
-        environments={opts.environments}
-        platforms={opts.platforms}
-        releases={opts.releases}
+        environments={filterOptions.environments}
+        platforms={filterOptions.platforms}
+        releases={filterOptions.releases}
       />
 
       <p className="mb-4 text-sm text-muted-foreground">
