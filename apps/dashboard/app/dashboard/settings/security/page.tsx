@@ -3,7 +3,7 @@
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import {
   Field,
@@ -23,7 +23,7 @@ export default function SecuritySettingsPage() {
         actions={<SettingsBtn variant="primary">Save changes</SettingsBtn>}
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Password">
           <FieldGroup>
             <Field label="Password" hint="Last changed never (OAuth sign-in)">

@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import {
   Field,
@@ -40,7 +40,7 @@ export default function ProfileSettingsPage() {
         }
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Avatar" description="PNG, JPG or GIF. 2 MB max.">
           <div className="flex items-center gap-5">
             <SettingsAvatar name={displayName} size={72} />

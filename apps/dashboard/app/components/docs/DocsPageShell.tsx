@@ -6,6 +6,7 @@ import { useMemo, useRef, useState, useEffect, type ReactNode } from "react";
 import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
 import { docsHomeAnchors, docsNavSections } from "./docs-nav";
+import { settingsInputClassName } from "@/lib/input-classes";
 
 function isNavItemActive(href: string, pathname: string, hash: string): boolean {
   if (href.startsWith("/docs#")) {
@@ -80,7 +81,7 @@ export function DocsPageShell({ children }: { children: ReactNode }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search docs"
-                className="w-full rounded-lg border border-border bg-surface/60 py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-border-strong focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:pr-12"
+                className={`${settingsInputClassName} py-2 pl-9 pr-3 sm:pr-12`}
               />
               <kbd className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
                 ⌘K

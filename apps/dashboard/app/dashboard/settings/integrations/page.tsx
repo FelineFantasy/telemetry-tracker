@@ -3,7 +3,7 @@
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { Section, SettingsBtn, SettingsPill } from "@/app/components/dashboard/settings/settings-ui";
 
@@ -21,7 +21,7 @@ export default function IntegrationsSettingsPage() {
         description="Connect Telemetry Tracker to your toolchain."
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Available integrations">
           <ul className="divide-y divide-border">
             {INTEGRATIONS.map((i) => (

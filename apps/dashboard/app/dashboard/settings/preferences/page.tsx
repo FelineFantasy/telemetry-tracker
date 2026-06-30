@@ -3,7 +3,7 @@
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import {
   Field,
@@ -23,7 +23,7 @@ export default function PreferencesSettingsPage() {
         actions={<SettingsBtn variant="primary">Save changes</SettingsBtn>}
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Dashboard defaults">
           <FieldGroup>
             <Field label="Default time range">

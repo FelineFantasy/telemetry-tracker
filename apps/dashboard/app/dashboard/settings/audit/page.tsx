@@ -3,7 +3,7 @@
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { Section, SettingsPill } from "@/app/components/dashboard/settings/settings-ui";
 
@@ -21,7 +21,7 @@ export default function AuditSettingsPage() {
         description="Organization activity for compliance and troubleshooting."
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Recent events">
           <div className="overflow-x-auto">
             <table className="min-w-full text-[13px]">

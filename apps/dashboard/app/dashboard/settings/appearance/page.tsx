@@ -3,7 +3,7 @@
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { Section, SettingsBtn, SettingsPill } from "@/app/components/dashboard/settings/settings-ui";
 
@@ -22,7 +22,7 @@ export default function AppearanceSettingsPage() {
         actions={<SettingsBtn variant="primary">Save changes</SettingsBtn>}
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Theme">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {THEMES.map((t) => (

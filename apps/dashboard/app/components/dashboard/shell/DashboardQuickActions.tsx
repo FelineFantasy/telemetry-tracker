@@ -17,6 +17,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ComingSoonBadge } from "@/app/components/dashboard/coming-soon-ui";
 import { DashboardPopover } from "./DashboardPopover";
 import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
 
@@ -74,7 +75,7 @@ export function DashboardQuickActions() {
               >
                 <ActionIcon icon={a.icon} />
                 <span className="flex-1">{a.label}</span>
-                <span className="font-mono text-[9px] uppercase">Soon</span>
+                <ComingSoonBadge />
               </button>
             ) : (
               <Link
@@ -90,7 +91,7 @@ export function DashboardQuickActions() {
           )}
           <div className="my-1 h-px bg-border" />
           <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-            Explore (soon)
+            Explore (coming soon)
           </div>
           {[
             { label: "New trace query", icon: Workflow },
@@ -103,12 +104,13 @@ export function DashboardQuickActions() {
               type="button"
               className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-surface"
               onClick={() => {
-                toast.message("Coming soon", { description: item.label });
+                toast.message("Coming soon", { description: `${item.label} is not available yet.` });
                 close();
               }}
             >
               <ActionIcon icon={item.icon} />
               <span className="flex-1">{item.label}</span>
+              <ComingSoonBadge />
             </button>
           ))}
         </div>

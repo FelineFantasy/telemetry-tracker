@@ -3,12 +3,12 @@
 import {
   SettingsPageBody,
   SettingsPageHeader,
-  SettingsPreviewNote,
+  SettingsComingSoonNote,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { Section, SettingsPill, SettingsToggle } from "@/app/components/dashboard/settings/settings-ui";
 
 const FLAGS = [
-  { id: "cmdk", label: "Command palette", desc: "Global ⌘K navigation (preview)", on: false },
+  { id: "cmdk", label: "Command palette", desc: "Global ⌘K navigation", on: false },
   { id: "traces", label: "Traces view", desc: "Distributed tracing UI", on: false },
   { id: "alerts", label: "Alert rules", desc: "Threshold-based alerting", on: false },
 ];
@@ -21,7 +21,7 @@ export default function LabsSettingsPage() {
         description="Experimental features — may change or be removed."
       />
       <SettingsPageBody>
-        <SettingsPreviewNote />
+        <SettingsComingSoonNote />
         <Section title="Feature previews">
           <ul className="divide-y divide-border">
             {FLAGS.map((f) => (
@@ -29,7 +29,7 @@ export default function LabsSettingsPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 text-[13px]">
                     {f.label}
-                    <SettingsPill tone="brand">Preview</SettingsPill>
+                    <SettingsPill tone="muted">Coming soon</SettingsPill>
                   </div>
                   <div className="text-[11px] text-muted-foreground">{f.desc}</div>
                 </div>
