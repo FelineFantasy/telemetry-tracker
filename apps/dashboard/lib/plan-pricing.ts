@@ -47,3 +47,55 @@ export function formatPeriodEnd(iso: string | null): string | null {
     return null;
   }
 }
+
+export function resolveEffectivePlanTier(
+  billing: { effectivePlanTier: string } | null,
+  usage: { planTier: string } | null
+): string | null {
+  return billing?.effectivePlanTier ?? usage?.planTier ?? null;
+}
+
+export function billingStatusHint({
+  billing,
+  hasStripeCustomer,
+  canManageBilling,
+  hasUpgradeActions,
+}: {
+  billing: BillingHealthInfoShape | null;
+  hasStripeCustomer: boolean;
+  canManageBilling: boolean;
+  hasUpgradeActions: boolean;
+}): string {
+  if (billing?.billingAlertVariant) {
+    return "Update payment method in the Stripe portal";
+  }
+  if (hasStripeCustomer) return "Managed via Stripe";
+  if (hasUpgradeActions) return "Upgrade below to start a subscription";
+  if (canManageBilling) {
+    return "Create a project to unlock usage tracking and upgrade controls";
+  }
+  return "Contact an organization owner to manage billing";
+}
+
+type BillingHealthInfoShape = Parameters<typeof billingStatusLabel>[0];
+
+export function usageUnavailableMessage({
+  hasProjects,
+  effectiveProjectId,
+  capabilitiesLoaded,
+}: {
+  hasProjects: boolean;
+  effectiveProjectId: string;
+  capabilitiesLoaded: boolean;
+}): string {
+  if (!hasProjects) {
+    return "Create a project to track monthly ingest usage for this organization.";
+  }
+  if (effectiveProjectId === "") {
+    return "Select a project in the header to load monthly ingest usage for this organization.";
+  }
+  if (!capabilitiesLoaded) {
+    return "Monthly ingest usage could not be loaded for this session. Try refreshing the page.";
+  }
+  return "Usage details are unavailable for the selected project. Try refreshing or choose another project.";
+}

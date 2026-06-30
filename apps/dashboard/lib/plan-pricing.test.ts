@@ -1,10 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { formatPlanPriceEur, PLAN_LIST_PRICES_EUR } from "./plan-pricing";
+import {
+  billingStatusHint,
+  formatPlanPriceEur,
+  PLAN_LIST_PRICES_EUR,
+  resolveEffectivePlanTier,
+  usageUnavailableMessage,
+} from "./plan-pricing";
 
 describe("plan-pricing", () => {
   it("formats EUR list prices", () => {
     expect(formatPlanPriceEur(PLAN_LIST_PRICES_EUR.FREE)).toBe("€0");
     expect(formatPlanPriceEur(PLAN_LIST_PRICES_EUR.PRO)).toMatch(/29/);
     expect(formatPlanPriceEur(PLAN_LIST_PRICES_EUR.BUSINESS)).toMatch(/99/);
+  });
+
+  it("falls back to usage plan tier for effective plan display", () => {
+    expect(resolveEffectivePlanTier(null, { planTier: "PRO" })).toBe("PRO");
+    expect(resolveEffectivePlanTier({ effectivePlanTier: "BUSINESS" }, { planTier: "PRO" })).toBe(
+      "BUSINESS"
+    );
+  });
+
+  it("describes usage gaps without always asking for project selection", () => {
+    expect(
+      usageUnavailableMessage({
+        hasProjects: false,
+        effectiveProjectId: "",
+        capabilitiesLoaded: false,
+      })
+    ).toMatch(/Create a project/);
+    expect(
+      usageUnavailableMessage({
+        hasProjects: true,
+        effectiveProjectId: "proj-1",
+        capabilitiesLoaded: true,
+      })
+    ).toMatch(/unavailable for the selected project/);
+  });
+
+  it("avoids upgrade hint when checkout controls are not shown", () => {
+    expect(
+      billingStatusHint({
+        billing: null,
+        hasStripeCustomer: false,
+        canManageBilling: true,
+        hasUpgradeActions: false,
+      })
+    ).toMatch(/Create a project/);
+    expect(
+      billingStatusHint({
+        billing: null,
+        hasStripeCustomer: false,
+        canManageBilling: true,
+        hasUpgradeActions: true,
+      })
+    ).toMatch(/Upgrade below/);
   });
 });
