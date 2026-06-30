@@ -8,4 +8,5 @@ export const authInputClassName = `${inputFieldClassName} rounded-lg border bord
 
 export const filterInputClassName = `${inputFieldClassName} h-9 rounded-md border border-border bg-background px-3 text-[13px] text-foreground placeholder:text-muted-foreground/60 hover:border-muted-foreground/30 focus:border-border-strong`;
 
-export const searchInputClassName = `${inputFieldClassName} bg-transparent text-sm text-foreground placeholder:text-muted-foreground`;
+/** Borderless popover search fields — transparent border shows focus via border-strong. */
+export const searchInputClassName = `${inputFieldClassName} rounded-md border border-transparent bg-transparent px-1 text-sm text-foreground placeholder:text-muted-foreground focus:border-border-strong`;

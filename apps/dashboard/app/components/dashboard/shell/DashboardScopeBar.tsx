@@ -63,40 +63,23 @@ export function DashboardScopeBar({
     ...(appValue ? [{ key: "app", label: "app", value: appValue }] : []),
   ];
 
-  if (apps.length === 0) {
-    return (
-      <div className="mb-6 rounded-xl border border-border bg-surface/40 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Filters active
-          </span>
-          {filters.map((f) => (
-            <span
-              key={f.key}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/60 px-2 py-1 text-[12px]"
-            >
-              <span className="font-mono text-[10px] uppercase text-muted-foreground">{f.label}</span>
-              <span className="max-w-[12rem] truncate">{f.value}</span>
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="mb-6 space-y-3 rounded-xl border border-border bg-surface/40 p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[12px] font-medium text-muted-foreground">App</span>
-        <div className="min-w-[10rem] flex-1 sm:max-w-xs">
-          <DashboardCustomSelect
-            value={appValue}
-            options={appOptions}
-            triggerId="scope-app"
-            listLabelledBy="scope-app-l"
-            onValueChange={onAppChange}
-          />
-        </div>
+        {apps.length > 0 ? (
+          <>
+            <span className="text-[12px] font-medium text-muted-foreground">App</span>
+            <div className="min-w-[10rem] flex-1 sm:max-w-xs">
+              <DashboardCustomSelect
+                value={appValue}
+                options={appOptions}
+                triggerId="scope-app"
+                listLabelledBy="scope-app-l"
+                onValueChange={onAppChange}
+              />
+            </div>
+          </>
+        ) : null}
         <SettingsBtn
           type="button"
           variant="outline"
