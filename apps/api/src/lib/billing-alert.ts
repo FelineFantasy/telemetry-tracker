@@ -21,3 +21,31 @@ export function billingAlertVariant(
   if (s === "incomplete_expired") return "incomplete_expired";
   return null;
 }
+
+export type BillingHealthSnapshot = {
+  stripeSubscriptionStatus: string | null;
+  stripeCurrentPeriodEnd: string | null;
+  storedPlanTier: string;
+  effectivePlanTier: string;
+  hasStripeCustomer: boolean;
+  billingAlertVariant: BillingAlertVariant | null;
+};
+
+export function billingHealthFromPlanContext(ctx: {
+  stripeSubscriptionStatus: string | null;
+  stripeCurrentPeriodEnd: Date | null;
+  storedPlanTier: string;
+  planTier: string;
+  stripeCustomerId: string | null;
+}): BillingHealthSnapshot {
+  return {
+    stripeSubscriptionStatus: ctx.stripeSubscriptionStatus,
+    stripeCurrentPeriodEnd: ctx.stripeCurrentPeriodEnd
+      ? ctx.stripeCurrentPeriodEnd.toISOString()
+      : null,
+    storedPlanTier: ctx.storedPlanTier,
+    effectivePlanTier: ctx.planTier,
+    hasStripeCustomer: ctx.stripeCustomerId != null,
+    billingAlertVariant: billingAlertVariant(ctx.stripeSubscriptionStatus),
+  };
+}

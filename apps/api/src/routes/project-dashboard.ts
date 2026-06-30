@@ -6,6 +6,7 @@ import {
   createApiKeyWithPlanLimitCheck,
   createProjectWithPlanLimitCheck,
   getMonthlyIngestUsed,
+  loadPlanContextForOrganization,
   loadPlanContextForProject,
 } from "../lib/plan-enforcement.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
@@ -23,8 +24,8 @@ import {
 } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import {
-  type BillingAlertVariant,
-  billingAlertVariant,
+  type BillingHealthSnapshot,
+  billingHealthFromPlanContext,
 } from "../lib/billing-alert.js";
 import {
   allowUnauthenticatedReads,
@@ -598,14 +599,7 @@ export async function projectDashboardRoutes(
       nearQuota: boolean;
       retentionDays: number;
     } | null = null;
-    let billingHealth: {
-      stripeSubscriptionStatus: string | null;
-      stripeCurrentPeriodEnd: string | null;
-      storedPlanTier: string;
-      effectivePlanTier: string;
-      hasStripeCustomer: boolean;
-      billingAlertVariant: BillingAlertVariant | null;
-    } | null = null;
+    let billingHealth: BillingHealthSnapshot | null = null;
     if (projectId !== null) {
       const ctx = await loadPlanContextForProject(prisma, projectId);
       if (ctx) {
@@ -622,16 +616,12 @@ export async function projectDashboardRoutes(
           nearQuota: ratio >= 0.9,
           retentionDays: ctx.limits.retentionDays,
         };
-        billingHealth = {
-          stripeSubscriptionStatus: ctx.stripeSubscriptionStatus,
-          stripeCurrentPeriodEnd: ctx.stripeCurrentPeriodEnd
-            ? ctx.stripeCurrentPeriodEnd.toISOString()
-            : null,
-          storedPlanTier: ctx.storedPlanTier,
-          effectivePlanTier: ctx.planTier,
-          hasStripeCustomer: ctx.stripeCustomerId != null,
-          billingAlertVariant: billingAlertVariant(ctx.stripeSubscriptionStatus),
-        };
+        billingHealth = billingHealthFromPlanContext(ctx);
+      }
+    } else if (headerOrg) {
+      const ctx = await loadPlanContextForOrganization(prisma, headerOrg);
+      if (ctx) {
+        billingHealth = billingHealthFromPlanContext(ctx);
       }
     }
 
