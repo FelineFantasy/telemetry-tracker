@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "./db.js";
 import { getSessionUser, type SessionUser } from "./auth-session.js";
-import { headerFirst } from "./http-headers.js";
+import { headerFirst, readOrganizationIdHeader } from "./http-headers.js";
 import { readProjectIdFromEnv } from "./project-scope.js";
 
 const UUID_RE =
@@ -52,10 +52,19 @@ async function membershipForUser(
   return m != null;
 }
 
+/** Org-scoped dashboard calls may omit `X-Project-Id`; do not fall back to env default then. */
+export function isOrgScopedWithoutProjectHeader(request: FastifyRequest): boolean {
+  const headerOrg = readOrganizationIdHeader(request);
+  const raw = headerFirst(request, "x-project-id");
+  const hasValidProjectHeader = Boolean(raw && UUID_RE.test(raw));
+  return Boolean(headerOrg) && !hasValidProjectHeader;
+}
+
 /**
  * Resolve the project id from `X-Project-Id` or the env fallback.
  * When the header is missing, invalid, or points at a deleted project, falls back to
- * `TELEMETRY_PROJECT_ID` / the seeded default project.
+ * `TELEMETRY_PROJECT_ID` / the seeded default project unless the request is org-scoped
+ * without a project header (billing/settings with only `X-Organization-Id`).
  */
 async function resolveRequestedProject(
   request: FastifyRequest
@@ -68,6 +77,10 @@ async function resolveRequestedProject(
     if (scope) {
       return { id: scope.id, scope };
     }
+  }
+
+  if (isOrgScopedWithoutProjectHeader(request)) {
+    return { id: "", scope: null };
   }
 
   const fallbackScope = await loadProjectScope(fallbackId);
