@@ -5,9 +5,6 @@ import { prisma } from "../lib/db.js";
 import {
   createApiKeyWithPlanLimitCheck,
   createProjectWithPlanLimitCheck,
-  getMonthlyIngestUsed,
-  loadPlanContextForOrganization,
-  loadPlanContextForProject,
 } from "../lib/plan-enforcement.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
 import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
@@ -21,21 +18,15 @@ import {
   canManageMembers,
   canArchiveOrganization,
   canArchiveProject,
-  canResolveErrors,
   canRevokeApiKey,
   getMembershipRoleForOrganization,
   getMembershipRoleForProject,
 } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import {
-  type BillingHealthSnapshot,
-  billingHealthFromPlanContext,
-} from "../lib/billing-alert.js";
-import {
   allowUnauthenticatedReads,
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
-  tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
 import { sendTransactionalEmail } from "../lib/email.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
