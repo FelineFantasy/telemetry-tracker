@@ -124,11 +124,6 @@ export default async function ErrorsListPage({
   const currentParams = buildErrorsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
-  const filterOptions = await getFilterOptions(appFilter || undefined);
-  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
-  if (rawEnv !== environment) {
-    redirect(mergeListQuery(ERRORS_PATH, currentParams, { environment }));
-  }
 
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
@@ -159,7 +154,7 @@ export default async function ErrorsListPage({
   if (r) apiQuery.set("range", r);
   if (from) apiQuery.set("from", from);
   if (to) apiQuery.set("to", to);
-  if (environment) apiQuery.set("environment", environment);
+  if (rawEnv) apiQuery.set("environment", rawEnv);
   if (q) apiQuery.set("q", q);
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
@@ -168,8 +163,14 @@ export default async function ErrorsListPage({
 
   let items: ErrorGroupRow[] = [];
   let total = 0;
+  let filterOptions = { environments: [] as string[] };
+
   try {
-    const data = await getErrors(apiQuery);
+    const [opts, data] = await Promise.all([
+      getFilterOptions(appFilter || undefined),
+      getErrors(apiQuery),
+    ]);
+    filterOptions = opts;
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
   } catch (e) {
@@ -179,6 +180,11 @@ export default async function ErrorsListPage({
         <ErrorState message={String(e instanceof Error ? e.message : e)} />
       </>
     );
+  }
+
+  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
+  if (rawEnv !== environment) {
+    redirect(mergeListQuery(ERRORS_PATH, currentParams, { environment }));
   }
 
   const hrefForPage = (p: number) =>

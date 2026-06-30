@@ -60,14 +60,9 @@ export function resolveEffectiveProjectId(
 }
 
 export async function getDashboardProjectId(): Promise<string> {
-  const sessionId = await getDashboardSessionId();
-  if (!sessionId) return DEFAULT_PROJECT_ID;
-
-  const { getDashboardWorkspaceForRequest } = await import(
-    "@/lib/dashboard-workspace-request"
-  );
-  const { effectiveProjectId } = await getDashboardWorkspaceForRequest();
-  return effectiveProjectId;
+  const cookie = await getDashboardProjectCookie();
+  if (isValidDashboardProjectId(cookie)) return cookie;
+  return DEFAULT_PROJECT_ID;
 }
 
 export async function getDashboardSessionId(): Promise<string | undefined> {

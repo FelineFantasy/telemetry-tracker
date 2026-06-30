@@ -10,6 +10,7 @@ import { DocsPreview } from "@/app/components/marketing/docs-preview";
 import { Cta } from "@/app/components/marketing/cta";
 import { Footer } from "@/app/components/marketing/footer";
 import { socialPreviewImage } from "@/lib/social-image";
+import { getDashboardSessionId } from "@/lib/dashboard-project";
 import { resolveMetadataBase } from "@/lib/site-url";
 
 const homeTitle = "Telemetry Tracker — Observability for teams that ship";
@@ -38,18 +39,20 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const isAuthenticated = Boolean(await getDashboardSessionId());
+
   return (
     <main id="main-content" className="min-h-screen bg-background text-foreground">
-      <Nav />
-      <Hero />
+      <Nav isAuthenticated={isAuthenticated} />
+      <Hero isAuthenticated={isAuthenticated} />
       <LogoStrip />
       <Features />
       <Sdks />
       <ProductShots />
       <Pricing />
       <DocsPreview />
-      <Cta />
+      <Cta isAuthenticated={isAuthenticated} />
       <Footer />
     </main>
   );

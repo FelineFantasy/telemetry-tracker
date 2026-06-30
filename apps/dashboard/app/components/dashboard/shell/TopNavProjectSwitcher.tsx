@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { Check, ChevronDown, Pin, Plus, Search } from "lucide-react";
 import { setDashboardProjectId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
-import { fetchProjectNavSummaries } from "@/lib/project-nav-summary-client";
 import type { ProjectNavSummary } from "@/lib/project-nav-summary-types";
 import {
   getProjectPickerPrefs,
@@ -36,11 +35,11 @@ const IDLE_SUMMARY: ProjectNavSummary = {
 export function TopNavProjectSwitcher({
   projects,
   currentProjectId,
-  organizationId,
+  projectNavSummaries,
 }: {
   projects: ProjectOption[];
   currentProjectId: string;
-  organizationId: string | null;
+  projectNavSummaries: Record<string, ProjectNavSummary>;
 }) {
   const router = useRouter();
   const pathname = usePathname() ?? "/";
@@ -50,23 +49,11 @@ export function TopNavProjectSwitcher({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState(getProjectPickerPrefs);
-  const [summaries, setSummaries] = useState<Record<string, ProjectNavSummary>>({});
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setValue(currentProjectId);
   }, [currentProjectId]);
-
-  useEffect(() => {
-    if (!organizationId) return;
-    let cancelled = false;
-    void fetchProjectNavSummaries(organizationId).then((next) => {
-      if (!cancelled) setSummaries(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [organizationId]);
 
   useEffect(() => {
     if (!open) {
@@ -95,8 +82,8 @@ export function TopNavProjectSwitcher({
 
   const summaryFor = useCallback(
     (projectId: string): ProjectNavSummary =>
-      summaries[projectId] ?? { ...IDLE_SUMMARY, projectId },
-    [summaries]
+      projectNavSummaries[projectId] ?? { ...IDLE_SUMMARY, projectId },
+    [projectNavSummaries]
   );
 
   const selectProject = useCallback(

@@ -57,6 +57,7 @@ model OrganizationMembership {
   created_at      DateTime     @default(now()) @map("created_at")
 
   @@unique([user_id, organization_id])
+  @@index([user_id])
   @@index([organization_id])
 }
 
@@ -197,6 +198,7 @@ model Event {
 
   @@index([project_id, created_at])
   @@index([project_id, app])
+  @@index([project_id, environment])
 }
 
 model ErrorGroup {
@@ -217,6 +219,7 @@ model ErrorGroup {
   @@unique([project_id, fingerprint])
   @@index([project_id, last_seen])
   @@index([project_id, app])
+  @@index([project_id, environment])
 }
 
 model ErrorOccurrence {

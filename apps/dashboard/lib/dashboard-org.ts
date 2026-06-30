@@ -1,6 +1,5 @@
 import { cache } from "react";
-import { API_BASE_URL } from "@/lib/api-url";
-import { getDashboardSessionId } from "@/lib/dashboard-project";
+import { fetchDashboardBootstrap } from "@/lib/dashboard-bootstrap-server";
 
 /** Cookie storing the active dashboard organization (matches API `X-Organization-Id`). */
 export const TELEMETRY_ORG_COOKIE = "telemetry_organization_id";
@@ -12,28 +11,12 @@ type MetaOrganizationsPayload =
   | { ok: false };
 
 /**
- * Single GET /api/meta/organizations per request — shared by workspace layout, org list helpers,
- * and `getResolvedDashboardOrganizationId`.
+ * Org list from dashboard bootstrap — no separate GET /api/meta/organizations.
  */
 const getMetaOrganizationsPayload = cache(async (): Promise<MetaOrganizationsPayload> => {
-  const sessionId = await getDashboardSessionId();
-  if (!sessionId) return { ok: true, organizations: [] };
-  const res = await fetch(`${API_BASE_URL}/api/meta/organizations`, {
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${sessionId}`,
-    },
-  });
-  if (!res.ok) return { ok: false };
-  const data = (await res.json()) as {
-    organizations?: { id: string; name?: string }[];
-  };
-  const raw = Array.isArray(data.organizations) ? data.organizations : [];
-  const organizations = raw.map((o) => ({
-    id: o.id,
-    name: typeof o.name === "string" ? o.name : "",
-  }));
-  return { ok: true, organizations };
+  const bootstrap = await fetchDashboardBootstrap();
+  if (!bootstrap) return { ok: false };
+  return { ok: true, organizations: bootstrap.organizations };
 });
 
 export async function fetchDashboardOrganizationsPayload(): Promise<MetaOrganizationsPayload> {
@@ -52,21 +35,13 @@ export async function getDashboardOrganizationId(): Promise<string | undefined> 
 
 /**
  * Organization id aligned with the sidebar: cookie when valid, otherwise first membership.
- * Sends this as `X-Organization-Id` so APIs match the workspace you see even when the org cookie
- * is missing or stale. Cached per request (React `cache`).
  */
 export const getResolvedDashboardOrganizationId = cache(
   async (): Promise<string | undefined> => {
     const cookieOrg = await getDashboardOrganizationId();
-    const sessionId = await getDashboardSessionId();
-    if (!sessionId) {
-      return cookieOrg;
-    }
-    const p = await getMetaOrganizationsPayload();
-    if (!p.ok) {
-      return cookieOrg;
-    }
-    const resolved = resolveActiveOrganizationId(cookieOrg, p.organizations);
+    const bootstrap = await fetchDashboardBootstrap();
+    if (!bootstrap) return cookieOrg;
+    const resolved = resolveActiveOrganizationId(cookieOrg, bootstrap.organizations);
     return resolved ?? undefined;
   }
 );

@@ -20,20 +20,27 @@ import { OverviewAppHealth } from "@/app/components/dashboard/overview/OverviewA
 import { OverviewActiveIncidents } from "@/app/components/dashboard/overview/OverviewActiveIncidents";
 import { OverviewMetricsSection } from "@/app/components/dashboard/overview/OverviewMetricsSection";
 import { OverviewExtraCharts } from "@/app/components/dashboard/overview/OverviewExtraCharts";
-import { DashboardScopeBar } from "@/app/components/dashboard/shell/DashboardScopeBar";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
 import { parseOverviewCompare, resolveScopedQueryValue, compareLabelFor, buildErrorGroupDetailHref, formatOverviewDeltaLine } from "@/lib/overview-scope-url";
 import { firstQueryValue } from "@/lib/search-params";
+import { coalesceOverviewRequest } from "@/lib/api-inflight";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { dashboardDebug } from "@/lib/dashboard-debug";
+import { fetchDashboardBootstrap } from "@/lib/dashboard-bootstrap-server";
 import { getDashboardUser } from "@/lib/dashboard-user";
 import {
-  fetchDashboardAppsList,
   fetchDashboardEnvironments,
+  fetchDashboardNavScope,
   getDashboardWorkspaceForRequest,
 } from "@/lib/dashboard-workspace-request";
+import {
+  overviewScopeMatches,
+  readOverviewCookieScope,
+  type OverviewRequestScope,
+} from "@/lib/overview-request-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +59,8 @@ async function getOverview(
     errorsOrder: string;
     topEventsSort: string;
     topEventsOrder: string;
-  }
+  },
+  scope: OverviewRequestScope
 ) {
   const params = new URLSearchParams();
   if (range) params.set("range", range);
@@ -66,12 +74,30 @@ async function getOverview(
   params.set("errorsOrder", list.errorsOrder);
   params.set("topEventsSort", list.topEventsSort);
   params.set("topEventsOrder", list.topEventsOrder);
-  const res = await dashboardApiFetch(`/api/overview?${params.toString()}`);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
-  }
-  return res.json() as Promise<OverviewApiResponse>;
+  const path = `/api/overview?${params.toString()}`;
+  const cacheKey = `${scope.projectId}:${scope.organizationId ?? ""}:${path}`;
+
+  return coalesceOverviewRequest(cacheKey, async () => {
+    const started = Date.now();
+    dashboardDebug("overview", "fetch start", { cacheKey });
+    const res = await dashboardApiFetch(path, undefined, {
+      projectIdOverride: scope.projectId,
+      ...(scope.organizationId
+        ? { organizationIdOverride: scope.organizationId }
+        : {}),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      dashboardDebug("overview", "fetch failed", {
+        status: res.status,
+        ms: Date.now() - started,
+        body: text.slice(0, 300),
+      });
+      throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
+    }
+    dashboardDebug("overview", "fetch ok", { ms: Date.now() - started });
+    return res.json() as Promise<OverviewApiResponse>;
+  });
 }
 
 function emptySeries(): OverviewApiResponse["series"] {
@@ -152,37 +178,99 @@ export default async function OverviewPage({
   const errorsOrder = firstQueryValue(params.errorsOrder) ?? "desc";
   const topEventsSort = firstQueryValue(params.topEventsSort) ?? "count";
   const topEventsOrder = firstQueryValue(params.topEventsOrder) ?? "desc";
-  const rangeLabel = range === "7d" ? "7d" : "24h";
   const rangeLabelLong = range === "7d" ? "Last 7 days" : "Last 24 hours";
   const currentOverviewParams = buildOverviewParamsRecord(params);
+  const listParams = {
+    errorsPage,
+    eventsPage,
+    listPageSize,
+    errorsSort,
+    errorsOrder,
+    topEventsSort,
+    topEventsOrder,
+  };
 
-  const [user, workspace] = await Promise.all([
+  const cookieScope = await readOverviewCookieScope();
+  const pageStarted = Date.now();
+
+  const overviewEarlyPromise =
+    cookieScope.projectId !== ""
+      ? getOverview(
+          range,
+          rawApp ?? undefined,
+          rawEnvironment ?? undefined,
+          compare,
+          listParams,
+          cookieScope
+        ).catch((e) => ({ error: e } as const))
+      : Promise.resolve({ error: new Error("No project selected") } as const);
+
+  const [user, workspace, bootstrap, overviewEarly] = await Promise.all([
     getDashboardUser(),
     getDashboardWorkspaceForRequest(),
+    fetchDashboardBootstrap(),
+    overviewEarlyPromise,
   ]);
   const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
-  const organizationName =
-    organizations.find((o) => o.id === resolvedOrgId)?.name ?? null;
-  const projectName = projects.find((p) => p.id === effectiveProjectId)?.name ?? null;
-  const projectSlug = projects.find((p) => p.id === effectiveProjectId)?.slug ?? null;
+
+  dashboardDebug("overview", "parallel shell done", {
+    ms: Date.now() - pageStarted,
+    orgCount: organizations.length,
+    projectCount: projects.length,
+    resolvedOrgId,
+    effectiveProjectId,
+    hasUser: user !== null,
+    cookieScope,
+  });
+
+  const resolvedScope: OverviewRequestScope = {
+    projectId: effectiveProjectId,
+    organizationId: resolvedOrgId,
+  };
+
+  let overviewResult = overviewEarly;
+  if (
+    effectiveProjectId !== "" &&
+    !overviewScopeMatches(cookieScope, resolvedScope)
+  ) {
+    dashboardDebug("overview", "refetch — scope differs from cookies", {
+      cookieScope,
+      resolvedScope,
+    });
+    overviewResult = await getOverview(
+      range,
+      rawApp ?? undefined,
+      rawEnvironment ?? undefined,
+      compare,
+      listParams,
+      resolvedScope
+    ).catch((e) => ({ error: e } as const));
+  }
 
   const apps =
     effectiveProjectId === ""
       ? []
-      : await fetchDashboardAppsList(effectiveProjectId, resolvedOrgId);
+      : overviewScopeMatches(cookieScope, resolvedScope)
+        ? (bootstrap?.navScope.apps ?? [])
+        : (await fetchDashboardNavScope(effectiveProjectId, resolvedOrgId)).apps;
 
   const app = resolveScopedQueryValue(rawApp, apps);
+  if (rawApp !== app) {
+    redirect(mergeListQuery(OVERVIEW_PATH, currentOverviewParams, { app }));
+  }
+
   const scopedEnvironments =
     effectiveProjectId === ""
       ? []
-      : await fetchDashboardEnvironments(effectiveProjectId, resolvedOrgId, app);
-  const environment = resolveScopedQueryValue(rawEnvironment, scopedEnvironments);
+      : overviewScopeMatches(cookieScope, resolvedScope) && !app
+        ? (bootstrap?.navScope.environments ?? [])
+        : await fetchDashboardEnvironments(effectiveProjectId, resolvedOrgId, app);
 
-  const scopeCorrections: Record<string, string | null> = {};
-  if (rawApp !== app) scopeCorrections.app = app;
-  if (rawEnvironment !== environment) scopeCorrections.environment = environment;
-  if (Object.keys(scopeCorrections).length > 0) {
-    redirect(mergeListQuery(OVERVIEW_PATH, currentOverviewParams, scopeCorrections));
+  const environment = resolveScopedQueryValue(rawEnvironment, scopedEnvironments);
+  if (rawEnvironment !== environment) {
+    redirect(
+      mergeListQuery(OVERVIEW_PATH, currentOverviewParams, { environment })
+    );
   }
 
   const workspaceStats = buildOverviewWorkspaceStats(
@@ -191,21 +279,8 @@ export default async function OverviewPage({
     resolvedOrgId
   );
 
-  let data: OverviewApiResponse;
-  try {
-    data = await getOverview(range, app ?? undefined, environment ?? undefined, compare, {
-      errorsPage,
-      eventsPage,
-      listPageSize,
-      errorsSort,
-      errorsOrder,
-      topEventsSort,
-      topEventsOrder,
-    });
-    if (!data.series) {
-      data = { ...data, series: emptySeries() };
-    }
-  } catch (e) {
+  if ("error" in overviewResult) {
+    const e = overviewResult.error;
     return (
       <>
         <OverviewGreeting user={user} />
@@ -214,14 +289,19 @@ export default async function OverviewPage({
     );
   }
 
-  const errorsDelta = data.errorsLast24h - data.errorsPrevious;
-  const eventsDelta = data.eventsLast24h - data.eventsPrevious;
+  const overviewData: OverviewApiResponse = {
+    ...overviewResult,
+    series: overviewResult.series ?? emptySeries(),
+  };
+
+  const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
+  const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
   const compareLabel = compareLabelFor(compare, range);
   const errDeltaFmt = formatDeltaLine(errorsDelta, "errors", compareLabel);
   const evDeltaFmt = formatDeltaLine(eventsDelta, "events", compareLabel);
 
   const health: OverviewHealth =
-    data.health ?? {
+    overviewData.health ?? {
       status: "operational",
       statusLabel: "Operational",
       subtitle: "No health metrics returned",
@@ -231,11 +311,11 @@ export default async function OverviewPage({
       throughputPerSec: 0,
       peakThroughputPerSec: 0,
     };
-  const activeIssues = data.activeIssues ?? [];
-  const sessionDurationSeries = data.sessionDurationSeries ?? [];
-  const workspaceTelemetry: OverviewWorkspaceTelemetry = data.workspaceTelemetry ?? {
-    ingestRequests: data.eventsLast24h + data.errorsLast24h,
-    sdkEventRows: data.eventsLast24h,
+  const activeIssues = overviewData.activeIssues ?? [];
+  const sessionDurationSeries = overviewData.sessionDurationSeries ?? [];
+  const workspaceTelemetry: OverviewWorkspaceTelemetry = overviewData.workspaceTelemetry ?? {
+    ingestRequests: overviewData.eventsLast24h + overviewData.errorsLast24h,
+    sdkEventRows: overviewData.eventsLast24h,
     distinctApps: apps.length,
     distinctSdkVersions: 0,
   };
@@ -274,17 +354,6 @@ export default async function OverviewPage({
         }
       />
 
-      <Suspense fallback={null}>
-        <DashboardScopeBar
-          organizationName={organizationName}
-          projectName={projectName}
-          projectSlug={projectSlug}
-          apps={apps}
-          rangeLabel={rangeLabel}
-          environmentLabel={environment ?? null}
-        />
-      </Suspense>
-
       <OverviewAppHealth health={health} />
       <OverviewActiveIncidents issues={activeIssues} />
 
@@ -293,21 +362,21 @@ export default async function OverviewPage({
           range={range}
           overviewPath={OVERVIEW_PATH}
           currentParams={currentOverviewParams}
-          eventsCount={data.eventsLast24h}
-          eventsPrevious={data.eventsPrevious}
-          errorsCount={data.errorsLast24h}
-          errorsPrevious={data.errorsPrevious}
-          sessionsCount={data.sessionsCount ?? 0}
-          sessionsPrevious={data.sessionsPrevious ?? 0}
-          activeUsers={data.activeUsers ?? 0}
-          activeUsersPrevious={data.activeUsersPrevious ?? 0}
+          eventsCount={overviewData.eventsLast24h}
+          eventsPrevious={overviewData.eventsPrevious}
+          errorsCount={overviewData.errorsLast24h}
+          errorsPrevious={overviewData.errorsPrevious}
+          sessionsCount={overviewData.sessionsCount ?? 0}
+          sessionsPrevious={overviewData.sessionsPrevious ?? 0}
+          activeUsers={overviewData.activeUsers ?? 0}
+          activeUsersPrevious={overviewData.activeUsersPrevious ?? 0}
           workspaceStats={workspaceStats}
           workspaceTelemetry={workspaceTelemetry}
         />
       </Suspense>
 
       <OverviewExtraCharts
-        series={data.series}
+        series={overviewData.series}
         sessionDurationSeries={sessionDurationSeries}
         rangeLabel={rangeLabelLong}
       />
@@ -315,7 +384,7 @@ export default async function OverviewPage({
       <DashboardSection
         kicker="Live telemetry"
         title="Trends & breakdown"
-        description={`Project-scoped data from your telemetry API · ${contextParts.join(" · ")}`}
+        description={`Project-scoped overviewData from your telemetry API · ${contextParts.join(" · ")}`}
         className="mb-8"
       >
         <OverviewSortControls
@@ -327,20 +396,20 @@ export default async function OverviewPage({
           topEventsOrder={topEventsOrder}
         />
 
-        <OverviewTrendsChart series={data.series} rangeLabel={rangeLabelLong} />
+        <OverviewTrendsChart series={overviewData.series} rangeLabel={rangeLabelLong} />
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <OverviewTopBars
             title="Top errors (this page)"
             subtitle="Occurrences in the current table page — compare at a glance"
-            rows={mapErrorGroupsToBarRows(data.topErrorGroups ?? [])}
+            rows={mapErrorGroupsToBarRows(overviewData.topErrorGroups ?? [])}
             accent="errors"
             emptyMessage="No error groups recorded on this page."
           />
           <OverviewTopBars
             title="Top events (this page)"
             subtitle="Event name counts on the current table page"
-            rows={mapTopEventsToBarRows(data.topEvents ?? [])}
+            rows={mapTopEventsToBarRows(overviewData.topEvents ?? [])}
             accent="events"
             emptyMessage="No events recorded on this page."
           />
@@ -355,7 +424,7 @@ export default async function OverviewPage({
       >
         <StatCard
           label={`Total error occurrences · ${rangeLabelLong}`}
-          value={data.errorsLast24h}
+          value={overviewData.errorsLast24h}
           delta={errDeltaFmt.text}
           deltaTone={
             errorsDelta > 0 ? "danger" : errorsDelta < 0 ? "success" : "muted"
@@ -363,9 +432,9 @@ export default async function OverviewPage({
         />
 
         <h3 className="text-sm font-medium">Top error groups</h3>
-        {data.topErrorGroups?.length ? (
+        {overviewData.topErrorGroups?.length ? (
           <IssueList>
-            {data.topErrorGroups.map(
+            {overviewData.topErrorGroups.map(
               (g: {
                 id: string;
                 message: string;
@@ -396,9 +465,9 @@ export default async function OverviewPage({
           />
         )}
         <Pagination
-          total={data.errorsListTotal ?? 0}
-          page={data.errorsPage ?? errorsPage}
-          pageSize={data.listPageSize ?? listPageSize}
+          total={overviewData.errorsListTotal ?? 0}
+          page={overviewData.errorsPage ?? errorsPage}
+          pageSize={overviewData.listPageSize ?? listPageSize}
           hrefForPage={(p) =>
             mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
               errorsPage: String(p),
@@ -414,7 +483,7 @@ export default async function OverviewPage({
       >
         <StatCard
           label={`Total event rows · ${rangeLabelLong}`}
-          value={data.eventsLast24h}
+          value={overviewData.eventsLast24h}
           delta={evDeltaFmt.text}
           deltaTone={
             eventsDelta > 0 ? "success" : eventsDelta < 0 ? "danger" : "muted"
@@ -422,9 +491,9 @@ export default async function OverviewPage({
         />
 
         <h3 className="text-sm font-medium">Top event names</h3>
-        {data.topEvents?.length ? (
+        {overviewData.topEvents?.length ? (
           <IssueList>
-            {data.topEvents.map(
+            {overviewData.topEvents.map(
               (e: {
                 name: string;
                 count: number;
@@ -464,9 +533,9 @@ export default async function OverviewPage({
           />
         )}
         <Pagination
-          total={data.eventsListTotal ?? 0}
-          page={data.eventsPage ?? eventsPage}
-          pageSize={data.listPageSize ?? listPageSize}
+          total={overviewData.eventsListTotal ?? 0}
+          page={overviewData.eventsPage ?? eventsPage}
+          pageSize={overviewData.listPageSize ?? listPageSize}
           hrefForPage={(p) =>
             mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
               eventsPage: String(p),
