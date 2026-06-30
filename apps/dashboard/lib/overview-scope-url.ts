@@ -7,8 +7,22 @@ export function parseOverviewCompare(raw: string | undefined): OverviewComparePa
 }
 
 export function compareLabelFor(param: OverviewCompareParam, range: "24h" | "7d"): string {
-  if (param === "week-ago" && range === "24h") return "vs same window last week";
+  if (param === "week-ago") return "vs same window last week";
   return range === "7d" ? "vs previous 7 days" : "vs previous 24 hours";
+}
+
+/** Preserve app/environment scope when switching top-level dashboard tabs. */
+export function buildDashboardNavTabHref(
+  path: string,
+  searchParams: URLSearchParams
+): string {
+  const params = new URLSearchParams();
+  const app = searchParams.get("app");
+  const environment = searchParams.get("environment");
+  if (app) params.set("app", app);
+  if (environment) params.set("environment", environment);
+  const q = params.toString();
+  return q ? `${path}?${q}` : path;
 }
 
 export function mergeOverviewScopeQuery(

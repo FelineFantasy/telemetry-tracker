@@ -288,7 +288,7 @@ export async function apiRoutes(
         compareWindow.previousUntil ?? since
       ),
       listDistinctEnvironments(prisma, projectId, appFilter),
-      getSessionDurationSeries(prisma, projectId, rangeKey, since, appFilter),
+      getSessionDurationSeries(prisma, projectId, rangeKey, since, appFilter, environment),
       getWorkspaceTelemetry(prisma, projectId, since, appFilter, environment),
       listActiveIssues(prisma, scope),
     ]);
@@ -298,7 +298,8 @@ export async function apiRoutes(
       errorsCount,
       eventsPrevious,
       errorsPrevious,
-      series.events
+      series.events,
+      rangeKey
     );
 
     const topEvents = await Promise.all(

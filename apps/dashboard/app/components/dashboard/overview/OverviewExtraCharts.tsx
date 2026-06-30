@@ -54,6 +54,7 @@ export function OverviewExtraCharts({
 
   const charts = [
     {
+      id: "error-rate",
       title: "Error rate",
       subtitle: rangeLabel,
       data: errorRate,
@@ -62,6 +63,7 @@ export function OverviewExtraCharts({
       color: "#f87171",
     },
     {
+      id: "event-volume",
       title: "Event volume",
       subtitle: rangeLabel,
       data: events,
@@ -70,6 +72,7 @@ export function OverviewExtraCharts({
       color: "#60a5fa",
     },
     {
+      id: "error-volume",
       title: "Error volume",
       subtitle: rangeLabel,
       data: mapSeries(series.errors, series.bucket, "errors"),
@@ -78,6 +81,7 @@ export function OverviewExtraCharts({
       color: "#fb923c",
     },
     {
+      id: "avg-session-duration",
       title: "Avg session duration",
       subtitle: `${rangeLabel} · ended sessions only`,
       data: sessions,
@@ -95,7 +99,7 @@ export function OverviewExtraCharts({
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {charts.map((c) => (
-          <DashboardPanel key={c.title} className="p-4">
+          <DashboardPanel key={c.id} className="p-4">
             <div className="mb-3">
               <h3 className="text-[13px] font-medium">{c.title}</h3>
               <p className="text-[11px] text-muted-foreground">{c.subtitle}</p>
@@ -109,7 +113,7 @@ export function OverviewExtraCharts({
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={c.data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                     <defs>
-                      <linearGradient id={`grad-${c.title}`} x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id={`grad-${c.id}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={c.color} stopOpacity={0.35} />
                         <stop offset="100%" stopColor={c.color} stopOpacity={0} />
                       </linearGradient>
@@ -130,7 +134,7 @@ export function OverviewExtraCharts({
                       type="monotone"
                       dataKey={c.dataKey}
                       stroke={c.color}
-                      fill={`url(#grad-${c.title})`}
+                      fill={`url(#grad-${c.id})`}
                       strokeWidth={2}
                     />
                   </AreaChart>

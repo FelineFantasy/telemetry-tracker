@@ -100,7 +100,7 @@ export function resolveCompareWindow(
   const hours = range === "7d" ? 7 * 24 : 24;
   const ms = hours * 60 * 60 * 1000;
   const since = new Date(Date.now() - ms);
-  if (compare === "week-ago" && range === "24h") {
+  if (compare === "week-ago") {
     const weekAgoEnd = new Date(since.getTime() - 6 * 24 * 60 * 60 * 1000);
     const weekAgoStart = new Date(weekAgoEnd.getTime() - ms);
     return { previousSince: weekAgoStart, previousUntil: weekAgoEnd };
@@ -114,6 +114,30 @@ export async function countSessions(
   scope: Scope,
   until?: Date
 ): Promise<number> {
+  if (scope.environment) {
+    const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+    const untilClause =
+      until === undefined
+        ? Prisma.empty
+        : Prisma.sql`AND s."started_at" < ${until}`;
+    const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS c
+      FROM "Session" s
+      WHERE s."project_id" = ${scope.projectId}
+        AND s."started_at" >= ${scope.since}
+        ${untilClause}
+        ${appClause}
+        AND EXISTS (
+          SELECT 1 FROM "Event" e
+          WHERE e."project_id" = s."project_id"
+            AND e."session_id" = s."session_id"
+            AND e."environment" = ${scope.environment}
+            AND e."created_at" >= ${scope.since}
+        )
+    `);
+    return Number(rows[0]?.c ?? 0);
+  }
+
   const where = sessionScopeWhere(scope);
   if (until) {
     (where as { started_at: { gte: Date; lt: Date } }).started_at = {
@@ -178,10 +202,20 @@ export async function getSessionDurationSeries(
   projectId: string,
   rangeLabel: "24h" | "7d",
   since: Date,
-  app?: string
+  app?: string,
+  environment?: string
 ): Promise<OverviewTimeSeriesPoint[]> {
   const trunc = rangeLabel === "7d" ? "day" : "hour";
   const appClause = app ? Prisma.sql`AND s."app" = ${app}` : Prisma.empty;
+  const envClause = environment
+    ? Prisma.sql`AND EXISTS (
+        SELECT 1 FROM "Event" e
+        WHERE e."project_id" = s."project_id"
+          AND e."session_id" = s."session_id"
+          AND e."environment" = ${environment}
+          AND e."created_at" >= ${since}
+      )`
+    : Prisma.empty;
   const rows = await prisma.$queryRaw<{ bucket: Date; avg_sec: number | null }[]>(Prisma.sql`
     SELECT
       (date_trunc(${trunc}, s."started_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
@@ -191,6 +225,7 @@ export async function getSessionDurationSeries(
       AND s."started_at" >= ${since}
       AND s."ended_at" IS NOT NULL
       ${appClause}
+      ${envClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -223,7 +258,7 @@ export async function getWorkspaceTelemetry(
     }),
     prisma.event.groupBy({
       by: ["app"],
-      where: { project_id: projectId, created_at: { gte: since } } as Prisma.EventWhereInput,
+      where: eventWhere,
     }),
     prisma.event.groupBy({
       by: ["sdk_version"],
@@ -247,7 +282,8 @@ export function computeOverviewHealth(
   errors: number,
   eventsPrevious: number,
   errorsPrevious: number,
-  seriesEvents: OverviewTimeSeriesPoint[]
+  seriesEvents: OverviewTimeSeriesPoint[],
+  range: "24h" | "7d" = "24h"
 ): OverviewHealth {
   const total = events + errors;
   const totalPrev = eventsPrevious + errorsPrevious;
@@ -256,8 +292,8 @@ export function computeOverviewHealth(
   const errorRateDeltaPct = errorRatePct - prevErrorRatePct;
   const successRatePct = total > 0 ? (events / total) * 100 : 100;
 
-  const hourSeconds = 3600;
-  const throughputs = seriesEvents.map((p) => p.count / hourSeconds);
+  const bucketSeconds = range === "7d" ? 86_400 : 3600;
+  const throughputs = seriesEvents.map((p) => p.count / bucketSeconds);
   const peakThroughputPerSec = throughputs.length ? Math.max(...throughputs) : 0;
   const avgThroughputPerSec =
     throughputs.length > 0
