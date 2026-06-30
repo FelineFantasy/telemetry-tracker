@@ -43,29 +43,24 @@ export const fetchDashboardNavScope = cache(async function fetchDashboardNavScop
   organizationId: string | null,
   app?: string | null
 ): Promise<DashboardNavScope> {
-  const bootstrap = await fetchDashboardBootstrap();
-  if (!bootstrap) return { apps: [], environments: [] };
+  const empty: DashboardNavScope = { apps: [], environments: [] };
+  if (!projectId) return empty;
 
   const appFilter = app?.trim() || null;
-  if (!appFilter) {
-    return bootstrap.navScope;
-  }
+  const path = appFilter
+    ? `/api/meta/nav-scope?app=${encodeURIComponent(appFilter)}`
+    : "/api/meta/nav-scope";
 
-  const res = await dashboardApiFetch(
-    `/api/meta/nav-scope?app=${encodeURIComponent(appFilter)}`,
-    undefined,
-    {
-      projectIdOverride: projectId,
-      ...(organizationId ? { organizationIdOverride: organizationId } : {}),
-    }
-  );
-  if (!res.ok) return bootstrap.navScope;
+  const res = await dashboardApiFetch(path, undefined, {
+    projectIdOverride: projectId,
+    ...(organizationId ? { organizationIdOverride: organizationId } : {}),
+  });
+  if (!res.ok) return empty;
+
   const data = (await res.json()) as { apps?: string[]; environments?: string[] };
   return {
-    apps: Array.isArray(data.apps) ? data.apps : bootstrap.navScope.apps,
-    environments: Array.isArray(data.environments)
-      ? data.environments
-      : bootstrap.navScope.environments,
+    apps: Array.isArray(data.apps) ? data.apps : [],
+    environments: Array.isArray(data.environments) ? data.environments : [],
   };
 });
 

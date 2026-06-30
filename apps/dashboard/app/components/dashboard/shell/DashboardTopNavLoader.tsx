@@ -29,12 +29,15 @@ export async function DashboardTopNavLoader() {
     effectiveProjectId,
   });
 
-  let navScope = bootstrap?.navScope ?? { apps: [] as string[], environments: [] as string[] };
-  const cookieMatchesEffective =
-    !cookieProjectId ||
-    cookieProjectId.toLowerCase() === effectiveProjectId.toLowerCase();
-  if (effectiveProjectId !== "" && !cookieMatchesEffective) {
-    navScope = await fetchDashboardNavScope(effectiveProjectId, resolvedOrgId);
+  let navScope = { apps: [] as string[], environments: [] as string[] };
+  if (effectiveProjectId !== "") {
+    const cookieMatchesEffective =
+      !cookieProjectId ||
+      cookieProjectId.toLowerCase() === effectiveProjectId.toLowerCase();
+    navScope =
+      cookieMatchesEffective && bootstrap?.navScope
+        ? bootstrap.navScope
+        : await fetchDashboardNavScope(effectiveProjectId, resolvedOrgId);
   }
 
   return (

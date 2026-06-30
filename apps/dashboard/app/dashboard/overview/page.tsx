@@ -384,7 +384,7 @@ export default async function OverviewPage({
       <DashboardSection
         kicker="Live telemetry"
         title="Trends & breakdown"
-        description={`Project-scoped overviewData from your telemetry API · ${contextParts.join(" · ")}`}
+        description={`Project-scoped data from your telemetry API · ${contextParts.join(" · ")}`}
         className="mb-8"
       >
         <OverviewSortControls
