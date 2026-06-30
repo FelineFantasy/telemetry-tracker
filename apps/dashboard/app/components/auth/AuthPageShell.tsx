@@ -1,9 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/app/components/marketing/logo";
+import { authInputClassName } from "@/lib/input-classes";
 
-const inputCls =
-  "w-full rounded-lg border border-border bg-background/60 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition-colors focus:border-border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
+export const authInputCls = authInputClassName;
 
 const COPY = {
   login: {
@@ -159,11 +159,9 @@ export function AuthField({
         placeholder={placeholder}
         autoComplete={autoComplete}
         aria-invalid={!!error}
-        className={inputCls}
+        className={authInputCls}
       />
       {error ? <p className="mt-1.5 text-xs text-destructive">{error}</p> : null}
     </label>
   );
 }
-
-export { inputCls as authInputCls };

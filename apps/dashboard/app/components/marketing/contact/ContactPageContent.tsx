@@ -10,6 +10,7 @@ import {
 import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
 import { gmailComposeUrl } from "@/lib/contact-email";
+import { authInputClassName } from "@/lib/input-classes";
 
 type ContactValues = ContactFormInput;
 
@@ -67,8 +68,7 @@ const faqs = [
   },
 ];
 
-const inputCls =
-  "w-full rounded-lg border border-border bg-background/60 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition-colors focus:border-border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
+const inputCls = authInputClassName;
 
 function Field({
   label,

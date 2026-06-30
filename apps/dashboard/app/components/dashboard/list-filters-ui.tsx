@@ -8,6 +8,7 @@ import type {
 } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { filterInputClassName } from "@/lib/input-classes";
 
 export function FilterSection({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -59,12 +60,7 @@ export function FilterInput({
   return (
     <input
       {...props}
-      className={cn(
-        "h-9 w-full rounded-md border border-border bg-background px-3 text-[13px] text-foreground",
-        "placeholder:text-muted-foreground/60",
-        "hover:border-muted-foreground/30 focus:border-brand/50 focus:outline-none focus:ring-1 focus:ring-brand/30",
-        className
-      )}
+      className={cn(filterInputClassName, "w-full", className)}
     />
   );
 }

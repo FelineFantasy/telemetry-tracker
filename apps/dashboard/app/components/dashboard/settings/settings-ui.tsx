@@ -1,6 +1,9 @@
 "use client";
 
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes, ButtonHTMLAttributes } from "react";
+import {
+  settingsInputClassName,
+} from "@/lib/input-classes";
 
 export function Section({
   title,
@@ -83,7 +86,7 @@ export function SettingsInput(
   return (
     <input
       {...rest}
-      className={`w-full rounded-md border border-border bg-surface/60 px-3 py-1.5 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-border-strong focus:bg-surface ${mono ? "font-mono" : ""} ${className}`}
+      className={`${settingsInputClassName} ${mono ? "font-mono" : ""} ${className}`}
     />
   );
 }
@@ -93,7 +96,7 @@ export function SettingsTextarea(props: TextareaHTMLAttributes<HTMLTextAreaEleme
   return (
     <textarea
       {...rest}
-      className={`w-full resize-y rounded-md border border-border bg-surface/60 px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-border-strong focus:bg-surface ${className}`}
+      className={`${settingsInputClassName} resize-y py-2 ${className}`}
     />
   );
 }
@@ -113,7 +116,7 @@ export function SettingsSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`w-full rounded-md border border-border bg-surface/60 px-3 py-1.5 text-[13px] outline-none focus:border-border-strong ${className}`}
+      className={`${settingsInputClassName} ${className}`}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value} className="bg-popover">

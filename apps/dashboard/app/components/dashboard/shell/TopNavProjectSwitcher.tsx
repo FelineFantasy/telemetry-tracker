@@ -13,6 +13,7 @@ import {
 import type { ProjectOption } from "@/lib/dashboard-workspace-types";
 import { DashboardPopover } from "./DashboardPopover";
 import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
+import { searchInputClassName } from "@/lib/input-classes";
 
 export function TopNavProjectSwitcher({
   projects,
@@ -97,7 +98,7 @@ export function TopNavProjectSwitcher({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search projects…"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              className={`w-full ${searchInputClassName}`}
             />
           </div>
           <div className="max-h-80 overflow-y-auto p-1.5">
