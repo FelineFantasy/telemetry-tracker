@@ -3,23 +3,41 @@ import { computeOverviewHealth, resolveCompareWindow } from "./overview-stats.js
 
 describe("resolveCompareWindow", () => {
   it("offsets week-ago comparison for 7d range", () => {
-    const now = Date.now();
-    const { previousSince, previousUntil } = resolveCompareWindow("7d", "week-ago");
-    const currentSince = now - 7 * 24 * 60 * 60 * 1000;
-    const weekAgoEnd = currentSince - 6 * 24 * 60 * 60 * 1000;
-    const weekAgoStart = weekAgoEnd - 7 * 24 * 60 * 60 * 1000;
+    const currentSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const { previousSince, previousUntil } = resolveCompareWindow(
+      "7d",
+      "week-ago",
+      currentSince
+    );
+    const weekAgoEnd = new Date(currentSince.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const weekAgoStart = new Date(weekAgoEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    expect(previousUntil?.getTime()).toBeCloseTo(weekAgoEnd, -3);
-    expect(previousSince.getTime()).toBeCloseTo(weekAgoStart, -3);
+    expect(previousUntil?.getTime()).toBe(weekAgoEnd.getTime());
+    expect(previousSince.getTime()).toBe(weekAgoStart.getTime());
   });
 
   it("uses immediately prior window for previous compare on 7d", () => {
-    const now = Date.now();
-    const { previousSince, previousUntil } = resolveCompareWindow("7d", "previous");
-    const currentSince = now - 7 * 24 * 60 * 60 * 1000;
+    const currentSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const { previousSince, previousUntil } = resolveCompareWindow(
+      "7d",
+      "previous",
+      currentSince
+    );
 
-    expect(previousUntil?.getTime()).toBeCloseTo(currentSince, -3);
-    expect(previousSince.getTime()).toBeCloseTo(currentSince - 7 * 24 * 60 * 60 * 1000, -3);
+    expect(previousUntil?.getTime()).toBe(currentSince.getTime());
+    expect(previousSince.getTime()).toBe(currentSince.getTime() - 7 * 24 * 60 * 60 * 1000);
+  });
+
+  it("anchors previous compare end to the supplied current window start", () => {
+    const currentSince = new Date("2026-05-01T12:00:00.000Z");
+    const { previousSince, previousUntil } = resolveCompareWindow(
+      "24h",
+      "previous",
+      currentSince
+    );
+
+    expect(previousUntil).toEqual(currentSince);
+    expect(previousSince).toEqual(new Date("2026-04-30T12:00:00.000Z"));
   });
 });
 

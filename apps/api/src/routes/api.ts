@@ -169,7 +169,7 @@ export async function apiRoutes(
       return reply.status(400).send({ error: "Invalid topEventsOrder" });
     }
     const { since, label } = parseRange(range);
-    const compareWindow = resolveCompareWindow(range, compare);
+    const compareWindow = resolveCompareWindow(range, compare, since);
     const scope = { projectId, since, app: appFilter, environment };
     const listPageSize = Math.min(
       MAX_OVERVIEW_LIST_PAGE_SIZE,

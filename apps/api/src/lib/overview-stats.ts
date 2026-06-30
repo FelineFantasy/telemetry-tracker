@@ -95,18 +95,18 @@ function errorOccurrenceScopeSql(
 
 export function resolveCompareWindow(
   range: "24h" | "7d",
-  compare: OverviewCompareMode
+  compare: OverviewCompareMode,
+  currentSince: Date
 ): { previousSince: Date; previousUntil: Date | undefined } {
   const hours = range === "7d" ? 7 * 24 : 24;
   const ms = hours * 60 * 60 * 1000;
-  const since = new Date(Date.now() - ms);
   if (compare === "week-ago") {
-    const weekAgoEnd = new Date(since.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const weekAgoEnd = new Date(currentSince.getTime() - 6 * 24 * 60 * 60 * 1000);
     const weekAgoStart = new Date(weekAgoEnd.getTime() - ms);
     return { previousSince: weekAgoStart, previousUntil: weekAgoEnd };
   }
-  const previousSince = new Date(since.getTime() - ms);
-  return { previousSince, previousUntil: since };
+  const previousSince = new Date(currentSince.getTime() - ms);
+  return { previousSince, previousUntil: currentSince };
 }
 
 export async function countSessions(
