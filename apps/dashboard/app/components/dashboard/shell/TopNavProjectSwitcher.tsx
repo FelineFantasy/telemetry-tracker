@@ -11,9 +11,10 @@ import {
   LEGACY_SEEDED_PROJECT_NAME,
 } from "@/lib/workspace-placeholders";
 import type { ProjectOption } from "@/lib/dashboard-workspace-types";
-import { DashboardPopover } from "./DashboardPopover";
-import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
 import { searchInputClassName } from "@/lib/input-classes";
+import { DashboardPopover } from "./DashboardPopover";
+import { NavPickerTrigger } from "./shell-primitives";
+import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
 
 export function TopNavProjectSwitcher({
   projects,
@@ -56,37 +57,20 @@ export function TopNavProjectSwitcher({
   const current = projects.find((p) => p.id === value) ?? projects[0]!;
   const displayName = formatProjectRailName(current.name, current.slug);
 
-  if (projects.length === 1) {
-    return (
-      <div
-        className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-sm"
-        title={
-          current.name === LEGACY_SEEDED_PROJECT_NAME
-            ? "Default project from initial setup"
-            : `${current.name} · ${current.slug}`
-        }
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-success" />
-        <span>{displayName}</span>
-      </div>
-    );
-  }
-
   return (
     <DashboardPopover
       width="w-80"
       trigger={(toggle, open) => (
-        <button
-          type="button"
+        <NavPickerTrigger
           onClick={toggle}
           disabled={pending}
           aria-expanded={open}
-          className="inline-flex max-w-[9rem] items-center gap-2 truncate rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-left text-sm hover:bg-surface sm:max-w-none"
+          aria-label="Project"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-success" />
-          <span>{displayName}</span>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </button>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+          <span className="truncate">{displayName}</span>
+          <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+        </NavPickerTrigger>
       )}
     >
       {(close) => (
@@ -94,7 +78,6 @@ export function TopNavProjectSwitcher({
           <div className="flex items-center gap-2 border-b border-border px-3 py-2">
             <Search className="h-3.5 w-3.5 text-muted-foreground" />
             <input
-              autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search projects…"
@@ -102,6 +85,9 @@ export function TopNavProjectSwitcher({
             />
           </div>
           <div className="max-h-80 overflow-y-auto p-1.5">
+            <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+              Projects
+            </div>
             {filtered.map((p) => {
               const name = formatProjectRailName(p.name, p.slug);
               const active = p.id === value;
@@ -111,6 +97,10 @@ export function TopNavProjectSwitcher({
                   type="button"
                   disabled={pending}
                   onClick={() => {
+                    if (p.id === value) {
+                      close();
+                      return;
+                    }
                     setValue(p.id);
                     startTransition(async () => {
                       const r = await setDashboardProjectId(p.id);
@@ -134,6 +124,17 @@ export function TopNavProjectSwitcher({
             })}
             {filtered.length === 0 ? (
               <p className="px-2 py-4 text-center text-sm text-muted-foreground">No projects match.</p>
+            ) : null}
+            {current.name === LEGACY_SEEDED_PROJECT_NAME && current.slug === "default" ? (
+              <p className="px-2 py-2 text-[12px] text-muted-foreground">
+                <Link
+                  href="/dashboard/settings/organization"
+                  onClick={close}
+                  className="text-brand hover:underline"
+                >
+                  Rename this project
+                </Link>
+              </p>
             ) : null}
           </div>
           <div className="border-t border-border p-1.5">

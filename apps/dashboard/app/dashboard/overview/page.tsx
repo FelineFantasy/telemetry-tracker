@@ -165,6 +165,7 @@ export default async function OverviewPage({
   const organizationName =
     organizations.find((o) => o.id === resolvedOrgId)?.name ?? null;
   const projectName = projects.find((p) => p.id === effectiveProjectId)?.name ?? null;
+  const projectSlug = projects.find((p) => p.id === effectiveProjectId)?.slug ?? null;
   const displayOrgName = organizationName
     ? formatOrganizationRailName(organizationName)
     : null;
@@ -280,11 +281,12 @@ export default async function OverviewPage({
 
       <Suspense fallback={null}>
         <DashboardScopeBar
-          organizationName={displayOrgName}
+          organizationName={organizationName}
           projectName={projectName}
+          projectSlug={projectSlug}
           apps={apps}
-          environments={environments}
           rangeLabel={rangeLabel}
+          environmentLabel={environment ?? null}
         />
       </Suspense>
 

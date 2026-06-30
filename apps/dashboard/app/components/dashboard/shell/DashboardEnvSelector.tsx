@@ -2,10 +2,11 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { ChevronDown } from "lucide-react";
-import { DashboardPopover } from "./DashboardPopover";
-import { buildDashboardHrefWithEnvironment, resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { Check, ChevronDown } from "lucide-react";
 import { dashboardPathForAppFilter } from "@/lib/dashboard-app-href";
+import { buildDashboardHrefWithEnvironment, resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { DashboardPopover } from "./DashboardPopover";
+import { NavPickerLabel, NavPickerTrigger } from "./shell-primitives";
 
 export function DashboardEnvSelector({ environments }: { environments: string[] }) {
   const pathname = usePathname() ?? "/";
@@ -15,7 +16,7 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
 
   const rawEnv = searchParams.get("environment") ?? "";
   const envValue = resolveScopedQueryValue(rawEnv, environments) ?? "";
-  const label = envValue || "All";
+  const displayEnv = envValue || "All";
 
   useEffect(() => {
     if (rawEnv === "" || environments.includes(rawEnv)) return;
@@ -24,50 +25,58 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
     );
   }, [environments, pathForLinks, rawEnv, router, searchParams]);
 
-  if (environments.length === 0) return null;
-
   return (
     <DashboardPopover
-      width="w-44"
+      width="w-52"
       trigger={(toggle, open) => (
-        <button
-          type="button"
+        <NavPickerTrigger
           onClick={toggle}
           aria-expanded={open}
           aria-label="Environment"
-          className="inline-flex items-center gap-1 rounded-md border border-border bg-surface/60 px-2 py-1.5 text-[12px] text-muted-foreground hover:bg-surface hover:text-foreground"
+          className="max-w-[10rem]"
         >
-          <span className="font-mono text-[10px] uppercase">env</span>
-          <span className="max-w-[5rem] truncate text-foreground">{label}</span>
-          <ChevronDown className="h-3 w-3" />
-        </button>
+          <NavPickerLabel>Env</NavPickerLabel>
+          <span className="truncate font-medium uppercase">{displayEnv}</span>
+          <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+        </NavPickerTrigger>
       )}
     >
       {(close) => (
         <div className="p-1.5">
+          <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            Environments
+          </div>
           <button
             type="button"
-            className="flex w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
             onClick={() => {
               router.push(buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams));
               close();
             }}
           >
-            All environments
+            <span className="flex-1">All environments</span>
+            {envValue === "" ? <Check className="h-3.5 w-3.5" /> : null}
           </button>
           {environments.map((e) => (
             <button
               key={e}
               type="button"
-              className="flex w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
               onClick={() => {
                 router.push(buildDashboardHrefWithEnvironment(pathForLinks, e, searchParams));
                 close();
               }}
             >
-              {e}
+              <span className="flex-1">{e}</span>
+              {envValue === e ? <Check className="h-3.5 w-3.5" /> : null}
             </button>
           ))}
+          {environments.length === 0 ? (
+            <p className="px-2 py-2 text-[12px] leading-relaxed text-muted-foreground">
+              Environments appear when your SDK sends an <code className="text-foreground">environment</code>{" "}
+              field on ingest.
+            </p>
+          ) : null}
         </div>
       )}
     </DashboardPopover>
