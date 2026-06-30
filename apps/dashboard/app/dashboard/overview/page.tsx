@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { Badge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
@@ -24,12 +25,13 @@ import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
-import { parseOverviewCompare } from "@/lib/overview-scope-url";
+import { parseOverviewCompare, resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { firstQueryValue } from "@/lib/search-params";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { getDashboardUser } from "@/lib/dashboard-user";
 import {
   fetchDashboardAppsList,
+  fetchDashboardEnvironments,
   getDashboardWorkspaceForRequest,
 } from "@/lib/dashboard-workspace-request";
 import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
@@ -156,8 +158,8 @@ export default async function OverviewPage({
   const params = await searchParams;
   const rangeRaw = firstQueryValue(params.range);
   const range = rangeRaw === "7d" ? "7d" : "24h";
-  const app = firstQueryValue(params.app)?.trim() || null;
-  const environment = firstQueryValue(params.environment)?.trim() || null;
+  const rawApp = firstQueryValue(params.app)?.trim() || null;
+  const rawEnvironment = firstQueryValue(params.environment)?.trim() || null;
   const compare = parseOverviewCompare(firstQueryValue(params.compare));
   const errorsPage = parsePageParam(firstQueryValue(params.errorsPage));
   const eventsPage = parsePageParam(firstQueryValue(params.eventsPage));
@@ -186,6 +188,20 @@ export default async function OverviewPage({
     effectiveProjectId === ""
       ? []
       : await fetchDashboardAppsList(effectiveProjectId, resolvedOrgId);
+
+  const app = resolveScopedQueryValue(rawApp, apps);
+  const scopedEnvironments =
+    effectiveProjectId === ""
+      ? []
+      : await fetchDashboardEnvironments(effectiveProjectId, resolvedOrgId, app);
+  const environment = resolveScopedQueryValue(rawEnvironment, scopedEnvironments);
+
+  const scopeCorrections: Record<string, string | null> = {};
+  if (rawApp !== app) scopeCorrections.app = app;
+  if (rawEnvironment !== environment) scopeCorrections.environment = environment;
+  if (Object.keys(scopeCorrections).length > 0) {
+    redirect(mergeListQuery(OVERVIEW_PATH, currentOverviewParams, scopeCorrections));
+  }
 
   const workspaceStats = buildOverviewWorkspaceStats(
     organizations,
@@ -233,7 +249,7 @@ export default async function OverviewPage({
       peakThroughputPerSec: 0,
     };
   const activeIssues = data.activeIssues ?? [];
-  const environments = data.environments ?? [];
+  const environments = scopedEnvironments;
   const sessionDurationSeries = data.sessionDurationSeries ?? [];
   const workspaceTelemetry: OverviewWorkspaceTelemetry = data.workspaceTelemetry ?? {
     ingestRequests: data.eventsLast24h + data.errorsLast24h,

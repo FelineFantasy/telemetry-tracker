@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { DashboardPopover } from "./DashboardPopover";
-import { buildDashboardHrefWithEnvironment } from "@/lib/overview-scope-url";
+import { buildDashboardHrefWithEnvironment, resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardPathForAppFilter } from "@/lib/dashboard-app-href";
 
 export function DashboardEnvSelector({ environments }: { environments: string[] }) {
@@ -13,8 +13,7 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
   const pathForLinks = dashboardPathForAppFilter(pathname);
 
   const rawEnv = searchParams.get("environment") ?? "";
-  const envValue =
-    rawEnv !== "" && environments.includes(rawEnv) ? rawEnv : "";
+  const envValue = resolveScopedQueryValue(rawEnv, environments) ?? "";
   const label = envValue || "All";
 
   if (environments.length === 0) return null;

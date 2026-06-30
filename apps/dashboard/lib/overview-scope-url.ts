@@ -11,6 +11,16 @@ export function compareLabelFor(param: OverviewCompareParam, range: "24h" | "7d"
   return range === "7d" ? "vs previous 7 days" : "vs previous 24 hours";
 }
 
+/** Keep only query values present in the scoped allow-list (app/env pickers). */
+export function resolveScopedQueryValue(
+  raw: string | null | undefined,
+  allowed: readonly string[]
+): string | null {
+  const value = raw?.trim() ?? "";
+  if (value === "" || !allowed.includes(value)) return null;
+  return value;
+}
+
 /** Preserve app/environment scope when switching top-level dashboard tabs. */
 export function buildDashboardNavTabHref(
   path: string,

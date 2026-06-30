@@ -1,14 +1,17 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCustomSelect";
 import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
 import { SettingsBtn } from "@/app/components/dashboard/settings/settings-ui";
 import { buildDashboardHrefWithApp } from "@/lib/dashboard-app-href";
 import { dashboardPathForAppFilter } from "@/lib/dashboard-app-href";
-import { buildDashboardHrefWithEnvironment } from "@/lib/overview-scope-url";
+import {
+  buildDashboardHrefWithEnvironment,
+  resolveScopedQueryValue,
+} from "@/lib/overview-scope-url";
 
 type Props = {
   organizationName: string | null;
@@ -31,10 +34,16 @@ export function DashboardScopeBar({
   const pathForLinks = dashboardPathForAppFilter(pathname);
 
   const rawApp = searchParams.get("app") ?? "";
-  const appValue = rawApp !== "" && apps.includes(rawApp) ? rawApp : "";
+  const appValue = resolveScopedQueryValue(rawApp, apps) ?? "";
   const rawEnv = searchParams.get("environment") ?? "";
-  const envValue =
-    rawEnv !== "" && environments.includes(rawEnv) ? rawEnv : "";
+  const envValue = resolveScopedQueryValue(rawEnv, environments) ?? "";
+
+  useEffect(() => {
+    if (rawEnv === "" || environments.includes(rawEnv)) return;
+    router.replace(
+      buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams)
+    );
+  }, [environments, pathForLinks, rawEnv, router, searchParams]);
 
   const envOptions = useMemo((): DashboardSelectOption[] => {
     const o: DashboardSelectOption[] = [{ value: "", label: "All environments" }];

@@ -89,9 +89,15 @@ export async function fetchDashboardAppsList(
 
 export async function fetchDashboardEnvironments(
   projectId: string,
-  organizationId: string | null
+  organizationId: string | null,
+  app?: string | null
 ): Promise<string[]> {
-  const res = await dashboardApiFetch("/api/filter-options", undefined, {
+  const params = new URLSearchParams();
+  const appFilter = app?.trim();
+  if (appFilter) params.set("app", appFilter);
+  const query = params.toString();
+  const path = query ? `/api/filter-options?${query}` : "/api/filter-options";
+  const res = await dashboardApiFetch(path, undefined, {
     projectIdOverride: projectId,
     ...(organizationId ? { organizationIdOverride: organizationId } : {}),
   });
