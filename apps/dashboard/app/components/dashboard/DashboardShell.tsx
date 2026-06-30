@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { DashboardCapabilitiesProvider } from "./DashboardCapabilitiesContext";
-import { ConditionalAppContext } from "./shell/ConditionalAppContext";
 import { DashboardTopNav } from "./shell/DashboardTopNav";
 import { DashboardKeyboardShortcuts } from "./shell/DashboardKeyboardShortcuts";
 import type { OrgOption } from "@/lib/dashboard-workspace-types";
@@ -75,6 +74,7 @@ export function DashboardShell({
         currentProjectId={currentProjectId}
         user={user}
         environments={environments}
+        apps={apps}
       />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="main-content">
         <DashboardCapabilitiesProvider value={capabilities}>
@@ -84,7 +84,6 @@ export function DashboardShell({
           {capabilities?.usageQuota?.nearQuota ? (
             <QuotaBanner capabilities={capabilities} />
           ) : null}
-          <ConditionalAppContext apps={apps} />
           {children}
         </DashboardCapabilitiesProvider>
       </main>

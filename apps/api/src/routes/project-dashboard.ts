@@ -11,6 +11,7 @@ import {
 } from "../lib/plan-enforcement.js";
 import { hashApiKeySecret } from "../lib/api-key-auth.js";
 import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
+import { getProjectNavSummaries } from "../lib/project-nav-summary.js";
 import {
   canCreateApiKey,
   canCreateProject,
@@ -213,6 +214,55 @@ export async function projectDashboardRoutes(
         organizationId: p.organization_id,
       })),
     });
+  });
+
+  app.get("/meta/projects/nav-summary", async (request, reply) => {
+    const session = await getSessionUser(request);
+    const headerOrg = readOrganizationIdHeader(request);
+
+    if (!session && !allowUnauthenticatedReads()) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    let filterIds: string[] = [];
+    if (session) {
+      const orgRows = await prisma.organizationMembership.findMany({
+        where: { user_id: session.userId, organization: { deleted_at: null } },
+        select: { organization_id: true },
+      });
+      filterIds = [...new Set(orgRows.map((r) => r.organization_id))];
+      if (filterIds.length === 0) {
+        return reply.send({ summaries: [] });
+      }
+      if (headerOrg) {
+        if (!filterIds.includes(headerOrg)) {
+          return reply.status(403).send({ error: "Not a member of this organization" });
+        }
+        filterIds = [headerOrg];
+      }
+    } else if (headerOrg) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    } else {
+      filterIds = [DEFAULT_ORG_ID];
+    }
+
+    const projects = await prisma.project.findMany({
+      where: {
+        organization_id: { in: filterIds },
+        deleted_at: null,
+        organization: { deleted_at: null },
+      },
+      select: { id: true },
+    });
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const summaries = await getProjectNavSummaries(
+      prisma,
+      projects.map((p) => p.id),
+      since
+    );
+
+    return reply.send({ summaries });
   });
 
   app.post("/meta/projects", async (request, reply) => {
