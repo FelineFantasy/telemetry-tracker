@@ -340,6 +340,17 @@ function relativeStarted(iso: string): string {
   return `started ${Math.floor(ms / 86_400_000)}d ago`;
 }
 
+export function errorGroupDetailHref(
+  id: string,
+  scope: Pick<Scope, "app" | "environment">
+): string {
+  const params = new URLSearchParams();
+  if (scope.app) params.set("app", scope.app);
+  if (scope.environment) params.set("environment", scope.environment);
+  const q = params.toString();
+  return q ? `/dashboard/errors/${id}?${q}` : `/dashboard/errors/${id}`;
+}
+
 export async function listActiveIssues(
   prisma: PrismaClient,
   scope: Scope,
@@ -372,7 +383,7 @@ export async function listActiveIssues(
       title: g.message,
       meta: `${relativeStarted(g.first_seen.toISOString())} · app ${g.app}${envPart} · ${g.occurrences} occurrences`,
       status: "Open",
-      href: `/dashboard/errors/${g.id}`,
+      href: errorGroupDetailHref(g.id, scope),
     };
   });
 }

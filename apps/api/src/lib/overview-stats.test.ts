@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeOverviewHealth, resolveCompareWindow } from "./overview-stats.js";
+import { computeOverviewHealth, errorGroupDetailHref, resolveCompareWindow } from "./overview-stats.js";
 
 describe("resolveCompareWindow", () => {
   it("offsets week-ago comparison for 7d range", () => {
@@ -38,6 +38,21 @@ describe("resolveCompareWindow", () => {
 
     expect(previousUntil).toEqual(currentSince);
     expect(previousSince).toEqual(new Date("2026-04-30T12:00:00.000Z"));
+  });
+});
+
+describe("errorGroupDetailHref", () => {
+  it("includes active app and environment scope in the link", () => {
+    expect(
+      errorGroupDetailHref("eg_1", {
+        app: "web",
+        environment: "production",
+      })
+    ).toBe("/dashboard/errors/eg_1?app=web&environment=production");
+  });
+
+  it("omits query string when no scope filters are set", () => {
+    expect(errorGroupDetailHref("eg_1", {})).toBe("/dashboard/errors/eg_1");
   });
 });
 
