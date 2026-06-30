@@ -5,6 +5,17 @@ import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCusto
 import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
 import { FiltersSortPanel } from "@/app/components/dashboard/FiltersSortPanel";
 import {
+  FilterField,
+  FilterForm,
+  FilterInput,
+  FilterLabel,
+  FilterRow,
+  FilterSegment,
+  FilterSegmentItem,
+  FilterSubmitBtn,
+  FilterSubmitWrap,
+} from "@/app/components/dashboard/list-filters-ui";
+import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
@@ -98,7 +109,7 @@ export function ErrorsListToolbar({
         to={to}
       />
 
-      <form method="get" action={path} className="errors-filters__form">
+      <FilterForm method="get" action={path}>
         {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
         {rangePreset && !customRange ? (
           <input type="hidden" name="range" value={rangePreset} />
@@ -109,22 +120,19 @@ export function ErrorsListToolbar({
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}
 
-        <div className="errors-filters__row errors-filters__row--search">
-          <label className="errors-filters__field errors-filters__field--grow">
-            <span className="errors-filters__label">Search message</span>
-            <input
+        <FilterRow>
+          <FilterField grow>
+            <FilterLabel>Search message</FilterLabel>
+            <FilterInput
               type="search"
               name="q"
-              className="errors-filters__input errors-filters__input--search"
               defaultValue={q}
               placeholder="Filter by error text…"
               autoComplete="off"
             />
-          </label>
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("env-l")}>
-              Environment
-            </span>
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("env-l")}>Environment</FilterLabel>
             <DashboardCustomSelect
               name="environment"
               value={environment}
@@ -132,11 +140,9 @@ export function ErrorsListToolbar({
               triggerId={id("env-t")}
               listLabelledBy={id("env-l")}
             />
-          </label>
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("status-l")}>
-              Status
-            </span>
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("status-l")}>Status</FilterLabel>
             <DashboardCustomSelect
               name="status"
               value={status || "all"}
@@ -144,14 +150,12 @@ export function ErrorsListToolbar({
               triggerId={id("status-t")}
               listLabelledBy={id("status-l")}
             />
-          </label>
-        </div>
+          </FilterField>
+        </FilterRow>
 
-        <div className="errors-filters__row errors-filters__row--sort">
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("sort-l")}>
-              Sort by
-            </span>
+        <FilterRow>
+          <FilterField>
+            <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
             <DashboardCustomSelect
               name="sort"
               value={sort || "last_seen"}
@@ -159,46 +163,35 @@ export function ErrorsListToolbar({
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}
             />
-          </label>
+          </FilterField>
 
-          <fieldset
-            className="errors-filters__fieldset"
+          <FilterSegment
+            legend="Order"
             title="Descending: newest dates and largest counts first. Ascending: the opposite."
+            ariaLabel="Sort order"
           >
-            <legend className="errors-filters__label">Order</legend>
-            <div className="errors-filters__segment" role="group" aria-label="Sort order">
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="order" value="desc" defaultChecked={order !== "asc"} />
-                <span>Desc</span>
-              </label>
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="order" value="asc" defaultChecked={order === "asc"} />
-                <span>Asc</span>
-              </label>
-            </div>
-          </fieldset>
+            <FilterSegmentItem name="order" value="desc" defaultChecked={order !== "asc"}>
+              Desc
+            </FilterSegmentItem>
+            <FilterSegmentItem name="order" value="asc" defaultChecked={order === "asc"}>
+              Asc
+            </FilterSegmentItem>
+          </FilterSegment>
 
-          <fieldset className="errors-filters__fieldset">
-            <legend className="errors-filters__label">Trend window</legend>
-            <div className="errors-filters__segment" role="group" aria-label="Trend comparison window">
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="trendWindow" value="24h" defaultChecked={trendWindow !== "7d"} />
-                <span>24h</span>
-              </label>
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="trendWindow" value="7d" defaultChecked={trendWindow === "7d"} />
-                <span>7d</span>
-              </label>
-            </div>
-          </fieldset>
+          <FilterSegment legend="Trend window" ariaLabel="Trend comparison window">
+            <FilterSegmentItem name="trendWindow" value="24h" defaultChecked={trendWindow !== "7d"}>
+              24h
+            </FilterSegmentItem>
+            <FilterSegmentItem name="trendWindow" value="7d" defaultChecked={trendWindow === "7d"}>
+              7d
+            </FilterSegmentItem>
+          </FilterSegment>
 
-          <div className="errors-filters__submit-wrap">
-            <button type="submit" className="errors-filters__btn errors-filters__btn--primary errors-filters__btn--submit">
-              Apply
-            </button>
-          </div>
-        </div>
-      </form>
+          <FilterSubmitWrap>
+            <FilterSubmitBtn>Apply</FilterSubmitBtn>
+          </FilterSubmitWrap>
+        </FilterRow>
+      </FilterForm>
     </FiltersSortPanel>
   );
 }

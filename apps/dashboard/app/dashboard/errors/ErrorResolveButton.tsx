@@ -5,7 +5,7 @@ import { useTransition } from "react";
 import { setErrorResolvedAction } from "@/app/dashboard/actions";
 import { toast } from "sonner";
 import { useDashboardCapabilities } from "@/app/components/dashboard/DashboardCapabilitiesContext";
-import { Button } from "@/app/components/ui/Button";
+import { SettingsBtn } from "@/app/components/dashboard/settings/settings-ui";
 
 export function ErrorResolveButton({
   errorGroupId,
@@ -34,13 +34,13 @@ export function ErrorResolveButton({
   }
 
   return (
-    <Button
+    <SettingsBtn
       type="button"
-      variant={resolved ? "secondary" : "primary"}
+      variant={resolved ? "default" : "primary"}
       disabled={pending}
       onClick={onClick}
     >
       {pending ? "…" : resolved ? "Mark as open" : "Mark as resolved"}
-    </Button>
+    </SettingsBtn>
   );
 }

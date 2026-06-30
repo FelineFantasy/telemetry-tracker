@@ -86,3 +86,22 @@ export async function fetchDashboardAppsList(
   const data = await res.json();
   return Array.isArray(data.apps) ? data.apps : [];
 }
+
+export async function fetchDashboardEnvironments(
+  projectId: string,
+  organizationId: string | null,
+  app?: string | null
+): Promise<string[]> {
+  const params = new URLSearchParams();
+  const appFilter = app?.trim();
+  if (appFilter) params.set("app", appFilter);
+  const query = params.toString();
+  const path = query ? `/api/filter-options?${query}` : "/api/filter-options";
+  const res = await dashboardApiFetch(path, undefined, {
+    projectIdOverride: projectId,
+    ...(organizationId ? { organizationIdOverride: organizationId } : {}),
+  });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { environments?: string[] };
+  return Array.isArray(data.environments) ? data.environments : [];
+}

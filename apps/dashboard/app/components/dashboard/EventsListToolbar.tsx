@@ -5,6 +5,17 @@ import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCusto
 import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
 import { FiltersSortPanel } from "@/app/components/dashboard/FiltersSortPanel";
 import {
+  FilterField,
+  FilterForm,
+  FilterInput,
+  FilterLabel,
+  FilterRow,
+  FilterSegment,
+  FilterSegmentItem,
+  FilterSubmitBtn,
+  FilterSubmitWrap,
+} from "@/app/components/dashboard/list-filters-ui";
+import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
@@ -101,7 +112,7 @@ export function EventsListToolbar({
         to={to}
       />
 
-      <form method="get" action={path} className="errors-filters__form">
+      <FilterForm method="get" action={path}>
         {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
         {rangePreset && !customRange ? (
           <input type="hidden" name="range" value={rangePreset} />
@@ -112,22 +123,19 @@ export function EventsListToolbar({
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}
 
-        <div className="errors-filters__row errors-filters__row--search">
-          <label className="errors-filters__field errors-filters__field--grow">
-            <span className="errors-filters__label">Event name</span>
-            <input
+        <FilterRow>
+          <FilterField grow>
+            <FilterLabel>Event name</FilterLabel>
+            <FilterInput
               type="search"
               name="name"
-              className="errors-filters__input errors-filters__input--search"
               defaultValue={name}
               placeholder="e.g. screen_view"
               autoComplete="off"
             />
-          </label>
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("env-l")}>
-              Environment
-            </span>
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("env-l")}>Environment</FilterLabel>
             <DashboardCustomSelect
               name="environment"
               value={environment}
@@ -135,11 +143,9 @@ export function EventsListToolbar({
               triggerId={id("env-t")}
               listLabelledBy={id("env-l")}
             />
-          </label>
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("plat-l")}>
-              Platform
-            </span>
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("plat-l")}>Platform</FilterLabel>
             <DashboardCustomSelect
               name="platform"
               value={platform}
@@ -147,11 +153,9 @@ export function EventsListToolbar({
               triggerId={id("plat-t")}
               listLabelledBy={id("plat-l")}
             />
-          </label>
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("rel-l")}>
-              Release
-            </span>
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("rel-l")}>Release</FilterLabel>
             <DashboardCustomSelect
               name="release"
               value={release}
@@ -159,28 +163,25 @@ export function EventsListToolbar({
               triggerId={id("rel-t")}
               listLabelledBy={id("rel-l")}
             />
-          </label>
-        </div>
+          </FilterField>
+        </FilterRow>
 
-        <div className="errors-filters__row">
-          <label className="errors-filters__field errors-filters__field--grow">
-            <span className="errors-filters__label">Properties (contains)</span>
-            <input
+        <FilterRow>
+          <FilterField grow>
+            <FilterLabel>Properties (contains)</FilterLabel>
+            <FilterInput
               type="search"
               name="propertiesContains"
-              className="errors-filters__input"
               defaultValue={propertiesContains}
               placeholder="JSON substring…"
               autoComplete="off"
             />
-          </label>
-        </div>
+          </FilterField>
+        </FilterRow>
 
-        <div className="errors-filters__row errors-filters__row--sort">
-          <label className="errors-filters__field">
-            <span className="errors-filters__label" id={id("sort-l")}>
-              Sort by
-            </span>
+        <FilterRow>
+          <FilterField>
+            <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
             <DashboardCustomSelect
               name="sort"
               value={sort || "created_at"}
@@ -188,32 +189,26 @@ export function EventsListToolbar({
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}
             />
-          </label>
+          </FilterField>
 
-          <fieldset
-            className="errors-filters__fieldset"
+          <FilterSegment
+            legend="Order"
             title="Descending vs ascending order for the selected column."
+            ariaLabel="Sort order"
           >
-            <legend className="errors-filters__label">Order</legend>
-            <div className="errors-filters__segment" role="group" aria-label="Sort order">
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="order" value="desc" defaultChecked={order !== "asc"} />
-                <span>Desc</span>
-              </label>
-              <label className="errors-filters__segment-item">
-                <input type="radio" name="order" value="asc" defaultChecked={order === "asc"} />
-                <span>Asc</span>
-              </label>
-            </div>
-          </fieldset>
+            <FilterSegmentItem name="order" value="desc" defaultChecked={order !== "asc"}>
+              Desc
+            </FilterSegmentItem>
+            <FilterSegmentItem name="order" value="asc" defaultChecked={order === "asc"}>
+              Asc
+            </FilterSegmentItem>
+          </FilterSegment>
 
-          <div className="errors-filters__submit-wrap">
-            <button type="submit" className="errors-filters__btn errors-filters__btn--primary errors-filters__btn--submit">
-              Apply
-            </button>
-          </div>
-        </div>
-      </form>
+          <FilterSubmitWrap>
+            <FilterSubmitBtn>Apply</FilterSubmitBtn>
+          </FilterSubmitWrap>
+        </FilterRow>
+      </FilterForm>
     </FiltersSortPanel>
   );
 }

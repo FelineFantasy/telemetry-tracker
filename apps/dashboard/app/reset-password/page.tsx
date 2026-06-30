@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthPageShell } from "@/app/components/auth/AuthPageShell";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
 export const metadata: Metadata = {
@@ -16,21 +17,29 @@ export default async function ResetPasswordPage({
   const trimmed = typeof token === "string" ? token.trim() : "";
 
   return (
-    <div className="auth-page">
-      <div className="auth-page__panel card">
-        <h1 className="auth-page__title">Choose a new password</h1>
-        {!trimmed ? (
-          <p className="auth-form__error" role="alert">
-            Missing reset token. Request a new link from{" "}
-            <Link href="/forgot-password">forgot password</Link>.
-          </p>
-        ) : (
-          <ResetPasswordForm token={trimmed} />
-        )}
-        <p className="auth-page__hint text-muted-foreground">
-          <Link href="/">← Back to home</Link>
+    <AuthPageShell mode="reset-password">
+      {!trimmed ? (
+        <p className="text-sm text-destructive" role="alert">
+          Missing reset token. Request a new link from{" "}
+          <Link
+            href="/forgot-password"
+            className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+          >
+            forgot password
+          </Link>
+          .
         </p>
-      </div>
-    </div>
+      ) : (
+        <ResetPasswordForm token={trimmed} />
+      )}
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        <Link
+          href="/"
+          className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+        >
+          ← Back to home
+        </Link>
+      </p>
+    </AuthPageShell>
   );
 }

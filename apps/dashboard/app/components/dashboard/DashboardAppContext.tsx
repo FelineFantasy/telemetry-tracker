@@ -10,8 +10,7 @@ import {
 } from "@/lib/dashboard-app-href";
 
 /**
- * Scope control (which app’s telemetry) — lives in the content column, not the nav rail,
- * matching common dashboard patterns (project/environment in header or toolbar).
+ * Scope control (which app’s telemetry) — lives in the content column, not the nav rail.
  */
 export function DashboardAppContext({ apps }: { apps: string[] }) {
   const pathname = usePathname() ?? "/";
@@ -20,7 +19,6 @@ export function DashboardAppContext({ apps }: { apps: string[] }) {
   const pathForLinks = dashboardPathForAppFilter(pathname);
   const rawApp = searchParams.get("app") ?? "";
 
-  /** Server layout refreshes after project/org switch (`router.refresh()`); no client refetch. */
   const value = rawApp !== "" && apps.includes(rawApp) ? rawApp : "";
 
   useEffect(() => {
@@ -56,22 +54,24 @@ export function DashboardAppContext({ apps }: { apps: string[] }) {
   if (apps.length === 0) return null;
 
   return (
-    <div className="dashboard-app-context">
-      <div className="dashboard-app-context__row">
-        <span id={labelId} className="dashboard-app-context__label">
+    <div className="mb-6 rounded-xl border border-border bg-surface/40 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span id={labelId} className="text-[12px] font-medium text-muted-foreground">
           App scope
         </span>
-        <DashboardCustomSelect
-          value={value}
-          options={options}
-          triggerId={triggerId}
-          listLabelledBy={labelId}
-          onValueChange={onValueChange}
-        />
+        <div className="min-w-[10rem] max-w-xs flex-1">
+          <DashboardCustomSelect
+            value={value}
+            options={options}
+            triggerId={triggerId}
+            listLabelledBy={labelId}
+            onValueChange={onValueChange}
+          />
+        </div>
       </div>
-      <p className="dashboard-app-context__hint m-0">
-        These names come from telemetry for the <strong>selected project</strong>—each event
-        includes an <strong>app</strong> string from your SDK. This control only filters what you
+      <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+        These names come from telemetry for the <strong className="text-foreground">selected project</strong>—each event
+        includes an <strong className="text-foreground">app</strong> string from your SDK. This control only filters what you
         see; it does not create apps or move data between projects.
       </p>
     </div>

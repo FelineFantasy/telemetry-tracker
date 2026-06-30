@@ -81,8 +81,12 @@ async function queryEventBucketsHourly(
   prisma: PrismaClient,
   projectId: string,
   since: Date,
-  appFilter: string | undefined
+  appFilter: string | undefined,
+  environmentFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
+  const envClause = environmentFilter
+    ? Prisma.sql`AND e."environment" = ${environmentFilter}`
+    : Prisma.empty;
   if (appFilter) {
     return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
       SELECT
@@ -92,6 +96,7 @@ async function queryEventBucketsHourly(
       WHERE e."project_id" = ${projectId}
         AND e."created_at" >= ${since}
         AND e."app" = ${appFilter}
+        ${envClause}
       GROUP BY 1
       ORDER BY 1
     `);
@@ -103,6 +108,7 @@ async function queryEventBucketsHourly(
     FROM "Event" e
     WHERE e."project_id" = ${projectId}
       AND e."created_at" >= ${since}
+      ${envClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -112,8 +118,12 @@ async function queryEventBucketsDaily(
   prisma: PrismaClient,
   projectId: string,
   since: Date,
-  appFilter: string | undefined
+  appFilter: string | undefined,
+  environmentFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
+  const envClause = environmentFilter
+    ? Prisma.sql`AND e."environment" = ${environmentFilter}`
+    : Prisma.empty;
   if (appFilter) {
     return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
       SELECT
@@ -123,6 +133,7 @@ async function queryEventBucketsDaily(
       WHERE e."project_id" = ${projectId}
         AND e."created_at" >= ${since}
         AND e."app" = ${appFilter}
+        ${envClause}
       GROUP BY 1
       ORDER BY 1
     `);
@@ -134,6 +145,7 @@ async function queryEventBucketsDaily(
     FROM "Event" e
     WHERE e."project_id" = ${projectId}
       AND e."created_at" >= ${since}
+      ${envClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -143,8 +155,12 @@ async function queryErrorBucketsHourly(
   prisma: PrismaClient,
   projectId: string,
   since: Date,
-  appFilter: string | undefined
+  appFilter: string | undefined,
+  environmentFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
+  const envClause = environmentFilter
+    ? Prisma.sql`AND eg."environment" = ${environmentFilter}`
+    : Prisma.empty;
   if (appFilter) {
     return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
       SELECT
@@ -155,6 +171,7 @@ async function queryErrorBucketsHourly(
       WHERE eg."project_id" = ${projectId}
         AND eo."created_at" >= ${since}
         AND eg."app" = ${appFilter}
+        ${envClause}
       GROUP BY 1
       ORDER BY 1
     `);
@@ -167,6 +184,7 @@ async function queryErrorBucketsHourly(
     INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
     WHERE eg."project_id" = ${projectId}
       AND eo."created_at" >= ${since}
+      ${envClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -176,8 +194,12 @@ async function queryErrorBucketsDaily(
   prisma: PrismaClient,
   projectId: string,
   since: Date,
-  appFilter: string | undefined
+  appFilter: string | undefined,
+  environmentFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
+  const envClause = environmentFilter
+    ? Prisma.sql`AND eg."environment" = ${environmentFilter}`
+    : Prisma.empty;
   if (appFilter) {
     return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
       SELECT
@@ -188,6 +210,7 @@ async function queryErrorBucketsDaily(
       WHERE eg."project_id" = ${projectId}
         AND eo."created_at" >= ${since}
         AND eg."app" = ${appFilter}
+        ${envClause}
       GROUP BY 1
       ORDER BY 1
     `);
@@ -200,6 +223,7 @@ async function queryErrorBucketsDaily(
     INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
     WHERE eg."project_id" = ${projectId}
       AND eo."created_at" >= ${since}
+      ${envClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -214,7 +238,8 @@ export async function getOverviewTimeSeries(
   projectId: string,
   rangeLabel: "24h" | "7d",
   since: Date,
-  appFilter: string | undefined
+  appFilter: string | undefined,
+  environmentFilter?: string
 ): Promise<OverviewTimeSeries> {
   const is7d = rangeLabel === "7d";
   const bucket: OverviewSeriesBucket = is7d ? "day" : "hour";
@@ -222,12 +247,12 @@ export async function getOverviewTimeSeries(
 
   const [eventRows, errorRows] = is7d
     ? await Promise.all([
-        queryEventBucketsDaily(prisma, projectId, since, appFilter),
-        queryErrorBucketsDaily(prisma, projectId, since, appFilter),
+        queryEventBucketsDaily(prisma, projectId, since, appFilter, environmentFilter),
+        queryErrorBucketsDaily(prisma, projectId, since, appFilter, environmentFilter),
       ])
     : await Promise.all([
-        queryEventBucketsHourly(prisma, projectId, since, appFilter),
-        queryErrorBucketsHourly(prisma, projectId, since, appFilter),
+        queryEventBucketsHourly(prisma, projectId, since, appFilter, environmentFilter),
+        queryErrorBucketsHourly(prisma, projectId, since, appFilter, environmentFilter),
       ]);
 
   return {

@@ -1,8 +1,9 @@
 import { PageTitle } from "@/app/components/PageTitle";
-import { Badge } from "@/app/components/Badge";
+import { redirect } from "next/navigation";
 import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
-import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
+import { effectiveListRange } from "@/lib/list-filters-url";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
+import { IssueList, IssueListItem } from "@/app/components/dashboard/IssueList";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -15,8 +16,8 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import Link from "next/link";
 
 const ERRORS_PATH = "/dashboard/errors";
 
@@ -120,7 +121,15 @@ export default async function ErrorsListPage({
   }>;
 }) {
   const sp = await searchParams;
+  const currentParams = buildErrorsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
+  const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
+  const filterOptions = await getFilterOptions(appFilter || undefined);
+  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
+  if (rawEnv !== environment) {
+    redirect(mergeListQuery(ERRORS_PATH, currentParams, { environment }));
+  }
+
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
     firstQueryValue(sp.pageSize),
@@ -142,7 +151,6 @@ export default async function ErrorsListPage({
   const r = firstQueryValue(sp.range);
   const from = firstQueryValue(sp.from);
   const to = firstQueryValue(sp.to);
-  const env = firstQueryValue(sp.environment);
   const q = firstQueryValue(sp.q);
   const status = firstQueryValue(sp.status);
   const sort = firstQueryValue(sp.sort);
@@ -151,7 +159,7 @@ export default async function ErrorsListPage({
   if (r) apiQuery.set("range", r);
   if (from) apiQuery.set("from", from);
   if (to) apiQuery.set("to", to);
-  if (env) apiQuery.set("environment", env);
+  if (environment) apiQuery.set("environment", environment);
   if (q) apiQuery.set("q", q);
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
@@ -160,33 +168,32 @@ export default async function ErrorsListPage({
 
   let items: ErrorGroupRow[] = [];
   let total = 0;
-  let filterOptions = { environments: [] as string[] };
   try {
-    const [data, opts] = await Promise.all([
-      getErrors(apiQuery),
-      getFilterOptions(appFilter || undefined),
-    ]);
+    const data = await getErrors(apiQuery);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
-    filterOptions = opts;
   } catch (e) {
     return (
       <>
-        <PageTitle title="Errors" />
+        <PageTitle title="Issues" />
         <ErrorState message={String(e instanceof Error ? e.message : e)} />
       </>
     );
   }
 
-  const currentParams = buildErrorsParamsRecord(sp);
   const hrefForPage = (p: number) =>
     mergeListQuery(ERRORS_PATH, currentParams, { page: String(p) });
 
-  const context = appFilter ? `App: ${appFilter}` : "All apps";
-
   return (
     <>
-      <PageTitle title="Errors" context={context} />
+      <PageTitle
+        title="Issues"
+        context={
+          appFilter
+            ? `Grouped errors for app ${appFilter}.`
+            : "Grouped errors with status, frequency, and stack traces."
+        }
+      />
 
       <ErrorsListToolbar
         path={ERRORS_PATH}
@@ -200,7 +207,7 @@ export default async function ErrorsListPage({
         from={from ?? ""}
         to={to ?? ""}
         q={q ?? ""}
-        environment={env ?? ""}
+        environment={environment ?? ""}
         status={status ?? "all"}
         sort={sort ?? "last_seen"}
         order={order ?? "desc"}
@@ -211,68 +218,53 @@ export default async function ErrorsListPage({
       <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
 
       {items.length ? (
-        <ul className="unstyled-list cards-list">
-          {items.map((g) => (
-            <li key={g.id} className="card">
-              <Badge>{g.app}</Badge>
-              {g.environment ? (
-                <>
-                  {" "}
-                  <Badge>{g.environment}</Badge>
-                </>
-              ) : null}
-              {g.resolved_at ? (
-                <>
-                  {" "}
-                  <span className="badge badge--resolved">Resolved</span>
-                </>
-              ) : null}{" "}
-              <Link
+        <IssueList>
+          {items.map((g) => {
+            const metaParts = [
+              `${g.occurrences} occurrences`,
+              <>first <TimeAgo iso={g.first_seen} /></>,
+              <>last <TimeAgo iso={g.last_seen} /></>,
+            ];
+            if (g.users_affected != null && g.users_affected > 0) {
+              metaParts.push(`Users: ${g.users_affected}`);
+            }
+            if (g.sessions_affected != null && g.sessions_affected > 0) {
+              metaParts.push(`Sessions: ${g.sessions_affected}`);
+            }
+            if ((g.occurrences_recent ?? 0) + (g.occurrences_previous ?? 0) > 0) {
+              metaParts.push(
+                `Trend: ${g.occurrences_recent ?? 0} recent / ${g.occurrences_previous ?? 0} prior${
+                  g.trend_ratio != null ? ` (×${g.trend_ratio.toFixed(2)})` : ""
+                }`
+              );
+            }
+            return (
+              <IssueListItem
+                key={g.id}
                 href={
                   appFilter
                     ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
                     : `/dashboard/errors/${g.id}`
                 }
-                className="list-link !text-danger"
-              >
-                {g.message}
-              </Link>
-              {g.top_stack && (
-                <pre className="occurrence-card__meta">{g.top_stack}</pre>
-              )}
-              <span className="card__label card__label--block">
-                {g.occurrences} occurrences · first <TimeAgo iso={g.first_seen} /> · last{" "}
-                <TimeAgo iso={g.last_seen} />
-                {g.users_affected != null && g.users_affected > 0 ? (
+                message={g.message}
+                app={g.app}
+                environment={g.environment}
+                resolved={Boolean(g.resolved_at)}
+                topStack={g.top_stack}
+                meta={
                   <>
-                    {" "}
-                    · Users: {g.users_affected}
+                    {metaParts.map((part, i) => (
+                      <span key={i}>
+                        {i > 0 ? " · " : null}
+                        {part}
+                      </span>
+                    ))}
                   </>
-                ) : null}
-                {g.sessions_affected != null && g.sessions_affected > 0 ? (
-                  <>
-                    {" "}
-                    · Sessions: {g.sessions_affected}
-                  </>
-                ) : null}
-                {(g.occurrences_recent ?? 0) + (g.occurrences_previous ?? 0) >
-                0 ? (
-                  <>
-                    {" "}
-                    · Trend: {g.occurrences_recent ?? 0} recent /{" "}
-                    {g.occurrences_previous ?? 0} prior
-                    {g.trend_ratio != null ? (
-                      <>
-                        {" "}
-                        (×{g.trend_ratio.toFixed(2)})
-                      </>
-                    ) : null}
-                  </>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
+                }
+              />
+            );
+          })}
+        </IssueList>
       ) : (
         <EmptyState
           title="No errors recorded"

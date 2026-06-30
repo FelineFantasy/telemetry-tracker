@@ -8,6 +8,7 @@ import { LegalExternalLink } from "@/app/components/legal/LegalPageShell";
 import {
   AuthField,
   AuthPageShell,
+  AuthSubmitButton,
   authInputCls,
 } from "@/app/components/auth/AuthPageShell";
 import { PasswordInput } from "@/app/components/ui/PasswordInput";
@@ -166,25 +167,9 @@ export function RegisterPageForm({ serverChoice }: RegisterPageFormProps) {
           </p>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.01] disabled:opacity-60"
-        >
+        <AuthSubmitButton pending={pending}>
           {pending ? "Creating account…" : "Create account"}
-          <svg
-            viewBox="0 0 16 16"
-            className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M3 8h10M9 4l4 4-4 4" />
-          </svg>
-        </button>
+        </AuthSubmitButton>
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}

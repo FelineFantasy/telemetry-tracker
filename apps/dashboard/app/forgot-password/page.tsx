@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthPageShell } from "@/app/components/auth/AuthPageShell";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 export const metadata: Metadata = {
@@ -9,18 +10,16 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="auth-page">
-      <div className="auth-page__panel card">
-        <h1 className="auth-page__title">Reset password</h1>
-        <p className="auth-page__lede">
-          Enter your account email. If it exists, we will create a reset link (shown here in
-          development; email in production when configured).
-        </p>
-        <ForgotPasswordForm />
-        <p className="auth-page__hint text-muted-foreground">
-          <Link href="/">← Back to home</Link>
-        </p>
-      </div>
-    </div>
+    <AuthPageShell mode="forgot-password">
+      <ForgotPasswordForm />
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        <Link
+          href="/"
+          className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+        >
+          ← Back to home
+        </Link>
+      </p>
+    </AuthPageShell>
   );
 }

@@ -18,7 +18,7 @@ describe("OrganizationUsageCard", () => {
       />
     );
     expect(screen.getByText(/FREE/)).toBeTruthy();
-    expect(screen.getByText(/20%/)).toBeTruthy();
+    expect(screen.getByText("20.0%")).toBeTruthy();
     expect(screen.getByText(/14 days/)).toBeTruthy();
   });
 });

@@ -17,10 +17,19 @@ import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
 import { getOverviewTimeSeries } from "../lib/overview-timeseries.js";
 import {
+  computeOverviewHealth,
+  countActiveUsers,
+  countSessions,
+  getSessionDurationSeries,
+  getWorkspaceTelemetry,
+  listActiveIssues,
+  listDistinctEnvironments,
+  resolveCompareWindow,
+  type OverviewCompareMode,
+} from "../lib/overview-stats.js";
+import {
   whereErrorGroupById,
   whereErrorGroupProject,
-  whereErrorOccurrencePreviousWindow,
-  whereErrorOccurrenceSince,
   whereEventById,
   whereEventProject,
   whereSessionById,
@@ -69,12 +78,17 @@ function parseListPageSize(
 async function countDistinctEventNames(
   since: Date,
   appFilter: string | undefined,
-  projectId: string
+  projectId: string,
+  environment?: string
 ): Promise<number> {
+  const envClause = environment
+    ? Prisma.sql`AND "environment" = ${environment}`
+    : Prisma.empty;
   if (appFilter) {
     const r = await prisma.$queryRaw<[{ c: bigint }]>(
       Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
         SELECT name FROM "Event" WHERE project_id = ${projectId} AND created_at >= ${since} AND app = ${appFilter}
+        ${envClause}
         GROUP BY name
       ) t`
     );
@@ -83,6 +97,7 @@ async function countDistinctEventNames(
   const r = await prisma.$queryRaw<[{ c: bigint }]>(
     Prisma.sql`SELECT COUNT(*)::bigint AS c FROM (
       SELECT name FROM "Event" WHERE project_id = ${projectId} AND created_at >= ${since}
+      ${envClause}
       GROUP BY name
     ) t`
   );
@@ -122,6 +137,8 @@ export async function apiRoutes(
     const query = request.query as {
       range?: string;
       app?: string | string[];
+      environment?: string;
+      compare?: string;
       errorsPage?: string;
       eventsPage?: string;
       listPageSize?: string;
@@ -132,6 +149,9 @@ export async function apiRoutes(
     };
     const range = query.range === "7d" ? "7d" : "24h";
     const appFilter = queryApp(query.app);
+    const environment = queryString(query.environment);
+    const compare: OverviewCompareMode =
+      queryString(query.compare) === "week-ago" ? "week-ago" : "previous";
     const errSortParsed = parseOverviewErrorSortParam(queryString(query.errorsSort));
     if (!errSortParsed.ok) {
       return reply.status(400).send({ error: "Invalid errorsSort" });
@@ -148,7 +168,9 @@ export async function apiRoutes(
     if (!topEvOrderParsed.ok) {
       return reply.status(400).send({ error: "Invalid topEventsOrder" });
     }
-    const { since, previousSince, label } = parseRange(range);
+    const { since, label } = parseRange(range);
+    const compareWindow = resolveCompareWindow(range, compare, since);
+    const scope = { projectId, since, app: appFilter, environment };
     const listPageSize = Math.min(
       MAX_OVERVIEW_LIST_PAGE_SIZE,
       Math.max(
@@ -170,38 +192,46 @@ export async function apiRoutes(
         ? { _count: { name: topEvOrderParsed.order } }
         : { name: topEvOrderParsed.order };
 
-    const baseWhere = { ...whereEventProject(projectId), created_at: { gte: since } };
-    const eventWhere = appFilter
-      ? { ...baseWhere, app: appFilter }
-      : baseWhere;
-    const errorGroupWhere = appFilter
-      ? {
-          ...whereErrorGroupProject(projectId),
-          last_seen: { gte: since },
-          app: appFilter,
-        }
-      : { ...whereErrorGroupProject(projectId), last_seen: { gte: since } };
-    const errorOccurrenceWhere = whereErrorOccurrenceSince(
-      projectId,
-      since,
-      appFilter
-    );
-    const previousErrorWhere = whereErrorOccurrencePreviousWindow(
-      projectId,
-      previousSince,
-      since,
-      appFilter
-    );
-    const previousEventWhere = appFilter
-      ? {
-          ...whereEventProject(projectId),
-          created_at: { gte: previousSince, lt: since },
-          app: appFilter,
-        }
-      : {
-          ...whereEventProject(projectId),
-          created_at: { gte: previousSince, lt: since },
-        };
+    const baseWhere = {
+      ...whereEventProject(projectId),
+      created_at: { gte: since },
+    };
+    const eventWhere = {
+      ...baseWhere,
+      ...(appFilter ? { app: appFilter } : {}),
+      ...(environment ? { environment } : {}),
+    };
+    const errorGroupWhere = {
+      ...whereErrorGroupProject(projectId),
+      last_seen: { gte: since },
+      ...(appFilter ? { app: appFilter } : {}),
+      ...(environment ? { environment } : {}),
+    };
+    const errorOccurrenceWhere = {
+      created_at: { gte: since },
+      error_group: {
+        project_id: projectId,
+        ...(appFilter ? { app: appFilter } : {}),
+        ...(environment ? { environment } : {}),
+      },
+    } as Prisma.ErrorOccurrenceWhereInput;
+    const previousErrorWhere = {
+      created_at: { gte: compareWindow.previousSince, ...(compareWindow.previousUntil ? { lt: compareWindow.previousUntil } : { lt: since }) },
+      error_group: {
+        project_id: projectId,
+        ...(appFilter ? { app: appFilter } : {}),
+        ...(environment ? { environment } : {}),
+      },
+    } as Prisma.ErrorOccurrenceWhereInput;
+    const previousEventWhere = {
+      ...whereEventProject(projectId),
+      created_at: {
+        gte: compareWindow.previousSince,
+        ...(compareWindow.previousUntil ? { lt: compareWindow.previousUntil } : { lt: since }),
+      },
+      ...(appFilter ? { app: appFilter } : {}),
+      ...(environment ? { environment } : {}),
+    };
 
     const rangeKey = range === "7d" ? "7d" : "24h";
 
@@ -215,11 +245,19 @@ export async function apiRoutes(
       errorsPrevious,
       eventsPrevious,
       series,
+      sessionsCount,
+      sessionsPrevious,
+      activeUsers,
+      activeUsersPrevious,
+      environments,
+      sessionDurationSeries,
+      workspaceTelemetry,
+      activeIssues,
     ] = await Promise.all([
       prisma.errorOccurrence.count({ where: errorOccurrenceWhere }),
       prisma.event.count({ where: eventWhere }),
       prisma.errorGroup.count({ where: errorGroupWhere }),
-      countDistinctEventNames(since, appFilter, projectId),
+      countDistinctEventNames(since, appFilter, projectId, environment),
       prisma.errorGroup.findMany({
         where: errorGroupWhere,
         skip: errorsSkip,
@@ -237,8 +275,32 @@ export async function apiRoutes(
       }),
       prisma.errorOccurrence.count({ where: previousErrorWhere }),
       prisma.event.count({ where: previousEventWhere }),
-      getOverviewTimeSeries(prisma, projectId, rangeKey, since, appFilter),
+      getOverviewTimeSeries(prisma, projectId, rangeKey, since, appFilter, environment),
+      countSessions(prisma, scope),
+      countSessions(prisma, {
+        ...scope,
+        since: compareWindow.previousSince,
+      }, compareWindow.previousUntil ?? since),
+      countActiveUsers(prisma, scope),
+      countActiveUsers(
+        prisma,
+        { ...scope, since: compareWindow.previousSince },
+        compareWindow.previousUntil ?? since
+      ),
+      listDistinctEnvironments(prisma, projectId, appFilter),
+      getSessionDurationSeries(prisma, projectId, rangeKey, since, appFilter, environment),
+      getWorkspaceTelemetry(prisma, projectId, since, appFilter, environment),
+      listActiveIssues(prisma, scope),
     ]);
+
+    const health = computeOverviewHealth(
+      eventsCount,
+      errorsCount,
+      eventsPrevious,
+      errorsPrevious,
+      series.events,
+      rangeKey
+    );
 
     const topEvents = await Promise.all(
       eventCounts.map(async (row: { name: string; _count: { name: number } }) => {
@@ -268,10 +330,19 @@ export async function apiRoutes(
     return reply.send({
       range: label,
       since: since.toISOString(),
+      compare,
       errorsLast24h: errorsCount,
       eventsLast24h: eventsCount,
       errorsPrevious,
       eventsPrevious,
+      sessionsCount,
+      sessionsPrevious,
+      activeUsers,
+      activeUsersPrevious,
+      environments,
+      health,
+      activeIssues,
+      workspaceTelemetry,
       topErrorGroups: errorGroups,
       topEvents,
       errorsListTotal,
@@ -280,6 +351,7 @@ export async function apiRoutes(
       eventsPage,
       listPageSize,
       series,
+      sessionDurationSeries,
     });
   });
 

@@ -11,13 +11,49 @@ export type OverviewSeries = {
   events: OverviewTimeSeriesPoint[];
 };
 
+export type OverviewHealth = {
+  status: "operational" | "degraded" | "outage";
+  statusLabel: string;
+  subtitle: string;
+  errorRatePct: number;
+  errorRateDeltaPct: number;
+  successRatePct: number;
+  throughputPerSec: number;
+  peakThroughputPerSec: number;
+};
+
+export type OverviewActiveIssue = {
+  id: string;
+  severity: "P1" | "P3";
+  title: string;
+  meta: string;
+  status: string;
+  href: string;
+};
+
+export type OverviewWorkspaceTelemetry = {
+  ingestRequests: number;
+  sdkEventRows: number;
+  distinctApps: number;
+  distinctSdkVersions: number;
+};
+
 export type OverviewApiResponse = {
   range: string;
   since: string;
+  compare?: "previous" | "week-ago";
   errorsLast24h: number;
   eventsLast24h: number;
   errorsPrevious: number;
   eventsPrevious: number;
+  sessionsCount?: number;
+  sessionsPrevious?: number;
+  activeUsers?: number;
+  activeUsersPrevious?: number;
+  environments?: string[];
+  health?: OverviewHealth;
+  activeIssues?: OverviewActiveIssue[];
+  workspaceTelemetry?: OverviewWorkspaceTelemetry;
   topErrorGroups: Array<{
     id: string;
     message: string;
@@ -40,4 +76,10 @@ export type OverviewApiResponse = {
   eventsPage?: number;
   listPageSize?: number;
   series: OverviewSeries;
+  sessionDurationSeries?: OverviewTimeSeriesPoint[];
+};
+
+export type OverviewWorkspaceStats = {
+  projects: { count: number; detail: string };
+  organizations: { count: number; detail: string };
 };

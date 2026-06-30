@@ -6,7 +6,7 @@ import {
   createBillingCheckoutAction,
   createBillingPortalAction,
 } from "@/app/dashboard/actions";
-import { Button } from "@/app/components/ui/Button";
+import { SettingsBtn } from "@/app/components/dashboard/settings/settings-ui";
 
 export function OrganizationBillingActions({
   organizationId,
@@ -45,26 +45,26 @@ export function OrganizationBillingActions({
 
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      <Button
+      <SettingsBtn
         type="button"
         variant="primary"
         disabled={pending}
         onClick={() => goCheckout("PRO")}
       >
         Upgrade to Pro
-      </Button>
-      <Button
+      </SettingsBtn>
+      <SettingsBtn
         type="button"
-        variant="secondary"
+        variant="outline"
         disabled={pending}
         onClick={() => goCheckout("BUSINESS")}
       >
         Upgrade to Business
-      </Button>
+      </SettingsBtn>
       {hasStripeCustomer ? (
-        <Button type="button" variant="secondary" disabled={pending} onClick={goPortal}>
+        <SettingsBtn type="button" variant="outline" disabled={pending} onClick={goPortal}>
           Manage billing
-        </Button>
+        </SettingsBtn>
       ) : null}
     </div>
   );

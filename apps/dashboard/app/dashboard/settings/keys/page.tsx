@@ -1,4 +1,4 @@
-import { PageTitle } from "@/app/components/PageTitle";
+import { SettingsPageHeader } from "@/app/components/dashboard/settings/SettingsPageHeader";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { ApiKeysClient, type ApiKeyRow } from "./ApiKeysClient";
@@ -39,9 +39,9 @@ export default async function ApiKeysSettingsPage() {
   if (!loaded.ok) {
     return (
       <>
-        <PageTitle
+        <SettingsPageHeader
           title="API keys"
-          context="Keys belong to the project selected in the sidebar (under the organization). Telemetry sent with a key is stored in that project only."
+          description="Keys belong to the project selected in the header. Telemetry sent with a key is stored in that project only."
         />
         <ErrorState message={loaded.message} />
       </>
@@ -50,9 +50,9 @@ export default async function ApiKeysSettingsPage() {
 
   return (
     <>
-      <PageTitle
+      <SettingsPageHeader
         title="API keys"
-        context="Keys belong to the project selected in the sidebar (under the organization). Telemetry sent with a key is stored in that project only."
+        description="Keys belong to the project selected in the header. Telemetry sent with a key is stored in that project only."
       />
       <ApiKeysClient keys={loaded.keys} />
     </>

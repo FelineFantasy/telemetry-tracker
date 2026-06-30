@@ -1,12 +1,13 @@
 import { PageTitle } from "@/app/components/PageTitle";
+import { redirect } from "next/navigation";
 import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar";
-import { effectiveListRange } from "@/app/components/dashboard/DateRangeShortcuts";
+import { effectiveListRange } from "@/lib/list-filters-url";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import { Table, TableListLink, TableWrap } from "@/app/components/ui/Table";
+import { Table, TableListLink, TablePropertiesCell, TableViewLink, TableWrap } from "@/app/components/ui/Table";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import {
   DEFAULT_LIST_PAGE_SIZE,
@@ -15,8 +16,8 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
-import Link from "next/link";
 
 const EVENTS_PATH = "/dashboard/events";
 
@@ -91,7 +92,15 @@ export default async function EventsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const currentParams = buildEventsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
+  const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
+  const filterOptions = await getFilterOptions(appFilter || undefined);
+  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
+  if (rawEnv !== environment) {
+    redirect(mergeListQuery(EVENTS_PATH, currentParams, { environment }));
+  }
+
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
     firstQueryValue(sp.pageSize),
@@ -114,7 +123,6 @@ export default async function EventsPage({
   const from = firstQueryValue(sp.from);
   const to = firstQueryValue(sp.to);
   const name = firstQueryValue(sp.name);
-  const environment = firstQueryValue(sp.environment);
   const platform = firstQueryValue(sp.platform);
   const release = firstQueryValue(sp.release);
   const propertiesContains = firstQueryValue(sp.propertiesContains);
@@ -133,15 +141,10 @@ export default async function EventsPage({
 
   let items: EventRow[] = [];
   let total = 0;
-  let opts = { environments: [] as string[], platforms: [] as string[], releases: [] as string[] };
   try {
-    const [data, filterOpts] = await Promise.all([
-      getEvents(apiQuery),
-      getFilterOptions(appFilter || undefined),
-    ]);
+    const data = await getEvents(apiQuery);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
-    opts = filterOpts;
   } catch (e) {
     return (
       <>
@@ -151,19 +154,23 @@ export default async function EventsPage({
     );
   }
 
-  const currentParams = buildEventsParamsRecord(sp);
   const hrefForPage = (p: number) =>
     mergeListQuery(EVENTS_PATH, currentParams, { page: String(p) });
 
   const contextParts = [];
   if (appFilter) contextParts.push(`App: ${appFilter}`);
   if (firstQueryValue(sp.name)) contextParts.push(`Event: ${firstQueryValue(sp.name)}`);
-  const context =
-    contextParts.length > 0 ? contextParts.join(" · ") : "All events";
 
   return (
     <>
-      <PageTitle title="Events" context={context} />
+      <PageTitle
+        title="Events"
+        context={
+          contextParts.length > 0
+            ? contextParts.join(" · ")
+            : "Product and analytics events recorded by your SDK."
+        }
+      />
 
       <EventsListToolbar
         path={EVENTS_PATH}
@@ -183,12 +190,12 @@ export default async function EventsPage({
         propertiesContains={propertiesContains ?? ""}
         sort={sort ?? "created_at"}
         order={order ?? "desc"}
-        environments={opts.environments}
-        platforms={opts.platforms}
-        releases={opts.releases}
+        environments={filterOptions.environments}
+        platforms={filterOptions.platforms}
+        releases={filterOptions.releases}
       />
 
-      <p className="filter-hint text-muted-foreground text-sm">
+      <p className="mb-4 text-sm text-muted-foreground">
         Properties search matches raw JSON text (useful for known keys or values).
       </p>
 
@@ -219,30 +226,20 @@ export default async function EventsPage({
                       {e.name}
                     </TableListLink>
                   </td>
-                  <td className="table-cell-properties">
-                    {e.properties != null &&
-                    typeof e.properties === "object" &&
-                    Object.keys(e.properties as object).length > 0 ? (
-                      <pre className="table-properties-json">
-                        {JSON.stringify(e.properties, null, 2)}
-                      </pre>
-                    ) : (
-                      <span className="table-properties-empty">—</span>
-                    )}
+                  <td className="max-w-md">
+                    <TablePropertiesCell data={e.properties} />
                   </td>
                   <td>
                     <TimeAgo iso={e.created_at} />
                   </td>
-                  <td className="table-cell-view">
-                    <Link
+                  <td>
+                    <TableViewLink
                       href={
                         appFilter
                           ? `/dashboard/events/${e.id}?app=${encodeURIComponent(appFilter)}`
                           : `/dashboard/events/${e.id}`
                       }
-                    >
-                      View
-                    </Link>
+                    />
                   </td>
                 </tr>
               ))}

@@ -7,6 +7,7 @@ import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
 import { socialPreviewImage } from "@/lib/social-image";
 import { resolveMetadataBase } from "@/lib/site-url";
 import "./globals.css";
+import "./filter-day-picker.css";
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",

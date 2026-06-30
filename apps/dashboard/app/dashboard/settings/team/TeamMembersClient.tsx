@@ -6,7 +6,7 @@ import {
   inviteOrganizationMemberAction,
   updateOrganizationMemberRoleAction,
 } from "@/app/dashboard/actions";
-import { Button } from "@/app/components/ui/Button";
+import { Section, SettingsBtn, SettingsInput } from "@/app/components/dashboard/settings/settings-ui";
 import { Table, TableWrap } from "@/app/components/ui/Table";
 import { TimeAgo } from "@/app/components/TimeAgo";
 
@@ -18,7 +18,6 @@ export type TeamMemberRow = {
   joinedAt: string;
 };
 
-/** Least-privileged first for `<select>` default (VIEWER). */
 const ROLES = ["VIEWER", "EDITOR", "OWNER"] as const;
 
 export function TeamMembersClient({
@@ -39,13 +38,8 @@ export function TeamMembersClient({
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
-  /** Optimistic role per member until server action + refresh complete. */
-  const [optimisticRoleByUser, setOptimisticRoleByUser] = useState<
-    Record<string, string>
-  >({});
-  const [roleChangePendingFor, setRoleChangePendingFor] = useState<string | null>(
-    null
-  );
+  const [optimisticRoleByUser, setOptimisticRoleByUser] = useState<Record<string, string>>({});
+  const [roleChangePendingFor, setRoleChangePendingFor] = useState<string | null>(null);
 
   useEffect(() => {
     setOptimisticRoleByUser((prev) => {
@@ -85,11 +79,7 @@ export function TeamMembersClient({
     startTransition(async () => {
       setRoleChangePendingFor(userId);
       try {
-        const r = await updateOrganizationMemberRoleAction(
-          organizationId,
-          userId,
-          role
-        );
+        const r = await updateOrganizationMemberRoleAction(organizationId, userId, role);
         if (!r.ok) {
           setOptimisticRoleByUser((prev) => {
             const n = { ...prev };
@@ -107,33 +97,29 @@ export function TeamMembersClient({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {canManageMembers ? (
-        <section className="card p-6 max-w-lg" aria-labelledby="invite-heading">
-          <h2 id="invite-heading" className="card__label mb-4">
-            Invite member
-          </h2>
-          <form action={onInvite} className="flex flex-col gap-3">
-            <label className="text-sm text-muted-foreground" htmlFor="invite-email">
+        <Section title="Invite member">
+          <form action={onInvite} className="flex max-w-md flex-col gap-3">
+            <label className="text-[13px] text-muted-foreground" htmlFor="invite-email">
               Email
             </label>
-            <input
+            <SettingsInput
               id="invite-email"
               name="email"
               type="email"
               required
-              className="filter-input"
               placeholder="colleague@company.com"
               disabled={pending}
               autoComplete="email"
             />
-            <label className="text-sm text-muted-foreground" htmlFor="invite-role">
+            <label className="text-[13px] text-muted-foreground" htmlFor="invite-role">
               Role
             </label>
             <select
               id="invite-role"
               name="role"
-              className="filter-input"
+              className="w-full rounded-md border border-border bg-surface/60 px-3 py-1.5 text-[13px] outline-none focus:border-border-strong"
               disabled={pending}
               defaultValue="VIEWER"
             >
@@ -144,81 +130,82 @@ export function TeamMembersClient({
               ))}
             </select>
             {inviteError ? (
-              <p className="text-sm text-destructive m-0" role="alert">
+              <p className="text-sm text-destructive" role="alert">
                 {inviteError}
               </p>
             ) : null}
             {inviteUrl ? (
-              <p className="text-sm m-0">
+              <p className="text-sm text-muted-foreground">
                 Share this link to register:{" "}
-                <code className="text-xs break-all">{inviteUrl}</code>
+                <code className="break-all text-xs text-foreground">{inviteUrl}</code>
               </p>
             ) : null}
-            <Button type="submit" variant="primary" disabled={pending}>
+            <SettingsBtn type="submit" variant="primary" disabled={pending}>
               {pending ? "Sending…" : "Add or invite"}
-            </Button>
+            </SettingsBtn>
           </form>
-        </section>
+        </Section>
       ) : null}
 
       {roleError ? (
-        <p className="text-sm text-destructive m-0" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {roleError}
         </p>
       ) : null}
 
-      {members.length === 0 ? (
-        <p className="text-muted-foreground">No members yet.</p>
-      ) : (
-        <TableWrap>
-          <Table>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => {
-                const isSelf = m.userId === currentUserId;
-                const isOnlyOwner = m.role === "OWNER" && ownerCount <= 1;
-                const canEditRole =
-                  canManageMembers && !(isSelf && isOnlyOwner);
-                return (
-                  <tr key={m.userId}>
-                    <td>{m.email}</td>
-                    <td>{m.displayName ?? "—"}</td>
-                    <td>
-                      {canEditRole ? (
-                        <select
-                          className="filter-input min-h-9 py-1"
-                          value={optimisticRoleByUser[m.userId] ?? m.role}
-                          aria-label={`Role for ${m.email}`}
-                          disabled={roleChangePendingFor === m.userId}
-                          onChange={(e) => onRoleChange(m.userId, e.target.value)}
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        m.role
-                      )}
-                    </td>
-                    <td>
-                      <TimeAgo iso={m.joinedAt} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </TableWrap>
-      )}
+      <Section title="Members">
+        {members.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No members yet.</p>
+        ) : (
+          <TableWrap className="border-0 bg-transparent">
+            <Table>
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m) => {
+                  const isSelf = m.userId === currentUserId;
+                  const isOnlyOwner = m.role === "OWNER" && ownerCount <= 1;
+                  const canEditRole = canManageMembers && !(isSelf && isOnlyOwner);
+                  return (
+                    <tr key={m.userId}>
+                      <td>{m.email}</td>
+                      <td>{m.displayName ?? "—"}</td>
+                      <td>
+                        {canEditRole ? (
+                          <select
+                            className="rounded-md border border-border bg-surface/60 px-2 py-1 text-[13px]"
+                            value={optimisticRoleByUser[m.userId] ?? m.role}
+                            aria-label={`Role for ${m.email}`}
+                            disabled={roleChangePendingFor === m.userId}
+                            onChange={(e) => onRoleChange(m.userId, e.target.value)}
+                          >
+                            {ROLES.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          m.role
+                        )}
+                      </td>
+                      <td>
+                        <TimeAgo iso={m.joinedAt} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </TableWrap>
+        )}
+      </Section>
     </div>
   );
 }

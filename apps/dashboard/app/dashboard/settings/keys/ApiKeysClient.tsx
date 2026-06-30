@@ -7,7 +7,12 @@ import {
   revokeDashboardApiKey,
 } from "@/app/dashboard/actions";
 import { useDashboardCapabilities } from "@/app/components/dashboard/DashboardCapabilitiesContext";
-import { Button } from "@/app/components/ui/Button";
+import {
+  Section,
+  SettingsBtn,
+  SettingsInput,
+  SettingsPill,
+} from "@/app/components/dashboard/settings/settings-ui";
 import { Table, TableWrap } from "@/app/components/ui/Table";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { toast } from "sonner";
@@ -23,7 +28,6 @@ export type ApiKeyRow = {
 
 export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
   const caps = useDashboardCapabilities();
-  /** Session blob missing (fetch/parse failure) — still show actions; API enforces create/revoke. */
   const permUnknown = caps === null;
   const canCreateApiKey = caps?.canCreateApiKey === true || permUnknown;
   const canRevokeApiKey = caps?.canRevokeApiKey === true || permUnknown;
@@ -59,18 +63,19 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
   }
 
   return (
-    <div className="api-keys">
+    <div className="flex flex-col gap-6">
       {newKey ? (
-        <div className="api-keys__banner card" role="status">
-          <div className="card__label">New key — copy now</div>
-          <p className="api-keys__warn">
+        <Section title="New key — copy now">
+          <p className="mb-3 text-[13px] text-muted-foreground">
             This secret is shown only once. Store it in an environment variable or secret manager.
           </p>
-          <div className="api-keys__secret-wrap">
-            <code className="api-keys__secret">{newKey}</code>
-            <Button
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <code className="flex-1 truncate rounded-md border border-border bg-background/80 px-3 py-2 font-mono text-[12px]">
+              {newKey}
+            </code>
+            <SettingsBtn
               type="button"
-              variant="secondary"
+              variant="default"
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(newKey);
@@ -81,82 +86,76 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
               }}
             >
               Copy
-            </Button>
+            </SettingsBtn>
+            <SettingsBtn type="button" variant="ghost" onClick={() => setNewKey(null)}>
+              Done
+            </SettingsBtn>
           </div>
-          <Button type="button" variant="ghost" onClick={() => setNewKey(null)}>
-            Done
-          </Button>
-        </div>
+        </Section>
       ) : null}
 
       {permUnknown ? (
-        <p className="m-0 max-w-lg rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-foreground" role="status">
-          Workspace permissions did not load. Create and revoke are still available; the server
-          will reject actions your account is not allowed to perform.
+        <p
+          className="rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-foreground"
+          role="status"
+        >
+          Workspace permissions did not load. Create and revoke are still available; the server will
+          reject actions your account is not allowed to perform.
         </p>
       ) : null}
 
       {canCreateApiKey ? (
-        <section className="api-keys__create card" aria-labelledby="create-key-heading">
-          <h2 id="create-key-heading" className="api-keys__section-title">
-            Create key
-          </h2>
-          <form action={onCreate} className="api-keys__form">
-            <label className="api-keys__label" htmlFor="key-name">
+        <Section title="Create key">
+          <form action={onCreate} className="flex max-w-md flex-col gap-3">
+            <label className="text-[13px] text-muted-foreground" htmlFor="key-name">
               Label <span className="text-muted-foreground">(optional)</span>
             </label>
-            <input
+            <SettingsInput
               id="key-name"
               name="name"
               type="text"
-              className="filter-input api-keys__input"
               placeholder="e.g. production CI"
               maxLength={120}
               autoComplete="off"
               disabled={pending}
             />
-            <label className="api-keys__label" htmlFor="key-allowed-app">
+            <label className="text-[13px] text-muted-foreground" htmlFor="key-allowed-app">
               Restrict to app <span className="text-muted-foreground">(optional)</span>
             </label>
-            <input
+            <SettingsInput
               id="key-allowed-app"
               name="allowedApp"
               type="text"
-              className="filter-input api-keys__input"
-              placeholder="e.g. my-ios-app — must match SDK app field"
+              placeholder="e.g. my-ios-app"
               maxLength={64}
               autoComplete="off"
               disabled={pending}
             />
             {formError ? (
-              <p className="api-keys__error" role="alert">
+              <p className="text-sm text-destructive" role="alert">
                 {formError}
               </p>
             ) : null}
-            <Button type="submit" variant="primary" disabled={pending}>
+            <SettingsBtn type="submit" variant="primary" disabled={pending}>
               {pending ? "Creating…" : "Create API key"}
-            </Button>
+            </SettingsBtn>
           </form>
-        </section>
+        </Section>
       ) : (
-        <p className="text-muted-foreground api-keys__read-only-hint">
-          You don&apos;t have permission to create API keys. Ask an organization owner or editor to
-          grant access.
+        <p className="text-sm text-muted-foreground">
+          You don&apos;t have permission to create API keys. Ask an organization owner or editor.
         </p>
       )}
 
-      <section className="api-keys__list" aria-labelledby="keys-list-heading">
-        <h2 id="keys-list-heading" className="api-keys__section-title">
-          Keys for this project
-        </h2>
+      <Section title="Keys for this project">
         {keys.length === 0 ? (
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {canCreateApiKey
               ? "No keys yet. Create one to send telemetry from your apps."
               : "No keys for this project yet."}
           </p>
         ) : (
-          <TableWrap>
+          <TableWrap className="border-0 bg-transparent">
             <Table>
               <thead>
                 <tr>
@@ -177,32 +176,30 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
                       <td>{k.name ?? "—"}</td>
                       <td>{k.allowedApp ?? "—"}</td>
                       <td>
-                        <code className="api-keys__mono">{k.publicId}</code>
+                        <code className="font-mono text-[11px]">{k.publicId}</code>
                       </td>
                       <td>
                         <TimeAgo iso={k.createdAt} />
                       </td>
-                      <td>
-                        {k.lastUsedAt ? <TimeAgo iso={k.lastUsedAt} /> : "—"}
-                      </td>
+                      <td>{k.lastUsedAt ? <TimeAgo iso={k.lastUsedAt} /> : "—"}</td>
                       <td>
                         {revoked ? (
-                          <span className="badge api-keys__badge api-keys__badge--off">Revoked</span>
+                          <SettingsPill tone="muted">Revoked</SettingsPill>
                         ) : (
-                          <span className="badge api-keys__badge api-keys__badge--on">Active</span>
+                          <SettingsPill tone="success">Active</SettingsPill>
                         )}
                       </td>
-                      <td className="api-keys__actions">
+                      <td>
                         {!revoked && canRevokeApiKey ? (
-                          <Button
+                          <SettingsBtn
                             type="button"
                             variant="outline"
-                            className="!min-h-9"
+                            size="sm"
                             disabled={revokePending === k.publicId}
                             onClick={() => onRevoke(k.publicId)}
                           >
                             {revokePending === k.publicId ? "…" : "Revoke"}
-                          </Button>
+                          </SettingsBtn>
                         ) : null}
                       </td>
                     </tr>
@@ -212,7 +209,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
             </Table>
           </TableWrap>
         )}
-      </section>
+      </Section>
     </div>
   );
 }

@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import { DashboardCustomSelect } from "@/app/components/dashboard/DashboardCustomSelect";
 import type { DashboardSelectOption } from "@/app/components/dashboard/DashboardCustomSelect";
 import { FiltersSortPanel } from "@/app/components/dashboard/FiltersSortPanel";
+import {
+  FilterField,
+  FilterLabel,
+  FilterRow,
+  FilterSection,
+  FilterSegment,
+  FilterSegmentItem,
+} from "@/app/components/dashboard/list-filters-ui";
 import { mergeListQuery } from "@/lib/list-filters-url";
 
 const ERR_SORT_OPTIONS: DashboardSelectOption[] = [
@@ -52,14 +60,11 @@ export function OverviewSortControls({
 
   return (
     <FiltersSortPanel rangeSummary={null}>
-      <div className="errors-filters__form">
-        <div className="errors-filters__section">
-          <span className="errors-filters__section-label">Error groups</span>
-          <div className="errors-filters__row errors-filters__row--sort">
-            <label className="errors-filters__field">
-              <span className="errors-filters__label" id={errSortId}>
-                Sort by
-              </span>
+      <div className="flex flex-col gap-4">
+        <FilterSection label="Error groups">
+          <FilterRow>
+            <FilterField>
+              <FilterLabel id={errSortId}>Sort by</FilterLabel>
               <DashboardCustomSelect
                 value={errorsSort}
                 options={ERR_SORT_OPTIONS}
@@ -67,46 +72,37 @@ export function OverviewSortControls({
                 listLabelledBy={errSortId}
                 onValueChange={(v) => push({ errorsSort: v, errorsPage: "1" })}
               />
-            </label>
+            </FilterField>
 
-            <fieldset
-              className="errors-filters__fieldset"
+            <FilterSegment
+              legend="Order"
               title="Descending: largest counts and newest dates first. Ascending: the opposite."
+              ariaLabel="Error groups sort order"
             >
-              <legend className="errors-filters__label">Order</legend>
-              <div className="errors-filters__segment" role="group" aria-label="Error groups sort order">
-                <label className="errors-filters__segment-item">
-                  <input
-                    type="radio"
-                    name={`overview-errors-order-${uid}`}
-                    value="desc"
-                    checked={errorsOrder === "desc"}
-                    onChange={() => push({ errorsOrder: "desc", errorsPage: "1" })}
-                  />
-                  <span>Desc</span>
-                </label>
-                <label className="errors-filters__segment-item">
-                  <input
-                    type="radio"
-                    name={`overview-errors-order-${uid}`}
-                    value="asc"
-                    checked={errorsOrder === "asc"}
-                    onChange={() => push({ errorsOrder: "asc", errorsPage: "1" })}
-                  />
-                  <span>Asc</span>
-                </label>
-              </div>
-            </fieldset>
-          </div>
-        </div>
+              <FilterSegmentItem
+                name={`overview-errors-order-${uid}`}
+                value="desc"
+                checked={errorsOrder === "desc"}
+                onChange={() => push({ errorsOrder: "desc", errorsPage: "1" })}
+              >
+                Desc
+              </FilterSegmentItem>
+              <FilterSegmentItem
+                name={`overview-errors-order-${uid}`}
+                value="asc"
+                checked={errorsOrder === "asc"}
+                onChange={() => push({ errorsOrder: "asc", errorsPage: "1" })}
+              >
+                Asc
+              </FilterSegmentItem>
+            </FilterSegment>
+          </FilterRow>
+        </FilterSection>
 
-        <div className="errors-filters__section">
-          <span className="errors-filters__section-label">Top events</span>
-          <div className="errors-filters__row errors-filters__row--sort">
-            <label className="errors-filters__field">
-              <span className="errors-filters__label" id={evSortId}>
-                Sort by
-              </span>
+        <FilterSection label="Top events">
+          <FilterRow>
+            <FilterField>
+              <FilterLabel id={evSortId}>Sort by</FilterLabel>
               <DashboardCustomSelect
                 value={topEventsSort}
                 options={TOP_EV_SORT_OPTIONS}
@@ -114,38 +110,32 @@ export function OverviewSortControls({
                 listLabelledBy={evSortId}
                 onValueChange={(v) => push({ topEventsSort: v, eventsPage: "1" })}
               />
-            </label>
+            </FilterField>
 
-            <fieldset
-              className="errors-filters__fieldset"
+            <FilterSegment
+              legend="Order"
               title="Descending: highest counts first. Ascending: lower counts or reverse name order."
+              ariaLabel="Top events sort order"
             >
-              <legend className="errors-filters__label">Order</legend>
-              <div className="errors-filters__segment" role="group" aria-label="Top events sort order">
-                <label className="errors-filters__segment-item">
-                  <input
-                    type="radio"
-                    name={`overview-events-order-${uid}`}
-                    value="desc"
-                    checked={topEventsOrder === "desc"}
-                    onChange={() => push({ topEventsOrder: "desc", eventsPage: "1" })}
-                  />
-                  <span>Desc</span>
-                </label>
-                <label className="errors-filters__segment-item">
-                  <input
-                    type="radio"
-                    name={`overview-events-order-${uid}`}
-                    value="asc"
-                    checked={topEventsOrder === "asc"}
-                    onChange={() => push({ topEventsOrder: "asc", eventsPage: "1" })}
-                  />
-                  <span>Asc</span>
-                </label>
-              </div>
-            </fieldset>
-          </div>
-        </div>
+              <FilterSegmentItem
+                name={`overview-events-order-${uid}`}
+                value="desc"
+                checked={topEventsOrder === "desc"}
+                onChange={() => push({ topEventsOrder: "desc", eventsPage: "1" })}
+              >
+                Desc
+              </FilterSegmentItem>
+              <FilterSegmentItem
+                name={`overview-events-order-${uid}`}
+                value="asc"
+                checked={topEventsOrder === "asc"}
+                onChange={() => push({ topEventsOrder: "asc", eventsPage: "1" })}
+              >
+                Asc
+              </FilterSegmentItem>
+            </FilterSegment>
+          </FilterRow>
+        </FilterSection>
       </div>
     </FiltersSortPanel>
   );

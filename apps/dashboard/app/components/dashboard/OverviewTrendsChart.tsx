@@ -34,7 +34,7 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
 
   return (
     <section
-      className="overview-trends card mb-6 rounded-lg border border-border bg-surface p-4 shadow-sm"
+      className="overview-trends mb-6 overflow-hidden rounded-xl border border-border bg-surface/40 p-4"
       aria-label="Volume trends"
     >
       <div className="mb-3">
