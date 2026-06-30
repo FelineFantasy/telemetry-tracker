@@ -20,6 +20,7 @@ import { OverviewAppHealth } from "@/app/components/dashboard/overview/OverviewA
 import { OverviewActiveIncidents } from "@/app/components/dashboard/overview/OverviewActiveIncidents";
 import { OverviewMetricsSection } from "@/app/components/dashboard/overview/OverviewMetricsSection";
 import { OverviewExtraCharts } from "@/app/components/dashboard/overview/OverviewExtraCharts";
+import { DashboardScopeBar } from "@/app/components/dashboard/shell/DashboardScopeBar";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
@@ -151,6 +152,7 @@ export default async function OverviewPage({
   const errorsOrder = firstQueryValue(params.errorsOrder) ?? "desc";
   const topEventsSort = firstQueryValue(params.topEventsSort) ?? "count";
   const topEventsOrder = firstQueryValue(params.topEventsOrder) ?? "desc";
+  const rangeLabel = range === "7d" ? "7d" : "24h";
   const rangeLabelLong = range === "7d" ? "Last 7 days" : "Last 24 hours";
   const currentOverviewParams = buildOverviewParamsRecord(params);
 
@@ -159,6 +161,10 @@ export default async function OverviewPage({
     getDashboardWorkspaceForRequest(),
   ]);
   const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
+  const organizationName =
+    organizations.find((o) => o.id === resolvedOrgId)?.name ?? null;
+  const projectName = projects.find((p) => p.id === effectiveProjectId)?.name ?? null;
+  const projectSlug = projects.find((p) => p.id === effectiveProjectId)?.slug ?? null;
 
   const apps =
     effectiveProjectId === ""
@@ -267,6 +273,17 @@ export default async function OverviewPage({
           />
         }
       />
+
+      <Suspense fallback={null}>
+        <DashboardScopeBar
+          organizationName={organizationName}
+          projectName={projectName}
+          projectSlug={projectSlug}
+          apps={apps}
+          rangeLabel={rangeLabel}
+          environmentLabel={environment ?? null}
+        />
+      </Suspense>
 
       <OverviewAppHealth health={health} />
       <OverviewActiveIncidents issues={activeIssues} />

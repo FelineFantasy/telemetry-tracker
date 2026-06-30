@@ -58,11 +58,7 @@ export function TopNavProjectSwitcher({
   }, [currentProjectId]);
 
   useEffect(() => {
-    if (!open) {
-      setQuery("");
-      return;
-    }
-    searchRef.current?.focus();
+    if (!organizationId) return;
     let cancelled = false;
     void fetchProjectNavSummaries(organizationId).then((next) => {
       if (!cancelled) setSummaries(next);
@@ -70,7 +66,15 @@ export function TopNavProjectSwitcher({
     return () => {
       cancelled = true;
     };
-  }, [open, organizationId]);
+  }, [organizationId]);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      return;
+    }
+    searchRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

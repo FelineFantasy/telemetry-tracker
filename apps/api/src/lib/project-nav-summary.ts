@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export type ProjectNavHealthStatus = "operational" | "degraded" | "outage" | "idle";
 
@@ -52,5 +53,50 @@ export async function getProjectNavSummaries(
   since: Date
 ): Promise<ProjectNavSummary[]> {
   if (projectIds.length === 0) return [];
-  return Promise.all(projectIds.map((id) => getProjectNavSummary(prisma, id, since)));
+
+  const idList = Prisma.join(projectIds.map((id) => Prisma.sql`${id}`));
+
+  const [eventCounts, errorCountRows, latestEnvRows] = await Promise.all([
+    prisma.event.groupBy({
+      by: ["project_id"],
+      where: { project_id: { in: projectIds }, created_at: { gte: since } },
+      _count: { _all: true },
+    }),
+    prisma.$queryRaw<{ project_id: string; c: bigint }[]>(Prisma.sql`
+      SELECT eg."project_id", COUNT(*)::bigint AS c
+      FROM "ErrorOccurrence" eo
+      INNER JOIN "ErrorGroup" eg ON eg."id" = eo."error_group_id"
+      WHERE eg."project_id" IN (${idList})
+        AND eo."created_at" >= ${since}
+      GROUP BY eg."project_id"
+    `),
+    prisma.$queryRaw<{ project_id: string; environment: string | null }[]>(Prisma.sql`
+      SELECT DISTINCT ON (e."project_id")
+        e."project_id",
+        e."environment"
+      FROM "Event" e
+      WHERE e."project_id" IN (${idList})
+      ORDER BY e."project_id", e."created_at" DESC
+    `),
+  ]);
+
+  const eventsByProject = new Map(
+    eventCounts.map((row) => [row.project_id, row._count._all])
+  );
+  const errorsByProject = new Map(
+    errorCountRows.map((row) => [row.project_id, Number(row.c)])
+  );
+  const envByProject = new Map(
+    latestEnvRows.map((row) => [row.project_id, row.environment?.trim() || null])
+  );
+
+  return projectIds.map((projectId) => {
+    const events = eventsByProject.get(projectId) ?? 0;
+    const errors = errorsByProject.get(projectId) ?? 0;
+    return {
+      projectId,
+      status: healthStatusFromCounts(events, errors),
+      primaryEnvironment: envByProject.get(projectId) ?? null,
+    };
+  });
 }

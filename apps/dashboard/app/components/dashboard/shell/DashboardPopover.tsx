@@ -31,8 +31,7 @@ export function DashboardPopover({
 
   const close = useCallback(() => {
     setOpen(false);
-    onOpenChange?.(false);
-  }, [onOpenChange]);
+  }, []);
 
   const toggle = useCallback(() => {
     setOpen((current) => {
@@ -45,10 +44,13 @@ export function DashboardPopover({
           minWidth: rect.width,
         });
       }
-      onOpenChange?.(next);
       return next;
     });
-  }, [align, onOpenChange]);
+  }, [align]);
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [onOpenChange, open]);
 
   useEffect(() => {
     if (!open) return;
