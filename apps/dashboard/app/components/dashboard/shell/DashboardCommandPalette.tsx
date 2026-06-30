@@ -22,6 +22,7 @@ import {
   Users,
 } from "lucide-react";
 import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
+import { searchInputClassName } from "@/lib/input-classes";
 import { ShellKbd } from "./DashboardPopover";
 
 type CommandItem = {
@@ -226,7 +227,7 @@ export function DashboardCommandPalette() {
                 onKeyDown={onInputKeyDown}
                 placeholder="Search pages and actions…"
                 autoComplete="off"
-                className="h-11 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className={`h-11 flex-1 ${searchInputClassName}`}
               />
               <ShellKbd>Esc</ShellKbd>
             </div>
