@@ -26,9 +26,16 @@ describe("plan-pricing", () => {
       usageUnavailableMessage({
         hasProjects: false,
         effectiveProjectId: "",
-        capabilitiesLoaded: false,
+        capabilitiesLoaded: true,
       })
     ).toMatch(/Create a project/);
+    expect(
+      usageUnavailableMessage({
+        hasProjects: false,
+        effectiveProjectId: "",
+        capabilitiesLoaded: false,
+      })
+    ).toMatch(/could not be loaded/);
     expect(
       usageUnavailableMessage({
         hasProjects: true,

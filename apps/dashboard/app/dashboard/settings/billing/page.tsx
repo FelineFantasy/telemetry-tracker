@@ -91,7 +91,7 @@ export default async function BillingSettingsPage() {
         }
       />
       <SettingsPageBody>
-        {capabilities === null && effectiveProjectId !== "" ? (
+        {capabilities === null ? (
           <p
             className="rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-foreground"
             role="status"
@@ -140,7 +140,7 @@ export default async function BillingSettingsPage() {
         ) : (
           <Section title="Usage">
             <p className="text-sm text-muted-foreground">{usageMessage}</p>
-            {!hasProjects ? (
+            {!hasProjects && capabilities !== null ? (
               <p className="mt-3 text-sm">
                 <Link href={ORGANIZATION_SETTINGS_NEW_PROJECT_URL} className="text-brand hover:underline">
                   Create project →

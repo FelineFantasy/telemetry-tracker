@@ -88,14 +88,14 @@ export function usageUnavailableMessage({
   effectiveProjectId: string;
   capabilitiesLoaded: boolean;
 }): string {
+  if (!capabilitiesLoaded) {
+    return "Monthly ingest usage and subscription details could not be loaded for this session. Try refreshing the page.";
+  }
   if (!hasProjects) {
     return "Create a project to track monthly ingest usage for this organization.";
   }
   if (effectiveProjectId === "") {
     return "Select a project in the header to load monthly ingest usage for this organization.";
-  }
-  if (!capabilitiesLoaded) {
-    return "Monthly ingest usage could not be loaded for this session. Try refreshing the page.";
   }
   return "Usage details are unavailable for the selected project. Try refreshing or choose another project.";
 }
