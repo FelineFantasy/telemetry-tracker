@@ -3,6 +3,7 @@ import { fetchDashboardBootstrap } from "@/lib/dashboard-bootstrap-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import {
   getDashboardOrganizationId,
+  organizationCookieDiffersFromResolved,
   resolveActiveOrganizationId,
 } from "@/lib/dashboard-org";
 import {
@@ -64,6 +65,32 @@ export const fetchDashboardNavScope = cache(async function fetchDashboardNavScop
   };
 });
 
+const fetchProjectsForOrganization = cache(async function fetchProjectsForOrganization(
+  organizationId: string
+): Promise<DashboardProjectRow[]> {
+  const res = await dashboardApiFetch("/api/meta/projects", undefined, {
+    organizationIdOverride: organizationId,
+  });
+  if (!res.ok) return [];
+
+  const data = (await res.json()) as {
+    projects?: {
+      id: string;
+      name: string;
+      slug: string;
+      organizationId?: string;
+    }[];
+  };
+
+  if (!Array.isArray(data.projects)) return [];
+  return data.projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+    organizationId: project.organizationId ?? organizationId,
+  }));
+});
+
 /**
  * Resolves sidebar org, project list for that org, and `effectiveProjectId` aligned with the
  * selected organization when the project cookie points at another org’s project.
@@ -81,9 +108,17 @@ export const getDashboardWorkspaceForRequest = cache(async function getDashboard
   ]);
 
   const organizations = bootstrap?.organizations ?? [];
-  const allProjects = bootstrap?.projects ?? [];
+  let allProjects = bootstrap?.projects ?? [];
 
   const resolvedOrgId = resolveActiveOrganizationId(cookieOrgId, organizations);
+
+  if (
+    allProjects.length === 0 &&
+    resolvedOrgId !== null &&
+    organizationCookieDiffersFromResolved(cookieOrgId, resolvedOrgId)
+  ) {
+    allProjects = await fetchProjectsForOrganization(resolvedOrgId);
+  }
 
   const projects =
     resolvedOrgId !== null

@@ -33,3 +33,15 @@ export function overviewScopeMatches(
       (resolved.organizationId ?? "").toLowerCase()
   );
 }
+
+/** Parallel overview prefetch is only valid when the resolved project matches cookies. */
+export function shouldReuseOverviewEarlyFetch(
+  cookieScope: OverviewRequestScope,
+  resolvedScope: OverviewRequestScope,
+  effectiveProjectId: string
+): boolean {
+  return (
+    effectiveProjectId !== "" &&
+    overviewScopeMatches(cookieScope, resolvedScope)
+  );
+}

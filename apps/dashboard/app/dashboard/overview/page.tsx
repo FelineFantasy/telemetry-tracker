@@ -39,6 +39,7 @@ import {
 import {
   overviewScopeMatches,
   readOverviewCookieScope,
+  shouldReuseOverviewEarlyFetch,
   type OverviewRequestScope,
 } from "@/lib/overview-request-scope";
 
@@ -229,22 +230,23 @@ export default async function OverviewPage({
   };
 
   let overviewResult = overviewEarly;
-  if (
-    effectiveProjectId !== "" &&
-    !overviewScopeMatches(cookieScope, resolvedScope)
-  ) {
-    dashboardDebug("overview", "refetch — scope differs from cookies", {
-      cookieScope,
-      resolvedScope,
-    });
-    overviewResult = await getOverview(
-      range,
-      rawApp ?? undefined,
-      rawEnvironment ?? undefined,
-      compare,
-      listParams,
-      resolvedScope
-    ).catch((e) => ({ error: e } as const));
+  if (!shouldReuseOverviewEarlyFetch(cookieScope, resolvedScope, effectiveProjectId)) {
+    if (effectiveProjectId !== "") {
+      dashboardDebug("overview", "refetch — scope differs from cookies", {
+        cookieScope,
+        resolvedScope,
+      });
+      overviewResult = await getOverview(
+        range,
+        rawApp ?? undefined,
+        rawEnvironment ?? undefined,
+        compare,
+        listParams,
+        resolvedScope
+      ).catch((e) => ({ error: e } as const));
+    } else {
+      overviewResult = { error: new Error("No project selected") } as const;
+    }
   }
 
   const apps =

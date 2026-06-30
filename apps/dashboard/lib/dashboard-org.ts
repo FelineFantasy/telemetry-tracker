@@ -61,3 +61,12 @@ export function resolveActiveOrganizationId(
   }
   return organizations[0]!.id;
 }
+
+/** True when a preference cookie points at an org other than the resolved sidebar org. */
+export function organizationCookieDiffersFromResolved(
+  cookieOrgId: string | undefined,
+  resolvedOrgId: string | null
+): boolean {
+  if (!cookieOrgId?.trim() || resolvedOrgId === null) return false;
+  return cookieOrgId.toLowerCase() !== resolvedOrgId.toLowerCase();
+}
