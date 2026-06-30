@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ComingSoonBanner } from "./coming-soon-ui";
+import { ComingSoonBanner } from "../coming-soon-ui";
 
 export function SettingsPageHeader({
   title,
