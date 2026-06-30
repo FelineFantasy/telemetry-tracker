@@ -9,7 +9,12 @@ import { OrganizationUsageCard } from "@/app/dashboard/settings/organization/Org
 import { OrganizationBillingActions } from "@/app/dashboard/settings/organization/OrganizationBillingActions";
 import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
 import { getDashboardSessionContext } from "@/lib/dashboard-capabilities";
+import {
+  loadOrganizationMembers,
+  resolveCanManageMembers,
+} from "@/lib/dashboard-org-permissions";
 import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
+import { getDashboardUser } from "@/lib/dashboard-user";
 import {
   billingStatusHint,
   billingStatusLabel,
@@ -47,14 +52,22 @@ export default async function BillingSettingsPage() {
 
   const orgName = organizations.find((o) => o.id === resolvedOrgId)?.name ?? "Organization";
 
-  const capabilities = await getDashboardSessionContext(
-    effectiveProjectId === "" ? null : effectiveProjectId,
-    resolvedOrgId
-  );
+  const [capabilities, membersRes, user] = await Promise.all([
+    getDashboardSessionContext(
+      effectiveProjectId === "" ? null : effectiveProjectId,
+      resolvedOrgId
+    ),
+    loadOrganizationMembers(resolvedOrgId),
+    getDashboardUser(),
+  ]);
 
   const usage = capabilities?.usageQuota ?? null;
   const billing = capabilities?.billingHealth ?? null;
-  const canManageBilling = capabilities?.canManageMembers === true;
+  const canManageBilling = resolveCanManageMembers({
+    members: membersRes.ok ? membersRes.members : null,
+    userId: user?.id,
+    sessionCanManageMembers: capabilities?.canManageMembers,
+  });
   const hasStripeCustomer = billing?.hasStripeCustomer === true;
   const effectivePlanTier = resolveEffectivePlanTier(billing, usage);
   const showBillingActions = canManageBilling && resolvedOrgId !== null;
