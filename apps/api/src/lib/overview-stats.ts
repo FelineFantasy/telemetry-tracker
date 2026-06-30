@@ -120,6 +120,10 @@ export async function countSessions(
       until === undefined
         ? Prisma.empty
         : Prisma.sql`AND s."started_at" < ${until}`;
+    const eventUntilClause =
+      until === undefined
+        ? Prisma.empty
+        : Prisma.sql`AND e."created_at" < ${until}`;
     const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
       SELECT COUNT(*)::bigint AS c
       FROM "Session" s
@@ -133,6 +137,7 @@ export async function countSessions(
             AND e."session_id" = s."session_id"
             AND e."environment" = ${scope.environment}
             AND e."created_at" >= ${scope.since}
+            ${eventUntilClause}
         )
     `);
     return Number(rows[0]?.c ?? 0);
