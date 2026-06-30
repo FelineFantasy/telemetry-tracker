@@ -39,41 +39,58 @@ export async function buildDashboardBootstrap(
   headerOrg?: string | null
 ): Promise<
   | { ok: true; payload: DashboardBootstrapPayload }
-  | { ok: false; reason: "forbidden_org" | "no_user" }
+  | { ok: false; reason: "no_user" }
 > {
   const started = Date.now();
-  const projectId = await tryResolveReadProjectId(request);
   logBootstrap("start", {
     userId: session.userId,
-    projectId,
     headerOrg: headerOrg ?? null,
   });
 
-  const navScopePromise =
-    projectId !== null
-      ? loadNavScopeForProject(prisma, projectId)
-      : Promise.resolve({ apps: [] as string[], environments: [] as string[] });
-
-  const [workspace, userRow, navScope] = await Promise.all([
+  const [workspace, userRow] = await Promise.all([
     loadWorkspaceMetaForUser(prisma, session.userId, headerOrg),
     prisma.user.findUnique({
       where: { id: session.userId },
       select: { id: true, email: true, display_name: true },
     }),
-    navScopePromise,
   ]);
 
-  if (workspace.forbiddenOrg) {
-    logBootstrap("forbidden_org", { ms: Date.now() - started });
-    return { ok: false, reason: "forbidden_org" };
-  }
   if (!userRow) {
     logBootstrap("no_user", { ms: Date.now() - started });
     return { ok: false, reason: "no_user" };
   }
 
+  const user: DashboardBootstrapUser = {
+    id: userRow.id,
+    email: userRow.email,
+    displayName: userRow.display_name,
+  };
+
+  if (workspace.forbiddenOrg) {
+    logBootstrap("forbidden_org — returning org list only", {
+      ms: Date.now() - started,
+      orgCount: workspace.organizations.length,
+    });
+    return {
+      ok: true,
+      payload: {
+        organizations: workspace.organizations,
+        projects: [],
+        navScope: { apps: [], environments: [] },
+        user,
+      },
+    };
+  }
+
+  const projectId = await tryResolveReadProjectId(request);
+  const navScope =
+    projectId !== null
+      ? await loadNavScopeForProject(prisma, projectId)
+      : { apps: [] as string[], environments: [] as string[] };
+
   logBootstrap("ok", {
     ms: Date.now() - started,
+    projectId,
     orgCount: workspace.organizations.length,
     projectCount: workspace.projects.length,
     appCount: navScope.apps.length,
@@ -86,11 +103,7 @@ export async function buildDashboardBootstrap(
       organizations: workspace.organizations,
       projects: workspace.projects,
       navScope,
-      user: {
-        id: userRow.id,
-        email: userRow.email,
-        displayName: userRow.display_name,
-      },
+      user,
     },
   };
 }

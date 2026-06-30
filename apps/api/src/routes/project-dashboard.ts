@@ -152,9 +152,6 @@ export async function projectDashboardRoutes(
     const headerOrg = readOrganizationIdHeader(request);
     const result = await buildDashboardBootstrap(prisma, session, request, headerOrg);
     if (!result.ok) {
-      if (result.reason === "forbidden_org") {
-        return reply.status(403).send({ error: "Not a member of this organization" });
-      }
       return reply.status(401).send({ error: "Unauthorized" });
     }
     return reply.send(result.payload);
