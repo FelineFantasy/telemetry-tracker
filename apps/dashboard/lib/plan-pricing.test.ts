@@ -52,6 +52,15 @@ describe("plan-pricing", () => {
         hasStripeCustomer: false,
         canManageBilling: true,
         hasUpgradeActions: false,
+        billingContextLoaded: false,
+      })
+    ).toMatch(/Refresh the page/);
+    expect(
+      billingStatusHint({
+        billing: null,
+        hasStripeCustomer: false,
+        canManageBilling: true,
+        hasUpgradeActions: false,
       })
     ).toMatch(/Create a project/);
     expect(

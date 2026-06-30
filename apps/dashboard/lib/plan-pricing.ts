@@ -60,12 +60,17 @@ export function billingStatusHint({
   hasStripeCustomer,
   canManageBilling,
   hasUpgradeActions,
+  billingContextLoaded = true,
 }: {
   billing: BillingHealthInfoShape | null;
   hasStripeCustomer: boolean;
   canManageBilling: boolean;
   hasUpgradeActions: boolean;
+  billingContextLoaded?: boolean;
 }): string {
+  if (!billingContextLoaded && canManageBilling) {
+    return "Refresh the page to load billing and subscription details";
+  }
   if (billing?.billingAlertVariant) {
     return "Update payment method in the Stripe portal";
   }

@@ -69,14 +69,16 @@ export default async function BillingSettingsPage() {
     sessionCanManageMembers: capabilities?.canManageMembers,
   });
   const hasStripeCustomer = billing?.hasStripeCustomer === true;
+  const billingContextLoaded = capabilities !== null;
   const effectivePlanTier = resolveEffectivePlanTier(billing, usage);
-  const showBillingActions = canManageBilling && resolvedOrgId !== null;
+  const showBillingActions =
+    canManageBilling && resolvedOrgId !== null && billingContextLoaded;
   const billingActionsInUsageCard = Boolean(usage && showBillingActions);
   const periodEnd = formatPeriodEnd(billing?.stripeCurrentPeriodEnd ?? null);
   const usageMessage = usageUnavailableMessage({
     hasProjects,
     effectiveProjectId,
-    capabilitiesLoaded: capabilities !== null,
+    capabilitiesLoaded: billingContextLoaded,
   });
 
   return (
@@ -120,6 +122,7 @@ export default async function BillingSettingsPage() {
                 hasStripeCustomer,
                 canManageBilling,
                 hasUpgradeActions: showBillingActions && !hasStripeCustomer,
+                billingContextLoaded,
               })}
             />
             <SettingsStat
