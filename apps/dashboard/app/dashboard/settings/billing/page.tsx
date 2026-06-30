@@ -9,7 +9,6 @@ import {
 import {
   Section,
   SettingsBtn,
-  SettingsPill,
   SettingsStat,
   UsageBar,
 } from "@/app/components/dashboard/settings/settings-ui";

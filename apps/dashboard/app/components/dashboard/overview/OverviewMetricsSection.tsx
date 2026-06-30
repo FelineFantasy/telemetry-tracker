@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   compareLabelFor,
   mergeOverviewScopeQuery,
@@ -15,12 +15,10 @@ import type {
 
 export function OverviewCompareToggle({
   value,
-  range,
   overviewPath,
   currentParams,
 }: {
   value: OverviewCompareParam;
-  range: "24h" | "7d";
   overviewPath: string;
   currentParams: Record<string, string>;
 }) {
@@ -96,7 +94,6 @@ export function OverviewMetricsSection({
     <>
       <OverviewCompareToggle
         value={compare}
-        range={range}
         overviewPath={overviewPath}
         currentParams={currentParams}
       />
