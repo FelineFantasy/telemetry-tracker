@@ -1,4 +1,32 @@
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+export function NavPickerTrigger({
+  className,
+  children,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex max-w-[11rem] items-center gap-1.5 truncate rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-left text-sm hover:bg-surface sm:max-w-[14rem]",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function NavPickerLabel({ children }: { children: ReactNode }) {
+  return (
+    <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+      {children}
+    </span>
+  );
+}
 
 export function ShellCard({
   className,

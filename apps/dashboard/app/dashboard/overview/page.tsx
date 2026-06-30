@@ -34,7 +34,6 @@ import {
   fetchDashboardEnvironments,
   getDashboardWorkspaceForRequest,
 } from "@/lib/dashboard-workspace-request";
-import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
 
 export const dynamic = "force-dynamic";
 
@@ -165,9 +164,7 @@ export default async function OverviewPage({
   const organizationName =
     organizations.find((o) => o.id === resolvedOrgId)?.name ?? null;
   const projectName = projects.find((p) => p.id === effectiveProjectId)?.name ?? null;
-  const displayOrgName = organizationName
-    ? formatOrganizationRailName(organizationName)
-    : null;
+  const projectSlug = projects.find((p) => p.id === effectiveProjectId)?.slug ?? null;
 
   const apps =
     effectiveProjectId === ""
@@ -235,7 +232,6 @@ export default async function OverviewPage({
       peakThroughputPerSec: 0,
     };
   const activeIssues = data.activeIssues ?? [];
-  const environments = scopedEnvironments;
   const sessionDurationSeries = data.sessionDurationSeries ?? [];
   const workspaceTelemetry: OverviewWorkspaceTelemetry = data.workspaceTelemetry ?? {
     ingestRequests: data.eventsLast24h + data.errorsLast24h,
@@ -280,11 +276,12 @@ export default async function OverviewPage({
 
       <Suspense fallback={null}>
         <DashboardScopeBar
-          organizationName={displayOrgName}
+          organizationName={organizationName}
           projectName={projectName}
+          projectSlug={projectSlug}
           apps={apps}
-          environments={environments}
           rangeLabel={rangeLabel}
+          environmentLabel={environment ?? null}
         />
       </Suspense>
 

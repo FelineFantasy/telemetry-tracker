@@ -71,7 +71,7 @@ export function DashboardCustomSelect({
         id={triggerId}
         className={cn(
           "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-left text-[13px]",
-          "hover:border-muted-foreground/30 focus:border-brand/50 focus:outline-none focus:ring-1 focus:ring-brand/30"
+          "hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         )}
         aria-haspopup="listbox"
         aria-expanded={open ? "true" : "false"}

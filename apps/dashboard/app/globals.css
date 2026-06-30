@@ -100,8 +100,13 @@
     color: var(--foreground);
   }
 
-  :focus-visible {
+  :where(button, a, summary, [role="button"], [tabindex]:not(input):not(textarea):not(select)):focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  :where(input, textarea, select):focus,
+  :where(input, textarea, select):focus-visible {
+    @apply outline-none ring-0 ring-offset-0 shadow-none;
   }
 }
 
