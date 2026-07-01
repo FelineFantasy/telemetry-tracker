@@ -26,7 +26,7 @@ export function CodeBlock({ code, lang, caption }: CodeBlockProps) {
 
   return (
     <figure className="not-prose my-6 overflow-hidden rounded-lg border border-code-border bg-code-bg shadow-sm">
-      <div className="flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2 border-b border-code-border/80 bg-black/15 px-3 py-2">
+      <div className="flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2 border-b border-code-border/80 bg-muted/40 px-3 py-2">
         <figcaption className="text-xs font-medium text-code-foreground/80">
           {caption ?? "Code"}
         </figcaption>

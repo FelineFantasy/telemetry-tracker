@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { CookieConsent } from "@/app/components/marketing/cookie-consent";
+import { ThemeColorMeta } from "@/app/components/ThemeColorMeta";
+import { ThemeProvider } from "@/app/components/ThemeProvider";
 import { NavigationProgress } from "@/app/components/ui/NavigationProgress";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
 import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
@@ -12,7 +14,10 @@ import "./globals.css";
 import "./filter-day-picker.css";
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 const defaultTitle =
@@ -73,17 +78,20 @@ export default async function RootLayout({
 }>) {
   const serverChoice = await getCookieConsentChoiceFromCookies();
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
-        <ToasterProvider />
-        <Suspense fallback={null}>
-          <NavigationProgress />
-        </Suspense>
-        {children}
-        <CookieConsent serverChoice={serverChoice} />
+        <ThemeProvider>
+          <ThemeColorMeta />
+          <a href="#main-content" className="skip-link">
+            Skip to main content
+          </a>
+          <ToasterProvider />
+          <Suspense fallback={null}>
+            <NavigationProgress />
+          </Suspense>
+          {children}
+          <CookieConsent serverChoice={serverChoice} />
+        </ThemeProvider>
       </body>
     </html>
   );

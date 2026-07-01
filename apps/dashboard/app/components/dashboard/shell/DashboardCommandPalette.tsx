@@ -207,7 +207,7 @@ export function DashboardCommandPalette() {
       {open ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-[12vh]">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            className="absolute inset-0 bg-background/70 backdrop-blur-md"
             aria-hidden
             onPointerDown={close}
           />
