@@ -1,33 +1,94 @@
 # Release and deployment process
 
-This document describes how we cut app releases and deploy **Telemetry Tracker** (API + dashboard). SDK packages (`@tacko/telemetry-*`) use separate semver in `packages/*/package.json` and `pnpm publish:packages` — see [README](../README.md#publishing-sdk-packages-to-npm).
+This document describes how we integrate, release, and deploy **Telemetry Tracker** (API + dashboard). SDK packages (`@tacko/telemetry-*`) use separate semver in `packages/*/package.json` and `pnpm publish:packages` — see [README](../README.md#publishing-sdk-packages-to-npm).
+
+User-facing changes are recorded in [CHANGELOG.md](../CHANGELOG.md).
+
+---
+
+## Branch model
+
+| Branch | Role |
+|--------|------|
+| **`develop`** | Integration branch — feature PRs merge here; CI must pass |
+| **`main`** | Production — official hosted cloud and semver GitHub Releases |
+| **`feature/*`, `fix/*`** | Short-lived; open PRs against **`develop`** |
+
+```mermaid
+flowchart LR
+  Feature[feature/fix branch]
+  Develop[develop]
+  Main[main]
+  Hosted[Railway production]
+  Tag[GitHub Release vX.Y.Z]
+  Feature -->|PR| Develop
+  Develop -->|milestone release PR| Main
+  Main --> Hosted
+  Main --> Tag
+```
+
+**Deploy ≠ release.** Railway production deploys from **`main`**. Self-hosters and GitHub Release consumers follow **semver tags** on `main`.
+
+There is no separate staging deploy yet — validate on `develop` locally before milestone promotion.
+
+---
+
+## Release cadence
+
+Releases are **milestone-driven**:
+
+1. Track work in a GitHub milestone (e.g. “v1.2 — …”).
+2. Merge completed work into **`develop`**; keep [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` up to date.
+3. When the milestone is complete and CI is green, promote **`develop` → `main`** (release PR or fast-forward).
+4. Tag **`main`**, publish GitHub Release, migrate production DB, verify deploy.
+
+**Hotfixes** on production: branch from **`main`**, fix, merge to **`main`**, tag a **patch** version, then merge/backport to **`develop`** so branches stay aligned.
 
 ---
 
 ## Versioning
 
-| Artifact | Version | Tag format |
-|----------|---------|------------|
+| Artifact | Version | Tag / registry |
+|----------|---------|----------------|
 | **App** (API + dashboard) | Semver on `main` | `v1.0.0`, `v1.1.0`, … |
-| **SDKs** | Per-package in `packages/*/package.json` | npm registry (optional) |
+| **SDKs** | Per-package in `packages/*/package.json` | npm (`pnpm publish:packages`) |
 
-App releases are tagged on **`main`** at the commit that represents the release (usually immediately after merging the release PR or committing release notes).
+### Semver guidance
+
+| Bump | When |
+|------|------|
+| **MAJOR** | Breaking ingest/HTTP contract, auth model, required env vars, destructive migrations |
+| **MINOR** | Features, backward-compatible migrations, dashboard UX (typical milestone release) |
+| **PATCH** | Bug fixes and hotfixes on `main` |
+
+Always document **migrations**, **new env vars**, and **breaking changes** in CHANGELOG and the GitHub Release notes.
 
 ---
 
 ## Release checklist (maintainers)
 
-1. **Merge to `main`** — all changes for the release are on `main`; CI is green.
-2. **Update release notes** — add a section to this file or a `CHANGELOG.md` entry (optional but recommended for v1.1+).
-3. **Tag:**
+### Before promoting `develop` → `main`
+
+- [ ] GitHub milestone complete (or release scope agreed)
+- [ ] [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` section complete
+- [ ] CI green on `develop` (`pnpm lint`, `pnpm test`, `pnpm -r run build`)
+- [ ] Self-host upgrade notes ready (migrations, env vars)
+
+### On `main` after promotion
+
+1. **Finalize CHANGELOG** — rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD` and commit on `main` if not already done in the release PR.
+2. **Tag:**
    ```bash
    git checkout main && git pull origin main
-   git tag -a v1.0.0 -m "Telemetry Tracker v1.0.0 — self-hosted v1"
-   git push origin v1.0.0
+   git tag -a v1.1.0 -m "Telemetry Tracker v1.1.0"
+   git push origin v1.1.0
    ```
-4. **GitHub Release** — create from the tag with summary + test plan (see [gh release create](https://cli.github.com/manual/gh_release_create)).
-5. **Deploy** — follow [Deploy runbook](#deploy-runbook-railway) below.
-6. **Post-deploy** — run [verification](#post-deploy-verification) and [bootstrap](#bootstrap-first-production-install) if fresh install.
+3. **GitHub Release** — create from the tag; include summary, upgrade steps, and migration command ([gh release create](https://cli.github.com/manual/gh_release_create)).
+4. **Deploy** — Railway rebuilds `main` automatically; see [Deploy runbook](#deploy-runbook-railway).
+5. **Production DB** — run [migrations](#3-database-migrations-production) (CI does not touch prod).
+6. **Post-deploy** — [verification](#post-deploy-verification).
+7. **SDK** — if ingest/SDK contract changed, bump `packages/*/package.json` and `pnpm publish:packages`.
+8. **Sync `develop`** — merge `main` into `develop` if hotfixes landed on `main` only.
 
 ---
 
@@ -44,20 +105,20 @@ Production uses **three Railway services** (+ optional Cron):
 
 ### 1. Trigger deploy
 
-- **Automatic:** push/merge to the branch Railway watches (usually `main`). Each service rebuilds when its watch paths change.
+- **Automatic:** push/merge to **`main`**. Each service rebuilds when its watch paths change.
 - **Manual:** Railway dashboard → service → **Redeploy**.
 
 ### 2. CI gate (GitHub)
 
-On every push/PR to `main`, CI runs (`.github/workflows/ci.yml`):
+On push and pull requests to **`develop`** and **`main`**, CI runs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):
 
 - `pnpm lint`
 - `prisma migrate deploy` (against CI Postgres only)
 - `pnpm test` with `RUN_DB_INTEGRATION_TESTS=true`
-- `pnpm build`
+- `pnpm -r run build`
 - telemetry-core dist drift check
 
-**Do not tag or deploy production if CI is failing.**
+**Do not promote to `main`, tag, or deploy production if CI is failing.**
 
 ### 3. Database migrations (production)
 
@@ -90,7 +151,7 @@ Set on **each Railway service** (not only a local `.env`). Core vars: [DEPLOYMEN
 
 **API (recommended):**
 
-- `RESEND_API_KEY`, `TELEMETRY_EMAIL_FROM` — invites and password reset
+- `RESEND_API_KEY`, `TELEMETRY_EMAIL_FROM` — invites, password reset, notification email
 - `TELEMETRY_ALLOW_REGISTRATION=false` — after first user exists
 
 **API (never in production):**
@@ -133,6 +194,7 @@ In the browser:
 
 - Dashboard loads; `/dashboard` redirects to login when logged out
 - Register (if allowed) → org → project → API key → ingest → Overview shows data
+- Notifications bell and Appearance theme (v1.1+)
 
 See also [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md).
 
@@ -150,7 +212,7 @@ See also [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md).
 
 ## v1.0.0 (2026-06-26)
 
-First production-ready self-hosted release.
+First production-ready self-hosted release. Full changelog: [CHANGELOG.md#100---2026-06-26](../CHANGELOG.md#100---2026-06-26).
 
 **Includes:**
 

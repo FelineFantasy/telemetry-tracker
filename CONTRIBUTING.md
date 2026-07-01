@@ -103,13 +103,23 @@ Use descriptive migration names. For production, only `prisma migrate deploy` is
 
 ## Pull requests
 
+- Open PRs against **`develop`** (integration branch). Releases promote **`develop` → `main`** when a milestone is complete — see [docs/RELEASE.md](docs/RELEASE.md).
 - Prefer **focused** changes: one concern per PR when possible.
 - Describe **what** changed and **why** in the PR body (reproduce steps for bugs).
 - If you are unsure about product or security behavior (auth, ingest, billing), open an issue first.
 
+### Changelog
+
+User-facing changes must add a line under **[Unreleased]** in [CHANGELOG.md](CHANGELOG.md):
+
+- **Added** / **Changed** / **Fixed** / **Security** / **Breaking** / **Database** (if migrations or env vars)
+- Skip for internal refactors, test-only, or comment-only changes
+
+Maintainers rename `[Unreleased]` to a version when cutting a release.
+
 ### Branch naming
 
-Use one branch per pull request.
+Use one branch per pull request. **Base branch: `develop`.**
 
 Use lowercase kebab-case with a type prefix:
 
@@ -151,10 +161,11 @@ When you open the PR, confirm:
 - [ ] Lint passes
 - [ ] Build succeeds
 - [ ] Documentation updated (if needed)
+- [ ] [CHANGELOG.md](CHANGELOG.md) updated under `[Unreleased]` (if user-facing)
 - [ ] New code follows the existing style
 - [ ] No breaking changes (or called out clearly in the PR description)
 
-CI on `main` runs the same checks (see [.github/workflows/ci.yml](.github/workflows/ci.yml)).
+CI runs on pull requests to **`develop`** and **`main`** (see [.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 ## Code of conduct
 
