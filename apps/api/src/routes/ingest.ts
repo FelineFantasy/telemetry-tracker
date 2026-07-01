@@ -222,9 +222,6 @@ export async function ingestRoutes(
       app: body.app,
       environment: body.environment ?? null,
     });
-    if (isNew) {
-      void notifyNewErrorGroupEmail(prisma, projectId, errorGroup);
-    }
     await prisma.errorOccurrence.create({
       data: {
         error_group_id: errorGroup.id,
@@ -237,6 +234,9 @@ export async function ingestRoutes(
       },
     });
     await addIngestUnits(prisma, projectId, 1);
+    if (isNew) {
+      void notifyNewErrorGroupEmail(prisma, projectId, errorGroup);
+    }
     void maybeNotifyQuotaAfterIngest(prisma, projectId);
     return reply.status(204).send();
   });

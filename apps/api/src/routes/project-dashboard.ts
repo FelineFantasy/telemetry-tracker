@@ -16,7 +16,7 @@ import {
   parseNotificationPreferences,
   validateNotificationPreferencesPatch,
 } from "../lib/notification-preferences.js";
-import { shouldSendInviteEmail } from "../lib/notification-email-dispatch.js";
+import { sendOrganizationInviteEmail } from "../lib/notification-email-dispatch.js";
 import {
   attachNotificationReadState,
   markNotificationsRead,
@@ -37,7 +37,6 @@ import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
 } from "../lib/read-project-request.js";
-import { sendTransactionalEmail } from "../lib/email.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 
 const DEFAULT_ORG_ID =
@@ -550,7 +549,7 @@ export async function projectDashboardRoutes(
             invited_by_id: session.userId,
           },
         });
-        return { kind: "invited" as const, token: row.token };
+        return { kind: "invited" as const, token: row.token, inviteId: row.id };
       });
 
       if (inviteResult.kind === "org_unavailable") {
@@ -560,13 +559,11 @@ export async function projectDashboardRoutes(
 
       const inviteUrl = `${base}/register?invite=${encodeURIComponent(token)}`;
 
-      if (await shouldSendInviteEmail(prisma, email)) {
-        void sendTransactionalEmail({
-          to: email,
-          subject: "You're invited to Telemetry Tracker",
-          html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
-        });
-      }
+      void sendOrganizationInviteEmail(
+        prisma,
+        { id: inviteResult.inviteId, email, token },
+        inviteUrl
+      );
 
       return reply.status(201).send({
         status: "invited" as const,

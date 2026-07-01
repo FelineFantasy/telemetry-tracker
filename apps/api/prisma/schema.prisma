@@ -103,6 +103,7 @@ model OrganizationInvite {
   invited_by_id   String       @map("invited_by_id")
   invited_by      User         @relation("InviteCreatedBy", fields: [invited_by_id], references: [id], onDelete: Cascade)
   created_at      DateTime     @default(now()) @map("created_at")
+  invite_email_sent_at DateTime? @map("invite_email_sent_at")
 
   @@unique([organization_id, email])
   @@index([organization_id])

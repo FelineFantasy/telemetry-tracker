@@ -5,6 +5,7 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from "./notification-preferences.js"
 import {
   notifyOrganizationMembersByEmail,
   sendNotificationEmailIfAllowed,
+  sendOrganizationInviteEmail,
 } from "./notification-email-dispatch.js";
 
 vi.mock("./email.js", () => ({
@@ -148,5 +149,73 @@ describe("sendNotificationEmailIfAllowed", () => {
         },
       },
     });
+  });
+});
+
+describe("sendOrganizationInviteEmail", () => {
+  it("claims NotificationEmailLog for registered invitees", async () => {
+    const createMany = vi.fn(async () => ({ count: 1 }));
+    const prisma = {
+      user: {
+        findUnique: vi.fn(async () => ({
+          id: "user-1",
+          email: "invitee@example.com",
+          notification_preferences: emailEnabledPrefs,
+        })),
+      },
+      organizationInvite: {
+        updateMany: vi.fn(),
+      },
+      notificationEmailLog: {
+        createMany,
+        delete: vi.fn(),
+      },
+    } as unknown as Parameters<typeof sendOrganizationInviteEmail>[0];
+
+    await sendOrganizationInviteEmail(
+      prisma,
+      { id: "invite-1", email: "invitee@example.com", token: "tok" },
+      "https://app.example.com/register?invite=tok"
+    );
+
+    expect(createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skipDuplicates: true,
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            user_id: "user-1",
+            notification_key: "team:invite:invite-1",
+          }),
+        ]),
+      })
+    );
+  });
+
+  it("skips guest invite email when invite_email_sent_at is already set", async () => {
+    const { sendTransactionalEmail } = await import("./email.js");
+    const sendMock = vi.mocked(sendTransactionalEmail);
+    sendMock.mockClear();
+
+    const prisma = {
+      user: {
+        findUnique: vi.fn(async () => null),
+      },
+      organizationInvite: {
+        updateMany: vi.fn(async () => ({ count: 0 })),
+        update: vi.fn(),
+      },
+      notificationEmailLog: {
+        createMany: vi.fn(),
+        delete: vi.fn(),
+      },
+    } as unknown as Parameters<typeof sendOrganizationInviteEmail>[0];
+
+    await sendOrganizationInviteEmail(
+      prisma,
+      { id: "invite-1", email: "new@example.com", token: "tok" },
+      "https://app.example.com/register?invite=tok"
+    );
+
+    expect(sendMock).not.toHaveBeenCalled();
   });
 });

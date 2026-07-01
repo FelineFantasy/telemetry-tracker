@@ -9,6 +9,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   markAllNotificationsReadAction,
   markNotificationsReadAction,
@@ -49,7 +50,13 @@ export function DashboardNotifications({ initialItems }: Props) {
     setItems((prev) => {
       const target = prev.find((item) => item.id === id);
       if (!target?.unread) return prev;
-      void markNotificationsReadAction([id]);
+      const previous = prev;
+      void markNotificationsReadAction([id]).then((result) => {
+        if (!result.ok) {
+          setItems(previous);
+          toast.error(result.error || "Could not mark notification as read");
+        }
+      });
       return prev.map((item) =>
         item.id === id ? { ...item, unread: false } : item
       );
@@ -59,7 +66,13 @@ export function DashboardNotifications({ initialItems }: Props) {
   const markAllRead = useCallback(() => {
     setItems((prev) => {
       if (!prev.some((item) => item.unread)) return prev;
-      void markAllNotificationsReadAction();
+      const previous = prev;
+      void markAllNotificationsReadAction().then((result) => {
+        if (!result.ok) {
+          setItems(previous);
+          toast.error(result.error || "Could not mark notifications as read");
+        }
+      });
       return prev.map((item) => ({ ...item, unread: false }));
     });
   }, []);

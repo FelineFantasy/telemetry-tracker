@@ -304,3 +304,66 @@ export async function shouldSendInviteEmail(
   const prefs = parseNotificationPreferences(user.notification_preferences);
   return shouldSendEmailForCategory(prefs, "team");
 }
+
+function organizationInviteEmailKey(inviteId: string): string {
+  return `team:invite:${inviteId}`;
+}
+
+export async function sendOrganizationInviteEmail(
+  prisma: PrismaClient,
+  invite: { id: string; email: string; token: string },
+  inviteUrl: string
+): Promise<void> {
+  if (!(await shouldSendInviteEmail(prisma, invite.email))) return;
+
+  const notificationKey = organizationInviteEmailKey(invite.id);
+  const item: DashboardNotificationItem = {
+    id: notificationKey,
+    type: "team",
+    title: "You're invited to Telemetry Tracker",
+    body: "You were invited to join an organization on Telemetry Tracker.",
+    occurredAt: new Date().toISOString(),
+    href: `/register?invite=${encodeURIComponent(invite.token)}`,
+  };
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalizeEmail(invite.email) },
+    select: {
+      id: true,
+      email: true,
+      notification_preferences: true,
+    },
+  });
+
+  if (user) {
+    await sendNotificationEmailIfAllowed(
+      prisma,
+      user.id,
+      user.email,
+      item,
+      parseNotificationPreferences(user.notification_preferences)
+    );
+    return;
+  }
+
+  const claimed = await prisma.organizationInvite.updateMany({
+    where: { id: invite.id, invite_email_sent_at: null },
+    data: { invite_email_sent_at: new Date() },
+  });
+  if (claimed.count === 0) return;
+
+  const result = await sendTransactionalEmail({
+    to: invite.email,
+    subject: "You're invited to Telemetry Tracker",
+    html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
+  });
+
+  if (!result.sent && !result.devLogged) {
+    await prisma.organizationInvite
+      .update({
+        where: { id: invite.id },
+        data: { invite_email_sent_at: null },
+      })
+      .catch(() => undefined);
+  }
+}
