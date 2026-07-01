@@ -233,6 +233,7 @@ export async function getSessionDurationSeries(
           AND e."session_id" = s."session_id"
           AND e."environment" = ${environment}
           AND e."created_at" >= ${since}
+          ${until ? Prisma.sql`AND e."created_at" <= ${until}` : Prisma.empty}
       )`
     : Prisma.empty;
   const rows = await prisma.$queryRaw<{ bucket: Date; avg_sec: number | null }[]>(Prisma.sql`

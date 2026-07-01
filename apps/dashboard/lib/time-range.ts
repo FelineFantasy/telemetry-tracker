@@ -248,6 +248,27 @@ export function effectiveIngestRateDurationMs(range: ParsedTimeRange): number {
   return OVERVIEW_CHART_MAX_BUCKETS * stepMs;
 }
 
+/** Metrics/compare window — unselected ranges use the recent chart span, not epoch→now. */
+export function effectiveOverviewWindow(range: ParsedTimeRange): {
+  gte: Date;
+  lte: Date;
+  durationMs: number;
+} {
+  if (!isUnselectedTimeRange(range.key)) {
+    return {
+      gte: range.gte,
+      lte: range.lte,
+      durationMs: Math.max(range.durationMs, 1),
+    };
+  }
+  const durationMs = effectiveIngestRateDurationMs(range);
+  return {
+    gte: new Date(range.lte.getTime() - durationMs),
+    lte: range.lte,
+    durationMs,
+  };
+}
+
 /** @deprecated Use buildUnselectedTimeRange */
 export function buildAllTimeRange(now: Date = new Date()): ParsedTimeRange {
   return buildUnselectedTimeRange(now);

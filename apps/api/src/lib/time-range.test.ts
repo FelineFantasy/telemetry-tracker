@@ -4,8 +4,10 @@ import {
   parseTimeRangeQuery,
   tryParseCustomRelativeInput,
   effectiveIngestRateDurationMs,
+  effectiveOverviewWindow,
   buildUnselectedTimeRange,
 } from "./time-range.js";
+import { resolveCompareWindow } from "./overview-stats.js";
 
 describe("parseTimeRangeQuery", () => {
   const now = new Date("2026-06-28T12:00:00.000Z");
@@ -78,5 +80,46 @@ describe("effectiveIngestRateDurationMs", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(effectiveIngestRateDurationMs(parsed.range)).toBe(parsed.range.durationMs);
+  });
+});
+
+describe("effectiveOverviewWindow", () => {
+  const now = new Date("2026-06-28T12:00:00.000Z");
+
+  it("anchors unselected ranges on the recent chart span", () => {
+    const range = buildUnselectedTimeRange(now);
+    const window = effectiveOverviewWindow(range);
+    const durationMs = 120 * 7 * 86_400_000;
+
+    expect(window.durationMs).toBe(durationMs);
+    expect(window.lte).toEqual(now);
+    expect(window.gte.getTime()).toBe(now.getTime() - durationMs);
+    expect(window.gte.getTime()).toBeGreaterThan(0);
+  });
+
+  it("passes preset ranges through unchanged", () => {
+    const parsed = parseTimeRangeQuery({ range: "7d" }, now);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(effectiveOverviewWindow(parsed.range)).toEqual({
+      gte: parsed.range.gte,
+      lte: parsed.range.lte,
+      durationMs: parsed.range.durationMs,
+    });
+  });
+
+  it("yields a valid compare window for unselected overview", () => {
+    const range = buildUnselectedTimeRange(now);
+    const window = effectiveOverviewWindow(range);
+    const { previousSince, previousUntil } = resolveCompareWindow(
+      window.durationMs,
+      "previous",
+      window.gte,
+      window.lte
+    );
+
+    expect(previousSince.getTime()).toBeGreaterThan(0);
+    expect(previousUntil?.getTime()).toBe(window.gte.getTime());
+    expect(previousSince.getTime()).toBe(window.gte.getTime() - window.durationMs);
   });
 });

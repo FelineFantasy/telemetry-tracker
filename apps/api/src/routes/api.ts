@@ -46,7 +46,7 @@ import {
 import { requireSessionUser } from "../lib/auth-session.js";
 import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
-import { parseOverviewTimeRangeQuery } from "../lib/time-range.js";
+import { effectiveOverviewWindow, parseOverviewTimeRangeQuery } from "../lib/time-range.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -135,6 +135,7 @@ export async function apiRoutes(
     const timeRange = timeRangeParsed.range;
     const since = timeRange.gte;
     const until = timeRange.lte;
+    const metricsWindow = effectiveOverviewWindow(timeRange);
     const appFilter = queryApp(query.app);
     const environment = queryString(query.environment);
     const compare: OverviewCompareMode =
@@ -156,12 +157,19 @@ export async function apiRoutes(
       return reply.status(400).send({ error: "Invalid topEventsOrder" });
     }
     const compareWindow = resolveCompareWindow(
-      timeRange.durationMs,
+      metricsWindow.durationMs,
       compare,
-      since,
-      until
+      metricsWindow.gte,
+      metricsWindow.lte
     );
-    const scope = { projectId, since, until, app: appFilter, environment };
+    const metricsScope = {
+      projectId,
+      since: metricsWindow.gte,
+      until: metricsWindow.lte,
+      app: appFilter,
+      environment,
+    };
+    const listScope = { projectId, since, until, app: appFilter, environment };
     const listPageSize = Math.min(
       MAX_OVERVIEW_LIST_PAGE_SIZE,
       Math.max(
@@ -199,11 +207,11 @@ export async function apiRoutes(
       ...(environment ? { environment } : {}),
     };
 
-    const previousUntil = compareWindow.previousUntil ?? since;
+    const previousUntil = compareWindow.previousUntil ?? metricsWindow.gte;
     const windowParams = {
       projectId,
-      since,
-      until,
+      since: metricsWindow.gte,
+      until: metricsWindow.lte,
       previousSince: compareWindow.previousSince,
       previousUntil,
       app: appFilter,
@@ -252,7 +260,7 @@ export async function apiRoutes(
       ),
       getOverviewSessionsPair(
         prisma,
-        scope,
+        metricsScope,
         compareWindow.previousSince,
         previousUntil
       ),
@@ -267,7 +275,7 @@ export async function apiRoutes(
         appFilter,
         environment
       ),
-      listActiveIssues(prisma, scope),
+      listActiveIssues(prisma, listScope),
     ]);
 
     const errorsCount = errorCounts.current;
