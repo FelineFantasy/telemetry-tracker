@@ -57,6 +57,19 @@ const preferencesSchema = z.object({
   }),
 });
 
+function normalizeNotificationPreferences(
+  data: z.infer<typeof preferencesSchema>
+): NotificationPreferences {
+  return {
+    ...data,
+    routing: {
+      ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
+      ...data.routing,
+      alerts: data.routing.alerts ?? DEFAULT_NOTIFICATION_PREFERENCES.routing.alerts,
+    },
+  };
+}
+
 export function parseNotificationPreferences(
   raw: unknown
 ): NotificationPreferences {
@@ -64,15 +77,7 @@ export function parseNotificationPreferences(
   if (!parsed.success) {
     return DEFAULT_NOTIFICATION_PREFERENCES;
   }
-  return {
-    ...parsed.data,
-    routing: {
-      ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
-      ...parsed.data.routing,
-      alerts:
-        parsed.data.routing.alerts ?? DEFAULT_NOTIFICATION_PREFERENCES.routing.alerts,
-    },
-  };
+  return normalizeNotificationPreferences(parsed.data);
 }
 
 export function validateNotificationPreferencesPatch(
@@ -82,7 +87,7 @@ export function validateNotificationPreferencesPatch(
   if (!parsed.success) {
     return { ok: false, error: "Invalid notification preferences payload" };
   }
-  return { ok: true, preferences: parsed.data };
+  return { ok: true, preferences: normalizeNotificationPreferences(parsed.data) };
 }
 
 export function categoryForNotificationType(
