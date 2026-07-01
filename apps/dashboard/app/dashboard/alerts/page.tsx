@@ -2,7 +2,7 @@ import { AlertsClient } from "./AlertsClient";
 import {
   fetchProjectAlertEvents,
   fetchProjectAlertSettings,
-} from "@/lib/alert-settings";
+} from "@/lib/alert-settings-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 export const dynamic = "force-dynamic";
