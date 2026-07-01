@@ -11,6 +11,7 @@
 - [ ] Tests pass (`pnpm test`; use `RUN_DB_INTEGRATION_TESTS=true` + Postgres if API integration behavior changed)
 - [ ] Lint passes (`pnpm lint`)
 - [ ] Build succeeds (`pnpm build`)
+- [ ] [CHANGELOG.md](../CHANGELOG.md) updated under `[Unreleased]` (if user-facing)
 - [ ] Documentation updated (if needed)
 - [ ] New code follows the existing style
 - [ ] No breaking changes (or called out clearly above)

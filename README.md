@@ -222,6 +222,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 | Stripe & Resend (optional) | [docs/BILLING.md](docs/BILLING.md) |
 | Production checklist | [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) |
 | Releases & deploy runbook | [docs/RELEASE.md](docs/RELEASE.md) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | RBAC & org model | [docs/RBAC.md](docs/RBAC.md) |
 | Plans & ingest auth | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) |
 | SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
