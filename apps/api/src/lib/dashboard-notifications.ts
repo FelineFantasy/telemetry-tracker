@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { DashboardSessionContextPayload } from "./dashboard-session-context.js";
 import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
   filterInAppNotifications,
   filterInAppNotificationsForReadPersistence,
   parseNotificationPreferences,
@@ -90,9 +91,23 @@ function quotaNotifications(
   return items;
 }
 
-/** Quota limits use session `quota` items (billing routing); skip duplicate `alert` rows. */
+function preferredQuotaCollisionItem(
+  quota: DashboardNotificationItem,
+  alert: DashboardNotificationItem,
+  preferences: NotificationPreferences
+): DashboardNotificationItem {
+  const billingInApp = preferences.routing.billing.inapp;
+  const alertsInApp = preferences.routing.alerts.inapp;
+  if (billingInApp && !alertsInApp) return quota;
+  if (alertsInApp && !billingInApp) return alert;
+  if (billingInApp && alertsInApp) return alert;
+  return quota;
+}
+
+/** Resolve quota session items vs fired alert rows that share the same dedupe id. */
 export function dedupeNotificationItems(
-  items: DashboardNotificationItem[]
+  items: DashboardNotificationItem[],
+  preferences: NotificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES
 ): DashboardNotificationItem[] {
   const byId = new Map<string, DashboardNotificationItem>();
   for (const item of items) {
@@ -101,10 +116,20 @@ export function dedupeNotificationItems(
       byId.set(item.id, item);
       continue;
     }
-    if (existing.type === "alert" && item.type === "quota") {
-      byId.set(item.id, item);
-    } else if (existing.type === "quota" && item.type === "alert") {
-      continue;
+    const quota =
+      existing.type === "quota"
+        ? existing
+        : item.type === "quota"
+          ? item
+          : null;
+    const alert =
+      existing.type === "alert"
+        ? existing
+        : item.type === "alert"
+          ? item
+          : null;
+    if (quota && alert) {
+      byId.set(item.id, preferredQuotaCollisionItem(quota, alert, preferences));
     } else {
       byId.set(item.id, item);
     }
@@ -184,7 +209,7 @@ export async function buildDashboardNotifications(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
   );
 
-  const deduped = dedupeNotificationItems(items).sort(
+  const deduped = dedupeNotificationItems(items, preferences).sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
   );
 

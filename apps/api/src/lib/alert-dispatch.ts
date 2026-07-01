@@ -105,7 +105,6 @@ export async function recentAlertNotifications(
     where: {
       project_id: projectId,
       fired_at: { gte: since },
-      rule: "ERROR_SPIKE",
     },
     orderBy: { fired_at: "desc" },
     take: 5,
@@ -119,14 +118,12 @@ export async function recentAlertNotifications(
     },
   });
 
-  return rows
-    .filter((row) => row.rule === "ERROR_SPIKE")
-    .map((row) => ({
-      id: row.dedupe_key,
-      type: "alert" as const,
-      title: row.title,
-      body: row.body,
-      occurredAt: row.fired_at.toISOString(),
-      href: alertEventHref(row.rule, row.href),
-    }));
+  return rows.map((row) => ({
+    id: row.dedupe_key,
+    type: "alert" as const,
+    title: row.title,
+    body: row.body,
+    occurredAt: row.fired_at.toISOString(),
+    href: alertEventHref(row.rule, row.href),
+  }));
 }

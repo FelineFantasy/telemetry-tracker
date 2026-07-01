@@ -162,4 +162,55 @@ describe("buildDashboardNotifications", () => {
       expect.objectContaining({ type: "quota", id: quotaId }),
     ]);
   });
+
+  it("shows quota alert in bell when alerts routing is on and billing routing is off", async () => {
+    const yearMonth = new Date().toISOString().slice(0, 7);
+    const quotaId = `quota:near:p1:${yearMonth}`;
+    const prisma = {
+      alertEvent: {
+        findMany: async () => [
+          {
+            rule: "QUOTA_NEAR",
+            title: "Usage approaching limit",
+            body: "85% of your PRO plan monthly ingest",
+            href: "/dashboard/settings/billing",
+            dedupe_key: quotaId,
+            fired_at: new Date("2026-07-01T12:00:00.000Z"),
+          },
+        ],
+      },
+      errorGroup: { findMany: async () => [] },
+    } as never;
+
+    const prefs = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      routing: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        billing: { inapp: false, email: true },
+        alerts: { inapp: true, email: true },
+      },
+    };
+
+    const items = await buildDashboardNotifications(
+      prisma,
+      "p1",
+      {
+        ...baseSession,
+        usageQuota: {
+          planTier: "PRO",
+          monthlyIngestUsed: 850,
+          monthlyIngestLimit: 1000,
+          percentUsed: 85,
+          quotaExceeded: false,
+          nearQuota: true,
+          retentionDays: 30,
+        },
+      },
+      prefs
+    );
+
+    expect(items.filter((i) => i.id === quotaId)).toEqual([
+      expect.objectContaining({ type: "alert", id: quotaId }),
+    ]);
+  });
 });
