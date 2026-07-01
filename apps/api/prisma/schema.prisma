@@ -220,6 +220,7 @@ model AlertEvent {
   rule        AlertRuleType
   title       String
   body        String
+  href        String?
   dedupe_key  String        @map("dedupe_key")
   fired_at    DateTime      @default(now()) @map("fired_at")
 

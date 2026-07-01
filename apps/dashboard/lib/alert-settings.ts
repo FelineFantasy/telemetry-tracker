@@ -15,6 +15,7 @@ export type AlertEventRow = {
   rule: "ERROR_SPIKE" | "QUOTA_NEAR" | "QUOTA_EXCEEDED";
   title: string;
   body: string;
+  href: string | null;
   firedAt: string;
 };
 

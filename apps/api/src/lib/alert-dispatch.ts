@@ -21,6 +21,20 @@ function isUniqueViolation(e: unknown): boolean {
   );
 }
 
+/** Default in-app link when legacy rows have no stored href. */
+export function alertEventHref(rule: AlertRuleType, stored: string | null): string | null {
+  if (stored) return stored;
+  switch (rule) {
+    case "ERROR_SPIKE":
+      return "/dashboard/errors";
+    case "QUOTA_NEAR":
+    case "QUOTA_EXCEEDED":
+      return "/dashboard/settings/billing";
+    default:
+      return "/dashboard/alerts";
+  }
+}
+
 /** Record alert history and notify org members (email deduped via notification key). */
 export async function fireProjectAlert(
   prisma: PrismaClient,
@@ -34,6 +48,7 @@ export async function fireProjectAlert(
         rule: payload.rule,
         title: payload.title,
         body: payload.body,
+        href: payload.href,
         dedupe_key: payload.dedupeKey,
       },
     });
@@ -72,6 +87,7 @@ export async function listRecentAlertEvents(
       rule: true,
       title: true,
       body: true,
+      href: true,
       dedupe_key: true,
       fired_at: true,
     },
@@ -90,8 +106,10 @@ export async function recentAlertNotifications(
     orderBy: { fired_at: "desc" },
     take: 5,
     select: {
+      rule: true,
       title: true,
       body: true,
+      href: true,
       dedupe_key: true,
       fired_at: true,
     },
@@ -103,6 +121,6 @@ export async function recentAlertNotifications(
     title: row.title,
     body: row.body,
     occurredAt: row.fired_at.toISOString(),
-    href: "/dashboard/alerts",
+    href: alertEventHref(row.rule, row.href),
   }));
 }

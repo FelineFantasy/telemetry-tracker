@@ -880,6 +880,7 @@ export async function projectDashboardRoutes(
         rule: e.rule,
         title: e.title,
         body: e.body,
+        href: e.href,
         firedAt: e.fired_at.toISOString(),
       })),
     });

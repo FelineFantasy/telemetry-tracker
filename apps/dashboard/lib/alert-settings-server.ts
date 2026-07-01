@@ -15,7 +15,8 @@ function isEvent(value: unknown): value is AlertEventRow {
       o.rule === "QUOTA_EXCEEDED") &&
     typeof o.title === "string" &&
     typeof o.body === "string" &&
-    typeof o.firedAt === "string"
+    typeof o.firedAt === "string" &&
+    (o.href === null || typeof o.href === "string")
   );
 }
 

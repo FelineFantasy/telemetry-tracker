@@ -18,6 +18,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Database
 
 - `20260702120000_project_alerts` — `Project.alert_settings` JSON and `AlertEvent` history table
+- `20260702130000_alert_event_href` — persist in-app link on fired alerts
 
 ---
 
