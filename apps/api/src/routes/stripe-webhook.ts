@@ -173,8 +173,9 @@ export async function registerStripeWebhookIfConfigured(
               "../lib/notification-email-dispatch.js"
             );
             for (const org of orgsBefore) {
-              const periodEnd = sub.current_period_end
-                ? new Date(sub.current_period_end * 1000)
+              const periodEndUnix = stripeSubscriptionPeriodEndUnix(sub);
+              const periodEnd = periodEndUnix
+                ? new Date(periodEndUnix * 1000)
                 : null;
               void notifyBillingAlertEmail(
                 prisma,
