@@ -31,6 +31,23 @@ flowchart LR
 
 There is no separate staging deploy yet — validate on `develop` locally before milestone promotion.
 
+### `develop` merge gate
+
+Feature and fix PRs merge into **`develop`**. Branch protection (Settings → Branches → `develop`):
+
+| Rule | Mechanism |
+|------|-----------|
+| PR required | Branch protection — no direct pushes to `develop` |
+| CI must pass | Required status check: `build` ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) |
+| Bugbot | Required status check: `Cursor Bugbot` — see [CONTRIBUTING.md](../CONTRIBUTING.md#ai-code-review-bugbot) |
+| Branch up to date | Require branches to be up to date before merging |
+| Approvals | Optional (0 for solo maintainer, 1+ when collaborators review). Authors cannot approve their own PRs. |
+| **Not on `develop`** | `maintainer-review` — production gate only on **`main`** |
+
+**Adding status checks:** GitHub lists checks only after they have run at least once on a PR. Open or update a PR (e.g. trigger Bugbot with `bugbot run`), wait for `build` and `Cursor Bugbot` to finish, then edit the `develop` rule and select both under **Status checks that are required**.
+
+Bugbot findings default to a **`neutral`** check conclusion — they comment but do not block merge unless **fail on unresolved issues** is enabled in the Cursor Bugbot dashboard.
+
 ### `main` merge gate
 
 GitHub cannot require “your approval only when you are not the PR author” (authors cannot approve their own PRs). **`main`** uses:
