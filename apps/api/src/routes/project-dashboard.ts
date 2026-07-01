@@ -11,6 +11,16 @@ import { getProjectNavSummaries } from "../lib/project-nav-summary.js";
 import { loadNavScopeForProject, loadWorkspaceMetaForUser } from "../lib/workspace-meta.js";
 import { buildDashboardBootstrap } from "../lib/dashboard-bootstrap.js";
 import { buildDashboardSessionContext } from "../lib/dashboard-session-context.js";
+import { buildDashboardNotifications } from "../lib/dashboard-notifications.js";
+import {
+  parseNotificationPreferences,
+  validateNotificationPreferencesPatch,
+} from "../lib/notification-preferences.js";
+import { shouldSendInviteEmail } from "../lib/notification-email-dispatch.js";
+import {
+  attachNotificationReadState,
+  markNotificationsRead,
+} from "../lib/notification-read.js";
 import {
   canCreateApiKey,
   canCreateProject,
@@ -486,6 +496,14 @@ export async function projectDashboardRoutes(
         if (addExisting.kind === "already_member") {
           return reply.status(409).send({ error: "User is already a member" });
         }
+        const { notifyTeamMemberJoinedEmail } = await import(
+          "../lib/notification-email-dispatch.js"
+        );
+        void notifyTeamMemberJoinedEmail(prisma, orgId, {
+          email: target.email,
+          displayName: target.display_name,
+          role: newRole,
+        });
         return reply.status(201).send({ status: "added" as const });
       }
 
@@ -541,11 +559,13 @@ export async function projectDashboardRoutes(
 
       const inviteUrl = `${base}/register?invite=${encodeURIComponent(token)}`;
 
-      void sendTransactionalEmail({
-        to: email,
-        subject: "You're invited to Telemetry Tracker",
-        html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
-      });
+      if (await shouldSendInviteEmail(prisma, email)) {
+        void sendTransactionalEmail({
+          to: email,
+          subject: "You're invited to Telemetry Tracker",
+          html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
+        });
+      }
 
       return reply.status(201).send({
         status: "invited" as const,
@@ -638,6 +658,134 @@ export async function projectDashboardRoutes(
       return reply.status(403).send({ error: "Forbidden" });
     }
     return reply.send(sessionContext);
+  });
+
+  app.get("/meta/notifications", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const sessionContext = await buildDashboardSessionContext(prisma, session, request);
+    if (sessionContext === null) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { email: true, notification_preferences: true },
+    });
+    const preferences = parseNotificationPreferences(user?.notification_preferences);
+    const projectId = sessionContext.projectId || null;
+    const headerOrg = readOrganizationIdHeader(request);
+    const memberships = await prisma.organizationMembership.findMany({
+      where: { user_id: session.userId },
+      select: { organization_id: true },
+    });
+    let organizationIds = memberships.map((m) => m.organization_id);
+    if (headerOrg && organizationIds.includes(headerOrg)) {
+      organizationIds = [headerOrg];
+    }
+    const items = await buildDashboardNotifications(
+      prisma,
+      projectId,
+      sessionContext,
+      preferences,
+      user
+        ? {
+            userId: session.userId,
+            userEmail: user.email,
+            organizationIds,
+          }
+        : undefined
+    );
+    const withRead = await attachNotificationReadState(prisma, session.userId, items);
+    return reply.send({ items: withRead });
+  });
+
+  app.post("/meta/notifications/read", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+
+    const body = (request.body ?? {}) as { ids?: unknown; all?: unknown };
+    const sessionContext = await buildDashboardSessionContext(prisma, session, request);
+    if (sessionContext === null) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+
+    if (body.all === true) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { email: true, notification_preferences: true },
+      });
+      const preferences = parseNotificationPreferences(user?.notification_preferences);
+      const headerOrg = readOrganizationIdHeader(request);
+      const memberships = await prisma.organizationMembership.findMany({
+        where: { user_id: session.userId },
+        select: { organization_id: true },
+      });
+      let organizationIds = memberships.map((m) => m.organization_id);
+      if (headerOrg && organizationIds.includes(headerOrg)) {
+        organizationIds = [headerOrg];
+      }
+      const items = await buildDashboardNotifications(
+        prisma,
+        sessionContext.projectId || null,
+        sessionContext,
+        preferences,
+        user
+          ? {
+              userId: session.userId,
+              userEmail: user.email,
+              organizationIds,
+            }
+          : undefined
+      );
+      await markNotificationsRead(
+        prisma,
+        session.userId,
+        items.map((item) => item.id)
+      );
+      return reply.send({ ok: true });
+    }
+
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+    if (ids.length === 0) {
+      return reply.status(400).send({ error: "Provide ids or all: true" });
+    }
+    await markNotificationsRead(prisma, session.userId, ids);
+    return reply.send({ ok: true });
+  });
+
+  app.get("/meta/notification-preferences", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { notification_preferences: true },
+    });
+    return reply.send({
+      preferences: parseNotificationPreferences(user?.notification_preferences),
+    });
+  });
+
+  app.patch("/meta/notification-preferences", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+
+    const parsed = validateNotificationPreferencesPatch(request.body);
+    if (!parsed.ok) {
+      return reply.status(400).send({ error: parsed.error });
+    }
+
+    await prisma.user.update({
+      where: { id: session.userId },
+      data: { notification_preferences: parsed.preferences },
+    });
+
+    return reply.send({ preferences: parsed.preferences });
   });
 
   app.get("/meta/members", async (request, reply) => {

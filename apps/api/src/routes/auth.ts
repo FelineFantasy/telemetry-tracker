@@ -92,6 +92,7 @@ export async function authRoutes(
             kind: "ok" as const,
             user: u,
             organizationId: invite.organization_id,
+            role: invite.role,
           };
         } catch (e: unknown) {
           if (
@@ -115,6 +116,15 @@ export async function authRoutes(
         return reply.status(409).send({ error: "Email already registered" });
       }
       const user = inviteOutcome.user;
+
+      const { notifyTeamMemberJoinedEmail } = await import(
+        "../lib/notification-email-dispatch.js"
+      );
+      void notifyTeamMemberJoinedEmail(prisma, inviteOutcome.organizationId, {
+        email: user.email,
+        displayName: user.display_name,
+        role: inviteOutcome.role,
+      });
 
       const sessionId = randomUUID();
       const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);

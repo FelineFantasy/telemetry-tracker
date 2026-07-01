@@ -38,12 +38,36 @@ model User {
   email          String                     @unique
   password_hash  String                     @map("password_hash")
   display_name   String?                    @map("display_name")
+  notification_preferences Json?            @map("notification_preferences")
   created_at     DateTime                   @default(now()) @map("created_at")
   updated_at     DateTime                   @updatedAt @map("updated_at")
   sessions       UserSession[]
   memberships    OrganizationMembership[]
   invites_sent   OrganizationInvite[] @relation("InviteCreatedBy")
   password_reset_tokens PasswordResetToken[]
+  notification_reads    NotificationRead[]
+  notification_email_logs NotificationEmailLog[]
+}
+
+model NotificationRead {
+  user_id          String   @map("user_id")
+  user             User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  notification_id  String   @map("notification_id")
+  read_at          DateTime @default(now()) @map("read_at")
+
+  @@id([user_id, notification_id])
+  @@index([user_id])
+}
+
+model NotificationEmailLog {
+  id               String   @id @default(uuid())
+  user_id          String   @map("user_id")
+  user             User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  notification_key String   @map("notification_key")
+  sent_at          DateTime @default(now()) @map("sent_at")
+
+  @@unique([user_id, notification_key])
+  @@index([user_id, sent_at])
 }
 
 /// Org membership for dashboard authorization.

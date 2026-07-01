@@ -166,6 +166,13 @@ export async function assertIngestPlanOrReply(
   const used = await getMonthlyIngestUsed(prisma, projectId);
   const m = checkMonthlyIngestUnits(used, additionalUnits, ctx.limits);
   if (!m.ok) {
+    const { notifyQuotaThresholdEmail } = await import("./notification-email-dispatch.js");
+    void notifyQuotaThresholdEmail(prisma, projectId, "exceeded", {
+      planTier: ctx.planTier,
+      monthlyIngestUsed: used,
+      monthlyIngestLimit: ctx.limits.monthlyIngestUnits,
+      percentUsed: Math.round((used / ctx.limits.monthlyIngestUnits) * 100),
+    });
     return {
       ok: false,
       status: 429,

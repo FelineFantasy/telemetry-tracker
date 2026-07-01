@@ -124,10 +124,41 @@ export async function registerStripeWebhookIfConfigured(
               where: { stripe_subscription_id: sub.id, deleted_at: null },
               data: patch,
             });
+            const { loadPlanContextForOrganization } = await import(
+              "../lib/plan-enforcement.js"
+            );
+            const { billingHealthFromPlanContext } = await import(
+              "../lib/billing-alert.js"
+            );
+            const { notifyBillingAlertEmail } = await import(
+              "../lib/notification-email-dispatch.js"
+            );
+            const orgs = await prisma.organization.findMany({
+              where: { stripe_subscription_id: sub.id, deleted_at: null },
+              select: { id: true },
+            });
+            for (const org of orgs) {
+              const ctx = await loadPlanContextForOrganization(prisma, org.id);
+              if (!ctx) continue;
+              const health = billingHealthFromPlanContext(ctx);
+              if (health.billingAlertVariant) {
+                void notifyBillingAlertEmail(
+                  prisma,
+                  org.id,
+                  health.billingAlertVariant,
+                  health.storedPlanTier,
+                  health.effectivePlanTier
+                );
+              }
+            }
             break;
           }
           case "customer.subscription.deleted": {
             const sub = event.data.object as Stripe.Subscription;
+            const orgsBefore = await prisma.organization.findMany({
+              where: { stripe_subscription_id: sub.id, deleted_at: null },
+              select: { id: true },
+            });
             await prisma.organization.updateMany({
               where: { stripe_subscription_id: sub.id },
               data: {
@@ -137,6 +168,18 @@ export async function registerStripeWebhookIfConfigured(
                 stripe_current_period_end: null,
               },
             });
+            const { notifyBillingAlertEmail } = await import(
+              "../lib/notification-email-dispatch.js"
+            );
+            for (const org of orgsBefore) {
+              void notifyBillingAlertEmail(
+                prisma,
+                org.id,
+                "canceled",
+                PlanTier.FREE,
+                PlanTier.FREE
+              );
+            }
             break;
           }
           default:
