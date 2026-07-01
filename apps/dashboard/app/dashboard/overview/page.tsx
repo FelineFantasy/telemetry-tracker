@@ -33,10 +33,12 @@ import {
   buildErrorGroupDetailHref,
   formatOverviewDeltaLine,
 } from "@/lib/overview-scope-url";
+import type { ParsedTimeRange } from "@/lib/time-range";
 import {
-  parseOverviewTimeRangeOrDefault,
+  parseOverviewTimeRangeQuery,
   isUnselectedTimeRange,
   effectiveIngestRateDurationMs,
+  appendListTimeRangeToParams,
 } from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 import { coalesceOverviewRequest } from "@/lib/api-inflight";
@@ -61,7 +63,8 @@ export const dynamic = "force-dynamic";
 const OVERVIEW_PATH = "/dashboard/overview";
 
 async function getOverview(
-  timeQuery: { range?: string; from?: string; to?: string },
+  parsedRange: ParsedTimeRange,
+  timeFromTo: { from?: string; to?: string },
   app: string | undefined,
   environment: string | undefined,
   compare: string,
@@ -77,11 +80,7 @@ async function getOverview(
   scope: OverviewRequestScope
 ) {
   const params = new URLSearchParams();
-  if (timeQuery.from) params.set("from", timeQuery.from);
-  if (timeQuery.to) params.set("to", timeQuery.to);
-  if (!timeQuery.from && !timeQuery.to && timeQuery.range) {
-    params.set("range", timeQuery.range);
-  }
+  appendListTimeRangeToParams(params, parsedRange, timeFromTo.from, timeFromTo.to);
   if (app) params.set("app", app);
   if (environment) params.set("environment", environment);
   if (compare === "week-ago") params.set("compare", "week-ago");
@@ -203,7 +202,16 @@ export default async function OverviewPage({
     from: firstQueryValue(params.from),
     to: firstQueryValue(params.to),
   };
-  const parsedRange = parseOverviewTimeRangeOrDefault(timeQuery);
+  const currentOverviewParams = buildOverviewParamsRecord(params);
+  const timeParse = parseOverviewTimeRangeQuery(timeQuery);
+  if (!timeParse.ok) {
+    const rest = { ...currentOverviewParams };
+    delete rest.range;
+    delete rest.from;
+    delete rest.to;
+    redirect(mergeListQuery(OVERVIEW_PATH, rest));
+  }
+  const parsedRange = timeParse.range;
   const rawApp = firstQueryValue(params.app)?.trim() || null;
   const rawEnvironment = firstQueryValue(params.environment)?.trim() || null;
   const compare = parseOverviewCompare(firstQueryValue(params.compare));
@@ -214,7 +222,6 @@ export default async function OverviewPage({
   const errorsOrder = firstQueryValue(params.errorsOrder) ?? "desc";
   const topEventsSort = firstQueryValue(params.topEventsSort) ?? "count";
   const topEventsOrder = firstQueryValue(params.topEventsOrder) ?? "desc";
-  const currentOverviewParams = buildOverviewParamsRecord(params);
   const listParams = {
     errorsPage,
     eventsPage,
@@ -231,6 +238,7 @@ export default async function OverviewPage({
   const overviewEarlyPromise =
     cookieScope.projectId !== ""
       ? getOverview(
+          parsedRange,
           timeQuery,
           rawApp ?? undefined,
           rawEnvironment ?? undefined,
@@ -271,6 +279,7 @@ export default async function OverviewPage({
         resolvedScope,
       });
       overviewResult = await getOverview(
+        parsedRange,
         timeQuery,
         rawApp ?? undefined,
         rawEnvironment ?? undefined,
@@ -367,8 +376,8 @@ export default async function OverviewPage({
       <OverviewIngestSetupBanner
         rangeKey={parsedRange.key}
         rangeLabel={displayRangeLabel}
-        eventsCount={overviewData.eventsLast24h}
-        errorsCount={overviewData.errorsLast24h}
+        eventsCount={overviewData.eventsListTotal ?? 0}
+        errorsCount={overviewData.errorsListTotal ?? 0}
       />
       <OverviewGreeting
         user={user}

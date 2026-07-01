@@ -275,16 +275,23 @@ export function buildAllTimeRange(now: Date = new Date()): ParsedTimeRange {
 }
 
 /** Overview + lists when URL has no time filter. */
+export function parseOverviewTimeRangeQuery(
+  query: { range?: string; from?: string; to?: string },
+  now: Date = new Date()
+): ParseTimeRangeResult {
+  const hasFromTo = Boolean(query.from?.trim() || query.to?.trim());
+  const rangeRaw = query.range?.trim();
+  if (!hasFromTo && (!rangeRaw || rangeRaw === "all" || rangeRaw === "none")) {
+    return { ok: true, range: buildUnselectedTimeRange(now) };
+  }
+  return parseTimeRangeQuery(query, now, "7d");
+}
+
 export function parseOverviewTimeRangeOrDefault(
   query: { range?: string; from?: string; to?: string },
   now: Date = new Date()
 ): ParsedTimeRange {
-  const hasFromTo = Boolean(query.from?.trim() || query.to?.trim());
-  const rangeRaw = query.range?.trim();
-  if (!hasFromTo && (!rangeRaw || rangeRaw === "all" || rangeRaw === "none")) {
-    return buildUnselectedTimeRange(now);
-  }
-  const parsed = parseTimeRangeQuery(query, now, "7d");
+  const parsed = parseOverviewTimeRangeQuery(query, now);
   return parsed.ok ? parsed.range : buildUnselectedTimeRange(now);
 }
 
