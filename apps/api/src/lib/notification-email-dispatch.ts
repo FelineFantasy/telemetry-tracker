@@ -34,6 +34,10 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export async function sendNotificationEmailIfAllowed(
   prisma: PrismaClient,
   userId: string,
@@ -46,15 +50,17 @@ export async function sendNotificationEmailIfAllowed(
     return false;
   }
 
-  const existing = await prisma.notificationEmailLog.findUnique({
-    where: {
-      user_id_notification_key: {
+  const claimed = await prisma.notificationEmailLog.createMany({
+    data: [
+      {
+        id: randomUUID(),
         user_id: userId,
         notification_key: item.id,
       },
-    },
+    ],
+    skipDuplicates: true,
   });
-  if (existing) return false;
+  if (claimed.count === 0) return false;
 
   const base = dashboardOriginOrNull();
   const result = await sendTransactionalEmail({
@@ -64,16 +70,19 @@ export async function sendNotificationEmailIfAllowed(
   });
 
   if (!result.sent && !result.devLogged) {
+    await prisma.notificationEmailLog
+      .delete({
+        where: {
+          user_id_notification_key: {
+            user_id: userId,
+            notification_key: item.id,
+          },
+        },
+      })
+      .catch(() => undefined);
     return false;
   }
 
-  await prisma.notificationEmailLog.create({
-    data: {
-      id: randomUUID(),
-      user_id: userId,
-      notification_key: item.id,
-    },
-  });
   return true;
 }
 
@@ -81,9 +90,12 @@ export async function notifyOrganizationMembersByEmail(
   prisma: PrismaClient,
   organizationId: string,
   item: DashboardNotificationItem,
-  options?: { roles?: OrgRole[] }
+  options?: { roles?: OrgRole[]; excludeEmails?: string[] }
 ): Promise<void> {
   const roles = options?.roles ?? [OrgRole.OWNER, OrgRole.EDITOR, OrgRole.VIEWER];
+  const excludeEmails = new Set(
+    (options?.excludeEmails ?? []).map((address) => normalizeEmail(address))
+  );
   const members = await prisma.organizationMembership.findMany({
     where: {
       organization_id: organizationId,
@@ -101,15 +113,17 @@ export async function notifyOrganizationMembersByEmail(
   });
 
   await Promise.all(
-    members.map((member) =>
-      sendNotificationEmailIfAllowed(
-        prisma,
-        member.user.id,
-        member.user.email,
-        item,
-        parseNotificationPreferences(member.user.notification_preferences)
+    members
+      .filter((member) => !excludeEmails.has(normalizeEmail(member.user.email)))
+      .map((member) =>
+        sendNotificationEmailIfAllowed(
+          prisma,
+          member.user.id,
+          member.user.email,
+          item,
+          parseNotificationPreferences(member.user.notification_preferences)
+        )
       )
-    )
   );
 }
 
@@ -234,6 +248,7 @@ export async function notifyTeamMemberJoinedEmail(
   };
   await notifyOrganizationMembersByEmail(prisma, organizationId, item, {
     roles: [OrgRole.OWNER, OrgRole.EDITOR],
+    excludeEmails: [member.email],
   });
 }
 
