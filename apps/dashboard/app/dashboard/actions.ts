@@ -15,6 +15,10 @@ import {
   type NotificationPreferences,
 } from "@/lib/notification-preferences-shared";
 import {
+  parseProjectAlertSettings,
+  type ProjectAlertSettings,
+} from "@/lib/alert-settings";
+import {
   DEFAULT_PROJECT_ID,
   TELEMETRY_PROJECT_COOKIE,
   getDashboardProjectId,
@@ -563,4 +567,29 @@ export async function markAllNotificationsReadAction(): Promise<
   }
   revalidatePath("/dashboard", "layout");
   return { ok: true };
+}
+
+export async function saveProjectAlertSettingsAction(
+  settings: ProjectAlertSettings
+): Promise<
+  | { ok: true; settings: ProjectAlertSettings }
+  | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch("/api/project/alert-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { settings?: unknown };
+    revalidatePath("/dashboard/alerts");
+    revalidatePath("/dashboard", "layout");
+    return { ok: true, settings: parseProjectAlertSettings(data.settings) };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
 }

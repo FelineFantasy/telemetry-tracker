@@ -18,6 +18,7 @@ import {
   getMembershipRoleForOrganization,
   getMembershipRoleForProject,
 } from "./org-permissions.js";
+import { loadProjectAlertSettings, quotaNearRatio } from "./error-spike-alert.js";
 import { tryResolveReadProjectId } from "./read-project-request.js";
 
 export type DashboardSessionContextPayload = {
@@ -78,13 +79,17 @@ export async function buildDashboardSessionContext(
       const limit = ctx.limits.monthlyIngestUnits;
       const ratio = limit > 0 ? used / limit : 0;
       const quotaExceeded = limit > 0 && used >= limit;
+      const alertSettings = await loadProjectAlertSettings(prisma, projectId);
       usageQuota = {
         planTier: ctx.planTier,
         monthlyIngestUsed: used,
         monthlyIngestLimit: limit,
         percentUsed: Math.round(ratio * 100),
         quotaExceeded,
-        nearQuota: ratio >= 0.9,
+        nearQuota:
+          !quotaExceeded &&
+          alertSettings.quota.enabled &&
+          ratio >= quotaNearRatio(alertSettings),
         retentionDays: ctx.limits.retentionDays,
       };
       billingHealth = billingHealthFromPlanContext(ctx);

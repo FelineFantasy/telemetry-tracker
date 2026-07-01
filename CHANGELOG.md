@@ -13,6 +13,32 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.2.0] - 2026-07-01
+
+### Added
+
+- **Alerting v1** — per-project error spike and quota threshold rules, alert history, in-app bell + email delivery, and `/dashboard/alerts` settings UI
+- **Bugbot review rules** — `.cursor/BUGBOT.md` (repo, API, dashboard, SDK) plus contributor docs for local `/review-bugbot` and GitHub integration
+
+### Database
+
+After upgrading from v1.1.0, run:
+
+```bash
+pnpm --filter api exec prisma migrate deploy
+```
+
+New migrations in this release:
+
+- `20260702120000_project_alerts`
+- `20260702130000_alert_event_href`
+
+### SDK compatibility
+
+- Platform v1.2.x works with `@tacko/telemetry-*` **>= 1.2.0** (no npm publish required for this release)
+
+---
+
 ## [1.1.0] - 2026-07-01
 
 ### Added

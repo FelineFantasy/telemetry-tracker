@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { DashboardSessionContextPayload } from "./dashboard-session-context.js";
 import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
   filterInAppNotifications,
   filterInAppNotificationsForReadPersistence,
   parseNotificationPreferences,
@@ -9,12 +10,13 @@ import {
 import { billingAlertNotificationContent } from "./billing-alert.js";
 import { billingNotificationKey } from "./billing-notification-keys.js";
 import { buildTeamNotifications } from "./notification-team.js";
+import { recentAlertNotifications } from "./alert-dispatch.js";
 import { currentYearMonth } from "./usage-meter.js";
 import { quotaNotificationKey } from "./quota-notification-keys.js";
 
 export type DashboardNotificationItem = {
   id: string;
-  type: "issue" | "billing" | "quota" | "team";
+  type: "issue" | "billing" | "quota" | "team" | "alert";
   title: string;
   body: string;
   occurredAt: string;
@@ -89,6 +91,52 @@ function quotaNotifications(
   return items;
 }
 
+function preferredQuotaCollisionItem(
+  quota: DashboardNotificationItem,
+  alert: DashboardNotificationItem,
+  preferences: NotificationPreferences
+): DashboardNotificationItem {
+  const billingInApp = preferences.routing.billing.inapp;
+  const alertsInApp = preferences.routing.alerts.inapp;
+  if (billingInApp && !alertsInApp) return quota;
+  if (alertsInApp && !billingInApp) return alert;
+  if (billingInApp && alertsInApp) return alert;
+  return quota;
+}
+
+/** Resolve quota session items vs fired alert rows that share the same dedupe id. */
+export function dedupeNotificationItems(
+  items: DashboardNotificationItem[],
+  preferences: NotificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES
+): DashboardNotificationItem[] {
+  const byId = new Map<string, DashboardNotificationItem>();
+  for (const item of items) {
+    const existing = byId.get(item.id);
+    if (!existing) {
+      byId.set(item.id, item);
+      continue;
+    }
+    const quota =
+      existing.type === "quota"
+        ? existing
+        : item.type === "quota"
+          ? item
+          : null;
+    const alert =
+      existing.type === "alert"
+        ? existing
+        : item.type === "alert"
+          ? item
+          : null;
+    if (quota && alert) {
+      byId.set(item.id, preferredQuotaCollisionItem(quota, alert, preferences));
+    } else {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
+}
+
 export type BuildDashboardNotificationsOptions = {
   /** Include items hidden by quiet hours (for mark-all-read persistence). */
   forReadPersistence?: boolean;
@@ -114,6 +162,8 @@ export async function buildDashboardNotifications(
   }
 
   if (projectId) {
+    items.push(...(await recentAlertNotifications(prisma, projectId)));
+
     const groups = await prisma.errorGroup.findMany({
       where: {
         project_id: projectId,
@@ -159,9 +209,13 @@ export async function buildDashboardNotifications(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
   );
 
+  const deduped = dedupeNotificationItems(items, preferences).sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+  );
+
   if (options?.forReadPersistence) {
-    return filterInAppNotificationsForReadPersistence(items, preferences);
+    return filterInAppNotificationsForReadPersistence(deduped, preferences);
   }
 
-  return filterInAppNotifications(items, preferences);
+  return filterInAppNotifications(deduped, preferences);
 }

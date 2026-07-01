@@ -263,34 +263,13 @@ export async function notifyTeamMemberJoinedEmail(
   });
 }
 
-/** After ingest, email org owners/editors when usage crosses 90% or 100%. */
+/** @deprecated Use maybeNotifyQuotaAlerts from quota-alert.js */
 export async function maybeNotifyQuotaAfterIngest(
   prisma: PrismaClient,
   projectId: string
 ): Promise<void> {
-  const { loadPlanContextForProject, getMonthlyIngestUsed } = await import(
-    "./plan-enforcement.js"
-  );
-  const ctx = await loadPlanContextForProject(prisma, projectId);
-  if (!ctx) return;
-  const used = await getMonthlyIngestUsed(prisma, projectId);
-  const limit = ctx.limits.monthlyIngestUnits;
-  if (limit <= 0) return;
-  const ratio = used / limit;
-  const percentUsed = Math.round(ratio * 100);
-  const details = {
-    planTier: ctx.planTier,
-    monthlyIngestUsed: used,
-    monthlyIngestLimit: limit,
-    percentUsed,
-  };
-  if (used >= limit) {
-    void notifyQuotaThresholdEmail(prisma, projectId, "exceeded", details);
-    return;
-  }
-  if (ratio >= 0.9) {
-    void notifyQuotaThresholdEmail(prisma, projectId, "near", details);
-  }
+  const { maybeNotifyQuotaAlerts } = await import("./quota-alert.js");
+  await maybeNotifyQuotaAlerts(prisma, projectId);
 }
 
 export async function shouldSendInviteEmail(

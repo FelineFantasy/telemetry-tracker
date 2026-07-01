@@ -167,6 +167,23 @@ When you open the PR, confirm:
 
 CI runs on pull requests to **`develop`** and **`main`** (see [.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
+### AI code review (Bugbot)
+
+This repo uses [Cursor Bugbot](https://cursor.com/docs/bugbot) on GitHub pull requests. Project-specific review rules live in:
+
+| File | Scope |
+|------|--------|
+| [`.cursor/BUGBOT.md`](.cursor/BUGBOT.md) | Repo-wide security, notifications, migrations |
+| [`apps/api/.cursor/BUGBOT.md`](apps/api/.cursor/BUGBOT.md) | Ingest, plan limits, alerts API |
+| [`apps/dashboard/.cursor/BUGBOT.md`](apps/dashboard/.cursor/BUGBOT.md) | Next.js server/client split, UI |
+| [`packages/.cursor/BUGBOT.md`](packages/.cursor/BUGBOT.md) | SDK semver and public API |
+
+**Before you push** (especially for alerts, notifications, billing, or ingest): run **`/review-bugbot`** in Cursor on your branch. If the same diff is reviewed locally, GitHub Bugbot can skip a duplicate run when the PR opens.
+
+**On GitHub:** comment `cursor review` or `bugbot run` on a PR to trigger a manual review. When Bugbot is wrong, resolve the thread and add an ignore rule to the relevant `BUGBOT.md` (or comment `@cursor remember …` on the PR for learned rules).
+
+**Branch protection (maintainers):** consider requiring the **`Cursor Bugbot`** status check on `develop` alongside `build`. Enable **incremental review** and **fail on unresolved issues** in the Bugbot dashboard if you want findings to block merge.
+
 ## Code of conduct
 
 Participation is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md). Please read it before contributing.

@@ -10,10 +10,9 @@ import { prisma } from "../lib/db.js";
 import { createIngestAuthPreHandler, requireIngestProjectId } from "../middleware/ingest-auth.js";
 import { assertIngestPlanOrReply } from "../lib/plan-enforcement.js";
 import { addIngestUnits } from "../lib/usage-meter.js";
-import {
-  maybeNotifyQuotaAfterIngest,
-  notifyNewErrorGroupEmail,
-} from "../lib/notification-email-dispatch.js";
+import { notifyNewErrorGroupEmail } from "../lib/notification-email-dispatch.js";
+import { maybeNotifyErrorSpike } from "../lib/error-spike-alert.js";
+import { maybeNotifyQuotaAlerts } from "../lib/quota-alert.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
 
 /**
@@ -114,7 +113,7 @@ export async function ingestRoutes(
       },
     });
     await addIngestUnits(prisma, projectId, 1);
-    void maybeNotifyQuotaAfterIngest(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId);
     return reply.status(204).send();
   });
 
@@ -159,7 +158,7 @@ export async function ingestRoutes(
       });
     }
     await addIngestUnits(prisma, projectId, 1);
-    void maybeNotifyQuotaAfterIngest(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId);
     return reply.status(204).send();
   });
 
@@ -199,7 +198,7 @@ export async function ingestRoutes(
       });
     }
     await addIngestUnits(prisma, projectId, n);
-    void maybeNotifyQuotaAfterIngest(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId);
     return reply.status(204).send();
   });
 
@@ -237,7 +236,8 @@ export async function ingestRoutes(
     if (isNew) {
       void notifyNewErrorGroupEmail(prisma, projectId, errorGroup);
     }
-    void maybeNotifyQuotaAfterIngest(prisma, projectId);
+    void maybeNotifyErrorSpike(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId);
     return reply.status(204).send();
   });
 }
