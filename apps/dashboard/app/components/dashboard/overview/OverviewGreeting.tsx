@@ -36,7 +36,7 @@ export function OverviewGreeting({
           Here&apos;s what&apos;s happening across your workspace today.
         </p>
       </div>
-      {actions ? <div className="shrink-0">{actions}</div> : null}
+      {actions ? <div className="relative z-20 shrink-0">{actions}</div> : null}
     </header>
   );
 }
