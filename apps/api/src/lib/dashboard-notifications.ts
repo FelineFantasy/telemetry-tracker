@@ -6,6 +6,8 @@ import {
   type NotificationPreferences,
 } from "./notification-preferences.js";
 import { buildTeamNotifications } from "./notification-team.js";
+import { currentYearMonth } from "./usage-meter.js";
+import { quotaNotificationKey } from "./quota-notification-keys.js";
 
 export type DashboardNotificationItem = {
   id: string;
@@ -83,14 +85,16 @@ function billingNotification(
 }
 
 function quotaNotifications(
+  projectId: string,
   quota: NonNullable<DashboardSessionContextPayload["usageQuota"]>
 ): DashboardNotificationItem[] {
   const items: DashboardNotificationItem[] = [];
   const occurredAt = new Date().toISOString();
+  const yearMonth = currentYearMonth();
 
   if (quota.quotaExceeded) {
     items.push({
-      id: "quota:exceeded",
+      id: quotaNotificationKey(projectId, "exceeded", yearMonth),
       type: "quota",
       title: "Monthly ingest limit reached",
       body: `${quota.monthlyIngestUsed.toLocaleString()} / ${quota.monthlyIngestLimit.toLocaleString()} units on your ${quota.planTier} plan. New ingest is being rejected.`,
@@ -102,7 +106,7 @@ function quotaNotifications(
 
   if (quota.nearQuota) {
     items.push({
-      id: "quota:near",
+      id: quotaNotificationKey(projectId, "near", yearMonth),
       type: "quota",
       title: "Usage approaching limit",
       body: `${quota.percentUsed}% of your ${quota.planTier} plan monthly ingest (${quota.monthlyIngestUsed.toLocaleString()} / ${quota.monthlyIngestLimit.toLocaleString()} units).`,
@@ -128,8 +132,8 @@ export async function buildDashboardNotifications(
     : null;
   if (billingItem) items.push(billingItem);
 
-  if (session.usageQuota) {
-    items.push(...quotaNotifications(session.usageQuota));
+  if (session.usageQuota && projectId) {
+    items.push(...quotaNotifications(projectId, session.usageQuota));
   }
 
   if (projectId) {

@@ -44,7 +44,7 @@ describe("buildDashboardNotifications", () => {
     });
 
     expect(items.some((i) => i.id === "billing:past_due")).toBe(true);
-    expect(items.some((i) => i.id === "quota:near")).toBe(true);
+    expect(items.some((i) => i.id.startsWith("quota:near:p1:"))).toBe(true);
   });
 
   it("includes unresolved error groups for the project", async () => {

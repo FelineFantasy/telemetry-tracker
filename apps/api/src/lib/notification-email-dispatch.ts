@@ -7,9 +7,9 @@ import {
   categoryForNotificationType,
   parseNotificationPreferences,
   shouldSendEmailForCategory,
-  type NotificationCategory,
   type NotificationPreferences,
 } from "./notification-preferences.js";
+import { quotaNotificationKey } from "./quota-notification-keys.js";
 
 function absoluteHref(href: string | null, base: string | null): string | null {
   if (!href) return null;
@@ -182,7 +182,7 @@ export async function notifyQuotaThresholdEmail(
   const item: DashboardNotificationItem =
     kind === "exceeded"
       ? {
-          id: "quota:exceeded",
+          id: quotaNotificationKey(projectId, "exceeded"),
           type: "quota",
           title: "Monthly ingest limit reached",
           body: `${details.monthlyIngestUsed.toLocaleString()} / ${details.monthlyIngestLimit.toLocaleString()} units on your ${details.planTier} plan.`,
@@ -190,7 +190,7 @@ export async function notifyQuotaThresholdEmail(
           href: "/dashboard/settings/billing",
         }
       : {
-          id: "quota:near",
+          id: quotaNotificationKey(projectId, "near"),
           type: "quota",
           title: "Usage approaching limit",
           body: `${details.percentUsed}% of your ${details.planTier} plan monthly ingest.`,
