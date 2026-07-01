@@ -12,7 +12,7 @@ import { filterInputClassName } from "@/lib/input-classes";
 
 export function FilterSection({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="mb-4 last:mb-0">
+    <div className="relative mb-4 last:mb-0">
       <span className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
@@ -118,7 +118,7 @@ export function FilterSubmitBtn({
       {...props}
       className={cn(
         "h-9 rounded-md bg-primary px-4 text-[13px] font-medium text-primary-foreground",
-        "hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-0",
+        "hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
@@ -169,7 +169,7 @@ export function FilterGhostBtn({
       {...props}
       className={cn(
         "h-9 rounded-md border border-border bg-transparent px-3 text-[13px] font-medium text-muted-foreground",
-        "hover:bg-surface/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-0",
+        "hover:bg-surface/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:border-border-strong",
         className
       )}
     />

@@ -10,7 +10,7 @@ export function NavPickerTrigger({
     <button
       type="button"
       className={cn(
-        "inline-flex max-w-[11rem] items-center gap-1.5 truncate rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-left text-sm hover:bg-surface sm:max-w-[14rem]",
+        "inline-flex max-w-[11rem] items-center gap-1.5 truncate rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-left text-sm hover:bg-surface focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-border-strong sm:max-w-[14rem]",
         className
       )}
       {...props}

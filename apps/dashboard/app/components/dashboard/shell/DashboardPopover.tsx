@@ -1,15 +1,21 @@
 "use client";
 
 import {
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  useFloating,
+  type Placement,
+} from "@floating-ui/react-dom";
+import {
   type ReactNode,
   useCallback,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-
-type PanelPosition = { top: number; left: number; minWidth: number };
+import { cn } from "@/lib/utils";
 
 export function DashboardPopover({
   trigger,
@@ -25,28 +31,23 @@ export function DashboardPopover({
   onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<PanelPosition | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const placement: Placement = align === "right" ? "bottom-end" : "bottom-start";
+
+  const { refs, floatingStyles } = useFloating({
+    open,
+    placement,
+    strategy: "fixed",
+    middleware: [offset(8), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
 
   const close = useCallback(() => {
     setOpen(false);
   }, []);
 
   const toggle = useCallback(() => {
-    setOpen((current) => {
-      const next = !current;
-      if (next && triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect();
-        setPosition({
-          top: rect.bottom + 8,
-          left: align === "right" ? rect.right : rect.left,
-          minWidth: rect.width,
-        });
-      }
-      return next;
-    });
-  }, [align]);
+    setOpen((current) => !current);
+  }, []);
 
   useEffect(() => {
     onOpenChange?.(open);
@@ -57,8 +58,9 @@ export function DashboardPopover({
 
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (panelRef.current?.contains(target)) return;
+      const reference = refs.reference.current;
+      if (reference instanceof Node && reference.contains(target)) return;
+      if (refs.floating.current?.contains(target)) return;
       close();
     };
 
@@ -72,45 +74,18 @@ export function DashboardPopover({
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [close, open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const updatePosition = () => {
-      if (!triggerRef.current) return;
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 8,
-        left: align === "right" ? rect.right : rect.left,
-        minWidth: rect.width,
-      });
-    };
-
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [align, open]);
+  }, [close, open, refs.reference, refs.floating]);
 
   const panel =
-    open && position && typeof document !== "undefined"
+    open && typeof document !== "undefined"
       ? createPortal(
           <div
-            ref={panelRef}
-            className={`fixed z-[1000] ${width} overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/60`}
-            style={{
-              top: position.top,
-              left: align === "right" ? undefined : position.left,
-              right:
-                align === "right"
-                  ? Math.max(8, window.innerWidth - position.left)
-                  : undefined,
-              minWidth: position.minWidth,
-            }}
+            ref={refs.setFloating}
+            className={cn(
+              "z-[9999] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/60",
+              width
+            )}
+            style={floatingStyles}
           >
             {children(close)}
           </div>,
@@ -120,7 +95,7 @@ export function DashboardPopover({
 
   return (
     <>
-      <div ref={triggerRef} className="relative shrink-0">
+      <div ref={refs.setReference} className="relative inline-flex shrink-0">
         {trigger(toggle, open)}
       </div>
       {panel}
