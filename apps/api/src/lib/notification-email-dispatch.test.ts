@@ -21,7 +21,7 @@ const emailEnabledPrefs = {
 };
 
 const teamItem: DashboardNotificationItem = {
-  id: "team:member:org-1:new@example.com",
+  id: "team:member:membership-abc",
   type: "team",
   title: "New team member",
   body: "New User joined your organization as editor.",

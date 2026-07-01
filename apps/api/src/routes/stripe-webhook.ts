@@ -147,7 +147,8 @@ export async function registerStripeWebhookIfConfigured(
                   org.id,
                   health.billingAlertVariant,
                   health.storedPlanTier,
-                  health.effectivePlanTier
+                  health.effectivePlanTier,
+                  ctx.stripeCurrentPeriodEnd
                 );
               }
             }
@@ -172,12 +173,16 @@ export async function registerStripeWebhookIfConfigured(
               "../lib/notification-email-dispatch.js"
             );
             for (const org of orgsBefore) {
+              const periodEnd = sub.current_period_end
+                ? new Date(sub.current_period_end * 1000)
+                : null;
               void notifyBillingAlertEmail(
                 prisma,
                 org.id,
                 "canceled",
                 PlanTier.FREE,
-                PlanTier.FREE
+                PlanTier.FREE,
+                periodEnd
               );
             }
             break;

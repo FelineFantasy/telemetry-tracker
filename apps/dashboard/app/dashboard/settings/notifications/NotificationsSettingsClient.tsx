@@ -22,7 +22,7 @@ import {
   type NotificationCategory,
   type NotificationChannel,
   type NotificationPreferences,
-} from "@/lib/notification-preferences";
+} from "@/lib/notification-preferences-shared";
 
 const CHANNELS: { id: NotificationChannel; label: string; desc: string; disabled?: boolean }[] = [
   { id: "inapp", label: "In-app", desc: "Notification center bell" },

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
 import { preferenceCookiesAllowedFromCookies, preferenceCookiesDeniedMessage } from "@/lib/cookie-consent-server";
-import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { dashboardApiFetch, type DashboardApiFetchOptions } from "@/lib/dashboard-api";
+import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
 import {
   fetchDashboardOrganizationsPayload,
   TELEMETRY_ORG_COOKIE,
@@ -12,7 +13,7 @@ import {
 import {
   parseNotificationPreferences,
   type NotificationPreferences,
-} from "@/lib/notification-preferences";
+} from "@/lib/notification-preferences-shared";
 import {
   DEFAULT_PROJECT_ID,
   TELEMETRY_PROJECT_COOKIE,
@@ -510,6 +511,16 @@ export async function saveNotificationPreferencesAction(
   }
 }
 
+async function notificationApiFetchOptions(): Promise<
+  Pick<DashboardApiFetchOptions, "projectIdOverride" | "organizationIdOverride">
+> {
+  const { effectiveProjectId, resolvedOrgId } = await getDashboardWorkspaceForRequest();
+  return {
+    projectIdOverride: effectiveProjectId === "" ? undefined : effectiveProjectId,
+    organizationIdOverride: resolvedOrgId ?? undefined,
+  };
+}
+
 export async function markNotificationsReadAction(
   ids: string[]
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -517,11 +528,15 @@ export async function markNotificationsReadAction(
   if (trimmed.length === 0) {
     return { ok: false, error: "No notification ids" };
   }
-  const res = await dashboardApiFetch("/api/meta/notifications/read", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ids: trimmed }),
-  });
+  const res = await dashboardApiFetch(
+    "/api/meta/notifications/read",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: trimmed }),
+    },
+    await notificationApiFetchOptions()
+  );
   if (!res.ok) {
     const t = await res.text();
     return { ok: false, error: t.slice(0, 400) || res.statusText };
@@ -533,11 +548,15 @@ export async function markNotificationsReadAction(
 export async function markAllNotificationsReadAction(): Promise<
   { ok: true } | { ok: false; error: string }
 > {
-  const res = await dashboardApiFetch("/api/meta/notifications/read", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ all: true }),
-  });
+  const res = await dashboardApiFetch(
+    "/api/meta/notifications/read",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    },
+    await notificationApiFetchOptions()
+  );
   if (!res.ok) {
     const t = await res.text();
     return { ok: false, error: t.slice(0, 400) || res.statusText };

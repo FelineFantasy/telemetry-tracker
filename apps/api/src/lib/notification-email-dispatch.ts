@@ -10,6 +10,7 @@ import {
   type NotificationPreferences,
 } from "./notification-preferences.js";
 import { quotaNotificationKey } from "./quota-notification-keys.js";
+import { billingNotificationEmailKey } from "./billing-notification-keys.js";
 
 function absoluteHref(href: string | null, base: string | null): string | null {
   if (!href) return null;
@@ -207,10 +208,15 @@ export async function notifyBillingAlertEmail(
   organizationId: string,
   variant: string,
   storedPlanTier: string,
-  effectivePlanTier: string
+  effectivePlanTier: string,
+  stripeCurrentPeriodEnd?: Date | string | null
 ): Promise<void> {
   const item: DashboardNotificationItem = {
-    id: `billing:${variant}`,
+    id: billingNotificationEmailKey(
+      organizationId,
+      variant,
+      stripeCurrentPeriodEnd
+    ),
     type: "billing",
     title:
       variant === "past_due"
@@ -235,11 +241,16 @@ export async function notifyBillingAlertEmail(
 export async function notifyTeamMemberJoinedEmail(
   prisma: PrismaClient,
   organizationId: string,
-  member: { email: string; displayName: string | null; role: string }
+  member: {
+    membershipId: string;
+    email: string;
+    displayName: string | null;
+    role: string;
+  }
 ): Promise<void> {
   const name = member.displayName?.trim() || member.email;
   const item: DashboardNotificationItem = {
-    id: `team:member:${organizationId}:${member.email}`,
+    id: `team:member:${member.membershipId}`,
     type: "team",
     title: "New team member",
     body: `${name} joined your organization as ${member.role}.`,

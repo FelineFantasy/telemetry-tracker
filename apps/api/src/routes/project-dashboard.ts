@@ -470,14 +470,14 @@ export async function projectDashboardRoutes(
             return { kind: "already_member" as const };
           }
           try {
-            await tx.organizationMembership.create({
+            const membership = await tx.organizationMembership.create({
               data: {
                 user_id: target.id,
                 organization_id: orgId,
                 role: newRole,
               },
             });
-            return { kind: "added" as const };
+            return { kind: "added" as const, membershipId: membership.id };
           } catch (e: unknown) {
             if (
               typeof e === "object" &&
@@ -500,6 +500,7 @@ export async function projectDashboardRoutes(
           "../lib/notification-email-dispatch.js"
         );
         void notifyTeamMemberJoinedEmail(prisma, orgId, {
+          membershipId: addExisting.membershipId,
           email: target.email,
           displayName: target.display_name,
           role: newRole,

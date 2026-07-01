@@ -72,28 +72,42 @@ export async function authRoutes(
           return { kind: "email_taken" as const };
         }
         const passwordHash = hashPassword(password);
-        try {
-          const u = await tx.user.create({
-            data: {
-              email,
-              password_hash: passwordHash,
-              display_name: displayName,
-              memberships: {
-                create: {
-                  organization_id: invite.organization_id,
-                  role: invite.role,
+          try {
+            const u = await tx.user.create({
+              data: {
+                email,
+                password_hash: passwordHash,
+                display_name: displayName,
+                memberships: {
+                  create: {
+                    organization_id: invite.organization_id,
+                    role: invite.role,
+                  },
                 },
               },
-            },
-            select: { id: true, email: true, display_name: true },
-          });
-          await tx.organizationInvite.delete({ where: { id: invite.id } });
-          return {
-            kind: "ok" as const,
-            user: u,
-            organizationId: invite.organization_id,
-            role: invite.role,
-          };
+              select: {
+                id: true,
+                email: true,
+                display_name: true,
+                memberships: {
+                  where: { organization_id: invite.organization_id },
+                  select: { id: true },
+                  take: 1,
+                },
+              },
+            });
+            await tx.organizationInvite.delete({ where: { id: invite.id } });
+            const membershipId = u.memberships[0]?.id;
+            if (!membershipId) {
+              throw new Error("Invite signup did not create organization membership");
+            }
+            return {
+              kind: "ok" as const,
+              user: { id: u.id, email: u.email, display_name: u.display_name },
+              organizationId: invite.organization_id,
+              membershipId,
+              role: invite.role,
+            };
         } catch (e: unknown) {
           if (
             typeof e === "object" &&
@@ -121,6 +135,7 @@ export async function authRoutes(
         "../lib/notification-email-dispatch.js"
       );
       void notifyTeamMemberJoinedEmail(prisma, inviteOutcome.organizationId, {
+        membershipId: inviteOutcome.membershipId,
         email: user.email,
         displayName: user.display_name,
         role: inviteOutcome.role,
