@@ -19,6 +19,7 @@ const baseSession: DashboardSessionContextPayload = {
 describe("buildDashboardNotifications", () => {
   it("includes billing and quota items", async () => {
     const prisma = {
+      alertEvent: { findMany: async () => [] },
       errorGroup: { findMany: async () => [] },
     } as never;
 
@@ -50,6 +51,7 @@ describe("buildDashboardNotifications", () => {
 
   it("includes unresolved error groups for the project", async () => {
     const prisma = {
+      alertEvent: { findMany: async () => [] },
       errorGroup: {
         findMany: async () => [
           {
