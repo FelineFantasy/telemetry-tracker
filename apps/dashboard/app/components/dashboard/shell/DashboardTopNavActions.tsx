@@ -1,19 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { BookOpen } from "lucide-react";
 import { DashboardCommandPalette } from "./DashboardCommandPalette";
-import { DashboardNotifications } from "./DashboardNotifications";
 import { DashboardQuickActions } from "./DashboardQuickActions";
 import { DashboardUserMenu } from "./DashboardUserMenu";
 import type { DashboardUser } from "@/lib/dashboard-user";
 
-export function DashboardTopNavActions({ user }: { user: DashboardUser | null }) {
+export function DashboardTopNavActions({
+  user,
+  notificationsSlot,
+}: {
+  user: DashboardUser | null;
+  notificationsSlot: ReactNode;
+}) {
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       <DashboardCommandPalette />
       <DashboardQuickActions />
-      <DashboardNotifications />
+      {notificationsSlot}
       <Link
         href="/docs"
         aria-label="Documentation"

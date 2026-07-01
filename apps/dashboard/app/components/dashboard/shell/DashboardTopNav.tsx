@@ -5,8 +5,20 @@ import type { OrgOption, ProjectOption } from "@/lib/dashboard-workspace-types";
 import type { DashboardUser } from "@/lib/dashboard-user";
 import { DashboardNavTabs } from "./DashboardNavTabs";
 import { DashboardTopNavActions } from "./DashboardTopNavActions";
+import { DashboardNotificationsLoader } from "./DashboardNotificationsLoader";
 import { NavScopePickersLoader } from "./NavScopePickersLoader";
 import { NavScopePickersSkeleton } from "./NavScopePickersSkeleton";
+
+function NotificationsFallback() {
+  return (
+    <div
+      className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground"
+      aria-hidden
+    >
+      <span className="h-4 w-4 animate-pulse rounded bg-muted" />
+    </div>
+  );
+}
 
 export function DashboardTopNav({
   organizations,
@@ -49,7 +61,14 @@ export function DashboardTopNav({
           </Suspense>
         </div>
 
-        <DashboardTopNavActions user={user} />
+        <DashboardTopNavActions
+          user={user}
+          notificationsSlot={
+            <Suspense fallback={<NotificationsFallback />}>
+              <DashboardNotificationsLoader />
+            </Suspense>
+          }
+        />
       </div>
       <div className="relative z-10">
         <DashboardNavTabs />

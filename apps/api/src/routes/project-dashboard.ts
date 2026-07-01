@@ -11,6 +11,16 @@ import { getProjectNavSummaries } from "../lib/project-nav-summary.js";
 import { loadNavScopeForProject, loadWorkspaceMetaForUser } from "../lib/workspace-meta.js";
 import { buildDashboardBootstrap } from "../lib/dashboard-bootstrap.js";
 import { buildDashboardSessionContext } from "../lib/dashboard-session-context.js";
+import { buildDashboardNotifications } from "../lib/dashboard-notifications.js";
+import {
+  parseNotificationPreferences,
+  validateNotificationPreferencesPatch,
+} from "../lib/notification-preferences.js";
+import { sendOrganizationInviteEmail } from "../lib/notification-email-dispatch.js";
+import {
+  attachNotificationReadState,
+  markNotificationsRead,
+} from "../lib/notification-read.js";
 import {
   canCreateApiKey,
   canCreateProject,
@@ -27,7 +37,6 @@ import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
 } from "../lib/read-project-request.js";
-import { sendTransactionalEmail } from "../lib/email.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 
 const DEFAULT_ORG_ID =
@@ -460,14 +469,14 @@ export async function projectDashboardRoutes(
             return { kind: "already_member" as const };
           }
           try {
-            await tx.organizationMembership.create({
+            const membership = await tx.organizationMembership.create({
               data: {
                 user_id: target.id,
                 organization_id: orgId,
                 role: newRole,
               },
             });
-            return { kind: "added" as const };
+            return { kind: "added" as const, membershipId: membership.id };
           } catch (e: unknown) {
             if (
               typeof e === "object" &&
@@ -486,6 +495,15 @@ export async function projectDashboardRoutes(
         if (addExisting.kind === "already_member") {
           return reply.status(409).send({ error: "User is already a member" });
         }
+        const { notifyTeamMemberJoinedEmail } = await import(
+          "../lib/notification-email-dispatch.js"
+        );
+        void notifyTeamMemberJoinedEmail(prisma, orgId, {
+          membershipId: addExisting.membershipId,
+          email: target.email,
+          displayName: target.display_name,
+          role: newRole,
+        });
         return reply.status(201).send({ status: "added" as const });
       }
 
@@ -531,7 +549,7 @@ export async function projectDashboardRoutes(
             invited_by_id: session.userId,
           },
         });
-        return { kind: "invited" as const, token: row.token };
+        return { kind: "invited" as const, token: row.token, inviteId: row.id };
       });
 
       if (inviteResult.kind === "org_unavailable") {
@@ -541,11 +559,11 @@ export async function projectDashboardRoutes(
 
       const inviteUrl = `${base}/register?invite=${encodeURIComponent(token)}`;
 
-      void sendTransactionalEmail({
-        to: email,
-        subject: "You're invited to Telemetry Tracker",
-        html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
-      });
+      void sendOrganizationInviteEmail(
+        prisma,
+        { id: inviteResult.inviteId, email, token },
+        inviteUrl
+      );
 
       return reply.status(201).send({
         status: "invited" as const,
@@ -638,6 +656,135 @@ export async function projectDashboardRoutes(
       return reply.status(403).send({ error: "Forbidden" });
     }
     return reply.send(sessionContext);
+  });
+
+  app.get("/meta/notifications", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const sessionContext = await buildDashboardSessionContext(prisma, session, request);
+    if (sessionContext === null) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { email: true, notification_preferences: true },
+    });
+    const preferences = parseNotificationPreferences(user?.notification_preferences);
+    const projectId = sessionContext.projectId || null;
+    const headerOrg = readOrganizationIdHeader(request);
+    const memberships = await prisma.organizationMembership.findMany({
+      where: { user_id: session.userId },
+      select: { organization_id: true },
+    });
+    let organizationIds = memberships.map((m) => m.organization_id);
+    if (headerOrg && organizationIds.includes(headerOrg)) {
+      organizationIds = [headerOrg];
+    }
+    const items = await buildDashboardNotifications(
+      prisma,
+      projectId,
+      sessionContext,
+      preferences,
+      user
+        ? {
+            userId: session.userId,
+            userEmail: user.email,
+            organizationIds,
+          }
+        : undefined
+    );
+    const withRead = await attachNotificationReadState(prisma, session.userId, items);
+    return reply.send({ items: withRead });
+  });
+
+  app.post("/meta/notifications/read", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+
+    const body = (request.body ?? {}) as { ids?: unknown; all?: unknown };
+    const sessionContext = await buildDashboardSessionContext(prisma, session, request);
+    if (sessionContext === null) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+
+    if (body.all === true) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { email: true, notification_preferences: true },
+      });
+      const preferences = parseNotificationPreferences(user?.notification_preferences);
+      const headerOrg = readOrganizationIdHeader(request);
+      const memberships = await prisma.organizationMembership.findMany({
+        where: { user_id: session.userId },
+        select: { organization_id: true },
+      });
+      let organizationIds = memberships.map((m) => m.organization_id);
+      if (headerOrg && organizationIds.includes(headerOrg)) {
+        organizationIds = [headerOrg];
+      }
+      const items = await buildDashboardNotifications(
+        prisma,
+        sessionContext.projectId || null,
+        sessionContext,
+        preferences,
+        user
+          ? {
+              userId: session.userId,
+              userEmail: user.email,
+              organizationIds,
+            }
+          : undefined,
+        { forReadPersistence: true }
+      );
+      await markNotificationsRead(
+        prisma,
+        session.userId,
+        items.map((item) => item.id)
+      );
+      return reply.send({ ok: true });
+    }
+
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+    if (ids.length === 0) {
+      return reply.status(400).send({ error: "Provide ids or all: true" });
+    }
+    await markNotificationsRead(prisma, session.userId, ids);
+    return reply.send({ ok: true });
+  });
+
+  app.get("/meta/notification-preferences", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { notification_preferences: true },
+    });
+    return reply.send({
+      preferences: parseNotificationPreferences(user?.notification_preferences),
+    });
+  });
+
+  app.patch("/meta/notification-preferences", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+
+    const parsed = validateNotificationPreferencesPatch(request.body);
+    if (!parsed.ok) {
+      return reply.status(400).send({ error: parsed.error });
+    }
+
+    await prisma.user.update({
+      where: { id: session.userId },
+      data: { notification_preferences: parsed.preferences },
+    });
+
+    return reply.send({ preferences: parsed.preferences });
   });
 
   app.get("/meta/members", async (request, reply) => {

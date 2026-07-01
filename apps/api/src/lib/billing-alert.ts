@@ -23,6 +23,7 @@ export function billingAlertVariant(
 }
 
 export type BillingHealthSnapshot = {
+  organizationId: string;
   stripeSubscriptionStatus: string | null;
   stripeCurrentPeriodEnd: string | null;
   storedPlanTier: string;
@@ -31,7 +32,42 @@ export type BillingHealthSnapshot = {
   billingAlertVariant: BillingAlertVariant | null;
 };
 
+export function billingAlertNotificationContent(
+  variant: BillingAlertVariant,
+  storedPlanTier: string,
+  effectivePlanTier: string
+): { title: string; body: string } {
+  switch (variant) {
+    case "past_due":
+      return {
+        title: "Payment past due",
+        body: `Update your payment method in Stripe. Your ${storedPlanTier} limits still apply until the subscription updates.`,
+      };
+    case "unpaid":
+      return {
+        title: "Subscription unpaid",
+        body: `Effective tier is ${effectivePlanTier}. Update billing to restore paid limits.`,
+      };
+    case "canceled":
+      return {
+        title: "Subscription canceled",
+        body: `Entitlements follow the ${effectivePlanTier} tier.`,
+      };
+    case "incomplete":
+      return {
+        title: "Subscription incomplete",
+        body: `Entitlements use the ${effectivePlanTier} tier until payment completes.`,
+      };
+    case "incomplete_expired":
+      return {
+        title: "Subscription setup expired",
+        body: `Entitlements use the ${effectivePlanTier} tier until you subscribe again.`,
+      };
+  }
+}
+
 export function billingHealthFromPlanContext(ctx: {
+  organizationId: string;
   stripeSubscriptionStatus: string | null;
   stripeCurrentPeriodEnd: Date | null;
   storedPlanTier: string;
@@ -39,6 +75,7 @@ export function billingHealthFromPlanContext(ctx: {
   stripeCustomerId: string | null;
 }): BillingHealthSnapshot {
   return {
+    organizationId: ctx.organizationId,
     stripeSubscriptionStatus: ctx.stripeSubscriptionStatus,
     stripeCurrentPeriodEnd: ctx.stripeCurrentPeriodEnd
       ? ctx.stripeCurrentPeriodEnd.toISOString()
