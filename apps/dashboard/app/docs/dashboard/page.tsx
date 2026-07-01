@@ -41,35 +41,59 @@ export default function DocsDashboardPage() {
         </p>
       </section>
 
+      <section className="mb-10" aria-labelledby="dash-time-range-heading">
+        <h2 id="dash-time-range-heading">Time range</h2>
+        <p>
+          Overview, Errors, Events, and Sessions share a <strong className="text-foreground">Time range</strong>{" "}
+          picker. Leave it unselected to show the latest rows regardless of age (sorted and paginated).
+          To narrow results, choose a preset, enter a custom relative window (for example{" "}
+          <code className="text-foreground">2h</code> or <code className="text-foreground">8w</code>
+          ), or pick an absolute <strong className="text-foreground">From</strong> /{" "}
+          <strong className="text-foreground">To</strong> date range.
+        </p>
+        <p>
+          Presets include 1 hour, 24 hours, 7 days, 14 days, 30 days, and 90 days. On{" "}
+          <strong className="text-foreground">Overview</strong>, charts and key metrics follow the
+          selected window; with no filter, metrics use a sensible default window for rates and
+          comparisons.
+        </p>
+        <p>
+          On <strong className="text-foreground">Issues</strong>, a separate{" "}
+          <strong className="text-foreground">Trend window</strong> controls the recent vs prior
+          period used for the trend column (same preset and custom options).
+        </p>
+      </section>
+
       <section className="mb-10" aria-labelledby="dash-overview-heading">
         <h2 id="dash-overview-heading">Overview</h2>
         <p>
-          High-level counts and trends for the selected time range, plus top error groups and top
-          event names. Use range tabs and the app filter to narrow scope.
+          High-level counts and trends, plus top error groups and top event names. Use the time range
+          picker and app/environment filters to narrow scope.
         </p>
       </section>
 
       <section className="mb-10" aria-labelledby="dash-errors-heading">
         <h2 id="dash-errors-heading">Errors</h2>
         <p>
-          Error groups are fingerprinted; each row shows occurrences, first/last seen, and trend. Open
-          a group to read the message, stack traces, and recent occurrences with context JSON.
+          Error groups are fingerprinted; each row shows occurrences, first/last seen, and trend
+          (based on the trend window). Open a group to read the message, stack traces, and recent
+          occurrences with context JSON.
         </p>
       </section>
 
       <section className="mb-10" aria-labelledby="dash-events-heading">
         <h2 id="dash-events-heading">Events</h2>
         <p>
-          Named analytics or product events with optional JSON properties. Filter by name, app,
-          environment, platform, release, and time—then open a row for full detail.
+          Named analytics or product events with optional JSON properties. Filter by time range,
+          name, app, environment, platform, and release—then open a row for full detail.
         </p>
       </section>
 
       <section aria-labelledby="dash-sessions-heading">
         <h2 id="dash-sessions-heading">Sessions</h2>
         <p>
-          Sessions group activity by session id and optional identity. Use the list to jump into a
-          single session’s timeline and metadata.
+          Sessions group activity by session id and optional identity. Filter by time range, then use
+          the list to jump into a single session’s timeline and metadata.
         </p>
       </section>
     </DocsArticle>
