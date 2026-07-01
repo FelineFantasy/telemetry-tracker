@@ -10,7 +10,6 @@ export async function maybeNotifyQuotaAlerts(
   projectId: string
 ): Promise<void> {
   const settings = await loadProjectAlertSettings(prisma, projectId);
-  if (!settings.quota.enabled) return;
 
   const { loadPlanContextForProject, getMonthlyIngestUsed } = await import(
     "./plan-enforcement.js"
@@ -35,6 +34,8 @@ export async function maybeNotifyQuotaAlerts(
     });
     return;
   }
+
+  if (!settings.quota.enabled) return;
 
   if (ratio >= quotaNearRatio(settings)) {
     void fireProjectAlert(prisma, {
