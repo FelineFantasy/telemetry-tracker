@@ -97,7 +97,7 @@ export function FilterSegmentItem({
   return (
     <label className="relative cursor-pointer">
       <input type="radio" className="peer sr-only" {...props} />
-      <span className="flex h-9 items-center px-3 text-[13px] text-muted-foreground transition-colors hover:bg-surface/60 peer-checked:bg-brand/15 peer-checked:text-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40">
+      <span className="flex h-9 items-center px-3 text-[13px] text-muted-foreground transition-colors hover:bg-surface/60 peer-checked:bg-muted peer-checked:text-foreground peer-focus-visible:outline-none">
         {children}
       </span>
     </label>
@@ -118,7 +118,7 @@ export function FilterSubmitBtn({
       {...props}
       className={cn(
         "h-9 rounded-md bg-primary px-4 text-[13px] font-medium text-primary-foreground",
-        "hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+        "hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-0",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
@@ -140,7 +140,7 @@ export function FilterPill({
   const className = cn(
     "inline-flex min-h-9 items-center justify-center rounded-md border px-3 text-[13px] font-medium transition-colors",
     active
-      ? "border-brand/45 bg-brand/10 text-foreground shadow-[0_0_0_1px_rgba(var(--brand-rgb,103,79,220),0.12)]"
+      ? "border-border-strong bg-muted text-foreground"
       : "border-border bg-transparent text-muted-foreground hover:border-muted-foreground/30 hover:bg-surface/60 hover:text-foreground"
   );
 
@@ -169,7 +169,7 @@ export function FilterGhostBtn({
       {...props}
       className={cn(
         "h-9 rounded-md border border-border bg-transparent px-3 text-[13px] font-medium text-muted-foreground",
-        "hover:bg-surface/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+        "hover:bg-surface/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-0",
         className
       )}
     />

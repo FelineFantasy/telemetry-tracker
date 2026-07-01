@@ -1,14 +1,14 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar";
-import { effectiveListRange } from "@/lib/list-filters-url";
+import { mergeListQuery } from "@/lib/list-filters-url";
+import { appendListTimeRangeToParams, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { Table, TableListLink, TablePropertiesCell, TableViewLink, TableWrap } from "@/app/components/ui/Table";
-import { mergeListQuery } from "@/lib/list-filters-url";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -101,11 +101,13 @@ export default async function EventsPage({
     firstQueryValue(sp.pageSize),
     firstQueryValue(sp.limit)
   );
-  const rangeEff = effectiveListRange(
+  const from = firstQueryValue(sp.from) ?? "";
+  const to = firstQueryValue(sp.to) ?? "";
+  const timeRange = parseListTimeRangeOrDefault(
     {
       range: firstQueryValue(sp.range),
-      from: firstQueryValue(sp.from),
-      to: firstQueryValue(sp.to),
+      from: from || undefined,
+      to: to || undefined,
     },
     "all"
   );
@@ -114,18 +116,13 @@ export default async function EventsPage({
   if (appFilter) apiQuery.set("app", appFilter);
   apiQuery.set("page", String(page));
   apiQuery.set("pageSize", String(pageSize));
-  const r = firstQueryValue(sp.range);
-  const from = firstQueryValue(sp.from);
-  const to = firstQueryValue(sp.to);
   const name = firstQueryValue(sp.name);
   const platform = firstQueryValue(sp.platform);
   const release = firstQueryValue(sp.release);
   const propertiesContains = firstQueryValue(sp.propertiesContains);
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
-  if (r) apiQuery.set("range", r);
-  if (from) apiQuery.set("from", from);
-  if (to) apiQuery.set("to", to);
+  appendListTimeRangeToParams(apiQuery, timeRange, from, to);
   if (name) apiQuery.set("name", name);
   if (rawEnv) apiQuery.set("environment", rawEnv);
   if (platform) apiQuery.set("platform", platform);
@@ -167,7 +164,7 @@ export default async function EventsPage({
   const hrefForPage = (p: number) =>
     mergeListQuery(EVENTS_PATH, currentParams, { page: String(p) });
 
-  const contextParts = [];
+  const contextParts = [timeRange.label];
   if (appFilter) contextParts.push(`App: ${appFilter}`);
   if (firstQueryValue(sp.name)) contextParts.push(`Event: ${firstQueryValue(sp.name)}`);
 
@@ -185,14 +182,12 @@ export default async function EventsPage({
       <EventsListToolbar
         path={EVENTS_PATH}
         currentParams={currentParams}
-        activePreset={rangeEff.activePreset}
-        customRange={rangeEff.customRange}
-        rangePreset={r ?? ""}
+        timeRange={timeRange}
+        fromParam={from}
+        toParam={to}
         appFilter={appFilter}
         pageSize={String(pageSize)}
         defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
-        from={from ?? ""}
-        to={to ?? ""}
         name={name ?? ""}
         environment={environment ?? ""}
         platform={platform ?? ""}

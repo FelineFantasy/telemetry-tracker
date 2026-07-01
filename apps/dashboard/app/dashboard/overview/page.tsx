@@ -11,11 +11,13 @@ import {
 } from "@/lib/overview-bar-rows";
 import { OverviewSortControls } from "@/app/components/dashboard/OverviewSortControls";
 import { OverviewTrendsChart } from "@/app/components/dashboard/OverviewTrendsChart";
-import { RangeTabs } from "@/app/components/dashboard/RangeTabs";
+import { TimeRangePicker } from "@/app/components/dashboard/TimeRangePicker";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { DashboardSection, StatCard } from "@/app/components/dashboard/dashboard-ui";
 import { IssueList, OverviewListItem } from "@/app/components/dashboard/IssueList";
 import { OverviewGreeting } from "@/app/components/dashboard/overview/OverviewGreeting";
+import { OverviewIngestSetupBanner } from "@/app/components/dashboard/overview/OverviewIngestSetupBanner";
+import { OverviewApiResponseLogger } from "@/app/components/dashboard/overview/OverviewApiResponseLogger";
 import { OverviewAppHealth } from "@/app/components/dashboard/overview/OverviewAppHealth";
 import { OverviewActiveIncidents } from "@/app/components/dashboard/overview/OverviewActiveIncidents";
 import { OverviewMetricsSection } from "@/app/components/dashboard/overview/OverviewMetricsSection";
@@ -24,7 +26,14 @@ import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
-import { parseOverviewCompare, resolveScopedQueryValue, compareLabelFor, buildErrorGroupDetailHref, formatOverviewDeltaLine } from "@/lib/overview-scope-url";
+import {
+  parseOverviewCompare,
+  resolveScopedQueryValue,
+  compareLabelFor,
+  buildErrorGroupDetailHref,
+  formatOverviewDeltaLine,
+} from "@/lib/overview-scope-url";
+import { parseOverviewTimeRangeOrDefault, isUnselectedTimeRange } from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 import { coalesceOverviewRequest } from "@/lib/api-inflight";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
@@ -48,7 +57,7 @@ export const dynamic = "force-dynamic";
 const OVERVIEW_PATH = "/dashboard/overview";
 
 async function getOverview(
-  range: string,
+  timeQuery: { range?: string; from?: string; to?: string },
   app: string | undefined,
   environment: string | undefined,
   compare: string,
@@ -64,7 +73,11 @@ async function getOverview(
   scope: OverviewRequestScope
 ) {
   const params = new URLSearchParams();
-  if (range) params.set("range", range);
+  if (timeQuery.from) params.set("from", timeQuery.from);
+  if (timeQuery.to) params.set("to", timeQuery.to);
+  if (!timeQuery.from && !timeQuery.to && timeQuery.range) {
+    params.set("range", timeQuery.range);
+  }
   if (app) params.set("app", app);
   if (environment) params.set("environment", environment);
   if (compare === "week-ago") params.set("compare", "week-ago");
@@ -97,7 +110,17 @@ async function getOverview(
       throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
     }
     dashboardDebug("overview", "fetch ok", { ms: Date.now() - started });
-    return res.json() as Promise<OverviewApiResponse>;
+    const body = (await res.json()) as OverviewApiResponse;
+    dashboardDebug("overview", "response", {
+      range: body.range,
+      since: body.since,
+      errorsLast24h: body.errorsLast24h,
+      eventsLast24h: body.eventsLast24h,
+      topErrorGroups: body.topErrorGroups?.length ?? 0,
+      topEvents: body.topEvents?.length ?? 0,
+      seriesPoints: body.series?.errors?.length ?? 0,
+    });
+    return body;
   });
 }
 
@@ -114,6 +137,8 @@ function buildOverviewParamsRecord(
 ): Record<string, string> {
   const keys = [
     "range",
+    "from",
+    "to",
     "app",
     "environment",
     "compare",
@@ -154,6 +179,8 @@ export default async function OverviewPage({
 }: {
   searchParams: Promise<{
     range?: string | string[];
+    from?: string | string[];
+    to?: string | string[];
     app?: string | string[];
     environment?: string | string[];
     compare?: string | string[];
@@ -167,8 +194,12 @@ export default async function OverviewPage({
   }>;
 }) {
   const params = await searchParams;
-  const rangeRaw = firstQueryValue(params.range);
-  const range = rangeRaw === "7d" ? "7d" : "24h";
+  const timeQuery = {
+    range: firstQueryValue(params.range),
+    from: firstQueryValue(params.from),
+    to: firstQueryValue(params.to),
+  };
+  const parsedRange = parseOverviewTimeRangeOrDefault(timeQuery);
   const rawApp = firstQueryValue(params.app)?.trim() || null;
   const rawEnvironment = firstQueryValue(params.environment)?.trim() || null;
   const compare = parseOverviewCompare(firstQueryValue(params.compare));
@@ -179,7 +210,6 @@ export default async function OverviewPage({
   const errorsOrder = firstQueryValue(params.errorsOrder) ?? "desc";
   const topEventsSort = firstQueryValue(params.topEventsSort) ?? "count";
   const topEventsOrder = firstQueryValue(params.topEventsOrder) ?? "desc";
-  const rangeLabelLong = range === "7d" ? "Last 7 days" : "Last 24 hours";
   const currentOverviewParams = buildOverviewParamsRecord(params);
   const listParams = {
     errorsPage,
@@ -197,7 +227,7 @@ export default async function OverviewPage({
   const overviewEarlyPromise =
     cookieScope.projectId !== ""
       ? getOverview(
-          range,
+          timeQuery,
           rawApp ?? undefined,
           rawEnvironment ?? undefined,
           compare,
@@ -237,7 +267,7 @@ export default async function OverviewPage({
         resolvedScope,
       });
       overviewResult = await getOverview(
-        range,
+        timeQuery,
         rawApp ?? undefined,
         rawEnvironment ?? undefined,
         compare,
@@ -296,9 +326,10 @@ export default async function OverviewPage({
     series: overviewResult.series ?? emptySeries(),
   };
 
+  const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
   const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
-  const compareLabel = compareLabelFor(compare, range);
+  const compareLabel = compareLabelFor(compare, displayRangeLabel);
   const errDeltaFmt = formatDeltaLine(errorsDelta, "errors", compareLabel);
   const evDeltaFmt = formatDeltaLine(eventsDelta, "events", compareLabel);
 
@@ -322,36 +353,33 @@ export default async function OverviewPage({
     distinctSdkVersions: 0,
   };
 
-  const contextParts = [rangeLabelLong];
+  const contextParts = isUnselectedTimeRange(parsedRange.key) ? [] : [displayRangeLabel];
   if (app) contextParts.push(`App: ${app}`);
   if (environment) contextParts.push(`Env: ${environment}`);
 
   return (
     <>
+      <OverviewApiResponseLogger data={overviewData} />
+      <OverviewIngestSetupBanner
+        rangeKey={parsedRange.key}
+        rangeLabel={displayRangeLabel}
+        eventsCount={overviewData.eventsLast24h}
+        errorsCount={overviewData.errorsLast24h}
+      />
       <OverviewGreeting
         user={user}
         actions={
-          <RangeTabs
-            tabs={[
-              {
-                href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
-                  range: null,
-                  errorsPage: null,
-                  eventsPage: null,
-                }),
-                label: "24h",
-                current: range === "24h",
-              },
-              {
-                href: mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
-                  range: "7d",
-                  errorsPage: null,
-                  eventsPage: null,
-                }),
-                label: "7d",
-                current: range === "7d",
-              },
-            ]}
+          <TimeRangePicker
+            path={OVERVIEW_PATH}
+            currentParams={currentOverviewParams}
+            includeAll
+            range={{
+              key: parsedRange.key,
+              label: displayRangeLabel,
+              shortLabel: parsedRange.shortLabel,
+              gte: overviewData.since,
+              lte: overviewData.until ?? parsedRange.lte.toISOString(),
+            }}
           />
         }
       />
@@ -361,7 +389,8 @@ export default async function OverviewPage({
 
       <Suspense fallback={null}>
         <OverviewMetricsSection
-          range={range}
+          rangeLabel={displayRangeLabel}
+          rangeDurationMs={parsedRange.durationMs}
           overviewPath={OVERVIEW_PATH}
           currentParams={currentOverviewParams}
           eventsCount={overviewData.eventsLast24h}
@@ -380,7 +409,7 @@ export default async function OverviewPage({
       <OverviewExtraCharts
         series={overviewData.series}
         sessionDurationSeries={sessionDurationSeries}
-        rangeLabel={rangeLabelLong}
+        rangeLabel={displayRangeLabel}
       />
 
       <DashboardSection
@@ -398,7 +427,7 @@ export default async function OverviewPage({
           topEventsOrder={topEventsOrder}
         />
 
-        <OverviewTrendsChart series={overviewData.series} rangeLabel={rangeLabelLong} />
+        <OverviewTrendsChart series={overviewData.series} rangeLabel={displayRangeLabel} />
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <OverviewTopBars
@@ -425,7 +454,7 @@ export default async function OverviewPage({
         className="mb-10"
       >
         <StatCard
-          label={`Total error occurrences · ${rangeLabelLong}`}
+          label={`Total error occurrences · ${displayRangeLabel}`}
           value={overviewData.errorsLast24h}
           delta={errDeltaFmt.text}
           deltaTone={
@@ -463,7 +492,7 @@ export default async function OverviewPage({
         ) : (
           <EmptyState
             title="No errors recorded"
-            message={`Nothing matched for ${rangeLabelLong}. Try another range or app filter.`}
+            message={`Nothing matched for ${displayRangeLabel}. Try another range or app filter.`}
           />
         )}
         <Pagination
@@ -484,7 +513,7 @@ export default async function OverviewPage({
         description="Named events your SDK recorded. Separate from errors above."
       >
         <StatCard
-          label={`Total event rows · ${rangeLabelLong}`}
+          label={`Total event rows · ${displayRangeLabel}`}
           value={overviewData.eventsLast24h}
           delta={evDeltaFmt.text}
           deltaTone={
@@ -531,7 +560,7 @@ export default async function OverviewPage({
         ) : (
           <EmptyState
             title="No events recorded"
-            message={`Nothing matched for ${rangeLabelLong}. Try another range or app filter.`}
+            message={`Nothing matched for ${displayRangeLabel}. Try another range or app filter.`}
           />
         )}
         <Pagination

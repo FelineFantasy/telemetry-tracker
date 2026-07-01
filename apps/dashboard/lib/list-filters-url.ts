@@ -22,7 +22,7 @@ export function mergeListQuery(
   return q ? `${path}?${q}` : path;
 }
 
-/** When `from`/`to` set, treat as custom; else normalize `range` with default for resource. */
+/** @deprecated Use parseListTimeRangeOrDefault from @/lib/time-range */
 export function effectiveListRange(
   params: { range?: string; from?: string; to?: string },
   defaultRange: string
@@ -31,8 +31,6 @@ export function effectiveListRange(
     return { activePreset: "custom", customRange: true };
   }
   const r = params.range?.trim();
-  if (r === "24h" || r === "7d" || r === "30d" || r === "90d" || r === "all") {
-    return { activePreset: r, customRange: false };
-  }
+  if (r) return { activePreset: r, customRange: false };
   return { activePreset: defaultRange, customRange: false };
 }

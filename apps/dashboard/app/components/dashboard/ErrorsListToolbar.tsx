@@ -19,50 +19,76 @@ import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
+import { TimeRangePicker } from "@/app/components/dashboard/TimeRangePicker";
+import {
+  listTimeRangeHiddenFields,
+  trendTimeRangeHiddenFields,
+  TREND_TIME_RANGE_QUERY_KEYS,
+  type ParsedTimeRange,
+} from "@/lib/time-range";
 
 type Props = {
   path: string;
   currentParams: Record<string, string>;
-  activePreset: string;
-  customRange: boolean;
-  /** Current `range` query value when using presets (omit when empty). */
-  rangePreset: string;
+  timeRange: ParsedTimeRange;
+  fromParam: string;
+  toParam: string;
+  trendTimeRange: ParsedTimeRange;
+  trendFromParam: string;
+  trendToParam: string;
   appFilter: string;
   pageSize: string;
   defaultPageSize: number;
-  from: string;
-  to: string;
   q: string;
   environment: string;
   status: string;
   sort: string;
   order: string;
-  trendWindow: string;
   environments: string[];
 };
 
 export function ErrorsListToolbar({
   path,
   currentParams,
-  activePreset,
-  customRange,
-  rangePreset,
+  timeRange,
+  fromParam,
+  toParam,
+  trendTimeRange,
+  trendFromParam,
+  trendToParam,
   appFilter,
   pageSize,
   defaultPageSize,
-  from,
-  to,
   q,
   environment,
   status,
   sort,
   order,
-  trendWindow,
   environments,
 }: Props) {
   const fieldIds = useId();
 
-  const rangeSummary = listFiltersRangeSummary(customRange, from, to);
+  const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
+  const timeHidden = listTimeRangeHiddenFields(timeRange, fromParam, toParam);
+  const trendHidden = trendTimeRangeHiddenFields(
+    trendTimeRange,
+    trendFromParam,
+    trendToParam
+  );
+  const pickerRange = {
+    key: timeRange.key,
+    label: timeRange.label,
+    shortLabel: timeRange.shortLabel,
+    gte: fromParam || timeRange.gte.toISOString(),
+    lte: toParam || timeRange.lte.toISOString(),
+  };
+  const trendPickerRange = {
+    key: trendTimeRange.key,
+    label: trendTimeRange.label,
+    shortLabel: trendTimeRange.shortLabel,
+    gte: trendFromParam || trendTimeRange.gte.toISOString(),
+    lte: trendToParam || trendTimeRange.lte.toISOString(),
+  };
 
   const sortOptions: DashboardSelectOption[] = useMemo(
     () => [
@@ -103,19 +129,18 @@ export function ErrorsListToolbar({
       <ListFiltersTimeRangeSection
         path={path}
         currentParams={currentParams}
-        activePreset={activePreset}
-        customRange={customRange}
-        from={from}
-        to={to}
+        parsedRange={pickerRange}
+        includeAll
       />
 
       <FilterForm method="get" action={path}>
         {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
-        {rangePreset && !customRange ? (
-          <input type="hidden" name="range" value={rangePreset} />
-        ) : null}
-        {customRange && from ? <input type="hidden" name="from" value={from} /> : null}
-        {customRange && to ? <input type="hidden" name="to" value={to} /> : null}
+        {Object.entries(timeHidden).map(([k, v]) => (
+          <input key={k} type="hidden" name={k} value={v} />
+        ))}
+        {Object.entries(trendHidden).map(([k, v]) => (
+          <input key={k} type="hidden" name={k} value={v} />
+        ))}
         {Number(pageSize) !== defaultPageSize ? (
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}
@@ -178,14 +203,19 @@ export function ErrorsListToolbar({
             </FilterSegmentItem>
           </FilterSegment>
 
-          <FilterSegment legend="Trend window" ariaLabel="Trend comparison window">
-            <FilterSegmentItem name="trendWindow" value="24h" defaultChecked={trendWindow !== "7d"}>
-              24h
-            </FilterSegmentItem>
-            <FilterSegmentItem name="trendWindow" value="7d" defaultChecked={trendWindow === "7d"}>
-              7d
-            </FilterSegmentItem>
-          </FilterSegment>
+          <FilterField>
+            <FilterLabel>Trend window</FilterLabel>
+            <p className="mb-1 text-[11px] text-muted-foreground">
+              Compares recent vs prior period of equal length
+            </p>
+            <TimeRangePicker
+              path={path}
+              currentParams={currentParams}
+              range={trendPickerRange}
+              queryKeys={TREND_TIME_RANGE_QUERY_KEYS}
+              compact
+            />
+          </FilterField>
 
           <FilterSubmitWrap>
             <FilterSubmitBtn>Apply</FilterSubmitBtn>

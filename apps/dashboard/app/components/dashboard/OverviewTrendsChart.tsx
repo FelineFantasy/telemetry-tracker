@@ -18,9 +18,17 @@ type Props = {
   rangeLabel: string;
 };
 
-function tickLabel(iso: string, bucket: "hour" | "day"): string {
+function tickLabel(iso: string, bucket: "hour" | "day" | "week"): string {
   const d = new Date(iso);
-  return bucket === "hour" ? format(d, "HH:mm") : format(d, "MMM d");
+  if (bucket === "hour") return format(d, "HH:mm");
+  if (bucket === "week") return format(d, "MMM d");
+  return format(d, "MMM d");
+}
+
+function bucketUnit(bucket: "hour" | "day" | "week"): string {
+  if (bucket === "hour") return "hourly";
+  if (bucket === "week") return "weekly";
+  return "daily";
 }
 
 export function OverviewTrendsChart({ series, rangeLabel }: Props) {
@@ -30,7 +38,7 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
     events: series.events[i]?.count ?? 0,
   }));
 
-  const summary = `Error and event volume over ${rangeLabel}. ${data.length} ${series.bucket === "hour" ? "hourly" : "daily"} buckets.`;
+  const summary = `Error and event volume over ${rangeLabel}. ${data.length} ${bucketUnit(series.bucket)} buckets.`;
 
   return (
     <section

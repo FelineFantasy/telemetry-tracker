@@ -24,6 +24,7 @@ type Props = {
   workspaceTelemetry: OverviewWorkspaceTelemetry;
   rangeLabel: string;
   compareLabel: string;
+  rangeDurationMs: number;
 };
 
 export function OverviewKeyMetrics({
@@ -39,6 +40,7 @@ export function OverviewKeyMetrics({
   workspaceTelemetry,
   rangeLabel,
   compareLabel,
+  rangeDurationMs,
 }: Props) {
   const metrics = [
     {
@@ -68,9 +70,9 @@ export function OverviewKeyMetrics({
   ];
 
   const ingestRate =
-    rangeLabel === "7d"
-      ? workspaceTelemetry.ingestRequests / (7 * 86400)
-      : workspaceTelemetry.ingestRequests / 86400;
+    rangeDurationMs > 0
+      ? workspaceTelemetry.ingestRequests / (rangeDurationMs / 1000)
+      : 0;
 
   return (
     <section className="mb-6">

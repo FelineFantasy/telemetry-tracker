@@ -46,6 +46,7 @@ import {
 import { requireSessionUser } from "../lib/auth-session.js";
 import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
+import { parseOverviewTimeRangeQuery } from "../lib/time-range.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -98,14 +99,6 @@ function queryString(value: string | string[] | undefined): string | undefined {
   return t || undefined;
 }
 
-function parseRange(range?: string): { since: Date; previousSince: Date; label: string } {
-  const hours = range === "7d" ? 7 * 24 : 24;
-  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
-  const previousSince = new Date(since.getTime() - hours * 60 * 60 * 1000);
-  const label = range === "7d" ? "7d" : "24h";
-  return { since, previousSince, label };
-}
-
 export async function apiRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions
@@ -115,6 +108,8 @@ export async function apiRoutes(
     if (projectId === null) return;
     const query = request.query as {
       range?: string;
+      from?: string;
+      to?: string;
       app?: string | string[];
       environment?: string;
       compare?: string;
@@ -126,7 +121,20 @@ export async function apiRoutes(
       topEventsSort?: string;
       topEventsOrder?: string;
     };
-    const range = query.range === "7d" ? "7d" : "24h";
+    const timeRangeParsed = parseOverviewTimeRangeQuery(
+      {
+        range: queryString(query.range),
+        from: queryString(query.from),
+        to: queryString(query.to),
+      },
+      new Date()
+    );
+    if (!timeRangeParsed.ok) {
+      return reply.status(400).send({ error: timeRangeParsed.error });
+    }
+    const timeRange = timeRangeParsed.range;
+    const since = timeRange.gte;
+    const until = timeRange.lte;
     const appFilter = queryApp(query.app);
     const environment = queryString(query.environment);
     const compare: OverviewCompareMode =
@@ -147,9 +155,13 @@ export async function apiRoutes(
     if (!topEvOrderParsed.ok) {
       return reply.status(400).send({ error: "Invalid topEventsOrder" });
     }
-    const { since, label } = parseRange(range);
-    const compareWindow = resolveCompareWindow(range, compare, since);
-    const scope = { projectId, since, app: appFilter, environment };
+    const compareWindow = resolveCompareWindow(
+      timeRange.durationMs,
+      compare,
+      since,
+      until
+    );
+    const scope = { projectId, since, until, app: appFilter, environment };
     const listPageSize = Math.min(
       MAX_OVERVIEW_LIST_PAGE_SIZE,
       Math.max(
@@ -173,7 +185,7 @@ export async function apiRoutes(
 
     const baseWhere = {
       ...whereEventProject(projectId),
-      created_at: { gte: since },
+      created_at: { gte: since, lte: until },
     };
     const eventWhere = {
       ...baseWhere,
@@ -182,12 +194,11 @@ export async function apiRoutes(
     };
     const errorGroupWhere = {
       ...whereErrorGroupProject(projectId),
-      last_seen: { gte: since },
+      last_seen: { gte: since, lte: until },
       ...(appFilter ? { app: appFilter } : {}),
       ...(environment ? { environment } : {}),
     };
 
-    const rangeKey = range === "7d" ? "7d" : "24h";
     const previousUntil = compareWindow.previousUntil ?? since;
     const windowParams = {
       projectId,
@@ -229,7 +240,15 @@ export async function apiRoutes(
         skip: eventsSkip,
         take: listPageSize,
       }),
-      getOverviewTimeSeries(prisma, projectId, rangeKey, since, appFilter, environment),
+      getOverviewTimeSeries(
+        prisma,
+        projectId,
+        since,
+        until,
+        timeRange.bucket,
+        appFilter,
+        environment
+      ),
       getOverviewSessionsPair(
         prisma,
         scope,
@@ -238,7 +257,15 @@ export async function apiRoutes(
       ),
       getOverviewActiveUsersPair(prisma, windowParams),
       listDistinctEnvironments(prisma, projectId, appFilter),
-      getSessionDurationSeries(prisma, projectId, rangeKey, since, appFilter, environment),
+      getSessionDurationSeries(
+        prisma,
+        projectId,
+        timeRange.bucket,
+        since,
+        until,
+        appFilter,
+        environment
+      ),
       listActiveIssues(prisma, scope),
     ]);
 
@@ -264,7 +291,7 @@ export async function apiRoutes(
       eventsPrevious,
       errorsPrevious,
       series.events,
-      rangeKey
+      timeRange.bucketSeconds
     );
 
     const latestByName = await fetchLatestEventsByName(prisma, {
@@ -289,8 +316,11 @@ export async function apiRoutes(
     });
 
     return reply.send({
-      range: label,
+      range: timeRange.key,
+      rangeLabel: timeRange.label,
       since: since.toISOString(),
+      until: until.toISOString(),
+      bucket: timeRange.bucket,
       compare,
       errorsLast24h: errorsCount,
       eventsLast24h: eventsCount,
@@ -333,6 +363,8 @@ export async function apiRoutes(
       sort?: string;
       order?: string;
       trendWindow?: string;
+      trendFrom?: string;
+      trendTo?: string;
     };
     const pageSize = parseListPageSize(query.pageSize, query.limit);
     const page = parsePositivePage(query.page, 1);
@@ -351,12 +383,19 @@ export async function apiRoutes(
     if (!orderParsed.ok) {
       return reply.status(400).send({ error: "Invalid order" });
     }
-    const trendWindowParsed = parseTrendWindowParam(queryString(query.trendWindow));
-    if (!trendWindowParsed.ok) {
-      return reply.status(400).send({ error: "Invalid trendWindow" });
-    }
-
     const trendEnd = range.lte ?? new Date();
+    const trendWindowParsed = parseTrendWindowParam(
+      {
+        trendWindow: queryString(query.trendWindow),
+        trendFrom: queryString(query.trendFrom),
+        trendTo: queryString(query.trendTo),
+      },
+      trendEnd
+    );
+    if (!trendWindowParsed.ok) {
+      return reply.status(400).send({ error: trendWindowParsed.error });
+    }
+    const trend = trendWindowParsed.trend;
 
     const filter: ErrorListFilterInput = {
       appId,
@@ -378,8 +417,8 @@ export async function apiRoutes(
         projectId,
         sortParsed.sort,
         orderParsed.order,
-        trendWindowParsed.trendWindow,
-        trendEnd,
+        trend.durationMs,
+        trend.end,
         skip,
         pageSize
       );
@@ -400,8 +439,8 @@ export async function apiRoutes(
     const metrics = await fetchMetricsForGroupIds(
       prisma,
       groups.map((g) => g.id),
-      trendWindowParsed.trendWindow,
-      trendEnd
+      trend.durationMs,
+      trend.end
     );
     const items = groups.map((g) => {
       const m = metrics.get(g.id);
@@ -583,7 +622,7 @@ export async function apiRoutes(
     const skip = (page - 1) * pageSize;
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
-    const range = parseCreatedRange(query, "24h");
+    const range = parseCreatedRange(query, "all");
     const sortParsed = parseSessionListSortParam(queryString(query.sort));
     if (!sortParsed.ok) {
       return reply.status(400).send({ error: "Invalid sort" });

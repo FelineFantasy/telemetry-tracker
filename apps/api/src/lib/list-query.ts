@@ -1,19 +1,11 @@
-/** Presets: hours from now, or "all" for no lower bound. */
-export type RangePreset = "24h" | "7d" | "30d" | "90d" | "all";
+import { parseTimeRangeQuery } from "./time-range.js";
 
-function normalizePreset(
-  value: string | undefined,
-  defaultPreset: RangePreset
-): RangePreset {
-  const v = value?.trim();
-  if (v === "24h" || v === "7d" || v === "30d" || v === "90d" || v === "all") {
-    return v;
-  }
-  return defaultPreset;
-}
+/** Presets: relative window, or "all" for no lower bound. */
+export type RangePreset = "all" | "1h" | "24h" | "7d" | "14d" | "30d" | "90d" | string;
 
 /**
- * List endpoints: optional `from` / `to` (ISO) override `range` preset.
+ * List endpoints: optional `from` / `to` (ISO) override `range`.
+ * Supports flexible relative tokens (2h, 8w) via shared time-range parser.
  * `defaultPreset` when `range` is omitted (errors/events: all; sessions: 24h).
  */
 export function parseCreatedRange(
@@ -22,11 +14,15 @@ export function parseCreatedRange(
     from?: string;
     to?: string;
   },
-  defaultPreset: RangePreset
+  defaultPreset: RangePreset = "all"
 ): { gte?: Date; lte?: Date } {
   const fromRaw = query.from?.trim();
   const toRaw = query.to?.trim();
+  const rangeRaw = query.range?.trim();
+
   if (fromRaw || toRaw) {
+    const parsed = parseTimeRangeQuery({ from: fromRaw, to: toRaw }, new Date(), "24h");
+    if (parsed.ok) return { gte: parsed.range.gte, lte: parsed.range.lte };
     const gte = fromRaw ? new Date(fromRaw) : undefined;
     const lte = toRaw ? endOfDayIfDateOnly(toRaw) : undefined;
     const out: { gte?: Date; lte?: Date } = {};
@@ -34,17 +30,22 @@ export function parseCreatedRange(
     if (lte && !Number.isNaN(lte.getTime())) out.lte = lte;
     return out;
   }
-  const preset = normalizePreset(query.range, defaultPreset);
-  if (preset === "all") return {};
-  const hours =
-    preset === "7d"
-      ? 7 * 24
-      : preset === "30d"
-        ? 30 * 24
-        : preset === "90d"
-          ? 90 * 24
-          : 24;
-  return { gte: new Date(Date.now() - hours * 60 * 60 * 1000) };
+
+  const effectiveRange = rangeRaw || defaultPreset;
+  if (effectiveRange === "all") return {};
+
+  const parsed = parseTimeRangeQuery({ range: effectiveRange }, new Date(), "24h");
+  if (!parsed.ok) {
+    if (defaultPreset === "all") return {};
+    const fallback = parseTimeRangeQuery(
+      { range: defaultPreset === "all" ? "24h" : defaultPreset },
+      new Date(),
+      "24h"
+    );
+    if (fallback.ok) return { gte: fallback.range.gte, lte: fallback.range.lte };
+    return {};
+  }
+  return { gte: parsed.range.gte, lte: parsed.range.lte };
 }
 
 /** If value is YYYY-MM-DD only, use end of that day (UTC) for inclusive upper bounds. */

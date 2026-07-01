@@ -7,36 +7,41 @@ import {
 } from "./overview-stats.js";
 
 describe("resolveCompareWindow", () => {
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
   it("offsets week-ago comparison for 7d range", () => {
-    const currentSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const until = new Date("2026-06-28T12:00:00.000Z");
+    const currentSince = new Date(until.getTime() - sevenDaysMs);
     const { previousSince, previousUntil } = resolveCompareWindow(
-      "7d",
+      sevenDaysMs,
       "week-ago",
-      currentSince
+      currentSince,
+      until
     );
-    const weekAgoEnd = new Date(currentSince.getTime() - 6 * 24 * 60 * 60 * 1000);
-    const weekAgoStart = new Date(weekAgoEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const weekAgoEnd = new Date(until.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const weekAgoStart = new Date(weekAgoEnd.getTime() - sevenDaysMs);
 
     expect(previousUntil?.getTime()).toBe(weekAgoEnd.getTime());
     expect(previousSince.getTime()).toBe(weekAgoStart.getTime());
   });
 
   it("uses immediately prior window for previous compare on 7d", () => {
-    const currentSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const currentSince = new Date(Date.now() - sevenDaysMs);
     const { previousSince, previousUntil } = resolveCompareWindow(
-      "7d",
+      sevenDaysMs,
       "previous",
       currentSince
     );
 
     expect(previousUntil?.getTime()).toBe(currentSince.getTime());
-    expect(previousSince.getTime()).toBe(currentSince.getTime() - 7 * 24 * 60 * 60 * 1000);
+    expect(previousSince.getTime()).toBe(currentSince.getTime() - sevenDaysMs);
   });
 
   it("anchors previous compare end to the supplied current window start", () => {
     const currentSince = new Date("2026-05-01T12:00:00.000Z");
+    const dayMs = 24 * 60 * 60 * 1000;
     const { previousSince, previousUntil } = resolveCompareWindow(
-      "24h",
+      dayMs,
       "previous",
       currentSince
     );
@@ -96,7 +101,7 @@ describe("computeOverviewHealth", () => {
       900,
       10,
       [{ t: "2026-01-01T00:00:00.000Z", count: 86_400 }],
-      "7d"
+      86_400
     );
     expect(h.throughputPerSec).toBe(1);
     expect(h.peakThroughputPerSec).toBe(1);

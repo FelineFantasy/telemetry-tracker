@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "test": "NODE_ENV=test vitest run",
     "test:watch": "NODE_ENV=test vitest",
-    "retention": "tsx src/jobs/run-retention.ts"
+    "retention": "tsx src/jobs/run-retention.ts",
+    "seed:dev-api-key": "tsx scripts/seed-dev-api-key.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

@@ -37,14 +37,19 @@ export type OverviewWorkspaceTelemetry = {
 type Scope = {
   projectId: string;
   since: Date;
+  until?: Date;
   app?: string;
   environment?: string;
 };
 
+function eventCreatedAtFilter(since: Date, until?: Date): { gte: Date; lte?: Date } {
+  return until ? { gte: since, lte: until } : { gte: since };
+}
+
 function eventScopeWhere(scope: Scope): Prisma.EventWhereInput {
   const where: Prisma.EventWhereInput = {
     project_id: scope.projectId,
-    created_at: { gte: scope.since },
+    created_at: eventCreatedAtFilter(scope.since, scope.until),
   } as Prisma.EventWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
@@ -54,7 +59,9 @@ function eventScopeWhere(scope: Scope): Prisma.EventWhereInput {
 function sessionScopeWhere(scope: Scope): Prisma.SessionWhereInput {
   const where: Prisma.SessionWhereInput = {
     project_id: scope.projectId,
-    started_at: { gte: scope.since },
+    started_at: scope.until
+      ? { gte: scope.since, lte: scope.until }
+      : { gte: scope.since },
   } as Prisma.SessionWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   return where;
@@ -63,7 +70,9 @@ function sessionScopeWhere(scope: Scope): Prisma.SessionWhereInput {
 function errorGroupScopeWhere(scope: Scope): Prisma.ErrorGroupWhereInput {
   const where: Prisma.ErrorGroupWhereInput = {
     project_id: scope.projectId,
-    last_seen: { gte: scope.since },
+    last_seen: scope.until
+      ? { gte: scope.since, lte: scope.until }
+      : { gte: scope.since },
   } as Prisma.ErrorGroupWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
@@ -94,14 +103,15 @@ function errorOccurrenceScopeSql(
 }
 
 export function resolveCompareWindow(
-  range: "24h" | "7d",
+  durationMs: number,
   compare: OverviewCompareMode,
-  currentSince: Date
+  currentSince: Date,
+  currentUntil?: Date
 ): { previousSince: Date; previousUntil: Date | undefined } {
-  const hours = range === "7d" ? 7 * 24 : 24;
-  const ms = hours * 60 * 60 * 1000;
+  const ms = durationMs;
   if (compare === "week-ago") {
-    const weekAgoEnd = new Date(currentSince.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const windowEnd = currentUntil ?? new Date(currentSince.getTime() + ms);
+    const weekAgoEnd = new Date(windowEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
     const weekAgoStart = new Date(weekAgoEnd.getTime() - ms);
     return { previousSince: weekAgoStart, previousUntil: weekAgoEnd };
   }
@@ -205,12 +215,13 @@ export async function listDistinctEnvironments(
 export async function getSessionDurationSeries(
   prisma: PrismaClient,
   projectId: string,
-  rangeLabel: "24h" | "7d",
+  bucket: "hour" | "day" | "week",
   since: Date,
+  until?: Date,
   app?: string,
   environment?: string
 ): Promise<OverviewTimeSeriesPoint[]> {
-  const trunc = rangeLabel === "7d" ? "day" : "hour";
+  const trunc = bucket === "week" ? "week" : bucket;
   const appClause = app ? Prisma.sql`AND s."app" = ${app}` : Prisma.empty;
   const envClause = environment
     ? Prisma.sql`AND EXISTS (
@@ -228,6 +239,7 @@ export async function getSessionDurationSeries(
     FROM "Session" s
     WHERE s."project_id" = ${projectId}
       AND s."started_at" >= ${since}
+      ${until ? Prisma.sql`AND s."started_at" <= ${until}` : Prisma.empty}
       AND s."ended_at" IS NOT NULL
       ${appClause}
       ${envClause}
@@ -496,7 +508,7 @@ export function computeOverviewHealth(
   eventsPrevious: number,
   errorsPrevious: number,
   seriesEvents: OverviewTimeSeriesPoint[],
-  range: "24h" | "7d" = "24h"
+  bucketSeconds = 3600
 ): OverviewHealth {
   const total = events + errors;
   const totalPrev = eventsPrevious + errorsPrevious;
@@ -505,8 +517,8 @@ export function computeOverviewHealth(
   const errorRateDeltaPct = errorRatePct - prevErrorRatePct;
   const successRatePct = total > 0 ? (events / total) * 100 : 100;
 
-  const bucketSeconds = range === "7d" ? 86_400 : 3600;
-  const throughputs = seriesEvents.map((p) => p.count / bucketSeconds);
+  const bucketSecondsValue = bucketSeconds;
+  const throughputs = seriesEvents.map((p) => p.count / bucketSecondsValue);
   const peakThroughputPerSec = throughputs.length ? Math.max(...throughputs) : 0;
   const avgThroughputPerSec =
     throughputs.length > 0
