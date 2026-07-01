@@ -33,7 +33,11 @@ import {
   buildErrorGroupDetailHref,
   formatOverviewDeltaLine,
 } from "@/lib/overview-scope-url";
-import { parseOverviewTimeRangeOrDefault, isUnselectedTimeRange } from "@/lib/time-range";
+import {
+  parseOverviewTimeRangeOrDefault,
+  isUnselectedTimeRange,
+  effectiveIngestRateDurationMs,
+} from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 import { coalesceOverviewRequest } from "@/lib/api-inflight";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
@@ -390,7 +394,7 @@ export default async function OverviewPage({
       <Suspense fallback={null}>
         <OverviewMetricsSection
           rangeLabel={displayRangeLabel}
-          rangeDurationMs={parsedRange.durationMs}
+          rangeDurationMs={effectiveIngestRateDurationMs(parsedRange)}
           overviewPath={OVERVIEW_PATH}
           currentParams={currentOverviewParams}
           eventsCount={overviewData.eventsLast24h}

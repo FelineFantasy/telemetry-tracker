@@ -84,12 +84,15 @@ function errorOccurrenceScopeSql(
   gte: Date,
   lt: Date | undefined,
   app?: string,
-  environment?: string
+  environment?: string,
+  lte?: Date
 ): Prisma.Sql {
   const timeClause =
-    lt === undefined
-      ? Prisma.sql`eo."created_at" >= ${gte}`
-      : Prisma.sql`eo."created_at" >= ${gte} AND eo."created_at" < ${lt}`;
+    lte !== undefined
+      ? Prisma.sql`eo."created_at" >= ${gte} AND eo."created_at" <= ${lte}`
+      : lt === undefined
+        ? Prisma.sql`eo."created_at" >= ${gte}`
+        : Prisma.sql`eo."created_at" >= ${gte} AND eo."created_at" < ${lt}`;
   const appClause = app ? Prisma.sql`AND eg."app" = ${app}` : Prisma.empty;
   const envClause = environment
     ? Prisma.sql`AND eg."environment" = ${environment}`
@@ -297,13 +300,14 @@ export async function getOverviewEventWindowStats(
   params: {
     projectId: string;
     since: Date;
+    until: Date;
     previousSince: Date;
     previousUntil: Date;
     app?: string;
     environment?: string;
   }
 ): Promise<OverviewEventWindowStats> {
-  const { projectId, since, previousSince, previousUntil, app, environment } = params;
+  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
   const filters = eventFilterSql(projectId, app, environment);
 
   const rows = await prisma.$queryRaw<
@@ -318,18 +322,27 @@ export async function getOverviewEventWindowStats(
     ]
   >(Prisma.sql`
     SELECT
-      COUNT(*) FILTER (WHERE e."created_at" >= ${since})::bigint AS events_count,
+      COUNT(*) FILTER (
+        WHERE e."created_at" >= ${since} AND e."created_at" <= ${until}
+      )::bigint AS events_count,
       COUNT(*) FILTER (
         WHERE e."created_at" >= ${previousSince} AND e."created_at" < ${previousUntil}
       )::bigint AS events_previous,
-      COUNT(DISTINCT e."name") FILTER (WHERE e."created_at" >= ${since})::bigint AS distinct_event_names,
-      COUNT(DISTINCT e."app") FILTER (WHERE e."created_at" >= ${since})::bigint AS distinct_apps,
+      COUNT(DISTINCT e."name") FILTER (
+        WHERE e."created_at" >= ${since} AND e."created_at" <= ${until}
+      )::bigint AS distinct_event_names,
+      COUNT(DISTINCT e."app") FILTER (
+        WHERE e."created_at" >= ${since} AND e."created_at" <= ${until}
+      )::bigint AS distinct_apps,
       COUNT(DISTINCT e."sdk_version") FILTER (
-        WHERE e."created_at" >= ${since} AND e."sdk_version" IS NOT NULL
+        WHERE e."created_at" >= ${since}
+          AND e."created_at" <= ${until}
+          AND e."sdk_version" IS NOT NULL
       )::bigint AS distinct_sdk_versions
     FROM "Event" e
     WHERE ${filters}
       AND e."created_at" >= ${previousSince}
+      AND e."created_at" <= ${until}
   `);
 
   const row = rows[0];
@@ -348,25 +361,29 @@ export async function getOverviewErrorCountsPair(
   params: {
     projectId: string;
     since: Date;
+    until: Date;
     previousSince: Date;
     previousUntil: Date;
     app?: string;
     environment?: string;
   }
 ): Promise<OverviewCountPair> {
-  const { projectId, since, previousSince, previousUntil, app, environment } = params;
+  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
   const whereSql = errorOccurrenceScopeSql(
     projectId,
     previousSince,
     undefined,
     app,
-    environment
+    environment,
+    until
   );
 
   const rows = await prisma.$queryRaw<[{ errors_count: bigint; errors_previous: bigint }]>(
     Prisma.sql`
       SELECT
-        COUNT(*) FILTER (WHERE eo."created_at" >= ${since})::bigint AS errors_count,
+        COUNT(*) FILTER (
+          WHERE eo."created_at" >= ${since} AND eo."created_at" <= ${until}
+        )::bigint AS errors_count,
         COUNT(*) FILTER (
           WHERE eo."created_at" >= ${previousSince} AND eo."created_at" < ${previousUntil}
         )::bigint AS errors_previous
@@ -389,20 +406,21 @@ export async function getOverviewActiveUsersPair(
   params: {
     projectId: string;
     since: Date;
+    until: Date;
     previousSince: Date;
     previousUntil: Date;
     app?: string;
     environment?: string;
   }
 ): Promise<OverviewCountPair> {
-  const { projectId, since, previousSince, previousUntil, app, environment } = params;
+  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
   const filters = eventFilterSql(projectId, app, environment);
 
   const rows = await prisma.$queryRaw<[{ active_users: bigint; active_users_previous: bigint }]>(
     Prisma.sql`
       SELECT
         COUNT(DISTINCT CASE
-          WHEN e."created_at" >= ${since}
+          WHEN e."created_at" >= ${since} AND e."created_at" <= ${until}
           THEN COALESCE(e."user_id", e."anonymous_id")
         END)::bigint AS active_users,
         COUNT(DISTINCT CASE
@@ -412,6 +430,7 @@ export async function getOverviewActiveUsersPair(
       FROM "Event" e
       WHERE ${filters}
         AND e."created_at" >= ${previousSince}
+        AND e."created_at" <= ${until}
         AND (e."user_id" IS NOT NULL OR e."anonymous_id" IS NOT NULL)
     `
   );
@@ -439,16 +458,20 @@ export async function getOverviewSessionsPair(
   }
 
   const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+  const until = scope.until ?? new Date();
   const rows = await prisma.$queryRaw<[{ sessions_count: bigint; sessions_previous: bigint }]>(
     Prisma.sql`
       SELECT
-        COUNT(*) FILTER (WHERE s."started_at" >= ${scope.since})::bigint AS sessions_count,
+        COUNT(*) FILTER (
+          WHERE s."started_at" >= ${scope.since} AND s."started_at" <= ${until}
+        )::bigint AS sessions_count,
         COUNT(*) FILTER (
           WHERE s."started_at" >= ${previousSince} AND s."started_at" < ${previousUntil}
         )::bigint AS sessions_previous
       FROM "Session" s
       WHERE s."project_id" = ${scope.projectId}
         AND s."started_at" >= ${previousSince}
+        AND s."started_at" <= ${until}
         ${appClause}
     `
   );

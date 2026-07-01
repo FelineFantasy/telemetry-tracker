@@ -7,6 +7,9 @@ import type { PrismaClient } from "@prisma/client";
 
 export type OverviewSeriesBucket = "hour" | "day" | "week";
 
+/** Max chart buckets — wide windows anchor on `until` so recent data stays visible. */
+export const OVERVIEW_CHART_MAX_BUCKETS = 120;
+
 export type OverviewTimeSeriesPoint = {
   t: string;
   count: number;
@@ -59,14 +62,35 @@ function truncateForBucket(d: Date, bucket: OverviewSeriesBucket): Date {
   return truncateUtcWeek(d);
 }
 
+/** @internal Exported for unit tests. */
+export function generateOverviewChartBuckets(
+  since: Date,
+  until: Date,
+  bucket: OverviewSeriesBucket
+): Date[] {
+  return generateBuckets(since, until, bucket);
+}
+
 function generateBuckets(since: Date, until: Date, bucket: OverviewSeriesBucket): Date[] {
   const step = bucketStepMs(bucket);
   const start = truncateForBucket(since, bucket);
+  const end = truncateForBucket(until, bucket);
+  const spanBuckets = Math.floor((end.getTime() - start.getTime()) / step) + 1;
+
+  if (spanBuckets <= OVERVIEW_CHART_MAX_BUCKETS) {
+    const out: Date[] = [];
+    for (let t = start.getTime(); t <= end.getTime(); t += step) {
+      out.push(new Date(t));
+    }
+    if (out.length === 0) out.push(start);
+    return out;
+  }
+
+  const windowStart = end.getTime() - (OVERVIEW_CHART_MAX_BUCKETS - 1) * step;
   const out: Date[] = [];
-  for (let t = start.getTime(); t <= until.getTime() && out.length < 120; t += step) {
+  for (let t = windowStart; t <= end.getTime(); t += step) {
     out.push(new Date(t));
   }
-  if (out.length === 0) out.push(start);
   return out;
 }
 

@@ -3,6 +3,8 @@ import {
   parseOverviewTimeRangeQuery,
   parseTimeRangeQuery,
   tryParseCustomRelativeInput,
+  effectiveIngestRateDurationMs,
+  buildUnselectedTimeRange,
 } from "./time-range.js";
 
 describe("parseTimeRangeQuery", () => {
@@ -60,5 +62,21 @@ describe("tryParseCustomRelativeInput", () => {
 
   it("rejects invalid input", () => {
     expect(tryParseCustomRelativeInput("nope")).toBeNull();
+  });
+});
+
+describe("effectiveIngestRateDurationMs", () => {
+  const now = new Date("2026-06-28T12:00:00.000Z");
+
+  it("uses chart window length for unselected ranges", () => {
+    const range = buildUnselectedTimeRange(now);
+    expect(effectiveIngestRateDurationMs(range)).toBe(120 * 7 * 86_400_000);
+  });
+
+  it("uses actual duration for preset ranges", () => {
+    const parsed = parseTimeRangeQuery({ range: "24h" }, now);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(effectiveIngestRateDurationMs(parsed.range)).toBe(parsed.range.durationMs);
   });
 });

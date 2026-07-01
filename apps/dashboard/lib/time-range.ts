@@ -231,6 +231,23 @@ export function buildUnselectedTimeRange(now: Date = new Date()): ParsedTimeRang
   };
 }
 
+/** Max chart buckets — mirrors API overview volume series cap. */
+const OVERVIEW_CHART_MAX_BUCKETS = 120;
+
+/** Duration for ingest-rate display when the selected window spans all history. */
+export function effectiveIngestRateDurationMs(range: ParsedTimeRange): number {
+  if (!isUnselectedTimeRange(range.key)) {
+    return Math.max(range.durationMs, 1);
+  }
+  const stepMs =
+    range.bucket === "hour"
+      ? 60 * 60 * 1000
+      : range.bucket === "day"
+        ? 86_400_000
+        : 7 * 86_400_000;
+  return OVERVIEW_CHART_MAX_BUCKETS * stepMs;
+}
+
 /** @deprecated Use buildUnselectedTimeRange */
 export function buildAllTimeRange(now: Date = new Date()): ParsedTimeRange {
   return buildUnselectedTimeRange(now);

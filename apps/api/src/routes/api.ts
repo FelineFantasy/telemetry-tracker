@@ -203,6 +203,7 @@ export async function apiRoutes(
     const windowParams = {
       projectId,
       since,
+      until,
       previousSince: compareWindow.previousSince,
       previousUntil,
       app: appFilter,
@@ -297,6 +298,7 @@ export async function apiRoutes(
     const latestByName = await fetchLatestEventsByName(prisma, {
       projectId,
       since,
+      until,
       app: appFilter,
       environment,
       names: eventCounts.map((row) => row.name),
