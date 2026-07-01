@@ -1,5 +1,6 @@
 import { OrgRole, type PrismaClient } from "@prisma/client";
 import type { DashboardNotificationItem } from "./dashboard-notifications.js";
+import { teamInviteNotificationKey } from "./team-notification-keys.js";
 
 const RECENT_MEMBER_DAYS = 14;
 
@@ -33,7 +34,7 @@ export async function buildTeamNotifications(
 
   for (const invite of pendingInvites) {
     items.push({
-      id: `team:invite:${invite.id}`,
+      id: teamInviteNotificationKey(invite.id, invite.token),
       type: "team",
       title: `Invitation to ${invite.organization.name}`,
       body: `You were invited as ${invite.role}. Accept to join the organization.`,

@@ -45,4 +45,34 @@ describe("buildTeamNotifications", () => {
       },
     ]);
   });
+
+  it("keys pending invite notifications by invite id and token", async () => {
+    const createdAt = new Date("2026-03-01T12:00:00.000Z");
+    const prisma = {
+      organizationInvite: {
+        findMany: vi.fn(async () => [
+          {
+            id: "invite-1",
+            token: "tok-new",
+            role: OrgRole.EDITOR,
+            created_at: createdAt,
+            organization: { id: "org-1", name: "Acme" },
+          },
+        ]),
+      },
+      organizationMembership: {
+        findMany: vi.fn(async () => []),
+      },
+    } as unknown as Parameters<typeof buildTeamNotifications>[0];
+
+    const items = await buildTeamNotifications(
+      prisma,
+      "invitee-1",
+      "invitee@example.com",
+      []
+    );
+
+    expect(items[0]?.id).toBe("team:invite:invite-1:tok-new");
+    expect(items[0]?.href).toBe("/register?invite=tok-new");
+  });
 });

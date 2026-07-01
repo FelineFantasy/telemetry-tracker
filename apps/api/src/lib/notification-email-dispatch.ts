@@ -15,6 +15,7 @@ import {
   type BillingAlertVariant,
 } from "./billing-alert.js";
 import { billingNotificationKey } from "./billing-notification-keys.js";
+import { teamInviteNotificationKey } from "./team-notification-keys.js";
 
 function absoluteHref(href: string | null, base: string | null): string | null {
   if (!href) return null;
@@ -305,10 +306,6 @@ export async function shouldSendInviteEmail(
   return shouldSendEmailForCategory(prefs, "team");
 }
 
-function organizationInviteEmailKey(inviteId: string, token: string): string {
-  return `team:invite:${inviteId}:${token}`;
-}
-
 export async function sendOrganizationInviteEmail(
   prisma: PrismaClient,
   invite: { id: string; email: string; token: string },
@@ -316,7 +313,7 @@ export async function sendOrganizationInviteEmail(
 ): Promise<void> {
   if (!(await shouldSendInviteEmail(prisma, invite.email))) return;
 
-  const notificationKey = organizationInviteEmailKey(invite.id, invite.token);
+  const notificationKey = teamInviteNotificationKey(invite.id, invite.token);
   const item: DashboardNotificationItem = {
     id: notificationKey,
     type: "team",
