@@ -28,7 +28,7 @@ export function AppearanceSettingsClient() {
 
   useEffect(() => setMounted(true), []);
 
-  const active = (theme ?? "dark") as ThemeId;
+  const active = mounted ? ((theme ?? "dark") as ThemeId) : null;
 
   return (
     <>
@@ -41,7 +41,7 @@ export function AppearanceSettingsClient() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {THEMES.map((t) => {
               const Icon = t.icon;
-              const selected = active === t.id;
+              const selected = active !== null && active === t.id;
               return (
                 <button
                   key={t.id}

@@ -31,21 +31,24 @@ const CHART_VAR_KEYS: Record<keyof ChartColors, string> = {
   event: "--chart-event",
 };
 
+/** Matches `.dark` chart tokens in globals.css — defaultTheme is dark. */
+const DARK_CHART_COLORS_FALLBACK: ChartColors = {
+  grid: "oklch(1 0 0 / 10%)",
+  axis: "oklch(1 0 0 / 16%)",
+  tick: "oklch(0.82 0.02 280)",
+  tooltipBg: "oklch(0.28 0.03 280)",
+  tooltipBorder: "oklch(0.45 0.03 280)",
+  tooltipFg: "oklch(0.96 0.01 260)",
+  tooltipLabel: "oklch(0.88 0.02 280)",
+  legend: "oklch(0.82 0.02 280)",
+  cursor: "oklch(0.52 0.19 280 / 12%)",
+  error: "oklch(0.72 0.2 25)",
+  event: "oklch(0.58 0.2 280)",
+};
+
 function readChartColors(): ChartColors {
   if (typeof window === "undefined") {
-    return {
-      grid: "rgba(148, 163, 184, 0.12)",
-      axis: "rgba(148, 163, 184, 0.2)",
-      tick: "#64748b",
-      tooltipBg: "#ffffff",
-      tooltipBorder: "rgba(15, 23, 42, 0.12)",
-      tooltipFg: "#0f172a",
-      tooltipLabel: "#475569",
-      legend: "#64748b",
-      cursor: "rgba(103, 79, 220, 0.08)",
-      error: "#f87171",
-      event: "#674fdc",
-    };
+    return DARK_CHART_COLORS_FALLBACK;
   }
   const styles = getComputedStyle(document.documentElement);
   const read = (key: keyof ChartColors) =>
