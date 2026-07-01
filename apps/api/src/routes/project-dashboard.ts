@@ -833,6 +833,58 @@ export async function projectDashboardRoutes(
     });
   });
 
+  app.get("/project/alert-settings", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const { loadProjectAlertSettings } = await import("../lib/error-spike-alert.js");
+    const settings = await loadProjectAlertSettings(prisma, projectId);
+    return reply.send({ settings });
+  });
+
+  app.patch("/project/alert-settings", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { validateProjectAlertSettingsPatch } = await import(
+      "../lib/project-alert-settings.js"
+    );
+    const validated = validateProjectAlertSettingsPatch(request.body);
+    if (!validated.ok) {
+      return reply.status(400).send({ error: validated.error });
+    }
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { alert_settings: validated.settings as object },
+    });
+    return reply.send({ settings: validated.settings });
+  });
+
+  app.get("/project/alert-events", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const q = request.query as { limit?: string };
+    const limitRaw = typeof q.limit === "string" ? Number(q.limit) : 25;
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(50, Math.max(1, Math.floor(limitRaw)))
+      : 25;
+    const { listRecentAlertEvents } = await import("../lib/alert-dispatch.js");
+    const events = await listRecentAlertEvents(prisma, projectId, limit);
+    return reply.send({
+      events: events.map((e) => ({
+        id: e.id,
+        rule: e.rule,
+        title: e.title,
+        body: e.body,
+        firedAt: e.fired_at.toISOString(),
+      })),
+    });
+  });
+
   app.get("/project/api-keys", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;

@@ -37,6 +37,7 @@ const CATEGORIES: { id: NotificationCategory; label: string; desc: string }[] = 
   { id: "issues", label: "Issues", desc: "Open error groups for the active project" },
   { id: "billing", label: "Billing", desc: "Quota thresholds and payment issues" },
   { id: "team", label: "Team", desc: "Invitations and new members in your organizations" },
+  { id: "alerts", label: "Alerts", desc: "Error spikes and quota threshold rules" },
 ];
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
@@ -151,7 +152,7 @@ export function NotificationsSettingsClient({
 
         <Section
           title="Routing"
-          description="Choose which categories appear on each channel. Billing alerts always bypass quiet hours in-app."
+          description="Choose which categories appear on each channel. Billing and alert notifications bypass quiet hours in-app."
         >
           <div className="overflow-x-auto">
             <table className="min-w-full text-[13px]">
@@ -200,7 +201,7 @@ export function NotificationsSettingsClient({
 
         <Section
           title="Quiet hours"
-          description={`Mute non-critical in-app alerts during a daily window (${prefs.quietHours.timezone}). Issue alerts are muted; billing and quota alerts still show.`}
+          description={`Mute non-critical in-app alerts during a daily window (${prefs.quietHours.timezone}). Issue alerts are muted; billing, quota, and alert rules still show.`}
         >
           <FieldGroup>
             <Field label="Enable quiet hours">

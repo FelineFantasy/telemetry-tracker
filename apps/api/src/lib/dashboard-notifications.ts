@@ -9,12 +9,13 @@ import {
 import { billingAlertNotificationContent } from "./billing-alert.js";
 import { billingNotificationKey } from "./billing-notification-keys.js";
 import { buildTeamNotifications } from "./notification-team.js";
+import { recentAlertNotifications } from "./alert-dispatch.js";
 import { currentYearMonth } from "./usage-meter.js";
 import { quotaNotificationKey } from "./quota-notification-keys.js";
 
 export type DashboardNotificationItem = {
   id: string;
-  type: "issue" | "billing" | "quota" | "team";
+  type: "issue" | "billing" | "quota" | "team" | "alert";
   title: string;
   body: string;
   occurredAt: string;
@@ -114,6 +115,8 @@ export async function buildDashboardNotifications(
   }
 
   if (projectId) {
+    items.push(...(await recentAlertNotifications(prisma, projectId)));
+
     const groups = await prisma.errorGroup.findMany({
       where: {
         project_id: projectId,
@@ -159,9 +162,13 @@ export async function buildDashboardNotifications(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
   );
 
+  const deduped = [...new Map(items.map((item) => [item.id, item])).values()].sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+  );
+
   if (options?.forReadPersistence) {
-    return filterInAppNotificationsForReadPersistence(items, preferences);
+    return filterInAppNotificationsForReadPersistence(deduped, preferences);
   }
 
-  return filterInAppNotifications(items, preferences);
+  return filterInAppNotifications(deduped, preferences);
 }

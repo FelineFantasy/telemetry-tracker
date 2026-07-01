@@ -2,7 +2,7 @@ import { dashboardApiFetch, type DashboardApiFetchOptions } from "@/lib/dashboar
 
 export type DashboardNotificationItem = {
   id: string;
-  type: "issue" | "billing" | "quota" | "team";
+  type: "issue" | "billing" | "quota" | "team" | "alert";
   title: string;
   body: string;
   occurredAt: string;
@@ -36,7 +36,8 @@ function isNotificationItem(value: unknown): value is DashboardNotificationItem 
     (o.type === "issue" ||
       o.type === "billing" ||
       o.type === "quota" ||
-      o.type === "team") &&
+      o.type === "team" ||
+      o.type === "alert") &&
     typeof o.title === "string" &&
     typeof o.body === "string" &&
     typeof o.occurredAt === "string" &&

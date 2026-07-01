@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 
-export type NotificationCategory = "issues" | "billing" | "team";
+export type NotificationCategory = "issues" | "billing" | "team" | "alerts";
 export type NotificationChannel = "inapp" | "email";
 
 export type NotificationPreferences = {
@@ -24,6 +24,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     issues: { inapp: true, email: false },
     billing: { inapp: true, email: true },
     team: { inapp: true, email: true },
+    alerts: { inapp: true, email: true },
   },
   quietHours: {
     enabled: false,
@@ -44,6 +45,9 @@ const preferencesSchema = z.object({
     issues: z.object({ inapp: z.boolean(), email: z.boolean() }),
     billing: z.object({ inapp: z.boolean(), email: z.boolean() }),
     team: z.object({ inapp: z.boolean(), email: z.boolean() }),
+    alerts: z
+      .object({ inapp: z.boolean(), email: z.boolean() })
+      .optional(),
   }),
   quietHours: z.object({
     enabled: z.boolean(),
@@ -60,7 +64,15 @@ export function parseNotificationPreferences(
   if (!parsed.success) {
     return DEFAULT_NOTIFICATION_PREFERENCES;
   }
-  return parsed.data;
+  return {
+    ...parsed.data,
+    routing: {
+      ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
+      ...parsed.data.routing,
+      alerts:
+        parsed.data.routing.alerts ?? DEFAULT_NOTIFICATION_PREFERENCES.routing.alerts,
+    },
+  };
 }
 
 export function validateNotificationPreferencesPatch(
@@ -78,13 +90,14 @@ export function categoryForNotificationType(
 ): NotificationCategory {
   if (type === "issue") return "issues";
   if (type === "team") return "team";
+  if (type === "alert") return "alerts";
   return "billing";
 }
 
 export function isCriticalInAppNotification(
   item: DashboardNotificationItem
 ): boolean {
-  return item.type === "billing" || item.type === "quota";
+  return item.type === "billing" || item.type === "quota" || item.type === "alert";
 }
 
 export function shouldSendEmailForCategory(

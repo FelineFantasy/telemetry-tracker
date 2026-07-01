@@ -1,4 +1,4 @@
-export type NotificationCategory = "issues" | "billing" | "team";
+export type NotificationCategory = "issues" | "billing" | "team" | "alerts";
 export type NotificationChannel = "inapp" | "email";
 
 export type NotificationPreferences = {
@@ -21,6 +21,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     issues: { inapp: true, email: false },
     billing: { inapp: true, email: true },
     team: { inapp: true, email: true },
+    alerts: { inapp: true, email: true },
   },
   quietHours: {
     enabled: false,
@@ -64,6 +65,7 @@ export function parseNotificationPreferences(raw: unknown): NotificationPreferen
   const issues = route("issues");
   const billing = route("billing");
   const team = route("team");
+  const alerts = route("alerts");
 
   if (
     typeof ch.inapp !== "boolean" ||
@@ -81,7 +83,7 @@ export function parseNotificationPreferences(raw: unknown): NotificationPreferen
 
   return {
     channels: { inapp: ch.inapp, email: ch.email },
-    routing: { issues, billing, team },
+    routing: { issues, billing, team, alerts: alerts ?? DEFAULT_NOTIFICATION_PREFERENCES.routing.alerts },
     quietHours: {
       enabled: qh.enabled,
       startHour: qh.startHour,

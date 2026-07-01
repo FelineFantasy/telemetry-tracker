@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Bell,
+  BellRing,
   CreditCard,
   Users,
   Zap,
@@ -33,6 +34,8 @@ function NotifIcon({ type }: { type: DashboardNotificationItem["type"] }) {
       return <Zap className={`${cls} text-warning`} />;
     case "team":
       return <Users className={`${cls} text-brand`} />;
+    case "alert":
+      return <BellRing className={`${cls} text-warning`} />;
     default:
       return <Bell className={`${cls} text-brand`} />;
   }
