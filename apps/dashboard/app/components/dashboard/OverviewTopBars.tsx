@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { chartTooltipStyle, useChartColors } from "@/lib/use-chart-colors";
 
 type Props = {
   title: string;
@@ -20,15 +21,8 @@ type Props = {
   emptyMessage: string;
 };
 
-const FILL = {
-  errors: "#f87171",
-  events: "#8a7de4",
-} as const;
-
-/** Recharts renders SVG; CSS variables often do not apply to tick `fill` — use explicit light text. */
-const TICK_FILL = "#d4d0e8";
-
 export function OverviewTopBars({ title, subtitle, rows, accent, emptyMessage }: Props) {
+  const colors = useChartColors();
   const data = [...rows].reverse();
 
   if (!rows.length) {
@@ -40,8 +34,9 @@ export function OverviewTopBars({ title, subtitle, rows, accent, emptyMessage }:
     );
   }
 
-  const fill = FILL[accent];
+  const fill = accent === "errors" ? colors.error : colors.event;
   const maxVal = Math.max(...rows.map((r) => r.value), 1);
+  const tooltipStyle = chartTooltipStyle(colors);
 
   return (
     <section
@@ -65,22 +60,16 @@ export function OverviewTopBars({ title, subtitle, rows, accent, emptyMessage }:
               type="category"
               dataKey="label"
               width={148}
-              tick={{ fill: TICK_FILL, fontSize: 11 }}
+              tick={{ fill: colors.tick, fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               interval={0}
             />
             <Tooltip
-              cursor={{ fill: "rgba(103, 79, 220, 0.08)" }}
-              contentStyle={{
-                background: "#3d3758",
-                border: "1px solid #5c5678",
-                borderRadius: "8px",
-                fontSize: "12px",
-                color: "#f1f5f9",
-              }}
-              labelStyle={{ color: "#e8e4f7" }}
-              itemStyle={{ color: "#f8fafc" }}
+              cursor={{ fill: colors.cursor }}
+              contentStyle={tooltipStyle}
+              labelStyle={{ color: colors.tooltipLabel }}
+              itemStyle={{ color: colors.tooltipFg }}
             />
             <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={22}>
               {data.map((_, i) => (

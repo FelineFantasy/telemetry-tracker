@@ -11,7 +11,6 @@ import {
   Keyboard,
   LifeBuoy,
   LogOut,
-  Moon,
   Settings,
   SlidersHorizontal,
   Sparkles,
@@ -22,6 +21,7 @@ import { logoutAction } from "@/app/auth/actions";
 import type { DashboardUser } from "@/lib/dashboard-user";
 import { DashboardPopover } from "./DashboardPopover";
 import { ShellKbd } from "./DashboardPopover";
+import { ThemeMenuLink } from "./ThemeMenuLink";
 
 function userInitials(user: DashboardUser): string {
   const fromName = user.displayName?.trim();
@@ -46,8 +46,7 @@ const ACCOUNT_LINKS = [
 const PREFERENCE_LINKS = [
   { href: "/dashboard/settings/shortcuts", label: "Keyboard shortcuts", icon: Keyboard, shortcut: "?" },
   { href: "/dashboard/settings/preferences", label: "Preferences", icon: SlidersHorizontal },
-  { href: "/dashboard/settings/appearance", label: "Theme · Dark", icon: Moon },
-];
+] as const;
 
 const HELP_LINKS = [
   { href: "/docs", label: "Documentation", icon: BookOpen },
@@ -100,6 +99,7 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
               {PREFERENCE_LINKS.map((item) => (
                 <MenuLink key={item.href} {...item} />
               ))}
+              <ThemeMenuLink />
             </MenuGroup>
             <MenuGroup label="Help">
               {HELP_LINKS.map((item) => (

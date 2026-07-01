@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import type { OverviewSeries, OverviewTimeSeriesPoint } from "@/lib/overview-api";
 import { chartHasNoData } from "@/lib/overview-chart-series";
+import { chartTooltipStyle, useChartColors } from "@/lib/use-chart-colors";
 import { DashboardPanel } from "@/app/components/dashboard/dashboard-ui";
 
 function formatBucketLabel(iso: string, bucket: "hour" | "day" | "week"): string {
@@ -52,6 +53,7 @@ export function OverviewExtraCharts({
   sessionDurationSeries: OverviewTimeSeriesPoint[];
   rangeLabel: string;
 }) {
+  const colors = useChartColors();
   const errorRate = mergeErrorRateSeries(series);
   const events = mapSeries(series.events, series.bucket, "events");
   const sessions = mapSeries(sessionDurationSeries, series.bucket, "s");
@@ -64,7 +66,7 @@ export function OverviewExtraCharts({
       data: errorRate,
       dataKey: "pct" as const,
       unit: "%",
-      color: "#f87171",
+      color: colors.error,
     },
     {
       id: "event-volume",
@@ -95,6 +97,8 @@ export function OverviewExtraCharts({
     },
   ];
 
+  const tooltipStyle = chartTooltipStyle(colors);
+
   return (
     <section className="mb-8">
       <div className="mb-3">
@@ -122,16 +126,11 @@ export function OverviewExtraCharts({
                         <stop offset="100%" stopColor={c.color} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="rgba(148,163,184,0.08)" vertical={false} />
-                    <XAxis dataKey="t" tick={{ fill: "#888", fontSize: 10 }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fill: "#888", fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
+                    <CartesianGrid stroke={colors.grid} vertical={false} />
+                    <XAxis dataKey="t" tick={{ fill: colors.tick, fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fill: colors.tick, fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
                     <Tooltip
-                      contentStyle={{
-                        background: "var(--popover)",
-                        border: "1px solid var(--border)",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
+                      contentStyle={tooltipStyle}
                       formatter={(v: number) => [`${v} ${c.unit}`, c.title]}
                     />
                     <Area

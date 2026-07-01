@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { OverviewSeries } from "@/lib/overview-api";
+import { chartTooltipStyle, useChartColors } from "@/lib/use-chart-colors";
 
 type Props = {
   series: OverviewSeries;
@@ -32,6 +33,7 @@ function bucketUnit(bucket: "hour" | "day" | "week"): string {
 }
 
 export function OverviewTrendsChart({ series, rangeLabel }: Props) {
+  const colors = useChartColors();
   const data = series.errors.map((e, i) => ({
     label: tickLabel(e.t, series.bucket),
     errors: e.count,
@@ -39,6 +41,7 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
   }));
 
   const summary = `Error and event volume over ${rangeLabel}. ${data.length} ${bucketUnit(series.bucket)} buckets.`;
+  const tooltipStyle = chartTooltipStyle(colors);
 
   return (
     <section
@@ -58,41 +61,33 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
       >
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-            <CartesianGrid stroke="rgba(148, 163, 184, 0.12)" vertical={false} />
+            <CartesianGrid stroke={colors.grid} vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "#d4d0e8", fontSize: 11 }}
+              tick={{ fill: colors.tick, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "rgba(148, 163, 184, 0.2)" }}
+              axisLine={{ stroke: colors.axis }}
             />
             <YAxis
               yAxisId="err"
-              tick={{ fill: "rgba(248, 113, 113, 0.9)", fontSize: 11 }}
+              tick={{ fill: colors.error, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "rgba(248, 113, 113, 0.25)" }}
-              width={44}
+              axisLine={{ stroke: colors.error }}
             />
             <YAxis
               yAxisId="ev"
               orientation="right"
-              tick={{ fill: "rgba(103, 79, 220, 0.95)", fontSize: 11 }}
+              tick={{ fill: colors.event, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "rgba(103, 79, 220, 0.3)" }}
-              width={44}
+              axisLine={{ stroke: colors.event }}
             />
             <Tooltip
-              contentStyle={{
-                background: "#3d3758",
-                border: "1px solid #5c5678",
-                borderRadius: "8px",
-                fontSize: "12px",
-                color: "#f1f5f9",
-              }}
-              labelStyle={{ color: "#e8e4f7" }}
-              itemStyle={{ color: "#f8fafc" }}
+              contentStyle={tooltipStyle}
+              labelStyle={{ color: colors.tooltipLabel }}
+              itemStyle={{ color: colors.tooltipFg }}
             />
             <Legend
-              wrapperStyle={{ fontSize: "12px", paddingTop: "8px", color: "#d4d0e8" }}
+              wrapperStyle={{ fontSize: "12px", paddingTop: "8px", color: colors.legend }}
               formatter={(value) => (value === "errors" ? "Errors" : "Events")}
             />
             <Line
@@ -100,7 +95,7 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
               type="monotone"
               dataKey="errors"
               name="errors"
-              stroke="#f87171"
+              stroke={colors.error}
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
@@ -110,7 +105,7 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
               type="monotone"
               dataKey="events"
               name="events"
-              stroke="#674fdc"
+              stroke={colors.event}
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}

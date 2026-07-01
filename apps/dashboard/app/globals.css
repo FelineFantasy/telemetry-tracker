@@ -2,11 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens — pulse-beacon aesthetic (oklch, dark-only) */
+/* Design tokens — pulse-beacon aesthetic (oklch, light + dark) */
 @layer base {
   :root {
     --radius: 0.75rem;
 
+    --background: oklch(0.985 0.003 260);
+    --foreground: oklch(0.18 0.015 260);
+    --surface: oklch(0.965 0.006 260);
+    --surface-elevated: oklch(0.995 0.003 260);
+    --card: oklch(0.99 0.004 260);
+    --card-foreground: oklch(0.18 0.015 260);
+    --popover: oklch(0.995 0.003 260);
+    --popover-foreground: oklch(0.18 0.015 260);
+
+    --border: oklch(0.22 0.02 260 / 10%);
+    --border-strong: oklch(0.22 0.02 260 / 16%);
+    --input: oklch(0.22 0.02 260 / 8%);
+    --ring: oklch(0.55 0.18 250 / 35%);
+    --accent-color: oklch(0.55 0.18 250);
+
+    --muted: oklch(0.945 0.008 260);
+    --muted-foreground: oklch(0.48 0.02 260);
+    --accent: oklch(0.94 0.01 260);
+    --accent-foreground: oklch(0.18 0.015 260);
+
+    --brand: oklch(0.52 0.19 250);
+    --brand-soft: oklch(0.52 0.19 250 / 12%);
+
+    --primary: oklch(0.18 0.015 260);
+    --primary-foreground: oklch(0.98 0.003 260);
+    --secondary: oklch(0.94 0.01 260);
+    --secondary-foreground: oklch(0.18 0.015 260);
+
+    --success: oklch(0.58 0.17 150);
+    --warning: oklch(0.68 0.16 75);
+    --destructive: oklch(0.58 0.22 25);
+    --destructive-foreground: oklch(0.98 0 0);
+
+    --selection-bg: oklch(0.52 0.19 250 / 22%);
+
+    --chart-grid: oklch(0.55 0.02 260 / 14%);
+    --chart-axis: oklch(0.55 0.02 260 / 22%);
+    --chart-tick: oklch(0.48 0.02 260);
+    --chart-tooltip-bg: oklch(0.995 0.003 260);
+    --chart-tooltip-border: oklch(0.22 0.02 260 / 16%);
+    --chart-tooltip-fg: oklch(0.18 0.015 260);
+    --chart-tooltip-label: oklch(0.38 0.02 260);
+    --chart-legend: oklch(0.48 0.02 260);
+    --chart-cursor: oklch(0.52 0.19 250 / 10%);
+    --chart-error: oklch(0.62 0.22 25);
+    --chart-event: oklch(0.52 0.19 280);
+
+    --rdp-accent-background-color: oklch(0.52 0.19 250 / 14%);
+    --rdp-range-middle-background-color: oklch(0.52 0.19 250 / 10%);
+
+    /* Aliases for react-day-picker and legacy snippets */
+    --color-bg: var(--background);
+    --color-surface: var(--surface);
+    --color-border: var(--border);
+    --color-code-bg: var(--surface);
+    --color-code-border: var(--border-strong);
+    --color-code-foreground: var(--foreground);
+    --color-text: var(--foreground);
+    --color-text-muted: var(--muted-foreground);
+    --color-link: var(--brand);
+    --color-link-hover: oklch(0.45 0.18 250);
+    --color-error: var(--destructive);
+    --color-success: var(--success);
+    --color-foreground: var(--foreground);
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-lg: var(--radius);
+    --touch-min: 44px;
+    --font-size-body: 16px;
+    --font-size-sm: 14px;
+    --font-size-xs: 12px;
+    --font-size-h1: 1.5rem;
+    --font-size-h2: 1.25rem;
+    --line-height: 1.5;
+  }
+
+  .dark {
     --background: oklch(0.04 0 0);
     --foreground: oklch(0.97 0 0);
     --surface: oklch(0.08 0.005 260);
@@ -40,40 +121,34 @@
     --destructive: oklch(0.66 0.22 22);
     --destructive-foreground: oklch(0.98 0 0);
 
-    /* Aliases for react-day-picker and legacy snippets */
-    --color-bg: var(--background);
-    --color-surface: var(--surface);
-    --color-border: var(--border);
-    --color-code-bg: var(--surface);
-    --color-code-border: var(--border-strong);
-    --color-code-foreground: var(--foreground);
-    --color-text: var(--foreground);
-    --color-text-muted: var(--muted-foreground);
-    --color-link: var(--brand);
+    --selection-bg: oklch(1 0 0 / 12%);
+
+    --chart-grid: oklch(1 0 0 / 10%);
+    --chart-axis: oklch(1 0 0 / 16%);
+    --chart-tick: oklch(0.82 0.02 280);
+    --chart-tooltip-bg: oklch(0.28 0.03 280);
+    --chart-tooltip-border: oklch(0.45 0.03 280);
+    --chart-tooltip-fg: oklch(0.96 0.01 260);
+    --chart-tooltip-label: oklch(0.88 0.02 280);
+    --chart-legend: oklch(0.82 0.02 280);
+    --chart-cursor: oklch(0.52 0.19 280 / 12%);
+    --chart-error: oklch(0.72 0.2 25);
+    --chart-event: oklch(0.58 0.2 280);
+
+    --rdp-accent-background-color: oklch(0.58 0.2 280 / 16%);
+    --rdp-range-middle-background-color: oklch(0.58 0.2 280 / 12%);
+
     --color-link-hover: oklch(0.82 0.12 250);
-    --color-error: var(--destructive);
-    --color-success: var(--success);
-    --color-foreground: var(--foreground);
-    --space-xs: 4px;
-    --space-sm: 8px;
-    --space-md: 16px;
-    --space-lg: 24px;
-    --space-xl: 32px;
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-lg: var(--radius);
-    --touch-min: 44px;
-    --font-size-body: 16px;
-    --font-size-sm: 14px;
-    --font-size-xs: 12px;
-    --font-size-h1: 1.5rem;
-    --font-size-h2: 1.25rem;
-    --line-height: 1.5;
   }
 
   html {
-    color-scheme: dark;
+    color-scheme: light;
     accent-color: var(--accent-color);
     @apply scroll-smooth;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   *,
@@ -98,7 +173,7 @@
   }
 
   ::selection {
-    background: oklch(1 0 0 / 12%);
+    background: var(--selection-bg);
     color: var(--foreground);
   }
 
@@ -114,6 +189,12 @@
   input[type="date"],
   input[type="datetime-local"],
   input[type="time"] {
+    color-scheme: light;
+  }
+
+  html.dark input[type="date"],
+  html.dark input[type="datetime-local"],
+  html.dark input[type="time"] {
     color-scheme: dark;
   }
 
@@ -178,6 +259,12 @@
 
 /* Marketing utilities */
 .glow-blue {
+  background:
+    radial-gradient(60% 50% at 10% 0%, oklch(0.52 0.19 250 / 0.18) 0%, transparent 60%),
+    radial-gradient(40% 35% at 90% 100%, oklch(0.52 0.19 250 / 0.1) 0%, transparent 60%);
+}
+
+.dark .glow-blue {
   background:
     radial-gradient(60% 50% at 10% 0%, oklch(0.45 0.13 250 / 0.35) 0%, transparent 60%),
     radial-gradient(40% 35% at 90% 100%, oklch(0.45 0.13 250 / 0.18) 0%, transparent 60%);
