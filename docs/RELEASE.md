@@ -39,6 +39,7 @@ GitHub cannot require “your approval only when you are not the PR author” (a
 |------|-----------|
 | PR required | Branch protection |
 | CI must pass | Required check: `build` |
+| Bugbot (recommended) | Optional required check: `Cursor Bugbot` — see [CONTRIBUTING.md](../CONTRIBUTING.md#ai-code-review-bugbot) |
 | **Maintainer approval when author ≠ @unjica** | Required check: `maintainer-review` ([workflow](../.github/workflows/maintainer-review.yml)) |
 | **Your own PRs to `main`** | `maintainer-review` passes automatically; merge after `build` is green |
 | Review requests | [CODEOWNERS](../.github/CODEOWNERS) notifies @unjica on PRs to `main` |

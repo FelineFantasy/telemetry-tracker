@@ -14,6 +14,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Added
 
 - **Alerting v1** — per-project error spike and quota threshold rules, alert history, in-app bell + email delivery, and `/dashboard/alerts` settings UI
+- **Bugbot review rules** — `.cursor/BUGBOT.md` (repo, API, dashboard, SDK) plus contributor docs for local `/review-bugbot` and GitHub integration
 
 ### Database
 
