@@ -1,0 +1,3 @@
+# Default owner — GitHub auto-requests @unjica on PRs to main for visibility.
+# Merge gate: `.github/workflows/maintainer-review.yml` (required when author ≠ @unjica).
+* @unjica
