@@ -11,6 +11,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Alerting v1** — per-project error spike and quota threshold rules, alert history, in-app bell + email delivery, and `/dashboard/alerts` settings UI
+
+### Database
+
+- `20260702120000_project_alerts` — `Project.alert_settings` JSON and `AlertEvent` history table
+- `20260702130000_alert_event_href` — persist in-app link on fired alerts
+
 ---
 
 ## [1.1.0] - 2026-07-01
