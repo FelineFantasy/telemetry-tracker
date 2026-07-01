@@ -24,4 +24,14 @@ describe("generateOverviewChartBuckets", () => {
     expect(buckets[0]!.toISOString()).toBe("2026-03-01T00:00:00.000Z");
     expect(buckets.at(-1)!.toISOString()).toBe("2026-03-08T00:00:00.000Z");
   });
+
+  it("uses the first capped bucket as the SQL query lower bound", () => {
+    const since = new Date("1970-01-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const buckets = generateOverviewChartBuckets(since, until, "week");
+    const querySince = buckets[0]!;
+
+    expect(querySince.getTime()).toBeGreaterThan(since.getTime());
+    expect(buckets.at(-1)?.toISOString()).toBe("2026-03-09T00:00:00.000Z");
+  });
 });

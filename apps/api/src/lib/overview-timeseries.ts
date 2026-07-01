@@ -183,13 +183,14 @@ export async function getOverviewTimeSeries(
   environmentFilter?: string
 ): Promise<OverviewTimeSeries> {
   const expected = generateBuckets(since, until, bucket);
+  const querySince = expected[0] ?? truncateForBucket(since, bucket);
 
   const [eventRows, errorRows] = await Promise.all([
     queryEventBuckets(
       prisma,
       bucket,
       projectId,
-      since,
+      querySince,
       until,
       appFilter,
       environmentFilter
@@ -198,7 +199,7 @@ export async function getOverviewTimeSeries(
       prisma,
       bucket,
       projectId,
-      since,
+      querySince,
       until,
       appFilter,
       environmentFilter

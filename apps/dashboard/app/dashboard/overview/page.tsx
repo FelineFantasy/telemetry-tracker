@@ -205,11 +205,13 @@ export default async function OverviewPage({
   const currentOverviewParams = buildOverviewParamsRecord(params);
   const timeParse = parseOverviewTimeRangeQuery(timeQuery);
   if (!timeParse.ok) {
-    const rest = { ...currentOverviewParams };
-    delete rest.range;
-    delete rest.from;
-    delete rest.to;
-    redirect(mergeListQuery(OVERVIEW_PATH, rest));
+    redirect(
+      mergeListQuery(OVERVIEW_PATH, currentOverviewParams, {
+        range: null,
+        from: null,
+        to: null,
+      })
+    );
   }
   const parsedRange = timeParse.range;
   const rawApp = firstQueryValue(params.app)?.trim() || null;
