@@ -77,7 +77,7 @@ export async function buildTeamNotifications(
   for (const row of recentMembers) {
     const name = row.user.display_name?.trim() || row.user.email;
     items.push({
-      id: `team:member:${row.organization_id}:${row.user_id}`,
+      id: `team:member:${row.id}`,
       type: "team",
       title: "New team member",
       body: `${name} joined ${row.organization.name} as ${row.role}.`,

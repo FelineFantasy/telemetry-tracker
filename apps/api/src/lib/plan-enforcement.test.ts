@@ -6,6 +6,12 @@ vi.mock("./ingest-project-rps.js", () => ({
   consumeIngestRps: (...args: unknown[]) => consumeIngestRps(...args),
 }));
 
+const notifyQuotaThresholdEmail = vi.fn(async () => undefined);
+
+vi.mock("./notification-email-dispatch.js", () => ({
+  notifyQuotaThresholdEmail: (...args: unknown[]) => notifyQuotaThresholdEmail(...args),
+}));
+
 vi.mock("./db.js", () => ({
   prisma: {
     project: {
@@ -33,6 +39,7 @@ import { prisma } from "./db.js";
 describe("assertIngestPlanOrReply", () => {
   beforeEach(() => {
     consumeIngestRps.mockClear();
+    notifyQuotaThresholdEmail.mockClear();
   });
 
   afterEach(() => {
@@ -46,5 +53,27 @@ describe("assertIngestPlanOrReply", () => {
     if (result.ok) return;
     expect(result.body.code).toBe("monthly_ingest_quota");
     expect(consumeIngestRps).not.toHaveBeenCalled();
+    expect(notifyQuotaThresholdEmail).toHaveBeenCalledWith(
+      prisma,
+      "project-1",
+      "exceeded",
+      expect.objectContaining({
+        monthlyIngestUsed: 250_000,
+        monthlyIngestLimit: 250_000,
+      })
+    );
+  });
+
+  it("does not send exceeded email when a batch would exceed but usage is below the cap", async () => {
+    vi.mocked(prisma.usageMonthly.findUnique).mockResolvedValueOnce({
+      ingest_units: 240_000,
+    } as Awaited<ReturnType<typeof prisma.usageMonthly.findUnique>>);
+
+    const result = await assertIngestPlanOrReply(prisma, "project-1", 20_000, ["app-a"]);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.body.code).toBe("monthly_ingest_quota");
+    expect(notifyQuotaThresholdEmail).not.toHaveBeenCalled();
   });
 });
