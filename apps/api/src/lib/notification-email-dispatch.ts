@@ -10,7 +10,11 @@ import {
   type NotificationPreferences,
 } from "./notification-preferences.js";
 import { quotaNotificationKey } from "./quota-notification-keys.js";
-import { billingNotificationEmailKey } from "./billing-notification-keys.js";
+import {
+  billingAlertNotificationContent,
+  type BillingAlertVariant,
+} from "./billing-alert.js";
+import { billingNotificationKey } from "./billing-notification-keys.js";
 
 function absoluteHref(href: string | null, base: string | null): string | null {
   if (!href) return null;
@@ -206,30 +210,25 @@ export async function notifyQuotaThresholdEmail(
 export async function notifyBillingAlertEmail(
   prisma: PrismaClient,
   organizationId: string,
-  variant: string,
+  variant: BillingAlertVariant,
   storedPlanTier: string,
   effectivePlanTier: string,
   stripeCurrentPeriodEnd?: Date | string | null
 ): Promise<void> {
+  const { title, body } = billingAlertNotificationContent(
+    variant,
+    storedPlanTier,
+    effectivePlanTier
+  );
   const item: DashboardNotificationItem = {
-    id: billingNotificationEmailKey(
+    id: billingNotificationKey(
       organizationId,
       variant,
       stripeCurrentPeriodEnd
     ),
     type: "billing",
-    title:
-      variant === "past_due"
-        ? "Payment past due"
-        : variant === "unpaid"
-          ? "Subscription unpaid"
-          : variant === "canceled"
-            ? "Subscription canceled"
-            : "Billing needs attention",
-    body:
-      variant === "past_due"
-        ? `Update your payment method in Stripe. Your ${storedPlanTier} limits still apply.`
-        : `Effective tier is ${effectivePlanTier}. Review billing in the dashboard.`,
+    title,
+    body,
     occurredAt: new Date().toISOString(),
     href: "/dashboard/settings/billing",
   };

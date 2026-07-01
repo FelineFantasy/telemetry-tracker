@@ -5,6 +5,8 @@ import {
   parseNotificationPreferences,
   type NotificationPreferences,
 } from "./notification-preferences.js";
+import { billingAlertNotificationContent } from "./billing-alert.js";
+import { billingNotificationKey } from "./billing-notification-keys.js";
 import { buildTeamNotifications } from "./notification-team.js";
 import { currentYearMonth } from "./usage-meter.js";
 import { quotaNotificationKey } from "./quota-notification-keys.js";
@@ -32,56 +34,24 @@ function billingNotification(
 
   const occurredAt =
     billing.stripeCurrentPeriodEnd ?? new Date().toISOString();
+  const { title, body } = billingAlertNotificationContent(
+    variant,
+    billing.storedPlanTier,
+    billing.effectivePlanTier
+  );
 
-  switch (variant) {
-    case "past_due":
-      return {
-        id: "billing:past_due",
-        type: "billing",
-        title: "Payment past due",
-        body: `Update your payment method in Stripe. Your ${billing.storedPlanTier} limits still apply until the subscription updates.`,
-        occurredAt,
-        href: "/dashboard/settings/billing",
-      };
-    case "unpaid":
-      return {
-        id: "billing:unpaid",
-        type: "billing",
-        title: "Subscription unpaid",
-        body: `Effective tier is ${billing.effectivePlanTier}. Update billing to restore paid limits.`,
-        occurredAt,
-        href: "/dashboard/settings/billing",
-      };
-    case "canceled":
-      return {
-        id: "billing:canceled",
-        type: "billing",
-        title: "Subscription canceled",
-        body: `Entitlements follow the ${billing.effectivePlanTier} tier.`,
-        occurredAt,
-        href: "/dashboard/settings/billing",
-      };
-    case "incomplete":
-      return {
-        id: "billing:incomplete",
-        type: "billing",
-        title: "Subscription incomplete",
-        body: `Entitlements use the ${billing.effectivePlanTier} tier until payment completes.`,
-        occurredAt,
-        href: "/dashboard/settings/billing",
-      };
-    case "incomplete_expired":
-      return {
-        id: "billing:incomplete_expired",
-        type: "billing",
-        title: "Subscription setup expired",
-        body: `Entitlements use the ${billing.effectivePlanTier} tier until you subscribe again.`,
-        occurredAt,
-        href: "/dashboard/settings/billing",
-      };
-    default:
-      return null;
-  }
+  return {
+    id: billingNotificationKey(
+      billing.organizationId,
+      variant,
+      billing.stripeCurrentPeriodEnd
+    ),
+    type: "billing",
+    title,
+    body,
+    occurredAt,
+    href: "/dashboard/settings/billing",
+  };
 }
 
 function quotaNotifications(

@@ -13,11 +13,13 @@ function billingPeriodScope(
   return iso.slice(0, 10);
 }
 
-/** Scoped dedupe key for billing alert emails — one per org, variant, and billing period. */
-export function billingNotificationEmailKey(
+/** Scoped billing alert key — one per org, variant, and billing period (in-app read + email dedupe). */
+export function billingNotificationKey(
   organizationId: string,
   variant: string,
   stripeCurrentPeriodEnd?: Date | string | null
 ): string {
   return `billing:${variant}:${organizationId}:${billingPeriodScope(stripeCurrentPeriodEnd)}`;
 }
+
+export const billingNotificationEmailKey = billingNotificationKey;

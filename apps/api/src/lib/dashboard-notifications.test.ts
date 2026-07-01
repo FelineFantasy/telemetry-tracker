@@ -25,6 +25,7 @@ describe("buildDashboardNotifications", () => {
     const items = await buildDashboardNotifications(prisma, "p1", {
       ...baseSession,
       billingHealth: {
+        organizationId: "org-1",
         stripeSubscriptionStatus: "past_due",
         stripeCurrentPeriodEnd: "2026-07-01T00:00:00.000Z",
         storedPlanTier: "PRO",
@@ -43,7 +44,7 @@ describe("buildDashboardNotifications", () => {
       },
     });
 
-    expect(items.some((i) => i.id === "billing:past_due")).toBe(true);
+    expect(items.some((i) => i.id === "billing:past_due:org-1:2026-07-01")).toBe(true);
     expect(items.some((i) => i.id.startsWith("quota:near:p1:"))).toBe(true);
   });
 

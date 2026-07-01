@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { billingNotificationEmailKey } from "./billing-notification-keys.js";
+import { billingNotificationKey } from "./billing-notification-keys.js";
 
-describe("billingNotificationEmailKey", () => {
-  it("scopes billing emails by org, variant, and Stripe period end", () => {
+describe("billingNotificationKey", () => {
+  it("scopes billing alerts by org, variant, and Stripe period end", () => {
     expect(
-      billingNotificationEmailKey(
+      billingNotificationKey(
         "org-1",
         "past_due",
         new Date("2026-05-15T12:00:00.000Z")
@@ -13,7 +13,7 @@ describe("billingNotificationEmailKey", () => {
   });
 
   it("uses calendar month when period end is missing", () => {
-    expect(billingNotificationEmailKey("org-1", "canceled", null)).toMatch(
+    expect(billingNotificationKey("org-1", "canceled", null)).toMatch(
       /^billing:canceled:org-1:\d{4}-\d{2}$/
     );
   });

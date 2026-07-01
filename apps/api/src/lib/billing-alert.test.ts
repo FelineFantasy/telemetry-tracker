@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { billingAlertVariant, billingHealthFromPlanContext } from "./billing-alert.js";
+import { billingAlertVariant, billingAlertNotificationContent, billingHealthFromPlanContext } from "./billing-alert.js";
 
 describe("billingAlertVariant", () => {
   it("returns null for empty or unknown", () => {
@@ -18,9 +18,21 @@ describe("billingAlertVariant", () => {
   });
 });
 
+describe("billingAlertNotificationContent", () => {
+  it("uses specific copy for incomplete setup alerts", () => {
+    expect(
+      billingAlertNotificationContent("incomplete", "PRO", "FREE").title
+    ).toBe("Subscription incomplete");
+    expect(
+      billingAlertNotificationContent("incomplete_expired", "PRO", "FREE").title
+    ).toBe("Subscription setup expired");
+  });
+});
+
 describe("billingHealthFromPlanContext", () => {
   it("includes Stripe customer and period end from org plan context", () => {
     const health = billingHealthFromPlanContext({
+      organizationId: "org-1",
       stripeSubscriptionStatus: "active",
       stripeCurrentPeriodEnd: new Date("2026-06-01T00:00:00.000Z"),
       storedPlanTier: "PRO",
