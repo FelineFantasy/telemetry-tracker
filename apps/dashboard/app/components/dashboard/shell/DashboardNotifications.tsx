@@ -50,10 +50,13 @@ export function DashboardNotifications({ initialItems }: Props) {
     setItems((prev) => {
       const target = prev.find((item) => item.id === id);
       if (!target?.unread) return prev;
-      const previous = prev;
       void markNotificationsReadAction([id]).then((result) => {
         if (!result.ok) {
-          setItems(previous);
+          setItems((current) =>
+            current.map((item) =>
+              item.id === id ? { ...item, unread: true } : item
+            )
+          );
           toast.error(result.error || "Could not mark notification as read");
         }
       });
@@ -65,11 +68,15 @@ export function DashboardNotifications({ initialItems }: Props) {
 
   const markAllRead = useCallback(() => {
     setItems((prev) => {
-      if (!prev.some((item) => item.unread)) return prev;
-      const previous = prev;
+      const unreadIds = prev.filter((item) => item.unread).map((item) => item.id);
+      if (unreadIds.length === 0) return prev;
       void markAllNotificationsReadAction().then((result) => {
         if (!result.ok) {
-          setItems(previous);
+          setItems((current) =>
+            current.map((item) =>
+              unreadIds.includes(item.id) ? { ...item, unread: true } : item
+            )
+          );
           toast.error(result.error || "Could not mark notifications as read");
         }
       });

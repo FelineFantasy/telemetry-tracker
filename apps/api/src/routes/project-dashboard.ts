@@ -735,7 +735,8 @@ export async function projectDashboardRoutes(
               userEmail: user.email,
               organizationIds,
             }
-          : undefined
+          : undefined,
+        { forReadPersistence: true }
       );
       await markNotificationsRead(
         prisma,

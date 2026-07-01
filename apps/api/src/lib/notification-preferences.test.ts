@@ -3,6 +3,7 @@ import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   filterInAppNotifications,
+  filterInAppNotificationsForReadPersistence,
   isInQuietHours,
   parseNotificationPreferences,
   shouldShowInAppNotification,
@@ -72,5 +73,22 @@ describe("notification-preferences", () => {
     };
     expect(isInQuietHours(prefs, new Date("2026-07-01T23:00:00.000Z"))).toBe(true);
     expect(isInQuietHours(prefs, new Date("2026-07-01T12:00:00.000Z"))).toBe(false);
+  });
+
+  it("keeps quiet-hours-hidden items for mark-all-read persistence", () => {
+    const prefs = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      quietHours: {
+        enabled: true,
+        startHour: 0,
+        endHour: 24,
+        timezone: "UTC",
+      },
+    };
+    expect(filterInAppNotifications([issue, billing], prefs)).toEqual([billing]);
+    expect(filterInAppNotificationsForReadPersistence([issue, billing], prefs)).toEqual([
+      issue,
+      billing,
+    ]);
   });
 });

@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { DashboardSessionContextPayload } from "./dashboard-session-context.js";
 import {
   filterInAppNotifications,
+  filterInAppNotificationsForReadPersistence,
   parseNotificationPreferences,
   type NotificationPreferences,
 } from "./notification-preferences.js";
@@ -88,12 +89,18 @@ function quotaNotifications(
   return items;
 }
 
+export type BuildDashboardNotificationsOptions = {
+  /** Include items hidden by quiet hours (for mark-all-read persistence). */
+  forReadPersistence?: boolean;
+};
+
 export async function buildDashboardNotifications(
   prisma: PrismaClient,
   projectId: string | null,
   session: DashboardSessionContextPayload,
   preferences: NotificationPreferences = parseNotificationPreferences(null),
-  context?: NotificationBuildContext
+  context?: NotificationBuildContext,
+  options?: BuildDashboardNotificationsOptions
 ): Promise<DashboardNotificationItem[]> {
   const items: DashboardNotificationItem[] = [];
 
@@ -151,6 +158,10 @@ export async function buildDashboardNotifications(
   items.sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
   );
+
+  if (options?.forReadPersistence) {
+    return filterInAppNotificationsForReadPersistence(items, preferences);
+  }
 
   return filterInAppNotifications(items, preferences);
 }

@@ -153,7 +153,7 @@ describe("sendNotificationEmailIfAllowed", () => {
 });
 
 describe("sendOrganizationInviteEmail", () => {
-  it("claims NotificationEmailLog for registered invitees", async () => {
+  it("claims NotificationEmailLog per invite token for registered invitees", async () => {
     const createMany = vi.fn(async () => ({ count: 1 }));
     const prisma = {
       user: {
@@ -164,6 +164,7 @@ describe("sendOrganizationInviteEmail", () => {
         })),
       },
       organizationInvite: {
+        findUnique: vi.fn(),
         updateMany: vi.fn(),
       },
       notificationEmailLog: {
@@ -174,8 +175,8 @@ describe("sendOrganizationInviteEmail", () => {
 
     await sendOrganizationInviteEmail(
       prisma,
-      { id: "invite-1", email: "invitee@example.com", token: "tok" },
-      "https://app.example.com/register?invite=tok"
+      { id: "invite-1", email: "invitee@example.com", token: "tok-new" },
+      "https://app.example.com/register?invite=tok-new"
     );
 
     expect(createMany).toHaveBeenCalledWith(
@@ -184,14 +185,14 @@ describe("sendOrganizationInviteEmail", () => {
         data: expect.arrayContaining([
           expect.objectContaining({
             user_id: "user-1",
-            notification_key: "team:invite:invite-1",
+            notification_key: "team:invite:invite-1:tok-new",
           }),
         ]),
       })
     );
   });
 
-  it("skips guest invite email when invite_email_sent_at is already set", async () => {
+  it("skips guest invite email when this token was already sent", async () => {
     const { sendTransactionalEmail } = await import("./email.js");
     const sendMock = vi.mocked(sendTransactionalEmail);
     sendMock.mockClear();
@@ -201,7 +202,8 @@ describe("sendOrganizationInviteEmail", () => {
         findUnique: vi.fn(async () => null),
       },
       organizationInvite: {
-        updateMany: vi.fn(async () => ({ count: 0 })),
+        findUnique: vi.fn(async () => ({ invite_email_sent_token: "tok" })),
+        updateMany: vi.fn(),
         update: vi.fn(),
       },
       notificationEmailLog: {
@@ -217,5 +219,34 @@ describe("sendOrganizationInviteEmail", () => {
     );
 
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("sends guest invite email when re-invited with a new token", async () => {
+    const { sendTransactionalEmail } = await import("./email.js");
+    const sendMock = vi.mocked(sendTransactionalEmail);
+    sendMock.mockClear();
+
+    const prisma = {
+      user: {
+        findUnique: vi.fn(async () => null),
+      },
+      organizationInvite: {
+        findUnique: vi.fn(async () => ({ invite_email_sent_token: "old-tok" })),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        update: vi.fn(),
+      },
+      notificationEmailLog: {
+        createMany: vi.fn(),
+        delete: vi.fn(),
+      },
+    } as unknown as Parameters<typeof sendOrganizationInviteEmail>[0];
+
+    await sendOrganizationInviteEmail(
+      prisma,
+      { id: "invite-1", email: "new@example.com", token: "new-tok" },
+      "https://app.example.com/register?invite=new-tok"
+    );
+
+    expect(sendMock).toHaveBeenCalled();
   });
 });

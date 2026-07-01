@@ -155,3 +155,15 @@ export function filterInAppNotifications(
 ): DashboardNotificationItem[] {
   return items.filter((item) => shouldShowInAppNotification(item, prefs, now));
 }
+
+/** For mark-all-read: respect routing but not quiet-hours hiding. */
+export function filterInAppNotificationsForReadPersistence(
+  items: DashboardNotificationItem[],
+  prefs: NotificationPreferences
+): DashboardNotificationItem[] {
+  if (!prefs.channels.inapp) return [];
+  return items.filter((item) => {
+    const category = categoryForNotificationType(item.type);
+    return prefs.routing[category].inapp;
+  });
+}

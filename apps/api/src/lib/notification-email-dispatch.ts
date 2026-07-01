@@ -305,8 +305,8 @@ export async function shouldSendInviteEmail(
   return shouldSendEmailForCategory(prefs, "team");
 }
 
-function organizationInviteEmailKey(inviteId: string): string {
-  return `team:invite:${inviteId}`;
+function organizationInviteEmailKey(inviteId: string, token: string): string {
+  return `team:invite:${inviteId}:${token}`;
 }
 
 export async function sendOrganizationInviteEmail(
@@ -316,7 +316,7 @@ export async function sendOrganizationInviteEmail(
 ): Promise<void> {
   if (!(await shouldSendInviteEmail(prisma, invite.email))) return;
 
-  const notificationKey = organizationInviteEmailKey(invite.id);
+  const notificationKey = organizationInviteEmailKey(invite.id, invite.token);
   const item: DashboardNotificationItem = {
     id: notificationKey,
     type: "team",
@@ -346,9 +346,19 @@ export async function sendOrganizationInviteEmail(
     return;
   }
 
+  const existing = await prisma.organizationInvite.findUnique({
+    where: { id: invite.id },
+    select: { invite_email_sent_token: true },
+  });
+  if (existing?.invite_email_sent_token === invite.token) return;
+
+  const previousToken = existing?.invite_email_sent_token ?? null;
   const claimed = await prisma.organizationInvite.updateMany({
-    where: { id: invite.id, invite_email_sent_at: null },
-    data: { invite_email_sent_at: new Date() },
+    where: {
+      id: invite.id,
+      invite_email_sent_token: previousToken,
+    },
+    data: { invite_email_sent_token: invite.token },
   });
   if (claimed.count === 0) return;
 
@@ -362,7 +372,7 @@ export async function sendOrganizationInviteEmail(
     await prisma.organizationInvite
       .update({
         where: { id: invite.id },
-        data: { invite_email_sent_at: null },
+        data: { invite_email_sent_token: previousToken },
       })
       .catch(() => undefined);
   }
