@@ -3,7 +3,10 @@
  */
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
-import type { OverviewTimeSeriesPoint } from "./overview-timeseries.js";
+import {
+  overviewChartQuerySince,
+  type OverviewTimeSeriesPoint,
+} from "./overview-timeseries.js";
 
 export type OverviewCompareMode = "previous" | "week-ago";
 
@@ -225,6 +228,8 @@ export async function getSessionDurationSeries(
   environment?: string
 ): Promise<OverviewTimeSeriesPoint[]> {
   const trunc = bucket === "week" ? "week" : bucket;
+  const queryUntil = until ?? new Date();
+  const querySince = overviewChartQuerySince(since, queryUntil, bucket);
   const appClause = app ? Prisma.sql`AND s."app" = ${app}` : Prisma.empty;
   const envClause = environment
     ? Prisma.sql`AND EXISTS (
@@ -232,7 +237,7 @@ export async function getSessionDurationSeries(
         WHERE e."project_id" = s."project_id"
           AND e."session_id" = s."session_id"
           AND e."environment" = ${environment}
-          AND e."created_at" >= ${since}
+          AND e."created_at" >= ${querySince}
           ${until ? Prisma.sql`AND e."created_at" <= ${until}` : Prisma.empty}
       )`
     : Prisma.empty;
@@ -242,7 +247,7 @@ export async function getSessionDurationSeries(
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) AS avg_sec
     FROM "Session" s
     WHERE s."project_id" = ${projectId}
-      AND s."started_at" >= ${since}
+      AND s."started_at" >= ${querySince}
       ${until ? Prisma.sql`AND s."started_at" <= ${until}` : Prisma.empty}
       AND s."ended_at" IS NOT NULL
       ${appClause}

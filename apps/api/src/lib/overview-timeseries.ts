@@ -71,6 +71,16 @@ export function generateOverviewChartBuckets(
   return generateBuckets(since, until, bucket);
 }
 
+/** Lower bound for chart SQL — first rendered bucket (capped at 120). */
+export function overviewChartQuerySince(
+  since: Date,
+  until: Date,
+  bucket: OverviewSeriesBucket
+): Date {
+  const expected = generateBuckets(since, until, bucket);
+  return expected[0] ?? truncateForBucket(since, bucket);
+}
+
 function generateBuckets(since: Date, until: Date, bucket: OverviewSeriesBucket): Date[] {
   const step = bucketStepMs(bucket);
   const start = truncateForBucket(since, bucket);
@@ -183,7 +193,7 @@ export async function getOverviewTimeSeries(
   environmentFilter?: string
 ): Promise<OverviewTimeSeries> {
   const expected = generateBuckets(since, until, bucket);
-  const querySince = expected[0] ?? truncateForBucket(since, bucket);
+  const querySince = overviewChartQuerySince(since, until, bucket);
 
   const [eventRows, errorRows] = await Promise.all([
     queryEventBuckets(
