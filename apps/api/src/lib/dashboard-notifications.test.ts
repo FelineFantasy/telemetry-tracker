@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildDashboardNotifications } from "./dashboard-notifications.js";
 import type { DashboardSessionContextPayload } from "./dashboard-session-context.js";
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "./notification-preferences.js";
 
 const baseSession: DashboardSessionContextPayload = {
   projectId: "p1",
@@ -70,5 +71,95 @@ describe("buildDashboardNotifications", () => {
     const issue = items.find((i) => i.id === "issue:eg1");
     expect(issue?.type).toBe("issue");
     expect(issue?.href).toBe("/dashboard/errors/eg1");
+  });
+
+  it("keeps session quota in bell when billing routing is on and alerts routing is off", async () => {
+    const prisma = {
+      alertEvent: { findMany: async () => [] },
+      errorGroup: { findMany: async () => [] },
+    } as never;
+
+    const prefs = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      routing: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        billing: { inapp: true, email: true },
+        alerts: { inapp: false, email: false },
+      },
+    };
+
+    const items = await buildDashboardNotifications(
+      prisma,
+      "p1",
+      {
+        ...baseSession,
+        usageQuota: {
+          planTier: "PRO",
+          monthlyIngestUsed: 950,
+          monthlyIngestLimit: 1000,
+          percentUsed: 95,
+          quotaExceeded: false,
+          nearQuota: true,
+          retentionDays: 30,
+        },
+      },
+      prefs
+    );
+
+    expect(items.some((i) => i.type === "quota" && i.id.startsWith("quota:near:p1:"))).toBe(
+      true
+    );
+    expect(items.some((i) => i.type === "alert")).toBe(false);
+  });
+
+  it("prefers session quota when a duplicate quota alert shares the same id", async () => {
+    const yearMonth = new Date().toISOString().slice(0, 7);
+    const quotaId = `quota:near:p1:${yearMonth}`;
+    const prisma = {
+      alertEvent: {
+        findMany: async () => [
+          {
+            rule: "QUOTA_NEAR",
+            title: "Usage approaching limit",
+            body: "fired alert",
+            href: "/dashboard/settings/billing",
+            dedupe_key: quotaId,
+            fired_at: new Date("2026-07-01T12:00:00.000Z"),
+          },
+        ],
+      },
+      errorGroup: { findMany: async () => [] },
+    } as never;
+
+    const prefs = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      routing: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        billing: { inapp: true, email: true },
+        alerts: { inapp: false, email: false },
+      },
+    };
+
+    const items = await buildDashboardNotifications(
+      prisma,
+      "p1",
+      {
+        ...baseSession,
+        usageQuota: {
+          planTier: "PRO",
+          monthlyIngestUsed: 950,
+          monthlyIngestLimit: 1000,
+          percentUsed: 95,
+          quotaExceeded: false,
+          nearQuota: true,
+          retentionDays: 30,
+        },
+      },
+      prefs
+    );
+
+    expect(items.filter((i) => i.id === quotaId)).toEqual([
+      expect.objectContaining({ type: "quota", id: quotaId }),
+    ]);
   });
 });

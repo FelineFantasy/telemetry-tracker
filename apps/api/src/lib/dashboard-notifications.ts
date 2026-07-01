@@ -90,6 +90,28 @@ function quotaNotifications(
   return items;
 }
 
+/** Quota limits use session `quota` items (billing routing); skip duplicate `alert` rows. */
+export function dedupeNotificationItems(
+  items: DashboardNotificationItem[]
+): DashboardNotificationItem[] {
+  const byId = new Map<string, DashboardNotificationItem>();
+  for (const item of items) {
+    const existing = byId.get(item.id);
+    if (!existing) {
+      byId.set(item.id, item);
+      continue;
+    }
+    if (existing.type === "alert" && item.type === "quota") {
+      byId.set(item.id, item);
+    } else if (existing.type === "quota" && item.type === "alert") {
+      continue;
+    } else {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
+}
+
 export type BuildDashboardNotificationsOptions = {
   /** Include items hidden by quiet hours (for mark-all-read persistence). */
   forReadPersistence?: boolean;
@@ -162,7 +184,7 @@ export async function buildDashboardNotifications(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
   );
 
-  const deduped = [...new Map(items.map((item) => [item.id, item])).values()].sort(
+  const deduped = dedupeNotificationItems(items).sort(
     (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
   );
 

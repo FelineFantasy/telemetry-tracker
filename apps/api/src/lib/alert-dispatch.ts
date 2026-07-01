@@ -102,7 +102,11 @@ export async function recentAlertNotifications(
 ): Promise<DashboardNotificationItem[]> {
   const since = new Date(Date.now() - RECENT_ALERTS_IN_BELL_DAYS * 24 * 60 * 60 * 1000);
   const rows = await prisma.alertEvent.findMany({
-    where: { project_id: projectId, fired_at: { gte: since } },
+    where: {
+      project_id: projectId,
+      fired_at: { gte: since },
+      rule: "ERROR_SPIKE",
+    },
     orderBy: { fired_at: "desc" },
     take: 5,
     select: {
@@ -115,12 +119,14 @@ export async function recentAlertNotifications(
     },
   });
 
-  return rows.map((row) => ({
-    id: row.dedupe_key,
-    type: "alert" as const,
-    title: row.title,
-    body: row.body,
-    occurredAt: row.fired_at.toISOString(),
-    href: alertEventHref(row.rule, row.href),
-  }));
+  return rows
+    .filter((row) => row.rule === "ERROR_SPIKE")
+    .map((row) => ({
+      id: row.dedupe_key,
+      type: "alert" as const,
+      title: row.title,
+      body: row.body,
+      occurredAt: row.fired_at.toISOString(),
+      href: alertEventHref(row.rule, row.href),
+    }));
 }
