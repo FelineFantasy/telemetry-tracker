@@ -15,7 +15,7 @@ export async function findOrCreateErrorGroup(
     app: string;
     environment?: string | null;
   }
-) {
+): Promise<{ group: { id: string; message: string; app: string; environment: string | null }; isNew: boolean }> {
   const existing = await prisma.errorGroup.findUnique({
     where: {
       project_id_fingerprint: {
@@ -35,9 +35,17 @@ export async function findOrCreateErrorGroup(
           : {}),
       },
     });
-    return existing;
+    return {
+      group: {
+        id: existing.id,
+        message: existing.message,
+        app: existing.app,
+        environment: existing.environment,
+      },
+      isNew: false,
+    };
   }
-  return prisma.errorGroup.create({
+  const created = await prisma.errorGroup.create({
     data: {
       project_id: data.projectId,
       fingerprint: data.fingerprint,
@@ -48,4 +56,13 @@ export async function findOrCreateErrorGroup(
       occurrences: 1,
     },
   });
+  return {
+    group: {
+      id: created.id,
+      message: created.message,
+      app: created.app,
+      environment: created.environment,
+    },
+    isNew: true,
+  };
 }

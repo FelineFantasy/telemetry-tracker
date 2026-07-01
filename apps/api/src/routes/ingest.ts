@@ -10,6 +10,10 @@ import { prisma } from "../lib/db.js";
 import { createIngestAuthPreHandler, requireIngestProjectId } from "../middleware/ingest-auth.js";
 import { assertIngestPlanOrReply } from "../lib/plan-enforcement.js";
 import { addIngestUnits } from "../lib/usage-meter.js";
+import {
+  maybeNotifyQuotaAfterIngest,
+  notifyNewErrorGroupEmail,
+} from "../lib/notification-email-dispatch.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
 
 /**
@@ -110,6 +114,7 @@ export async function ingestRoutes(
       },
     });
     await addIngestUnits(prisma, projectId, 1);
+    void maybeNotifyQuotaAfterIngest(prisma, projectId);
     return reply.status(204).send();
   });
 
@@ -154,6 +159,7 @@ export async function ingestRoutes(
       });
     }
     await addIngestUnits(prisma, projectId, 1);
+    void maybeNotifyQuotaAfterIngest(prisma, projectId);
     return reply.status(204).send();
   });
 
@@ -193,6 +199,7 @@ export async function ingestRoutes(
       });
     }
     await addIngestUnits(prisma, projectId, n);
+    void maybeNotifyQuotaAfterIngest(prisma, projectId);
     return reply.status(204).send();
   });
 
@@ -207,7 +214,7 @@ export async function ingestRoutes(
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const fingerprint = computeFingerprint(body.message, body.stack);
-    const errorGroup = await findOrCreateErrorGroup(prisma, {
+    const { group: errorGroup, isNew } = await findOrCreateErrorGroup(prisma, {
       projectId,
       fingerprint,
       message: body.message,
@@ -227,6 +234,10 @@ export async function ingestRoutes(
       },
     });
     await addIngestUnits(prisma, projectId, 1);
+    if (isNew) {
+      void notifyNewErrorGroupEmail(prisma, projectId, errorGroup);
+    }
+    void maybeNotifyQuotaAfterIngest(prisma, projectId);
     return reply.status(204).send();
   });
 }
