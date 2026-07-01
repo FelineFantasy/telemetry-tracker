@@ -19,6 +19,7 @@ import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
+import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
 
 const SORT_OPTIONS: DashboardSelectOption[] = [
   { value: "created_at", label: "Created" },
@@ -32,14 +33,12 @@ const SORT_OPTIONS: DashboardSelectOption[] = [
 type Props = {
   path: string;
   currentParams: Record<string, string>;
-  activePreset: string;
-  customRange: boolean;
-  rangePreset: string;
+  timeRange: ParsedTimeRange;
+  fromParam: string;
+  toParam: string;
   appFilter: string;
   pageSize: string;
   defaultPageSize: number;
-  from: string;
-  to: string;
   name: string;
   environment: string;
   platform: string;
@@ -55,14 +54,12 @@ type Props = {
 export function EventsListToolbar({
   path,
   currentParams,
-  activePreset,
-  customRange,
-  rangePreset,
+  timeRange,
+  fromParam,
+  toParam,
   appFilter,
   pageSize,
   defaultPageSize,
-  from,
-  to,
   name,
   environment,
   platform,
@@ -75,7 +72,15 @@ export function EventsListToolbar({
   releases,
 }: Props) {
   const fieldIds = useId();
-  const rangeSummary = listFiltersRangeSummary(customRange, from, to);
+  const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
+  const timeHidden = listTimeRangeHiddenFields(timeRange, fromParam, toParam);
+  const pickerRange = {
+    key: timeRange.key,
+    label: timeRange.label,
+    shortLabel: timeRange.shortLabel,
+    gte: fromParam || timeRange.gte.toISOString(),
+    lte: toParam || timeRange.lte.toISOString(),
+  };
 
   const environmentOptions: DashboardSelectOption[] = useMemo(
     () => [
@@ -106,19 +111,15 @@ export function EventsListToolbar({
       <ListFiltersTimeRangeSection
         path={path}
         currentParams={currentParams}
-        activePreset={activePreset}
-        customRange={customRange}
-        from={from}
-        to={to}
+        parsedRange={pickerRange}
+        includeAll
       />
 
       <FilterForm method="get" action={path}>
         {appFilter ? <input type="hidden" name="app" value={appFilter} /> : null}
-        {rangePreset && !customRange ? (
-          <input type="hidden" name="range" value={rangePreset} />
-        ) : null}
-        {customRange && from ? <input type="hidden" name="from" value={from} /> : null}
-        {customRange && to ? <input type="hidden" name="to" value={to} /> : null}
+        {Object.entries(timeHidden).map(([k, v]) => (
+          <input key={k} type="hidden" name={k} value={v} />
+        ))}
         {Number(pageSize) !== defaultPageSize ? (
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}

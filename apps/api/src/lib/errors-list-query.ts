@@ -7,6 +7,7 @@
 
 import { Prisma, PrismaClient } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
+import { parseTimeRangeQuery } from "./time-range.js";
 
 export const ERROR_LIST_SORTS = [
   "last_seen",
@@ -24,7 +25,14 @@ export type ErrorListSort = (typeof ERROR_LIST_SORTS)[number];
 
 export type ErrorListOrder = "asc" | "desc";
 
-export type TrendWindow = "24h" | "7d";
+export type TrendWindow = string;
+
+export type ParsedTrendWindow = {
+  durationMs: number;
+  end: Date;
+  label: string;
+  key: string;
+};
 
 export type ErrorListFilterInput = {
   appId?: string;
@@ -62,20 +70,38 @@ export function parseErrorListOrderParam(
 }
 
 export function parseTrendWindowParam(
-  value: string | undefined
-): { ok: true; trendWindow: TrendWindow } | { ok: false } {
-  if (value === undefined || value.trim() === "") {
-    return { ok: true, trendWindow: "24h" };
+  query: {
+    trendWindow?: string;
+    trendFrom?: string;
+    trendTo?: string;
+  },
+  anchorEnd: Date = new Date(),
+  defaultKey = "24h"
+): { ok: true; trend: ParsedTrendWindow } | { ok: false; error: string } {
+  const parsed = parseTimeRangeQuery(
+    {
+      range: query.trendWindow,
+      from: query.trendFrom,
+      to: query.trendTo,
+    },
+    anchorEnd,
+    defaultKey
+  );
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
   }
-  const v = value.trim();
-  if (v === "24h" || v === "7d") {
-    return { ok: true, trendWindow: v };
+  if (parsed.range.key === "all" || parsed.range.key === "none") {
+    return { ok: false, error: "Trend window cannot be all time" };
   }
-  return { ok: false };
-}
-
-export function trendWindowDurationMs(w: TrendWindow): number {
-  return w === "7d" ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  return {
+    ok: true,
+    trend: {
+      durationMs: parsed.range.durationMs,
+      end: parsed.range.lte,
+      label: parsed.range.label,
+      key: parsed.range.key,
+    },
+  };
 }
 
 export function buildErrorGroupWhereInput(
@@ -227,12 +253,12 @@ export async function listErrorGroupsAggregated(
   projectId: string,
   sort: ErrorListSort,
   order: ErrorListOrder,
-  trendW: TrendWindow,
+  trendW: number,
   trendEnd: Date,
   skip: number,
   take: number
 ): Promise<{ total: number; rows: ErrorGroupListRow[] }> {
-  const W = trendWindowDurationMs(trendW);
+  const W = trendW;
   const end = trendEnd;
   const recentStart = new Date(end.getTime() - W);
   const prevStart = new Date(end.getTime() - 2 * W);
@@ -281,7 +307,7 @@ export async function listErrorGroupsAggregated(
 export async function fetchMetricsForGroupIds(
   prisma: PrismaClient,
   ids: string[],
-  trendW: TrendWindow,
+  trendDurationMs: number,
   trendEnd: Date
 ): Promise<Map<string, Pick<ErrorGroupListRow, "users_affected" | "sessions_affected" | "occurrences_recent" | "occurrences_previous" | "trend_ratio">>> {
   const out = new Map<
@@ -293,7 +319,7 @@ export async function fetchMetricsForGroupIds(
   >();
   if (ids.length === 0) return out;
 
-  const W = trendWindowDurationMs(trendW);
+  const W = trendDurationMs;
   const end = trendEnd;
   const recentStart = new Date(end.getTime() - W);
   const prevStart = new Date(end.getTime() - 2 * W);

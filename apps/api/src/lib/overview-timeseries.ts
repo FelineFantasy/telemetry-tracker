@@ -5,7 +5,10 @@
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
-export type OverviewSeriesBucket = "hour" | "day";
+export type OverviewSeriesBucket = "hour" | "day" | "week";
+
+/** Max chart buckets — wide windows anchor on `until` so recent data stays visible. */
+export const OVERVIEW_CHART_MAX_BUCKETS = 120;
 
 export type OverviewTimeSeriesPoint = {
   t: string;
@@ -40,20 +43,63 @@ function truncateUtcDay(d: Date): Date {
   );
 }
 
-function generateUtcHourBuckets(since: Date, n: number): Date[] {
-  const start = truncateUtcHour(since);
-  const out: Date[] = [];
-  for (let i = 0; i < n; i++) {
-    out.push(new Date(start.getTime() + i * 60 * 60 * 1000));
-  }
-  return out;
+function truncateUtcWeek(d: Date): Date {
+  const day = truncateUtcDay(d);
+  const dow = day.getUTCDay();
+  const diff = dow === 0 ? 6 : dow - 1;
+  return new Date(day.getTime() - diff * 86_400_000);
 }
 
-function generateUtcDayBuckets(since: Date, n: number): Date[] {
-  const start = truncateUtcDay(since);
+function bucketStepMs(bucket: OverviewSeriesBucket): number {
+  if (bucket === "hour") return 60 * 60 * 1000;
+  if (bucket === "day") return 86_400_000;
+  return 7 * 86_400_000;
+}
+
+function truncateForBucket(d: Date, bucket: OverviewSeriesBucket): Date {
+  if (bucket === "hour") return truncateUtcHour(d);
+  if (bucket === "day") return truncateUtcDay(d);
+  return truncateUtcWeek(d);
+}
+
+/** @internal Exported for unit tests. */
+export function generateOverviewChartBuckets(
+  since: Date,
+  until: Date,
+  bucket: OverviewSeriesBucket
+): Date[] {
+  return generateBuckets(since, until, bucket);
+}
+
+/** Lower bound for chart SQL — first rendered bucket (capped at 120). */
+export function overviewChartQuerySince(
+  since: Date,
+  until: Date,
+  bucket: OverviewSeriesBucket
+): Date {
+  const expected = generateBuckets(since, until, bucket);
+  return expected[0] ?? truncateForBucket(since, bucket);
+}
+
+function generateBuckets(since: Date, until: Date, bucket: OverviewSeriesBucket): Date[] {
+  const step = bucketStepMs(bucket);
+  const start = truncateForBucket(since, bucket);
+  const end = truncateForBucket(until, bucket);
+  const spanBuckets = Math.floor((end.getTime() - start.getTime()) / step) + 1;
+
+  if (spanBuckets <= OVERVIEW_CHART_MAX_BUCKETS) {
+    const out: Date[] = [];
+    for (let t = start.getTime(); t <= end.getTime(); t += step) {
+      out.push(new Date(t));
+    }
+    if (out.length === 0) out.push(start);
+    return out;
+  }
+
+  const windowStart = end.getTime() - (OVERVIEW_CHART_MAX_BUCKETS - 1) * step;
   const out: Date[] = [];
-  for (let i = 0; i < n; i++) {
-    out.push(new Date(start.getTime() + i * 86_400_000));
+  for (let t = windowStart; t <= end.getTime(); t += step) {
+    out.push(new Date(t));
   }
   return out;
 }
@@ -77,152 +123,57 @@ function mergeBuckets(
   }));
 }
 
-async function queryEventBucketsHourly(
+async function queryEventBuckets(
   prisma: PrismaClient,
+  bucket: OverviewSeriesBucket,
   projectId: string,
   since: Date,
+  until: Date,
   appFilter: string | undefined,
   environmentFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
   const envClause = environmentFilter
     ? Prisma.sql`AND e."environment" = ${environmentFilter}`
     : Prisma.empty;
-  if (appFilter) {
-    return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
-      SELECT
-        (date_trunc('hour', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
-        COUNT(*)::bigint AS c
-      FROM "Event" e
-      WHERE e."project_id" = ${projectId}
-        AND e."created_at" >= ${since}
-        AND e."app" = ${appFilter}
-        ${envClause}
-      GROUP BY 1
-      ORDER BY 1
-    `);
-  }
+  const appClause = appFilter ? Prisma.sql`AND e."app" = ${appFilter}` : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT
-      (date_trunc('hour', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
+      (date_trunc(${bucket}, e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS c
     FROM "Event" e
     WHERE e."project_id" = ${projectId}
       AND e."created_at" >= ${since}
+      AND e."created_at" <= ${until}
+      ${appClause}
       ${envClause}
     GROUP BY 1
     ORDER BY 1
   `);
 }
 
-async function queryEventBucketsDaily(
+async function queryErrorBuckets(
   prisma: PrismaClient,
+  bucket: OverviewSeriesBucket,
   projectId: string,
   since: Date,
-  appFilter: string | undefined,
-  environmentFilter: string | undefined
-): Promise<{ bucket: Date; c: bigint }[]> {
-  const envClause = environmentFilter
-    ? Prisma.sql`AND e."environment" = ${environmentFilter}`
-    : Prisma.empty;
-  if (appFilter) {
-    return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
-      SELECT
-        (date_trunc('day', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
-        COUNT(*)::bigint AS c
-      FROM "Event" e
-      WHERE e."project_id" = ${projectId}
-        AND e."created_at" >= ${since}
-        AND e."app" = ${appFilter}
-        ${envClause}
-      GROUP BY 1
-      ORDER BY 1
-    `);
-  }
-  return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
-    SELECT
-      (date_trunc('day', e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
-      COUNT(*)::bigint AS c
-    FROM "Event" e
-    WHERE e."project_id" = ${projectId}
-      AND e."created_at" >= ${since}
-      ${envClause}
-    GROUP BY 1
-    ORDER BY 1
-  `);
-}
-
-async function queryErrorBucketsHourly(
-  prisma: PrismaClient,
-  projectId: string,
-  since: Date,
+  until: Date,
   appFilter: string | undefined,
   environmentFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
   const envClause = environmentFilter
     ? Prisma.sql`AND eg."environment" = ${environmentFilter}`
     : Prisma.empty;
-  if (appFilter) {
-    return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
-      SELECT
-        (date_trunc('hour', eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
-        COUNT(*)::bigint AS c
-      FROM "ErrorOccurrence" eo
-      INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
-      WHERE eg."project_id" = ${projectId}
-        AND eo."created_at" >= ${since}
-        AND eg."app" = ${appFilter}
-        ${envClause}
-      GROUP BY 1
-      ORDER BY 1
-    `);
-  }
+  const appClause = appFilter ? Prisma.sql`AND eg."app" = ${appFilter}` : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT
-      (date_trunc('hour', eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
+      (date_trunc(${bucket}, eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS c
     FROM "ErrorOccurrence" eo
     INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
     WHERE eg."project_id" = ${projectId}
       AND eo."created_at" >= ${since}
-      ${envClause}
-    GROUP BY 1
-    ORDER BY 1
-  `);
-}
-
-async function queryErrorBucketsDaily(
-  prisma: PrismaClient,
-  projectId: string,
-  since: Date,
-  appFilter: string | undefined,
-  environmentFilter: string | undefined
-): Promise<{ bucket: Date; c: bigint }[]> {
-  const envClause = environmentFilter
-    ? Prisma.sql`AND eg."environment" = ${environmentFilter}`
-    : Prisma.empty;
-  if (appFilter) {
-    return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
-      SELECT
-        (date_trunc('day', eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
-        COUNT(*)::bigint AS c
-      FROM "ErrorOccurrence" eo
-      INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
-      WHERE eg."project_id" = ${projectId}
-        AND eo."created_at" >= ${since}
-        AND eg."app" = ${appFilter}
-        ${envClause}
-      GROUP BY 1
-      ORDER BY 1
-    `);
-  }
-  return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
-    SELECT
-      (date_trunc('day', eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
-      COUNT(*)::bigint AS c
-    FROM "ErrorOccurrence" eo
-    INNER JOIN "ErrorGroup" eg ON eo."error_group_id" = eg.id
-    WHERE eg."project_id" = ${projectId}
-      AND eo."created_at" >= ${since}
+      AND eo."created_at" <= ${until}
+      ${appClause}
       ${envClause}
     GROUP BY 1
     ORDER BY 1
@@ -230,30 +181,40 @@ async function queryErrorBucketsDaily(
 }
 
 /**
- * Load error + event counts per UTC bucket for the overview range.
- * `rangeLabel` is "24h" → 24 hourly points; "7d" → 7 daily points.
+ * Load error + event counts per UTC bucket for the overview window.
  */
 export async function getOverviewTimeSeries(
   prisma: PrismaClient,
   projectId: string,
-  rangeLabel: "24h" | "7d",
   since: Date,
+  until: Date,
+  bucket: OverviewSeriesBucket,
   appFilter: string | undefined,
   environmentFilter?: string
 ): Promise<OverviewTimeSeries> {
-  const is7d = rangeLabel === "7d";
-  const bucket: OverviewSeriesBucket = is7d ? "day" : "hour";
-  const expected = is7d ? generateUtcDayBuckets(since, 7) : generateUtcHourBuckets(since, 24);
+  const expected = generateBuckets(since, until, bucket);
+  const querySince = overviewChartQuerySince(since, until, bucket);
 
-  const [eventRows, errorRows] = is7d
-    ? await Promise.all([
-        queryEventBucketsDaily(prisma, projectId, since, appFilter, environmentFilter),
-        queryErrorBucketsDaily(prisma, projectId, since, appFilter, environmentFilter),
-      ])
-    : await Promise.all([
-        queryEventBucketsHourly(prisma, projectId, since, appFilter, environmentFilter),
-        queryErrorBucketsHourly(prisma, projectId, since, appFilter, environmentFilter),
-      ]);
+  const [eventRows, errorRows] = await Promise.all([
+    queryEventBuckets(
+      prisma,
+      bucket,
+      projectId,
+      querySince,
+      until,
+      appFilter,
+      environmentFilter
+    ),
+    queryErrorBuckets(
+      prisma,
+      bucket,
+      projectId,
+      querySince,
+      until,
+      appFilter,
+      environmentFilter
+    ),
+  ]);
 
   return {
     bucket,

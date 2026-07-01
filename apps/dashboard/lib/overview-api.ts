@@ -6,7 +6,7 @@ export type OverviewTimeSeriesPoint = {
 };
 
 export type OverviewSeries = {
-  bucket: "hour" | "day";
+  bucket: "hour" | "day" | "week";
   errors: OverviewTimeSeriesPoint[];
   events: OverviewTimeSeriesPoint[];
 };
@@ -40,7 +40,10 @@ export type OverviewWorkspaceTelemetry = {
 
 export type OverviewApiResponse = {
   range: string;
+  rangeLabel?: string;
   since: string;
+  until?: string;
+  bucket?: "hour" | "day" | "week";
   compare?: "previous" | "week-ago";
   errorsLast24h: number;
   eventsLast24h: number;

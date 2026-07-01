@@ -19,7 +19,7 @@
     --border: oklch(1 0 0 / 8%);
     --border-strong: oklch(1 0 0 / 14%);
     --input: oklch(1 0 0 / 10%);
-    --ring: oklch(0.72 0.14 250);
+    --ring: oklch(1 0 0 / 18%);
 
     --muted: oklch(0.14 0.006 260);
     --muted-foreground: oklch(0.62 0.01 260);
@@ -96,17 +96,24 @@
   }
 
   ::selection {
-    background: var(--brand-soft);
+    background: oklch(1 0 0 / 12%);
     color: var(--foreground);
-  }
-
-  :where(button, a, summary, [role="button"], [tabindex]:not(input):not(textarea):not(select)):focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
   :where(input, textarea, select):focus,
   :where(input, textarea, select):focus-visible {
     @apply outline-none ring-0 ring-offset-0 shadow-none;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px var(--background) inset !important;
+    -webkit-text-fill-color: var(--foreground) !important;
+    caret-color: var(--foreground);
+    transition: background-color 99999s ease-out 0s;
   }
 }
 

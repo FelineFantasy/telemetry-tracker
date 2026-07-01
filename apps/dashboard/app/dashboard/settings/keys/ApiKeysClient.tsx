@@ -6,6 +6,7 @@ import {
   createDashboardApiKey,
   revokeDashboardApiKey,
 } from "@/app/dashboard/actions";
+import { ApiKeysEmptyState } from "./ApiKeysEmptyState";
 import { useDashboardCapabilities } from "@/app/components/dashboard/DashboardCapabilitiesContext";
 import {
   Section,
@@ -64,6 +65,13 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {keys.length === 0 ? (
+        <ApiKeysEmptyState
+          canCreate={canCreateApiKey}
+          onCreated={(key) => setNewKey(key)}
+        />
+      ) : null}
+
       {newKey ? (
         <Section title="New key — copy now">
           <p className="mb-3 text-[13px] text-muted-foreground">
@@ -151,7 +159,7 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
         {keys.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {canCreateApiKey
-              ? "No keys yet. Create one to send telemetry from your apps."
+              ? "Use the button above or the form below to create your first key."
               : "No keys for this project yet."}
           </p>
         ) : (

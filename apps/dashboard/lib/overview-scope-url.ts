@@ -6,9 +6,14 @@ export function parseOverviewCompare(raw: string | undefined): OverviewComparePa
   return raw === "week-ago" ? "week-ago" : "previous";
 }
 
-export function compareLabelFor(param: OverviewCompareParam, range: "24h" | "7d"): string {
+export function compareLabelFor(
+  param: OverviewCompareParam,
+  rangeLabel: string
+): string {
   if (param === "week-ago") return "vs same window last week";
-  return range === "7d" ? "vs previous 7 days" : "vs previous 24 hours";
+  if (rangeLabel === "Recent data") return "vs earlier data";
+  const normalized = rangeLabel.replace(/^Last /i, "");
+  return `vs prior ${normalized.toLowerCase()}`;
 }
 
 /** Keep only query values present in the scoped allow-list (app/env pickers). */

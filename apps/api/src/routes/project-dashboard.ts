@@ -3,10 +3,9 @@ import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
-  createApiKeyWithPlanLimitCheck,
   createProjectWithPlanLimitCheck,
 } from "../lib/plan-enforcement.js";
-import { hashApiKeySecret } from "../lib/api-key-auth.js";
+import { createProjectApiKey } from "../lib/create-project-api-key.js";
 import { getSessionUser, requireSessionUser } from "../lib/auth-session.js";
 import { getProjectNavSummaries } from "../lib/project-nav-summary.js";
 import { loadNavScopeForProject, loadWorkspaceMetaForUser } from "../lib/workspace-meta.js";
@@ -737,17 +736,7 @@ export async function projectDashboardRoutes(
       allowedApp = body.allowedApp.trim().slice(0, 64);
     }
 
-    const publicId = randomBytes(16).toString("hex");
-    const secret = randomBytes(32).toString("hex");
-    const secretHash = hashApiKeySecret(publicId, secret);
-    const fullKey = `tt_live_${publicId}_${secret}`;
-
-    const keyCreated = await createApiKeyWithPlanLimitCheck(prisma, projectId, {
-      public_id: publicId,
-      secret_hash: secretHash,
-      name,
-      allowed_app: allowedApp,
-    });
+    const keyCreated = await createProjectApiKey(prisma, projectId, { name, allowedApp });
     if (!keyCreated.ok) {
       if (keyCreated.code === "project_not_found") {
         return reply.status(403).send({ error: keyCreated.error });
@@ -758,10 +747,10 @@ export async function projectDashboardRoutes(
     }
 
     return reply.status(201).send({
-      key: fullKey,
-      publicId,
-      name,
-      allowedApp,
+      key: keyCreated.key.fullKey,
+      publicId: keyCreated.key.publicId,
+      name: keyCreated.key.name,
+      allowedApp: keyCreated.key.allowedApp,
       message:
         "Copy this key now. It will not be shown again. Store it as a secret (e.g. environment variable).",
     });

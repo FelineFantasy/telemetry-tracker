@@ -12,7 +12,7 @@ export function FiltersSortPanel({
   const panelId = useId();
   return (
     <div
-      className="mb-6 overflow-hidden rounded-xl border border-border bg-surface/40"
+      className="mb-6 overflow-visible rounded-xl border border-border bg-surface/40"
       aria-labelledby={panelId}
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">

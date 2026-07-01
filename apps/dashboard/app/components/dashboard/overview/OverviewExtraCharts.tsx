@@ -13,8 +13,11 @@ import type { OverviewSeries, OverviewTimeSeriesPoint } from "@/lib/overview-api
 import { chartHasNoData } from "@/lib/overview-chart-series";
 import { DashboardPanel } from "@/app/components/dashboard/dashboard-ui";
 
-function formatBucketLabel(iso: string, bucket: "hour" | "day"): string {
+function formatBucketLabel(iso: string, bucket: "hour" | "day" | "week"): string {
   const d = new Date(iso);
+  if (bucket === "week") {
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
   if (bucket === "day") {
     return d.toLocaleDateString(undefined, { weekday: "short" });
   }
@@ -32,7 +35,7 @@ function mergeErrorRateSeries(series: OverviewSeries): { t: string; pct: number 
   });
 }
 
-function mapSeries(points: OverviewTimeSeriesPoint[], bucket: "hour" | "day", unit: string) {
+function mapSeries(points: OverviewTimeSeriesPoint[], bucket: "hour" | "day" | "week", unit: string) {
   return points.map((p) => ({
     t: formatBucketLabel(p.t, bucket),
     value: p.count,

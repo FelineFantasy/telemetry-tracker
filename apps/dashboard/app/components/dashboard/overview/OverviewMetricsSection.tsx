@@ -57,7 +57,8 @@ export function OverviewCompareToggle({
 }
 
 export function OverviewMetricsSection({
-  range,
+  rangeLabel,
+  rangeDurationMs,
   overviewPath,
   currentParams,
   eventsCount,
@@ -71,7 +72,8 @@ export function OverviewMetricsSection({
   workspaceStats,
   workspaceTelemetry,
 }: {
-  range: "24h" | "7d";
+  rangeLabel: string;
+  rangeDurationMs: number;
   overviewPath: string;
   currentParams: Record<string, string>;
   eventsCount: number;
@@ -87,8 +89,7 @@ export function OverviewMetricsSection({
 }) {
   const searchParams = useSearchParams();
   const compare = parseOverviewCompare(searchParams.get("compare") ?? currentParams.compare);
-  const compareLabel = compareLabelFor(compare, range);
-  const rangeLabel = range === "7d" ? "7d" : "24h";
+  const compareLabel = compareLabelFor(compare, rangeLabel);
 
   return (
     <>
@@ -110,6 +111,7 @@ export function OverviewMetricsSection({
         workspaceTelemetry={workspaceTelemetry}
         rangeLabel={rangeLabel}
         compareLabel={compareLabel}
+        rangeDurationMs={rangeDurationMs}
       />
     </>
   );

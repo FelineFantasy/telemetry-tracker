@@ -71,7 +71,7 @@ export function DashboardCustomSelect({
         id={triggerId}
         className={cn(
           "flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-left text-[13px]",
-          "hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          "hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-border-strong"
         )}
         aria-haspopup="listbox"
         aria-expanded={open ? "true" : "false"}
@@ -87,7 +87,7 @@ export function DashboardCustomSelect({
       {open ? (
         <ul
           id={listId}
-          className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-60 overflow-auto rounded-md border border-border bg-popover py-1 shadow-lg"
+          className="absolute left-0 right-0 top-[calc(100%+4px)] z-[1000] max-h-60 overflow-auto rounded-md border border-border bg-popover py-1 shadow-lg"
           role="listbox"
           aria-labelledby={listLabelledBy}
         >

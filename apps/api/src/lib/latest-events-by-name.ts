@@ -17,6 +17,7 @@ export async function fetchLatestEventsByName(
   params: {
     projectId: string;
     since: Date;
+    until: Date;
     app?: string;
     environment?: string;
     names: string[];
@@ -30,6 +31,7 @@ export async function fetchLatestEventsByName(
     appId: params.app,
     environment: params.environment,
     gte: params.since,
+    lte: params.until,
   });
   const nameList = Prisma.join(names.map((name) => Prisma.sql`${name}`));
 

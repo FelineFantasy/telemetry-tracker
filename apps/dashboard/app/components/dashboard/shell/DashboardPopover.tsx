@@ -101,7 +101,7 @@ export function DashboardPopover({
       ? createPortal(
           <div
             ref={panelRef}
-            className={`fixed z-[200] ${width} overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/60`}
+            className={`fixed z-[1000] ${width} overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/60`}
             style={{
               top: position.top,
               left: align === "right" ? undefined : position.left,

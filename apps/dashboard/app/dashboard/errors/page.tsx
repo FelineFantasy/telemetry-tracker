@@ -1,14 +1,14 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
-import { effectiveListRange } from "@/lib/list-filters-url";
+import { mergeListQuery } from "@/lib/list-filters-url";
+import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { IssueList, IssueListItem } from "@/app/components/dashboard/IssueList";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import { mergeListQuery } from "@/lib/list-filters-url";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -77,6 +77,8 @@ function buildErrorsParamsRecord(sp: {
   sort?: string | string[];
   order?: string | string[];
   trendWindow?: string | string[];
+  trendFrom?: string | string[];
+  trendTo?: string | string[];
 }): Record<string, string> {
   const keys = [
     "app",
@@ -92,6 +94,8 @@ function buildErrorsParamsRecord(sp: {
     "sort",
     "order",
     "trendWindow",
+    "trendFrom",
+    "trendTo",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -118,6 +122,8 @@ export default async function ErrorsListPage({
     sort?: string | string[];
     order?: string | string[];
     trendWindow?: string | string[];
+    trendFrom?: string | string[];
+    trendTo?: string | string[];
   }>;
 }) {
   const sp = await searchParams;
@@ -130,11 +136,13 @@ export default async function ErrorsListPage({
     firstQueryValue(sp.pageSize),
     firstQueryValue(sp.limit)
   );
-  const rangeEff = effectiveListRange(
+  const from = firstQueryValue(sp.from) ?? "";
+  const to = firstQueryValue(sp.to) ?? "";
+  const timeRange = parseListTimeRangeOrDefault(
     {
       range: firstQueryValue(sp.range),
-      from: firstQueryValue(sp.from),
-      to: firstQueryValue(sp.to),
+      from: from || undefined,
+      to: to || undefined,
     },
     "all"
   );
@@ -143,23 +151,27 @@ export default async function ErrorsListPage({
   if (appFilter) apiQuery.set("app", appFilter);
   apiQuery.set("page", String(page));
   apiQuery.set("pageSize", String(pageSize));
-  const r = firstQueryValue(sp.range);
-  const from = firstQueryValue(sp.from);
-  const to = firstQueryValue(sp.to);
+  appendListTimeRangeToParams(apiQuery, timeRange, from, to);
+  const trendFrom = firstQueryValue(sp.trendFrom) ?? "";
+  const trendTo = firstQueryValue(sp.trendTo) ?? "";
+  const trendTimeRange = parseTrendTimeRangeOrDefault(
+    {
+      trendWindow: firstQueryValue(sp.trendWindow),
+      trendFrom: trendFrom || undefined,
+      trendTo: trendTo || undefined,
+    },
+    "24h"
+  );
+  appendTrendTimeRangeToParams(apiQuery, trendTimeRange, trendFrom, trendTo);
   const q = firstQueryValue(sp.q);
   const status = firstQueryValue(sp.status);
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
-  const trendWindow = firstQueryValue(sp.trendWindow);
-  if (r) apiQuery.set("range", r);
-  if (from) apiQuery.set("from", from);
-  if (to) apiQuery.set("to", to);
   if (rawEnv) apiQuery.set("environment", rawEnv);
   if (q) apiQuery.set("q", q);
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
-  if (trendWindow) apiQuery.set("trendWindow", trendWindow);
 
   let items: ErrorGroupRow[] = [];
   let total = 0;
@@ -196,28 +208,28 @@ export default async function ErrorsListPage({
         title="Issues"
         context={
           appFilter
-            ? `Grouped errors for app ${appFilter}.`
-            : "Grouped errors with status, frequency, and stack traces."
+            ? `${timeRange.label} · App: ${appFilter}`
+            : `${timeRange.label} · Grouped errors with status, frequency, and stack traces.`
         }
       />
 
       <ErrorsListToolbar
         path={ERRORS_PATH}
         currentParams={currentParams}
-        activePreset={rangeEff.activePreset}
-        customRange={rangeEff.customRange}
-        rangePreset={r ?? ""}
+        timeRange={timeRange}
+        fromParam={from}
+        toParam={to}
         appFilter={appFilter}
         pageSize={String(pageSize)}
         defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
-        from={from ?? ""}
-        to={to ?? ""}
         q={q ?? ""}
         environment={environment ?? ""}
         status={status ?? "all"}
         sort={sort ?? "last_seen"}
         order={order ?? "desc"}
-        trendWindow={trendWindow ?? "24h"}
+        trendTimeRange={trendTimeRange}
+        trendFromParam={trendFrom}
+        trendToParam={trendTo}
         environments={filterOptions.environments}
       />
 
@@ -239,7 +251,7 @@ export default async function ErrorsListPage({
             }
             if ((g.occurrences_recent ?? 0) + (g.occurrences_previous ?? 0) > 0) {
               metaParts.push(
-                `Trend: ${g.occurrences_recent ?? 0} recent / ${g.occurrences_previous ?? 0} prior${
+                `Trend (${trendTimeRange.label}): ${g.occurrences_recent ?? 0} recent / ${g.occurrences_previous ?? 0} prior${
                   g.trend_ratio != null ? ` (×${g.trend_ratio.toFixed(2)})` : ""
                 }`
               );

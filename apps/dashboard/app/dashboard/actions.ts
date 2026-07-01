@@ -342,6 +342,13 @@ export async function createDashboardApiKey(
   };
 }
 
+/** One-click first key with a sensible default label (Settings empty state). */
+export async function createFirstDashboardApiKey(): Promise<CreateApiKeyResult> {
+  const formData = new FormData();
+  formData.set("name", "Local development");
+  return createDashboardApiKey(null, formData);
+}
+
 export async function archiveProjectAction(
   projectId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

@@ -3,7 +3,10 @@
  */
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
-import type { OverviewTimeSeriesPoint } from "./overview-timeseries.js";
+import {
+  overviewChartQuerySince,
+  type OverviewTimeSeriesPoint,
+} from "./overview-timeseries.js";
 
 export type OverviewCompareMode = "previous" | "week-ago";
 
@@ -37,14 +40,19 @@ export type OverviewWorkspaceTelemetry = {
 type Scope = {
   projectId: string;
   since: Date;
+  until?: Date;
   app?: string;
   environment?: string;
 };
 
+function eventCreatedAtFilter(since: Date, until?: Date): { gte: Date; lte?: Date } {
+  return until ? { gte: since, lte: until } : { gte: since };
+}
+
 function eventScopeWhere(scope: Scope): Prisma.EventWhereInput {
   const where: Prisma.EventWhereInput = {
     project_id: scope.projectId,
-    created_at: { gte: scope.since },
+    created_at: eventCreatedAtFilter(scope.since, scope.until),
   } as Prisma.EventWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
@@ -54,7 +62,9 @@ function eventScopeWhere(scope: Scope): Prisma.EventWhereInput {
 function sessionScopeWhere(scope: Scope): Prisma.SessionWhereInput {
   const where: Prisma.SessionWhereInput = {
     project_id: scope.projectId,
-    started_at: { gte: scope.since },
+    started_at: scope.until
+      ? { gte: scope.since, lte: scope.until }
+      : { gte: scope.since },
   } as Prisma.SessionWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   return where;
@@ -63,7 +73,9 @@ function sessionScopeWhere(scope: Scope): Prisma.SessionWhereInput {
 function errorGroupScopeWhere(scope: Scope): Prisma.ErrorGroupWhereInput {
   const where: Prisma.ErrorGroupWhereInput = {
     project_id: scope.projectId,
-    last_seen: { gte: scope.since },
+    last_seen: scope.until
+      ? { gte: scope.since, lte: scope.until }
+      : { gte: scope.since },
   } as Prisma.ErrorGroupWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
@@ -75,12 +87,15 @@ function errorOccurrenceScopeSql(
   gte: Date,
   lt: Date | undefined,
   app?: string,
-  environment?: string
+  environment?: string,
+  lte?: Date
 ): Prisma.Sql {
   const timeClause =
-    lt === undefined
-      ? Prisma.sql`eo."created_at" >= ${gte}`
-      : Prisma.sql`eo."created_at" >= ${gte} AND eo."created_at" < ${lt}`;
+    lte !== undefined
+      ? Prisma.sql`eo."created_at" >= ${gte} AND eo."created_at" <= ${lte}`
+      : lt === undefined
+        ? Prisma.sql`eo."created_at" >= ${gte}`
+        : Prisma.sql`eo."created_at" >= ${gte} AND eo."created_at" < ${lt}`;
   const appClause = app ? Prisma.sql`AND eg."app" = ${app}` : Prisma.empty;
   const envClause = environment
     ? Prisma.sql`AND eg."environment" = ${environment}`
@@ -94,14 +109,15 @@ function errorOccurrenceScopeSql(
 }
 
 export function resolveCompareWindow(
-  range: "24h" | "7d",
+  durationMs: number,
   compare: OverviewCompareMode,
-  currentSince: Date
+  currentSince: Date,
+  currentUntil?: Date
 ): { previousSince: Date; previousUntil: Date | undefined } {
-  const hours = range === "7d" ? 7 * 24 : 24;
-  const ms = hours * 60 * 60 * 1000;
+  const ms = durationMs;
   if (compare === "week-ago") {
-    const weekAgoEnd = new Date(currentSince.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const windowEnd = currentUntil ?? new Date(currentSince.getTime() + ms);
+    const weekAgoEnd = new Date(windowEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
     const weekAgoStart = new Date(weekAgoEnd.getTime() - ms);
     return { previousSince: weekAgoStart, previousUntil: weekAgoEnd };
   }
@@ -205,12 +221,15 @@ export async function listDistinctEnvironments(
 export async function getSessionDurationSeries(
   prisma: PrismaClient,
   projectId: string,
-  rangeLabel: "24h" | "7d",
+  bucket: "hour" | "day" | "week",
   since: Date,
+  until?: Date,
   app?: string,
   environment?: string
 ): Promise<OverviewTimeSeriesPoint[]> {
-  const trunc = rangeLabel === "7d" ? "day" : "hour";
+  const trunc = bucket === "week" ? "week" : bucket;
+  const queryUntil = until ?? new Date();
+  const querySince = overviewChartQuerySince(since, queryUntil, bucket);
   const appClause = app ? Prisma.sql`AND s."app" = ${app}` : Prisma.empty;
   const envClause = environment
     ? Prisma.sql`AND EXISTS (
@@ -218,7 +237,8 @@ export async function getSessionDurationSeries(
         WHERE e."project_id" = s."project_id"
           AND e."session_id" = s."session_id"
           AND e."environment" = ${environment}
-          AND e."created_at" >= ${since}
+          AND e."created_at" >= ${querySince}
+          ${until ? Prisma.sql`AND e."created_at" <= ${until}` : Prisma.empty}
       )`
     : Prisma.empty;
   const rows = await prisma.$queryRaw<{ bucket: Date; avg_sec: number | null }[]>(Prisma.sql`
@@ -227,7 +247,8 @@ export async function getSessionDurationSeries(
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) AS avg_sec
     FROM "Session" s
     WHERE s."project_id" = ${projectId}
-      AND s."started_at" >= ${since}
+      AND s."started_at" >= ${querySince}
+      ${until ? Prisma.sql`AND s."started_at" <= ${until}` : Prisma.empty}
       AND s."ended_at" IS NOT NULL
       ${appClause}
       ${envClause}
@@ -285,13 +306,14 @@ export async function getOverviewEventWindowStats(
   params: {
     projectId: string;
     since: Date;
+    until: Date;
     previousSince: Date;
     previousUntil: Date;
     app?: string;
     environment?: string;
   }
 ): Promise<OverviewEventWindowStats> {
-  const { projectId, since, previousSince, previousUntil, app, environment } = params;
+  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
   const filters = eventFilterSql(projectId, app, environment);
 
   const rows = await prisma.$queryRaw<
@@ -306,18 +328,27 @@ export async function getOverviewEventWindowStats(
     ]
   >(Prisma.sql`
     SELECT
-      COUNT(*) FILTER (WHERE e."created_at" >= ${since})::bigint AS events_count,
+      COUNT(*) FILTER (
+        WHERE e."created_at" >= ${since} AND e."created_at" <= ${until}
+      )::bigint AS events_count,
       COUNT(*) FILTER (
         WHERE e."created_at" >= ${previousSince} AND e."created_at" < ${previousUntil}
       )::bigint AS events_previous,
-      COUNT(DISTINCT e."name") FILTER (WHERE e."created_at" >= ${since})::bigint AS distinct_event_names,
-      COUNT(DISTINCT e."app") FILTER (WHERE e."created_at" >= ${since})::bigint AS distinct_apps,
+      COUNT(DISTINCT e."name") FILTER (
+        WHERE e."created_at" >= ${since} AND e."created_at" <= ${until}
+      )::bigint AS distinct_event_names,
+      COUNT(DISTINCT e."app") FILTER (
+        WHERE e."created_at" >= ${since} AND e."created_at" <= ${until}
+      )::bigint AS distinct_apps,
       COUNT(DISTINCT e."sdk_version") FILTER (
-        WHERE e."created_at" >= ${since} AND e."sdk_version" IS NOT NULL
+        WHERE e."created_at" >= ${since}
+          AND e."created_at" <= ${until}
+          AND e."sdk_version" IS NOT NULL
       )::bigint AS distinct_sdk_versions
     FROM "Event" e
     WHERE ${filters}
       AND e."created_at" >= ${previousSince}
+      AND e."created_at" <= ${until}
   `);
 
   const row = rows[0];
@@ -336,25 +367,29 @@ export async function getOverviewErrorCountsPair(
   params: {
     projectId: string;
     since: Date;
+    until: Date;
     previousSince: Date;
     previousUntil: Date;
     app?: string;
     environment?: string;
   }
 ): Promise<OverviewCountPair> {
-  const { projectId, since, previousSince, previousUntil, app, environment } = params;
+  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
   const whereSql = errorOccurrenceScopeSql(
     projectId,
     previousSince,
     undefined,
     app,
-    environment
+    environment,
+    until
   );
 
   const rows = await prisma.$queryRaw<[{ errors_count: bigint; errors_previous: bigint }]>(
     Prisma.sql`
       SELECT
-        COUNT(*) FILTER (WHERE eo."created_at" >= ${since})::bigint AS errors_count,
+        COUNT(*) FILTER (
+          WHERE eo."created_at" >= ${since} AND eo."created_at" <= ${until}
+        )::bigint AS errors_count,
         COUNT(*) FILTER (
           WHERE eo."created_at" >= ${previousSince} AND eo."created_at" < ${previousUntil}
         )::bigint AS errors_previous
@@ -377,20 +412,21 @@ export async function getOverviewActiveUsersPair(
   params: {
     projectId: string;
     since: Date;
+    until: Date;
     previousSince: Date;
     previousUntil: Date;
     app?: string;
     environment?: string;
   }
 ): Promise<OverviewCountPair> {
-  const { projectId, since, previousSince, previousUntil, app, environment } = params;
+  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
   const filters = eventFilterSql(projectId, app, environment);
 
   const rows = await prisma.$queryRaw<[{ active_users: bigint; active_users_previous: bigint }]>(
     Prisma.sql`
       SELECT
         COUNT(DISTINCT CASE
-          WHEN e."created_at" >= ${since}
+          WHEN e."created_at" >= ${since} AND e."created_at" <= ${until}
           THEN COALESCE(e."user_id", e."anonymous_id")
         END)::bigint AS active_users,
         COUNT(DISTINCT CASE
@@ -400,6 +436,7 @@ export async function getOverviewActiveUsersPair(
       FROM "Event" e
       WHERE ${filters}
         AND e."created_at" >= ${previousSince}
+        AND e."created_at" <= ${until}
         AND (e."user_id" IS NOT NULL OR e."anonymous_id" IS NOT NULL)
     `
   );
@@ -427,16 +464,20 @@ export async function getOverviewSessionsPair(
   }
 
   const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+  const until = scope.until ?? new Date();
   const rows = await prisma.$queryRaw<[{ sessions_count: bigint; sessions_previous: bigint }]>(
     Prisma.sql`
       SELECT
-        COUNT(*) FILTER (WHERE s."started_at" >= ${scope.since})::bigint AS sessions_count,
+        COUNT(*) FILTER (
+          WHERE s."started_at" >= ${scope.since} AND s."started_at" <= ${until}
+        )::bigint AS sessions_count,
         COUNT(*) FILTER (
           WHERE s."started_at" >= ${previousSince} AND s."started_at" < ${previousUntil}
         )::bigint AS sessions_previous
       FROM "Session" s
       WHERE s."project_id" = ${scope.projectId}
         AND s."started_at" >= ${previousSince}
+        AND s."started_at" <= ${until}
         ${appClause}
     `
   );
@@ -496,7 +537,7 @@ export function computeOverviewHealth(
   eventsPrevious: number,
   errorsPrevious: number,
   seriesEvents: OverviewTimeSeriesPoint[],
-  range: "24h" | "7d" = "24h"
+  bucketSeconds = 3600
 ): OverviewHealth {
   const total = events + errors;
   const totalPrev = eventsPrevious + errorsPrevious;
@@ -505,8 +546,8 @@ export function computeOverviewHealth(
   const errorRateDeltaPct = errorRatePct - prevErrorRatePct;
   const successRatePct = total > 0 ? (events / total) * 100 : 100;
 
-  const bucketSeconds = range === "7d" ? 86_400 : 3600;
-  const throughputs = seriesEvents.map((p) => p.count / bucketSeconds);
+  const bucketSecondsValue = bucketSeconds;
+  const throughputs = seriesEvents.map((p) => p.count / bucketSecondsValue);
   const peakThroughputPerSec = throughputs.length ? Math.max(...throughputs) : 0;
   const avgThroughputPerSec =
     throughputs.length > 0
