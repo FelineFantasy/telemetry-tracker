@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { MAX_SOURCE_MAP_BUNDLES_PER_RELEASE } from "./source-map-artifact.js";
 import {
   enrichErrorGroupWithSymbolicatedStacks,
   findMatchingArtifact,
@@ -101,12 +102,16 @@ describe("firstSymbolicatedFrameLine", () => {
 });
 
 describe("enrichErrorGroupWithSymbolicatedStacks", () => {
-  it("loads source maps once per release when many occurrences share it", async () => {
-    const list = vi.fn(async () => [
-      { bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap },
+  it("loads bundle refs once per release and fetches content only for matching frames", async () => {
+    const findMany = vi.fn(async () => [
+      { id: "map-1", bundle_url: "https://cdn.example.com/bundle.js" },
     ]);
+    const findUnique = vi.fn(async () => ({
+      bundle_url: "https://cdn.example.com/bundle.js",
+      content: minimalMap,
+    }));
     const prisma = {
-      sourceMapArtifact: { findMany: list },
+      sourceMapArtifact: { findMany, findUnique },
     };
     const stack = [
       "Error: boom",
@@ -129,17 +134,22 @@ describe("enrichErrorGroupWithSymbolicatedStacks", () => {
       group
     );
 
-    expect(list).toHaveBeenCalledOnce();
+    expect(findMany).toHaveBeenCalledOnce();
+    expect(findMany).toHaveBeenCalledWith({
+      where: { project_id: "project-1", app: "web", release: "1.0.0" },
+      select: { id: true, bundle_url: true },
+      orderBy: { uploaded_at: "desc" },
+      take: MAX_SOURCE_MAP_BUNDLES_PER_RELEASE,
+    });
+    expect(findUnique).toHaveBeenCalledOnce();
     expect(enriched.symbolicated_top_stack).toContain("src/index.ts");
     expect(enriched.occurrences_list[0]?.symbolicated_stack).toContain("src/index.ts");
   });
 
   it("normalizes legacy padded app labels when loading maps", async () => {
-    const list = vi.fn(async () => [
-      { bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap },
-    ]);
+    const findMany = vi.fn(async () => []);
     const prisma = {
-      sourceMapArtifact: { findMany: list },
+      sourceMapArtifact: { findMany, findUnique: vi.fn() },
     };
     const stack = "    at main (https://cdn.example.com/bundle.js:1:0)";
     const group = {
@@ -150,18 +160,24 @@ describe("enrichErrorGroupWithSymbolicatedStacks", () => {
 
     await enrichErrorGroupWithSymbolicatedStacks(prisma as never, "project-1", group);
 
-    expect(list).toHaveBeenCalledWith({
+    expect(findMany).toHaveBeenCalledWith({
       where: { project_id: "project-1", app: "web", release: "1.0.0" },
+      select: { id: true, bundle_url: true },
       orderBy: { uploaded_at: "desc" },
+      take: MAX_SOURCE_MAP_BUNDLES_PER_RELEASE,
     });
   });
 
   it("derives symbolicated_top_stack only from the newest occurrence", async () => {
-    const list = vi.fn(async () => [
-      { bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap },
+    const findMany = vi.fn(async () => [
+      { id: "map-1", bundle_url: "https://cdn.example.com/bundle.js" },
     ]);
+    const findUnique = vi.fn(async () => ({
+      bundle_url: "https://cdn.example.com/bundle.js",
+      content: minimalMap,
+    }));
     const prisma = {
-      sourceMapArtifact: { findMany: list },
+      sourceMapArtifact: { findMany, findUnique },
     };
     const group = {
       app: "web",

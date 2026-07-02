@@ -8,12 +8,14 @@ export const MAX_SOURCE_MAP_BYTES = 10 * 1024 * 1024;
 /** Fastify `bodyLimit` for POST /api/project/source-maps (map JSON + request envelope). */
 export const SOURCE_MAP_UPLOAD_BODY_LIMIT = MAX_SOURCE_MAP_BYTES + 256 * 1024;
 
+/** Max bundle refs loaded per release during symbolication (metadata only). */
+export const MAX_SOURCE_MAP_BUNDLES_PER_RELEASE = 128;
+
+/** Max map contents loaded per error detail symbolication request. */
+export const MAX_SOURCE_MAP_CONTENT_LOADS_PER_DETAIL = 32;
+
 /** Zod field for ingest/upload app labels (non-empty after trim). */
-export const ingestAppSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .refine((value) => value.trim().length > 0);
+export const ingestAppSchema = z.string().trim().min(1).max(128);
 
 /** Trim app labels so ingest telemetry and uploaded maps share the same key. */
 export function normalizeMapAppLabel(app: string): string {
@@ -73,5 +75,36 @@ export async function listSourceMapArtifactsForRelease(
   return prisma.sourceMapArtifact.findMany({
     where: { project_id: projectId, app: appLabel, release: releaseLabel },
     orderBy: { uploaded_at: "desc" },
+  });
+}
+
+export type SourceMapArtifactRef = {
+  id: string;
+  bundle_url: string;
+};
+
+export async function listSourceMapArtifactRefsForRelease(
+  prisma: PrismaClient,
+  projectId: string,
+  app: string,
+  release: string
+): Promise<SourceMapArtifactRef[]> {
+  const appLabel = normalizeMapAppLabel(app);
+  const releaseLabel = normalizeMapReleaseLabel(release) ?? release;
+  return prisma.sourceMapArtifact.findMany({
+    where: { project_id: projectId, app: appLabel, release: releaseLabel },
+    select: { id: true, bundle_url: true },
+    orderBy: { uploaded_at: "desc" },
+    take: MAX_SOURCE_MAP_BUNDLES_PER_RELEASE,
+  });
+}
+
+export async function getSourceMapArtifactContentById(
+  prisma: PrismaClient,
+  id: string
+): Promise<Pick<SourceMapArtifact, "bundle_url" | "content"> | null> {
+  return prisma.sourceMapArtifact.findUnique({
+    where: { id },
+    select: { bundle_url: true, content: true },
   });
 }

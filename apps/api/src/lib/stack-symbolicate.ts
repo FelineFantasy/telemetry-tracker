@@ -1,10 +1,13 @@
 import { originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
 import type { PrismaClient, SourceMapArtifact } from "@prisma/client";
 import {
-  listSourceMapArtifactsForRelease,
+  getSourceMapArtifactContentById,
+  listSourceMapArtifactRefsForRelease,
+  MAX_SOURCE_MAP_CONTENT_LOADS_PER_DETAIL,
   normalizeBundleUrl,
   normalizeMapAppLabel,
   normalizeMapReleaseLabel,
+  type SourceMapArtifactRef,
 } from "./source-map-artifact.js";
 
 export type ParsedStackFrame = {
@@ -103,6 +106,16 @@ export function findMatchingArtifact(
   return null;
 }
 
+export function findMatchingArtifactRef(
+  frameFile: string,
+  refs: SourceMapArtifactRef[]
+): SourceMapArtifactRef | null {
+  for (const ref of refs) {
+    if (frameMatchesBundle(frameFile, ref.bundle_url)) return ref;
+  }
+  return null;
+}
+
 function formatSymbolicatedLine(
   frame: ParsedStackFrame,
   source: string | null | undefined,
@@ -186,22 +199,58 @@ export function firstSymbolicatedFrameLine(
   return null;
 }
 
-function createArtifactsLoader(
+function createSymbolicateContext(
   prisma: PrismaClient,
   projectId: string,
   app: string
-): (release: string | null | undefined) => Promise<Pick<SourceMapArtifact, "bundle_url" | "content">[]> {
-  const pending = new Map<string, Promise<Pick<SourceMapArtifact, "bundle_url" | "content">[]>>();
-  return (release: string | null | undefined) => {
-    const key = normalizeMapReleaseLabel(release) ?? "";
-    if (!key) return Promise.resolve([]);
-    let load = pending.get(key);
+) {
+  const refsByRelease = new Map<string, Promise<SourceMapArtifactRef[]>>();
+  const contentById = new Map<string, Pick<SourceMapArtifact, "bundle_url" | "content">>();
+  let contentLoads = 0;
+
+  async function refsForRelease(release: string): Promise<SourceMapArtifactRef[]> {
+    let load = refsByRelease.get(release);
     if (!load) {
-      load = listSourceMapArtifactsForRelease(prisma, projectId, app, key);
-      pending.set(key, load);
+      load = listSourceMapArtifactRefsForRelease(prisma, projectId, app, release);
+      refsByRelease.set(release, load);
     }
     return load;
-  };
+  }
+
+  async function artifactsForStack(
+    stack: string,
+    release: string
+  ): Promise<Pick<SourceMapArtifact, "bundle_url" | "content">[]> {
+    const refs = await refsForRelease(release);
+    if (refs.length === 0) return [];
+
+    const artifacts: Pick<SourceMapArtifact, "bundle_url" | "content">[] = [];
+    const seenIds = new Set<string>();
+
+    for (const line of stack.split(/\r?\n/)) {
+      const frame = parseStackFrame(line);
+      if (frame.file == null) continue;
+
+      const ref = findMatchingArtifactRef(frame.file, refs);
+      if (!ref || seenIds.has(ref.id)) continue;
+      seenIds.add(ref.id);
+
+      let artifact = contentById.get(ref.id);
+      if (!artifact) {
+        if (contentLoads >= MAX_SOURCE_MAP_CONTENT_LOADS_PER_DETAIL) break;
+        const row = await getSourceMapArtifactContentById(prisma, ref.id);
+        contentLoads += 1;
+        if (!row) continue;
+        artifact = row;
+        contentById.set(ref.id, row);
+      }
+      artifacts.push(artifact);
+    }
+
+    return artifacts;
+  }
+
+  return { artifactsForStack };
 }
 
 export async function symbolicateOccurrenceStack(
@@ -215,12 +264,12 @@ export async function symbolicateOccurrenceStack(
   const stackText = stack?.trim();
   if (!releaseLabel || !stackText) return null;
 
-  const artifacts = await listSourceMapArtifactsForRelease(
+  const { artifactsForStack } = createSymbolicateContext(
     prisma,
     projectId,
-    normalizeMapAppLabel(app),
-    releaseLabel
+    normalizeMapAppLabel(app)
   );
+  const artifacts = await artifactsForStack(stackText, releaseLabel);
   if (artifacts.length === 0) return null;
 
   const symbolicated = symbolicateStackTrace(stackText, artifacts);
@@ -245,14 +294,14 @@ export async function enrichErrorGroupWithSymbolicatedStacks<
   T extends ErrorGroupWithOccurrences,
 >(prisma: PrismaClient, projectId: string, group: T): Promise<T> {
   const app = normalizeMapAppLabel(group.app);
-  const artifactsForRelease = createArtifactsLoader(prisma, projectId, app);
+  const { artifactsForStack } = createSymbolicateContext(prisma, projectId, app);
 
   const newest = group.occurrences_list[0];
   let symbolicatedTop: string | null = null;
   if (newest?.stack?.trim()) {
     const newestRelease = normalizeMapReleaseLabel(newest.release ?? group.release);
     if (newestRelease) {
-      const artifacts = await artifactsForRelease(newestRelease);
+      const artifacts = await artifactsForStack(newest.stack, newestRelease);
       symbolicatedTop = firstSymbolicatedFrameLine(newest.stack, artifacts);
     }
   }
@@ -261,7 +310,7 @@ export async function enrichErrorGroupWithSymbolicatedStacks<
     group.occurrences_list.map(async (occ) => {
       const release = normalizeMapReleaseLabel(occ.release ?? group.release);
       if (!occ.stack?.trim() || !release) return occ;
-      const artifacts = await artifactsForRelease(release);
+      const artifacts = await artifactsForStack(occ.stack, release);
       const symbolicated = symbolicateStackTrace(occ.stack, artifacts);
       if (symbolicated === occ.stack) return occ;
       return { ...occ, symbolicated_stack: symbolicated };

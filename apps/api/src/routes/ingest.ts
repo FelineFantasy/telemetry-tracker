@@ -14,6 +14,7 @@ import { notifyNewErrorGroupEmail } from "../lib/notification-email-dispatch.js"
 import { maybeNotifyErrorSpike } from "../lib/error-spike-alert.js";
 import { maybeNotifyQuotaAlerts } from "../lib/quota-alert.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
+import { findIngestSession } from "../lib/ingest-session.js";
 import {
   ingestAppSchema,
   normalizeMapAppLabel,
@@ -100,7 +101,7 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    const app = normalizeMapAppLabel(body.app);
+    const app = body.app;
     if (!assertIngestAppAllowed(request, app, reply)) return;
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
@@ -131,17 +132,17 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    const app = normalizeMapAppLabel(body.app);
+    const app = body.app;
     if (!assertIngestAppAllowed(request, app, reply)) return;
-    const existing = await prisma.session.findFirst({
-      where: { project_id: projectId, session_id: body.session_id, app },
-      orderBy: { started_at: "desc" },
-    });
+    const existing = await findIngestSession(prisma, projectId, body.session_id, app);
     // Closing a session only sets `ended_at` — no new telemetry; must not be blocked by quota.
     if (existing && body.ended_at) {
       await prisma.session.update({
         where: { id: existing.id },
-        data: { ended_at: new Date(body.ended_at) },
+        data: {
+          ended_at: new Date(body.ended_at),
+          ...(existing.app !== app ? { app } : {}),
+        },
       });
       return reply.status(204).send();
     }
@@ -180,14 +181,14 @@ export async function ingestRoutes(
     for (const ev of parsed.data.events) {
       if (!assertIngestAppAllowed(request, ev.app, reply)) return;
     }
-    const batchApps = parsed.data.events.map((e) => normalizeMapAppLabel(e.app));
+    const batchApps = parsed.data.events.map((e) => e.app);
     const planOk = await assertIngestPlanOrReply(prisma, projectId, n, batchApps);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     for (const body of parsed.data.events) {
       await prisma.event.create({
         data: {
           project_id: projectId,
-          app: normalizeMapAppLabel(body.app),
+          app: body.app,
           platform: body.platform ?? null,
           environment: body.environment ?? null,
           release: body.release ?? null,
@@ -212,7 +213,7 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    const app = normalizeMapAppLabel(body.app);
+    const app = body.app;
     const release = normalizeMapReleaseLabel(body.release);
     if (!assertIngestAppAllowed(request, app, reply)) return;
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);

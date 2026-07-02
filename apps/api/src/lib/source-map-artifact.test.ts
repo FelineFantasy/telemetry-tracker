@@ -19,6 +19,7 @@ describe("source-map-artifact", () => {
   it("rejects whitespace-only ingest app labels", () => {
     expect(ingestAppSchema.safeParse("   ").success).toBe(false);
     expect(ingestAppSchema.safeParse("web").success).toBe(true);
+    expect(ingestAppSchema.parse("  web  ")).toBe("web");
   });
 
   it("normalizes bundle URLs", () => {
