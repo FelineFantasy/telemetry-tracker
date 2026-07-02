@@ -153,6 +153,7 @@ model Project {
   error_groups    ErrorGroup[]
   alert_settings  Json?          @map("alert_settings")
   alert_events    AlertEvent[]
+  source_map_artifacts SourceMapArtifact[]
 
   @@unique([organization_id, slug])
   @@index([organization_id])
@@ -303,4 +304,25 @@ model Session {
 
   @@index([project_id, started_at])
   @@index([project_id, app])
+}
+
+/// Uploaded source map JSON keyed by release and minified bundle path (symbolication in phase 4).
+model SourceMapArtifact {
+  id           String   @id @default(uuid())
+  project_id   String   @map("project_id")
+  project      Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  app          String
+  release      String
+  /// Minified bundle URL or path the map applies to (e.g. https://cdn.example/app.js).
+  bundle_url   String   @map("bundle_url")
+  /// Raw source map JSON (self-hosted storage; object-store key reserved for later).
+  content      String   @db.Text
+  storage_key  String?  @map("storage_key")
+  sha256       String
+  size_bytes   Int      @map("size_bytes")
+  uploaded_at  DateTime @default(now()) @map("uploaded_at")
+
+  @@unique([project_id, app, release, bundle_url])
+  @@index([project_id, release])
+  @@index([project_id, uploaded_at])
 }

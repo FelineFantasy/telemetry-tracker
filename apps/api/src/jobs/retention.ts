@@ -8,6 +8,7 @@ export type RetentionSweepResult = {
   eventsDeleted: number;
   sessionsDeleted: number;
   errorGroupsDeleted: number;
+  sourceMapsDeleted: number;
 };
 
 /**
@@ -33,6 +34,7 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
   let eventsDeleted = 0;
   let sessionsDeleted = 0;
   let errorGroupsDeleted = 0;
+  let sourceMapsDeleted = 0;
   let projectsProcessed = 0;
 
   for (const p of projects) {
@@ -67,6 +69,9 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
       const eg = await tx.errorGroup.deleteMany({
         where: { project_id: projectId, last_seen: { lt: cutoff } },
       });
+      const maps = await tx.sourceMapArtifact.deleteMany({
+        where: { project_id: projectId, uploaded_at: { lt: cutoff } },
+      });
       await tx.$executeRaw`
         UPDATE "ErrorGroup" AS eg
         SET occurrences = (
@@ -79,6 +84,7 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
         ev: ev.count,
         sess: sess.count,
         eg: eg.count,
+        maps: maps.count,
       };
     });
 
@@ -86,6 +92,7 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
     eventsDeleted += r.ev;
     sessionsDeleted += r.sess;
     errorGroupsDeleted += r.eg;
+    sourceMapsDeleted += r.maps;
   }
 
   return {
@@ -94,5 +101,6 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
     eventsDeleted,
     sessionsDeleted,
     errorGroupsDeleted,
+    sourceMapsDeleted,
   };
 }

@@ -16,11 +16,13 @@ describe("runRetentionSweep", () => {
       // predicate would delete both; ended_at deletes only the closed one.
       return { count: "ended_at" in where ? 1 : 2 };
     });
+    const sourceMapDeleteMany = vi.fn(async () => ({ count: 3 }));
     const tx = {
       errorOccurrence: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       event: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       session: { deleteMany: sessionDeleteMany },
       errorGroup: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      sourceMapArtifact: { deleteMany: sourceMapDeleteMany },
       $executeRaw: vi.fn(async () => 0),
     };
     const prisma = {
@@ -42,10 +44,17 @@ describe("runRetentionSweep", () => {
     const result = await runRetentionSweep(prisma as never);
 
     expect(result.sessionsDeleted).toBe(1);
+    expect(result.sourceMapsDeleted).toBe(3);
     expect(sessionDeleteMany).toHaveBeenCalledWith({
       where: {
         project_id: "project-1",
         ended_at: { lt: new Date("2026-04-22T10:00:00.000Z") },
+      },
+    });
+    expect(sourceMapDeleteMany).toHaveBeenCalledWith({
+      where: {
+        project_id: "project-1",
+        uploaded_at: { lt: new Date("2026-04-22T10:00:00.000Z") },
       },
     });
   });

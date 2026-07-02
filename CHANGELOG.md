@@ -14,10 +14,12 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Added
 
 - **Source maps (phase 1)** — persist `release` on error ingest and show release on error detail (foundation for v1.3.0 symbolication)
+- **Source maps (phase 2)** — `SourceMapArtifact` storage model, lookup helpers, and retention sweep integration
 
 ### Database
 
 - `20260703120000_error_release` — `release` column on `ErrorGroup` and `ErrorOccurrence`
+- `20260703130000_source_map_artifacts` — source map storage keyed by project, app, release, and bundle URL
 
 ---
 
