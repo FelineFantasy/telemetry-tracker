@@ -24,7 +24,7 @@ export function Hero({ isAuthenticated = false }: { isAuthenticated?: boolean })
             <span className="absolute inset-0 animate-pulse-dot rounded-full bg-success" />
             <span className="relative h-1.5 w-1.5 rounded-full bg-success" />
           </span>
-          Open source · Self-hosted telemetry
+          Open source · Hosted cloud at telemetry-tracker.com
           <svg
             viewBox="0 0 16 16"
             className="h-3 w-3"
@@ -45,8 +45,8 @@ export function Hero({ isAuthenticated = false }: { isAuthenticated?: boolean })
         </h1>
 
         <p className="mx-auto mt-6 max-w-xl text-balance text-base text-muted-foreground sm:text-lg">
-          Capture events, errors and sessions with lightweight SDKs. One platform for the signals
-          you actually act on — built for engineers who hate slow dashboards.
+          Capture errors, events and sessions with lightweight SDKs. Alert on spikes, symbolicated
+          stacks with source maps — one fast platform for the signals you actually act on.
         </p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-2">

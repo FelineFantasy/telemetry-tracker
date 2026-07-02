@@ -13,7 +13,7 @@ export default function DocsNextJsPage() {
       title="Next.js"
       lede={
         <p>
-          Use the <code>@tacko/telemetry-next</code> package for Next.js apps. It provides a
+          Use the <code>@telemetry-tracker/next</code> package for Next.js apps. It provides a
           provider, error boundary, and a hook to track page views. In the browser, uncaught errors
           and unhandled promise rejections are also reported automatically (via core’s global
           handlers after <code>init()</code>).
@@ -22,9 +22,9 @@ export default function DocsNextJsPage() {
     >
       <h2>Install</h2>
       <CodeBlock
-        code={`pnpm add @tacko/telemetry-next
+        code={`pnpm add @telemetry-tracker/next
 # or
-npm install @tacko/telemetry-next`}
+npm install @telemetry-tracker/next`}
       />
 
       <h2>Setup</h2>
@@ -35,7 +35,7 @@ npm install @tacko/telemetry-next`}
       </p>
       <CodeBlock
         code={`// app/layout.tsx
-import { TelemetryProvider, useTrackPage } from "@tacko/telemetry-next";
+import { TelemetryProvider, useTrackPage } from "@telemetry-tracker/next";
 
 function TrackPageView({ pathname }: { pathname: string }) {
   useTrackPage(pathname);
@@ -74,7 +74,7 @@ export default function RootLayout({ children }) {
         optionally show a fallback).
       </p>
       <CodeBlock
-        code={`import { TelemetryErrorBoundary } from "@tacko/telemetry-next";
+        code={`import { TelemetryErrorBoundary } from "@telemetry-tracker/next";
 
 <TelemetryErrorBoundary fallback={<div>Something went wrong</div>}>
   <YourComponent />
@@ -84,10 +84,10 @@ export default function RootLayout({ children }) {
       <h2>Custom events and identify</h2>
       <p>
         Import <code>trackEvent</code>, <code>screen</code>, and <code>identify</code> from{" "}
-        <code>@tacko/telemetry-next</code> when needed.
+        <code>@telemetry-tracker/next</code> when needed.
       </p>
       <CodeBlock
-        code={`import { trackEvent, screen, identify } from "@tacko/telemetry-next";
+        code={`import { trackEvent, screen, identify } from "@telemetry-tracker/next";
 
 trackEvent("signup_clicked", { source: "hero" });
 screen("/settings");

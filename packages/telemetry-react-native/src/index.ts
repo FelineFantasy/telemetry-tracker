@@ -8,7 +8,7 @@ import {
   endSession,
   SDK_VERSION,
   type TelemetryConfig,
-} from "@tacko/telemetry-core";
+} from "@telemetry-tracker/core";
 
 const g = typeof globalThis !== "undefined" ? globalThis : undefined;
 const ErrorUtils =

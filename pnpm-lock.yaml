@@ -84,10 +84,10 @@ importers:
       '@radix-ui/react-slot':
         specifier: ^1.3.0
         version: 1.3.0(@types/react@19.2.14)(react@19.2.4)
-      '@tacko/telemetry-core':
+      '@telemetry-tracker/core':
         specifier: workspace:*
         version: link:../../packages/telemetry-core
-      '@tacko/telemetry-next':
+      '@telemetry-tracker/next':
         specifier: workspace:*
         version: link:../../packages/telemetry-next
       class-variance-authority:
@@ -181,7 +181,7 @@ importers:
 
   packages/telemetry-next:
     dependencies:
-      '@tacko/telemetry-core':
+      '@telemetry-tracker/core':
         specifier: workspace:*
         version: link:../telemetry-core
       next:
@@ -200,7 +200,7 @@ importers:
 
   packages/telemetry-node:
     dependencies:
-      '@tacko/telemetry-core':
+      '@telemetry-tracker/core':
         specifier: workspace:*
         version: link:../telemetry-core
     devDependencies:
@@ -213,7 +213,7 @@ importers:
 
   packages/telemetry-react-native:
     dependencies:
-      '@tacko/telemetry-core':
+      '@telemetry-tracker/core':
         specifier: workspace:*
         version: link:../telemetry-core
       react-native:

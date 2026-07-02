@@ -87,7 +87,16 @@ packages/
   telemetry-react-native/
 ```
 
-SDKs are published as `@tacko/telemetry-*` on npm.
+SDKs are published as `@telemetry-tracker/*` on npm:
+
+| Package | npm name |
+|---------|----------|
+| `packages/telemetry-core` | `@telemetry-tracker/core` |
+| `packages/telemetry-next` | `@telemetry-tracker/next` |
+| `packages/telemetry-node` | `@telemetry-tracker/node` |
+| `packages/telemetry-react-native` | `@telemetry-tracker/react-native` |
+
+Publish (maintainers): create the `@telemetry-tracker` npm org, `npm login`, then `pnpm publish:packages`. After the first publish under the new scope, deprecate the legacy `@tacko/telemetry-*` packages with a message pointing to `@telemetry-tracker/*`.
 
 Design and entitlement rules are summarized in [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md); architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); deployment in [DEPLOYMENT.md](DEPLOYMENT.md) and [docs/RAILWAY.md](docs/RAILWAY.md); RBAC in [docs/RBAC.md](docs/RBAC.md).
 

@@ -18,6 +18,11 @@ export function DocsHomePage() {
       <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
         Telemetry Tracker is a lightweight, self-hostable pipeline for errors, events, and sessions.
         Install an SDK, point it at your ingest URL, and start triaging issues from the dashboard.
+        New to the official cloud? Start with{" "}
+        <Link href="/docs/hosted-cloud" className="text-brand hover:underline">
+          Hosted cloud getting started
+        </Link>
+        .
       </p>
 
       <DocsSection id="introduction" title="Introduction" eyebrow="01">
@@ -27,7 +32,7 @@ export function DocsHomePage() {
           in the dashboard.
         </p>
         <p>
-          SDKs are small wrappers around <DocsInlineCode>@tacko/telemetry-core</DocsInlineCode> that
+          SDKs are small wrappers around <DocsInlineCode>@telemetry-tracker/core</DocsInlineCode> that
           handle init, batching, and HTTP ingest. You can self-host the API and dashboard or use a
           hosted deployment with orgs, projects, and API keys.
         </p>
@@ -41,10 +46,10 @@ export function DocsHomePage() {
 
         <DocsSteps>
           <DocsStep n={1} title="Install the SDK">
-            <DocsCodeBlock language="bash">npm install @tacko/telemetry-core</DocsCodeBlock>
+            <DocsCodeBlock language="bash">npm install @telemetry-tracker/core</DocsCodeBlock>
           </DocsStep>
           <DocsStep n={2} title="Initialize at app entry">
-            <DocsCodeBlock language="ts">{`import { init } from "@tacko/telemetry-core";
+            <DocsCodeBlock language="ts">{`import { init } from "@telemetry-tracker/core";
 
 init({
   ingestUrl: "https://your-api.example.com",
@@ -55,7 +60,7 @@ init({
 });`}</DocsCodeBlock>
           </DocsStep>
           <DocsStep n={3} title="Capture your first event">
-            <DocsCodeBlock language="ts">{`import { trackEvent } from "@tacko/telemetry-core";
+            <DocsCodeBlock language="ts">{`import { trackEvent } from "@telemetry-tracker/core";
 
 trackEvent("checkout.completed", {
   plan: "pro",
@@ -114,7 +119,7 @@ trackEvent("checkout.completed", {
           fingerprints stack traces, groups them into issues, and stores individual occurrences
           with context.
         </p>
-        <DocsCodeBlock language="ts">{`import { trackError } from "@tacko/telemetry-core";
+        <DocsCodeBlock language="ts">{`import { trackError } from "@telemetry-tracker/core";
 
 try {
   await chargeCard();
@@ -132,7 +137,7 @@ try {
           <DocsInlineCode>identify(userId)</DocsInlineCode> to attach a stable user id while
           keeping the anonymous device id for pre-login activity.
         </p>
-        <DocsCodeBlock language="ts">{`import { trackEvent, screen, identify } from "@tacko/telemetry-core";
+        <DocsCodeBlock language="ts">{`import { trackEvent, screen, identify } from "@telemetry-tracker/core";
 
 identify("user-123");
 screen("/settings");

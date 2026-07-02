@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import { ContactEmailLink } from "@/app/components/legal/ContactEmailLink";
 import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
+import { HOSTED_DASHBOARD_URL, HOSTED_OPERATOR } from "@/lib/hosted-cloud";
 
-const EFFECTIVE = "June 28, 2026";
-const VERSION = "2026.06";
+const EFFECTIVE = "July 2, 2026";
+const VERSION = "2026.07";
 
 const principles = [
   {
@@ -69,6 +70,7 @@ const rights = [
 ];
 
 const toc: { id: string; label: string }[] = [
+  { id: "hosted-cloud", label: "Hosted cloud" },
   { id: "controller", label: "1. Who processes data" },
   { id: "what", label: "2. What we collect" },
   { id: "legal", label: "3. Legal basis" },
@@ -107,8 +109,9 @@ export function PrivacyPageContent() {
               Privacy Policy
             </h1>
             <p className="mt-5 max-w-2xl text-balance text-base text-muted-foreground md:text-lg">
-              How Telemetry Tracker handles personal data when you self-host. Written so an engineer
-              can audit it in one sitting.
+              How Telemetry Tracker handles personal data when you self-host or use the official
+              hosted cloud at telemetry-tracker.com. Written so an engineer can audit it in one
+              sitting.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
@@ -119,7 +122,7 @@ export function PrivacyPageContent() {
                 Version {VERSION}
               </span>
               <span className="rounded-full border border-border bg-surface/70 px-3 py-1 backdrop-blur">
-                Self-hosted first
+                Self-hosted & hosted cloud
               </span>
             </div>
           </div>
@@ -163,14 +166,40 @@ export function PrivacyPageContent() {
             <article className="max-w-3xl">
               <div className="rounded-2xl border border-border bg-surface/40 p-6 text-sm leading-relaxed text-muted-foreground">
                 <p className="text-foreground">
-                  <span className="font-medium">In short.</span> Telemetry Tracker is self-hosted
-                  software. Your operator controls what is collected, where it is stored, and how
-                  long it is kept. This page describes the data the product can process — it does
+                  <span className="font-medium">In short.</span> Self-hosted deployments are
+                  controlled by your operator. On the official Hosted Cloud at{" "}
+                  <a href={HOSTED_DASHBOARD_URL} className="underline-offset-4 hover:underline">
+                    telemetry-tracker.com
+                  </a>
+                  , {HOSTED_OPERATOR} processes dashboard account data and stores Customer Data in
+                  managed infrastructure. This page describes what the product can process — it does
                   not replace your privacy notices to end users.
                 </p>
               </div>
 
               <div className="mt-12 space-y-14 text-[15px] leading-relaxed text-muted-foreground">
+                <Section id="hosted-cloud" title="Official hosted cloud">
+                  <p>
+                    When you register at{" "}
+                    <a href={HOSTED_DASHBOARD_URL} className="text-foreground/85 hover:text-foreground">
+                      {HOSTED_DASHBOARD_URL.replace("https://", "")}
+                    </a>
+                    , {HOSTED_OPERATOR} is the data controller for your dashboard account (email,
+                    hashed password, organization membership) and processor of Customer Data you send
+                    through ingest (errors, events, sessions, source maps).
+                  </p>
+                  <p>
+                    Data is stored in managed PostgreSQL and object storage operated for the Hosted
+                    Cloud. Retention follows your plan tier and runs on a scheduled job. Billing uses
+                    Stripe; transactional email (invites, password reset) may use Resend when
+                    configured.
+                  </p>
+                  <p>
+                    Privacy requests for Hosted Cloud accounts:{" "}
+                    <ContactEmailLink className="text-foreground/85 hover:text-foreground" />.
+                  </p>
+                </Section>
+
                 <Section id="controller" title="1. Who processes data">
                   <p>
                     When you run Telemetry Tracker on your own infrastructure,{" "}
@@ -248,16 +277,18 @@ export function PrivacyPageContent() {
 
                 <Section id="sharing" title="4. Sharing">
                   <p>
-                    We do not sell personal data. Telemetry in a self-hosted deployment is not
-                    shared with us unless you choose to send reproduction details in support
-                    correspondence. Your operator may share data with service providers listed in
-                    Section 5 when those integrations are configured.
+                    We do not sell personal data. On a self-hosted deployment, telemetry is not
+                    shared with us unless you include reproduction details in support correspondence.
+                    On the Hosted Cloud, {HOSTED_OPERATOR} uses subprocessors (for example Stripe,
+                    Resend, and infrastructure providers) only to operate the service — see Section
+                    5.
                   </p>
                 </Section>
 
-                <Section id="subprocessors" title="5. Optional third parties">
+                <Section id="subprocessors" title="5. Third-party services">
                   <p>
-                    A self-hosted deployment may call external services when you configure them:
+                    Self-hosted and Hosted Cloud deployments may call external services when
+                    configured:
                   </p>
                   <div className="mt-5 overflow-hidden rounded-xl border border-border">
                     <table className="w-full text-left text-sm">
@@ -287,23 +318,24 @@ export function PrivacyPageContent() {
 
                 <Section id="transfers" title="6. Where data lives">
                   <p>
-                    Because you host the database and API, data residency is determined by where
-                    you deploy PostgreSQL and the dashboard. Optional third-party services may
-                    process data in their own regions — configure them only if that meets your
-                    compliance requirements.
+                    Self-hosted: data residency is determined by where you deploy PostgreSQL and
+                    the dashboard. Hosted Cloud: Customer Data and account data are stored in
+                    infrastructure selected by {HOSTED_OPERATOR} for the managed service. Optional
+                    third-party services may process data in their own regions — configure them only
+                    if that meets your compliance requirements.
                   </p>
                 </Section>
 
                 <Section id="retention" title="7. Retention">
                   <p>
-                    Default plan tiers define retention windows (14 days on Free, 90 on Pro, 365 on
-                    Business). A scheduled retention job deletes telemetry older than your
-                    effective plan limit. Because you control the database, you can also delete
-                    projects, rotate API keys, and purge rows directly.
+                    Plan tiers define retention windows (14 days on Free, 90 on Pro, 365 on Business).
+                    A scheduled retention job deletes telemetry older than your effective plan limit.
+                    Self-hosters can also delete projects, rotate API keys, and purge rows directly.
+                    On the Hosted Cloud, {HOSTED_OPERATOR} runs retention on your behalf.
                   </p>
                   <p>
-                    Schedule the retention job in production — without it, telemetry grows until
-                    manual cleanup. See the deployment docs for cron setup.
+                    Self-hosters must schedule the retention job in production — without it,
+                    telemetry grows until manual cleanup. See the deployment docs for cron setup.
                   </p>
                 </Section>
 

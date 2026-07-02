@@ -110,7 +110,7 @@ X-Project-Id: <project-uuid>
 
 Returns metadata only (no map body). Implementation: `apps/api/src/lib/source-map-upload.ts`.
 
-Future: multipart upload and CLI wrapper (`npx @tacko/telemetry-cli upload-sourcemaps --release=1.0.0 ./dist/**/*.map`).
+Future: multipart upload and CLI wrapper (`npx @telemetry-tracker/cli upload-sourcemaps --release=1.0.0 ./dist/**/*.map`).
 
 ## Phase 4 — symbolication
 

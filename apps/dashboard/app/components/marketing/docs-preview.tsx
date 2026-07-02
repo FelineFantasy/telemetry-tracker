@@ -3,34 +3,40 @@ import { SectionHeading } from "./features";
 
 const guides = [
   {
+    title: "Hosted cloud",
+    desc: "Register at telemetry-tracker.com, create a project, and send your first event.",
+    time: "5 min",
+    href: "/docs/hosted-cloud",
+  },
+  {
     title: "Quickstart",
     desc: "Install an SDK and capture your first event in under a minute.",
     time: "2 min",
+    href: "/docs#quickstart",
   },
   {
     title: "Capturing errors",
     desc: "Group, fingerprint and resolve exceptions across your apps.",
     time: "5 min",
+    href: "/docs#errors",
   },
   {
     title: "Sessions",
     desc: "Track session start and end events with user context.",
     time: "4 min",
+    href: "/docs#sessions",
   },
   {
     title: "Next.js integration",
     desc: "Provider, error boundary, and server-side capture.",
     time: "5 min",
+    href: "/docs/nextjs",
   },
   {
     title: "Self-hosting",
     desc: "Run the API and dashboard on your own infrastructure.",
     time: "10 min",
-  },
-  {
-    title: "Dashboard guide",
-    desc: "Overview, filters, orgs, projects and API keys.",
-    time: "6 min",
+    href: "/docs#self-hosting",
   },
 ];
 
@@ -48,7 +54,7 @@ export function DocsPreview() {
           {guides.map((g) => (
             <li key={g.title}>
               <Link
-                href="/docs"
+                href={g.href}
                 className="group flex h-full flex-col justify-between bg-background p-6 transition-colors hover:bg-surface/60"
               >
                 <div>

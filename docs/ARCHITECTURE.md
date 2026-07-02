@@ -9,7 +9,7 @@ High-level map of **Telemetry Tracker** for contributors. For RBAC details see [
 ```
 ┌─────────────────┐     ingest (API key)      ┌──────────────┐
 │  Client apps    │ ─────────────────────────▶│              │
-│  @tacko/telemetry-*                         │   Fastify    │
+│  @telemetry-tracker/*                         │   Fastify    │
 └─────────────────┘                           │   API        │
                                               │  apps/api    │
 ┌─────────────────┐     read (session)        │              │
@@ -40,7 +40,7 @@ High-level map of **Telemetry Tracker** for contributors. For RBAC details see [
 | `packages/telemetry-node` | Node global handlers, optional middleware |
 | `packages/telemetry-react-native` | RN global error handler, screen tracking |
 
-Published on npm as `@tacko/telemetry-*`. Workspace tooling: **pnpm**, root `eslint.config.mjs`, shared TypeScript.
+Published on npm as `@telemetry-tracker/*`. Workspace tooling: **pnpm**, root `eslint.config.mjs`, shared TypeScript.
 
 ---
 
@@ -144,7 +144,7 @@ Core telemetry tables: `Event`, `Session`, `ErrorGroup`, `ErrorOccurrence` — a
 
 ## SDK packages
 
-All SDKs depend on **`@tacko/telemetry-core`** for HTTP ingest:
+All SDKs depend on **`@telemetry-tracker/core`** for HTTP ingest:
 
 1. `init({ ingestUrl, app, apiKey, … })`
 2. `trackEvent` / `trackError` / `screen` / `identify`

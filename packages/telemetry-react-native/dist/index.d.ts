@@ -1,4 +1,4 @@
-import { identify, trackEvent, trackError as coreTrackError, screen as coreScreen, getSessionId, endSession, SDK_VERSION, type TelemetryConfig } from "@tacko/telemetry-core";
+import { identify, trackEvent, trackError as coreTrackError, screen as coreScreen, getSessionId, endSession, SDK_VERSION, type TelemetryConfig } from "@telemetry-tracker/core";
 export type TelemetryReactNativeConfig = TelemetryConfig & {
     app: string;
     platform?: string;
