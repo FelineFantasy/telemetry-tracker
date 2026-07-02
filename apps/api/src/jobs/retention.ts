@@ -69,9 +69,21 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
       const eg = await tx.errorGroup.deleteMany({
         where: { project_id: projectId, last_seen: { lt: cutoff } },
       });
-      const maps = await tx.sourceMapArtifact.deleteMany({
-        where: { project_id: projectId, uploaded_at: { lt: cutoff } },
-      });
+      // Keep maps for releases that still have in-window errors (ErrorGroup.last_seen),
+      // even when the map was uploaded before the retention cutoff.
+      const maps = await tx.$executeRaw`
+        DELETE FROM "SourceMapArtifact" AS sma
+        WHERE sma.project_id = ${projectId}
+          AND sma.uploaded_at < ${cutoff}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "ErrorGroup" AS eg
+            WHERE eg.project_id = sma.project_id
+              AND eg.app = sma.app
+              AND eg.release = sma.release
+              AND eg.last_seen >= ${cutoff}
+          )
+      `;
       await tx.$executeRaw`
         UPDATE "ErrorGroup" AS eg
         SET occurrences = (
@@ -84,7 +96,7 @@ export async function runRetentionSweep(prisma: PrismaClient): Promise<Retention
         ev: ev.count,
         sess: sess.count,
         eg: eg.count,
-        maps: maps.count,
+        maps: Number(maps),
       };
     });
 
