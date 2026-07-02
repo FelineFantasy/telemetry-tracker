@@ -4,13 +4,15 @@ import { z } from "zod";
 import {
   MAX_SOURCE_MAP_BYTES,
   normalizeBundleUrl,
+  normalizeMapAppLabel,
+  normalizeMapReleaseLabel,
   sha256Hex,
 } from "./source-map-artifact.js";
 
 const uploadBodySchema = z.object({
-  app: z.string().trim().min(1).max(128),
-  release: z.string().trim().min(1).max(256),
-  bundle_url: z.string().trim().min(1).max(2048),
+  app: z.string().min(1).max(128).refine((value) => value.trim().length > 0),
+  release: z.string().min(1).max(256).refine((value) => value.trim().length > 0),
+  bundle_url: z.string().min(1).max(2048).refine((value) => value.trim().length > 0),
   /** Source map JSON as a string or parsed object. */
   content: z.union([z.string().min(1), z.record(z.unknown())]),
 });
@@ -34,7 +36,19 @@ export function validateSourceMapUploadBody(
   if (!parsed.success) {
     return { ok: false, error: "Invalid source map upload payload" };
   }
-  return { ok: true, input: parsed.data };
+  const release = normalizeMapReleaseLabel(parsed.data.release);
+  if (!release) {
+    return { ok: false, error: "Invalid source map upload payload" };
+  }
+  return {
+    ok: true,
+    input: {
+      ...parsed.data,
+      app: normalizeMapAppLabel(parsed.data.app),
+      release,
+      bundle_url: normalizeBundleUrl(parsed.data.bundle_url),
+    },
+  };
 }
 
 /** Normalize and validate source map JSON (requires a numeric `version` field). */

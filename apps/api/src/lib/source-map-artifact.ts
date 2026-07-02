@@ -7,6 +7,20 @@ export const MAX_SOURCE_MAP_BYTES = 10 * 1024 * 1024;
 /** Fastify `bodyLimit` for POST /api/project/source-maps (map JSON + request envelope). */
 export const SOURCE_MAP_UPLOAD_BODY_LIMIT = MAX_SOURCE_MAP_BYTES + 256 * 1024;
 
+/** Trim app labels so ingest telemetry and uploaded maps share the same key. */
+export function normalizeMapAppLabel(app: string): string {
+  return app.trim();
+}
+
+/** Trim release labels; blank after trim becomes null (optional on errors). */
+export function normalizeMapReleaseLabel(
+  release: string | null | undefined
+): string | null {
+  if (release == null) return null;
+  const trimmed = release.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 export type SourceMapArtifactKey = {
   projectId: string;
   app: string;

@@ -2,10 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import {
   findSourceMapArtifact,
   normalizeBundleUrl,
+  normalizeMapAppLabel,
+  normalizeMapReleaseLabel,
   sha256Hex,
 } from "./source-map-artifact.js";
 
 describe("source-map-artifact", () => {
+  it("normalizes map app and release labels", () => {
+    expect(normalizeMapAppLabel("  web  ")).toBe("web");
+    expect(normalizeMapReleaseLabel(" 1.2.0 ")).toBe("1.2.0");
+    expect(normalizeMapReleaseLabel("   ")).toBeNull();
+    expect(normalizeMapReleaseLabel(undefined)).toBeNull();
+  });
+
   it("normalizes bundle URLs", () => {
     expect(normalizeBundleUrl("  https://cdn.example/app.js  ")).toBe(
       "https://cdn.example/app.js"

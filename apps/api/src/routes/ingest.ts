@@ -14,6 +14,10 @@ import { notifyNewErrorGroupEmail } from "../lib/notification-email-dispatch.js"
 import { maybeNotifyErrorSpike } from "../lib/error-spike-alert.js";
 import { maybeNotifyQuotaAlerts } from "../lib/quota-alert.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
+import {
+  normalizeMapAppLabel,
+  normalizeMapReleaseLabel,
+} from "../lib/source-map-artifact.js";
 
 /**
  * Ingest pipeline (implement in order):
@@ -75,7 +79,7 @@ function assertIngestAppAllowed(
 ): boolean {
   const allowed = request.ingestApiKeyAllowedApp;
   if (allowed == null) return true;
-  if (app !== allowed) {
+  if (normalizeMapAppLabel(app) !== normalizeMapAppLabel(allowed)) {
     void reply.status(403).send({ error: APP_RESTRICT_MSG });
     return false;
   }
@@ -210,8 +214,10 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    if (!assertIngestAppAllowed(request, body.app, reply)) return;
-    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    const app = normalizeMapAppLabel(body.app);
+    const release = normalizeMapReleaseLabel(body.release);
+    if (!assertIngestAppAllowed(request, app, reply)) return;
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const fingerprint = computeFingerprint(body.message, body.stack);
     const { group: errorGroup, isNew } = await findOrCreateErrorGroup(prisma, {
@@ -219,15 +225,15 @@ export async function ingestRoutes(
       fingerprint,
       message: body.message,
       top_stack: body.stack?.split("\n")[0]?.trim() ?? null,
-      app: body.app,
+      app,
       environment: body.environment ?? null,
-      release: body.release ?? null,
+      release,
     });
     await prisma.errorOccurrence.create({
       data: {
         error_group_id: errorGroup.id,
         stack: body.stack ?? null,
-        release: body.release ?? null,
+        release,
         context: (body.context ?? undefined) as Prisma.InputJsonValue | undefined,
         session_id: body.session_id ?? null,
         user_id: body.user_id ?? null,
