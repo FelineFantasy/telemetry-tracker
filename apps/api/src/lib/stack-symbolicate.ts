@@ -1,6 +1,11 @@
 import { originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
 import type { PrismaClient, SourceMapArtifact } from "@prisma/client";
-import { listSourceMapArtifactsForRelease, normalizeBundleUrl } from "./source-map-artifact.js";
+import {
+  listSourceMapArtifactsForRelease,
+  normalizeBundleUrl,
+  normalizeMapAppLabel,
+  normalizeMapReleaseLabel,
+} from "./source-map-artifact.js";
 
 export type ParsedStackFrame = {
   raw: string;
@@ -58,26 +63,34 @@ export function frameMatchesBundle(frameFile: string, bundleUrl: string): boolea
     try {
       const frameUrl = new URL(frame);
       const bundleUrlObj = new URL(bundle);
-      if (frameUrl.origin === bundleUrlObj.origin) {
-        return (
-          frameUrl.pathname === bundleUrlObj.pathname ||
-          frameUrl.pathname.endsWith(bundleUrlObj.pathname)
-        );
-      }
-      return false;
+      return (
+        frameUrl.origin === bundleUrlObj.origin &&
+        frameUrl.pathname === bundleUrlObj.pathname
+      );
     } catch {
       return false;
     }
   }
 
-  if (frame.endsWith(bundle) || bundle.endsWith(frame)) return true;
+  if (!frame.includes("://") && bundle.includes("://")) {
+    const frameBase = frame.split(/[/?#]/).pop() ?? frame;
+    if (frameBase.length === 0) return false;
+    try {
+      const bundlePathBase =
+        new URL(bundle).pathname.split("/").filter(Boolean).pop() ?? "";
+      return frameBase === bundlePathBase;
+    } catch {
+      return false;
+    }
+  }
 
-  const frameBase = frame.split(/[/?#]/).pop() ?? frame;
-  const bundleBase = bundle.split(/[/?#]/).pop() ?? bundle;
-  if (frameBase.length === 0 || frameBase !== bundleBase) return false;
+  if (!frame.includes("://") && !bundle.includes("://")) {
+    const frameBase = frame.split(/[/?#]/).pop() ?? frame;
+    const bundleBase = bundle.split(/[/?#]/).pop() ?? bundle;
+    return frameBase.length > 0 && frameBase === bundleBase;
+  }
 
-  // Relative/minified frame label (e.g. `app.js`) against a full bundle URL.
-  return !frame.includes("://");
+  return false;
 }
 
 export function findMatchingArtifact(
@@ -180,7 +193,7 @@ function createArtifactsLoader(
 ): (release: string | null | undefined) => Promise<Pick<SourceMapArtifact, "bundle_url" | "content">[]> {
   const pending = new Map<string, Promise<Pick<SourceMapArtifact, "bundle_url" | "content">[]>>();
   return (release: string | null | undefined) => {
-    const key = release?.trim() ?? "";
+    const key = normalizeMapReleaseLabel(release) ?? "";
     if (!key) return Promise.resolve([]);
     let load = pending.get(key);
     if (!load) {
@@ -198,11 +211,16 @@ export async function symbolicateOccurrenceStack(
   release: string | null | undefined,
   stack: string | null | undefined
 ): Promise<string | null> {
-  const releaseLabel = release?.trim();
+  const releaseLabel = normalizeMapReleaseLabel(release);
   const stackText = stack?.trim();
   if (!releaseLabel || !stackText) return null;
 
-  const artifacts = await listSourceMapArtifactsForRelease(prisma, projectId, app, releaseLabel);
+  const artifacts = await listSourceMapArtifactsForRelease(
+    prisma,
+    projectId,
+    normalizeMapAppLabel(app),
+    releaseLabel
+  );
   if (artifacts.length === 0) return null;
 
   const symbolicated = symbolicateStackTrace(stackText, artifacts);
@@ -226,7 +244,8 @@ type ErrorGroupWithOccurrences = {
 export async function enrichErrorGroupWithSymbolicatedStacks<
   T extends ErrorGroupWithOccurrences,
 >(prisma: PrismaClient, projectId: string, group: T): Promise<T> {
-  const artifactsForRelease = createArtifactsLoader(prisma, projectId, group.app);
+  const app = normalizeMapAppLabel(group.app);
+  const artifactsForRelease = createArtifactsLoader(prisma, projectId, app);
   let symbolicatedTop: string | null = null;
 
   const occurrences_list = await Promise.all(

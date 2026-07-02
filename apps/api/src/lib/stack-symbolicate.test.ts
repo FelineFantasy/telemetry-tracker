@@ -46,6 +46,15 @@ describe("frameMatchesBundle", () => {
     expect(frameMatchesBundle("app.js", "https://cdn.example.com/assets/app.js")).toBe(true);
   });
 
+  it("does not match different pathnames on the same host", () => {
+    expect(
+      frameMatchesBundle(
+        "https://cdn.example.com/prefix/app.js",
+        "https://cdn.example.com/app.js"
+      )
+    ).toBe(false);
+  });
+
   it("does not match different hosts by basename alone", () => {
     expect(
       frameMatchesBundle(
@@ -123,6 +132,28 @@ describe("enrichErrorGroupWithSymbolicatedStacks", () => {
     expect(list).toHaveBeenCalledOnce();
     expect(enriched.symbolicated_top_stack).toContain("src/index.ts");
     expect(enriched.occurrences_list[0]?.symbolicated_stack).toContain("src/index.ts");
+  });
+
+  it("normalizes legacy padded app labels when loading maps", async () => {
+    const list = vi.fn(async () => [
+      { bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap },
+    ]);
+    const prisma = {
+      sourceMapArtifact: { findMany: list },
+    };
+    const stack = "    at main (https://cdn.example.com/bundle.js:1:0)";
+    const group = {
+      app: "  web  ",
+      release: " 1.0.0 ",
+      occurrences_list: [{ id: "occ-1", stack, release: " 1.0.0 " }],
+    };
+
+    await enrichErrorGroupWithSymbolicatedStacks(prisma as never, "project-1", group);
+
+    expect(list).toHaveBeenCalledWith({
+      where: { project_id: "project-1", app: "web", release: "1.0.0" },
+      orderBy: { uploaded_at: "desc" },
+    });
   });
 });
 
