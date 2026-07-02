@@ -1,15 +1,16 @@
-# Require @unjica approval on PRs to main when the author is not @unjica.
+# Require @unjica approval on PRs to develop/main when the author is not @unjica.
 # GitHub branch protection cannot express this natively (authors cannot approve
 # their own PRs), so this job is a required status check instead of review count.
+# Set required human approvals to 0 on protected branches; use this check instead.
 name: Maintainer review
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
+    branches: [main, develop]
   pull_request_review:
     types: [submitted, dismissed]
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   pull-requests: read
