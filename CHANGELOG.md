@@ -15,6 +15,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 - **Source maps (phase 1)** — persist `release` on error ingest and show release on error detail (foundation for v1.3.0 symbolication)
 - **Source maps (phase 2)** — `SourceMapArtifact` storage model, lookup helpers, and retention sweep integration
+- **Source maps (phase 3)** — `POST/GET /api/project/source-maps` for JSON source map upload and listing (EDITOR+ upload, metadata-only list)
 
 ### Changed
 
