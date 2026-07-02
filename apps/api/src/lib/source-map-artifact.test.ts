@@ -1,11 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   findSourceMapArtifact,
+  ingestAppSchema,
   normalizeBundleUrl,
+  normalizeMapAppLabel,
+  normalizeMapReleaseLabel,
   sha256Hex,
 } from "./source-map-artifact.js";
 
 describe("source-map-artifact", () => {
+  it("normalizes map app and release labels", () => {
+    expect(normalizeMapAppLabel("  web  ")).toBe("web");
+    expect(normalizeMapReleaseLabel(" 1.2.0 ")).toBe("1.2.0");
+    expect(normalizeMapReleaseLabel("   ")).toBeNull();
+    expect(normalizeMapReleaseLabel(undefined)).toBeNull();
+  });
+
+  it("rejects whitespace-only ingest app labels", () => {
+    expect(ingestAppSchema.safeParse("   ").success).toBe(false);
+    expect(ingestAppSchema.safeParse("web").success).toBe(true);
+    expect(ingestAppSchema.parse("  web  ")).toBe("web");
+  });
+
   it("normalizes bundle URLs", () => {
     expect(normalizeBundleUrl("  https://cdn.example/app.js  ")).toBe(
       "https://cdn.example/app.js"
@@ -23,8 +39,8 @@ describe("source-map-artifact", () => {
 
     const result = await findSourceMapArtifact(prisma as never, {
       projectId: "p1",
-      app: "web",
-      release: "1.0.0",
+      app: "  web  ",
+      release: " 1.0.0 ",
       bundleUrl: "https://cdn.example/app.js",
     });
 

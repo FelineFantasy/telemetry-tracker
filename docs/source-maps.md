@@ -62,9 +62,9 @@ Retention: align with plan `retentionDays`; the nightly retention job deletes ar
 | Phase | Scope | Status |
 |-------|--------|--------|
 | **1** | Persist `release` on errors (ingest, schema, API, dashboard) | Done |
-| **2** | `SourceMapArtifact` schema + retention | In progress — `feature/source-maps-phase2` |
-| **3** | Upload API (`POST /api/project/source-maps`) + CLI docs | Planned |
-| **4** | Symbolication engine + API field `symbolicated_stack` | Planned |
+| **2** | `SourceMapArtifact` schema + retention | Done |
+| **3** | Upload API (`POST /api/project/source-maps`) + CLI docs | Done (JSON upload/list; CLI follow-up) |
+| **4** | Symbolication engine + API field `symbolicated_stack` | Done |
 | **5** | Dashboard frame UI, settings/history page | Planned |
 | **6** | Quotas, tests, docs, README roadmap ✅ | Planned |
 
@@ -79,21 +79,48 @@ Retention: align with plan `retentionDays`; the nightly retention job deletes ar
 
 - `SourceMapArtifact` table: unique `(project_id, app, release, bundle_url)`, `content` (TEXT), optional `storage_key`, `sha256`, `size_bytes`, `uploaded_at`.
 - Lookup helpers in `apps/api/src/lib/source-map-artifact.ts`.
-- Retention sweep deletes stale maps per project plan `retentionDays`.
+- Retention sweep deletes stale maps per project plan `retentionDays` (keeps maps when matching in-window errors exist).
 
-## Phase 3 — upload API (sketch)
+## Phase 3 — upload API
 
-```
+**Upload** (EDITOR+ session, active project):
+
+```http
 POST /api/project/source-maps
-Authorization: session (EDITOR+)
-Content-Type: multipart/form-data
+Content-Type: application/json
+X-Project-Id: <project-uuid>
 
-Fields: release, app, file (.map), bundle_url (optional)
+{
+  "app": "web",
+  "release": "1.2.0",
+  "bundle_url": "https://cdn.example.com/assets/app.js",
+  "content": { "version": 3, "sources": ["..."], "mappings": "..." }
+}
 ```
 
-Alternative for self-host simplicity: JSON body with gzip+base64 map content under size cap.
+Returns `201` on create, `200` on replace (same key). Max size: 10 MB (`MAX_SOURCE_MAP_BYTES`). `app` and `release` are trimmed on upload and on all ingest routes so keys align with symbolication and retention.
 
-CLI wrapper (future): `npx @tacko/telemetry-cli upload-sourcemaps --release=1.0.0 ./dist/**/*.map`
+**List** (any project member with read access):
+
+```http
+GET /api/project/source-maps?app=web&release=1.2.0
+X-Project-Id: <project-uuid>
+```
+
+Returns metadata only (no map body). Implementation: `apps/api/src/lib/source-map-upload.ts`.
+
+Future: multipart upload and CLI wrapper (`npx @tacko/telemetry-cli upload-sourcemaps --release=1.0.0 ./dist/**/*.map`).
+
+## Phase 4 — symbolication
+
+Server-side stack parsing (V8, Firefox-style) and source map lookup by `(project_id, app, release, bundle_url)`.
+
+`GET /api/errors/:id` adds optional fields when maps exist:
+
+- `symbolicated_top_stack` on the error group — first symbolicated frame from the newest occurrence stack (not `top_stack`, which stores the error message line)
+- `symbolicated_stack` on each occurrence in `occurrences_list`
+
+Symbolication is display-only; grouping fingerprints stay on raw minified stacks. Implementation: `apps/api/src/lib/stack-symbolicate.ts` (`@jridgewell/trace-mapping`).
 
 ## Security
 

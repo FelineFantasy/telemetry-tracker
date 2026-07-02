@@ -38,6 +38,7 @@ import {
   resolveReadProjectIdWithSession,
 } from "../lib/read-project-request.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
+import { SOURCE_MAP_UPLOAD_BODY_LIMIT } from "../lib/source-map-artifact.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -985,4 +986,52 @@ export async function projectDashboardRoutes(
       return reply.status(204).send();
     }
   );
+
+  app.post(
+    "/project/source-maps",
+    { bodyLimit: SOURCE_MAP_UPLOAD_BODY_LIMIT },
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+      if (projectId === null) return;
+      const projRole = await getMembershipRoleForProject(session.userId, projectId);
+      if (!canCreateApiKey(projRole)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+      const { validateSourceMapUploadBody, upsertSourceMapArtifact } = await import(
+        "../lib/source-map-upload.js"
+      );
+      const validated = validateSourceMapUploadBody(request.body);
+      if (!validated.ok) {
+        return reply.status(400).send({ error: validated.error });
+      }
+      const result = await upsertSourceMapArtifact(prisma, projectId, validated.input);
+      if (!result.ok) {
+        return reply.status(400).send({ error: result.error });
+      }
+      return reply.status(result.created ? 201 : 200).send({
+        artifact: result.artifact,
+      });
+    }
+  );
+
+  app.get("/project/source-maps", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const q = request.query as { app?: string; release?: string };
+    const appLabel = typeof q.app === "string" ? q.app.trim() : "";
+    const release = typeof q.release === "string" ? q.release.trim() : "";
+    if (!appLabel || !release) {
+      return reply.status(400).send({ error: "app and release query params are required" });
+    }
+    const { listSourceMapArtifactSummaries } = await import("../lib/source-map-upload.js");
+    const artifacts = await listSourceMapArtifactSummaries(
+      prisma,
+      projectId,
+      appLabel,
+      release
+    );
+    return reply.send({ artifacts });
+  });
 }

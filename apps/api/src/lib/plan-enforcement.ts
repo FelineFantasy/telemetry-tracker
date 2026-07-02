@@ -2,6 +2,7 @@ import { Prisma, type PlanTier, type PrismaClient } from "@prisma/client";
 import { limitsForPlan, type PlanLimits } from "../config/plans.js";
 import { effectivePlanTierForLimits } from "./effective-plan-tier.js";
 import { consumeIngestRps } from "./ingest-project-rps.js";
+import { normalizeMapAppLabel } from "./source-map-artifact.js";
 import { currentYearMonth } from "./usage-meter.js";
 
 export type PlanContext = {
@@ -117,19 +118,19 @@ async function findAppsAlreadyRegisteredInProject(
   projectId: string,
   appLabels: string[]
 ): Promise<Set<string>> {
-  const unique = [...new Set(appLabels)];
+  const unique = [...new Set(appLabels.map(normalizeMapAppLabel))];
   if (unique.length === 0) return new Set();
   const inList = Prisma.join(unique.map((a) => Prisma.sql`${a}`));
   const rows = await prisma.$queryRaw<{ app: string }[]>(Prisma.sql`
-    SELECT DISTINCT app FROM (
-      SELECT app FROM "Event" WHERE project_id = ${projectId} AND app IN (${inList})
+    SELECT DISTINCT TRIM(app) AS app FROM (
+      SELECT app FROM "Event" WHERE project_id = ${projectId} AND TRIM(app) IN (${inList})
       UNION
-      SELECT app FROM "Session" WHERE project_id = ${projectId} AND app IN (${inList})
+      SELECT app FROM "Session" WHERE project_id = ${projectId} AND TRIM(app) IN (${inList})
       UNION
-      SELECT app FROM "ErrorGroup" WHERE project_id = ${projectId} AND app IN (${inList})
+      SELECT app FROM "ErrorGroup" WHERE project_id = ${projectId} AND TRIM(app) IN (${inList})
     ) AS u
   `);
-  return new Set(rows.map((r) => r.app));
+  return new Set(rows.map((r) => normalizeMapAppLabel(r.app)));
 }
 
 /** Full distinct app count — only call when the ingest payload may introduce new app labels. */
@@ -139,11 +140,11 @@ async function countDistinctAppsInProject(
 ): Promise<number> {
   const rows = await prisma.$queryRaw<{ n: bigint }[]>`
     SELECT COUNT(*)::bigint AS n FROM (
-      SELECT DISTINCT app FROM "Event" WHERE project_id = ${projectId}
+      SELECT DISTINCT TRIM(app) AS app FROM "Event" WHERE project_id = ${projectId}
       UNION
-      SELECT DISTINCT app FROM "Session" WHERE project_id = ${projectId}
+      SELECT DISTINCT TRIM(app) AS app FROM "Session" WHERE project_id = ${projectId}
       UNION
-      SELECT DISTINCT app FROM "ErrorGroup" WHERE project_id = ${projectId}
+      SELECT DISTINCT TRIM(app) AS app FROM "ErrorGroup" WHERE project_id = ${projectId}
     ) AS u
   `;
   return Number(rows[0]?.n ?? 0);
@@ -192,7 +193,7 @@ export async function assertIngestPlanOrReply(
       },
     };
   }
-  const uniqueLabels = [...new Set(appLabels)];
+  const uniqueLabels = [...new Set(appLabels.map(normalizeMapAppLabel))];
   const already = await findAppsAlreadyRegisteredInProject(
     prisma,
     projectId,
