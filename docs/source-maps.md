@@ -64,7 +64,7 @@ Retention: align with plan `retentionDays`; the nightly retention job deletes ar
 | **1** | Persist `release` on errors (ingest, schema, API, dashboard) | Done |
 | **2** | `SourceMapArtifact` schema + retention | Done |
 | **3** | Upload API (`POST /api/project/source-maps`) + CLI docs | Done (JSON upload/list; CLI follow-up) |
-| **4** | Symbolication engine + API field `symbolicated_stack` | Planned |
+| **4** | Symbolication engine + API field `symbolicated_stack` | Done |
 | **5** | Dashboard frame UI, settings/history page | Planned |
 | **6** | Quotas, tests, docs, README roadmap ✅ | Planned |
 
@@ -110,6 +110,17 @@ X-Project-Id: <project-uuid>
 Returns metadata only (no map body). Implementation: `apps/api/src/lib/source-map-upload.ts`.
 
 Future: multipart upload and CLI wrapper (`npx @tacko/telemetry-cli upload-sourcemaps --release=1.0.0 ./dist/**/*.map`).
+
+## Phase 4 — symbolication
+
+Server-side stack parsing (V8, Firefox-style) and source map lookup by `(project_id, app, release, bundle_url)`.
+
+`GET /api/errors/:id` adds optional fields when maps exist:
+
+- `symbolicated_top_stack` on the error group
+- `symbolicated_stack` on each occurrence in `occurrences_list`
+
+Symbolication is display-only; grouping fingerprints stay on raw minified stacks. Implementation: `apps/api/src/lib/stack-symbolicate.ts` (`@jridgewell/trace-mapping`).
 
 ## Security
 

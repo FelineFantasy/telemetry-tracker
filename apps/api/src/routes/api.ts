@@ -522,7 +522,9 @@ export async function apiRoutes(
       },
     });
     if (!group) return reply.status(404).send({ error: "Not found" });
-    return reply.send(group);
+    const { enrichErrorGroupWithSymbolicatedStacks } = await import("../lib/stack-symbolicate.js");
+    const enriched = await enrichErrorGroupWithSymbolicatedStacks(prisma, projectId, group);
+    return reply.send(enriched);
   });
 
   app.get("/events", async (request, reply) => {
