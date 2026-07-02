@@ -18,6 +18,7 @@ type Occurrence = {
   id: string;
   created_at: string;
   stack?: string;
+  release?: string | null;
   context?: unknown;
   user_id?: string | null;
   session_id?: string | null;
@@ -34,6 +35,7 @@ type ErrorGroup = {
   first_seen: string;
   last_seen: string;
   environment?: string | null;
+  release?: string | null;
   resolved_at?: string | null;
   occurrences_list?: Occurrence[];
 };
@@ -85,6 +87,7 @@ export default async function ErrorDetailPage({
   const contextLine = [
     group.app,
     group.environment ? `env ${group.environment}` : null,
+    group.release ? `release ${group.release}` : null,
     `${group.occurrences} occurrence${group.occurrences === 1 ? "" : "s"}`,
     resolved ? "Resolved" : "Open",
   ]
@@ -107,6 +110,7 @@ export default async function ErrorDetailPage({
             <>
               <Badge>{group.app}</Badge>
               {group.environment ? <Badge>{group.environment}</Badge> : null}
+              {group.release ? <Badge>{group.release}</Badge> : null}
               {resolved ? <ResolvedBadge /> : null}
             </>
           }
@@ -154,6 +158,12 @@ export default async function ErrorDetailPage({
                         <div>
                           <dt className="text-muted-foreground">Session</dt>
                           <dd className="font-mono text-xs">{o.session_id}</dd>
+                        </div>
+                      ) : null}
+                      {o.release != null && o.release !== "" ? (
+                        <div>
+                          <dt className="text-muted-foreground">Release</dt>
+                          <dd>{o.release}</dd>
                         </div>
                       ) : null}
                       {o.sdk_version != null && o.sdk_version !== "" ? (

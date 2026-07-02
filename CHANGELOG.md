@@ -11,6 +11,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Source maps (phase 1)** — persist `release` on error ingest and show release on error detail (foundation for v1.3.0 symbolication)
+
+### Database
+
+- `20260703120000_error_release` — `release` column on `ErrorGroup` and `ErrorOccurrence`
+
 ---
 
 ## [1.2.0] - 2026-07-01
