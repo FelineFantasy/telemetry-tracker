@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 const features = [
   {
     title: "Error tracking",
-    desc: "Group, triage and resolve exceptions with full stack traces and occurrence history.",
+    desc: "Group and triage exceptions with stack traces, release tags, and symbolicated frames when source maps are uploaded.",
     icon: <path d="M8 2 L14 13 L2 13 Z M8 6.5 v3 M8 11 v0.5" />,
   },
   {
@@ -18,6 +18,26 @@ const features = [
       <>
         <circle cx="8" cy="8" r="6" />
         <path d="M8 4v4l3 2" />
+      </>
+    ),
+  },
+  {
+    title: "Alerting",
+    desc: "Error spike and quota threshold rules with in-app notifications and email to owners and editors.",
+    icon: (
+      <>
+        <path d="M8 2.5a4 4 0 0 1 4 4v2.5l1.2 2.4H2.8L4 9V6.5a4 4 0 0 1 4-4z" />
+        <path d="M7 12.5a1 1 0 0 0 2 0" />
+      </>
+    ),
+  },
+  {
+    title: "Source maps",
+    desc: "Upload JSON maps per app and release for readable stack traces on error detail — no more minified noise.",
+    icon: (
+      <>
+        <path d="M3 4h10v8H3z" />
+        <path d="M5 7h6M5 9.5h4" />
       </>
     ),
   },
@@ -43,11 +63,6 @@ const features = [
       </>
     ),
   },
-  {
-    title: "Usage analytics",
-    desc: "See ingestion, retention and per-project quota in real time. No surprise bills.",
-    icon: <path d="M2 13V4M6 13V8M10 13V6M14 13V3" />,
-  },
 ];
 
 export function Features() {
@@ -57,7 +72,7 @@ export function Features() {
         <SectionHeading
           eyebrow="Platform"
           title={<>One platform for the signals you act on.</>}
-          subtitle="Errors, events and sessions in a single store. Query them together, not across three tools."
+          subtitle="Errors, events, sessions, alerts and source maps in one store — query them together, not across three tools."
         />
 
         <ul className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">

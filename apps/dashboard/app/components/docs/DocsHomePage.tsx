@@ -18,6 +18,11 @@ export function DocsHomePage() {
       <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
         Telemetry Tracker is a lightweight, self-hostable pipeline for errors, events, and sessions.
         Install an SDK, point it at your ingest URL, and start triaging issues from the dashboard.
+        New to the official cloud? Start with{" "}
+        <Link href="/docs/hosted-cloud" className="text-brand hover:underline">
+          Hosted cloud getting started
+        </Link>
+        .
       </p>
 
       <DocsSection id="introduction" title="Introduction" eyebrow="01">

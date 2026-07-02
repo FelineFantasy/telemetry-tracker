@@ -34,7 +34,7 @@ const ACTIONS: Action[] = [
   { id: "invite", label: "Invite team member", icon: UserPlus, href: "/dashboard/settings/team" },
   { id: "key", label: "Generate API key", icon: Key, href: "/dashboard/settings/keys" },
   { id: "dashboard", label: "Create dashboard", icon: LayoutDashboard, comingSoon: true },
-  { id: "alert", label: "Create alert", icon: Bell, comingSoon: true },
+  { id: "alert", label: "Create alert", icon: Bell, href: "/dashboard/alerts" },
   { id: "flag", label: "Create feature flag", icon: Flag, comingSoon: true },
   { id: "release", label: "Track release", icon: GitBranch, comingSoon: true },
   { id: "export", label: "Export report", icon: BarChart3, comingSoon: true },
