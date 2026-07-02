@@ -3,6 +3,7 @@ import type { PrismaClient, SourceMapArtifact } from "@prisma/client";
 import { z } from "zod";
 import {
   MAX_SOURCE_MAP_BYTES,
+  ingestAppSchema,
   normalizeBundleUrl,
   normalizeMapAppLabel,
   normalizeMapReleaseLabel,
@@ -10,7 +11,7 @@ import {
 } from "./source-map-artifact.js";
 
 const uploadBodySchema = z.object({
-  app: z.string().min(1).max(128).refine((value) => value.trim().length > 0),
+  app: ingestAppSchema,
   release: z.string().min(1).max(256).refine((value) => value.trim().length > 0),
   bundle_url: z.string().min(1).max(2048).refine((value) => value.trim().length > 0),
   /** Source map JSON as a string or parsed object. */
@@ -128,51 +129,49 @@ export async function upsertSourceMapArtifact(
   const bundleUrl = normalizeBundleUrl(input.bundle_url);
   const sha256 = sha256Hex(parsed.json);
   const sizeBytes = Buffer.byteLength(parsed.json, "utf8");
-
-  const existing = await prisma.sourceMapArtifact.findUnique({
-    where: {
-      project_id_app_release_bundle_url: {
-        project_id: projectId,
-        app,
-        release,
-        bundle_url: bundleUrl,
-      },
-    },
-    select: { id: true },
-  });
-
-  const row = await prisma.sourceMapArtifact.upsert({
-    where: {
-      project_id_app_release_bundle_url: {
-        project_id: projectId,
-        app,
-        release,
-        bundle_url: bundleUrl,
-      },
-    },
-    create: {
-      id: randomUUID(),
+  const data = {
+    content: parsed.json,
+    sha256,
+    size_bytes: sizeBytes,
+  };
+  const where = {
+    project_id_app_release_bundle_url: {
       project_id: projectId,
       app,
       release,
       bundle_url: bundleUrl,
-      content: parsed.json,
-      sha256,
-      size_bytes: sizeBytes,
     },
-    update: {
-      content: parsed.json,
-      sha256,
-      size_bytes: sizeBytes,
-      uploaded_at: new Date(),
-    },
-  });
-
-  return {
-    ok: true,
-    artifact: toSourceMapArtifactSummary(row),
-    created: existing === null,
   };
+
+  try {
+    const row = await prisma.sourceMapArtifact.create({
+      data: {
+        id: randomUUID(),
+        project_id: projectId,
+        app,
+        release,
+        bundle_url: bundleUrl,
+        ...data,
+      },
+    });
+    return {
+      ok: true,
+      artifact: toSourceMapArtifactSummary(row),
+      created: true,
+    };
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "P2002") throw error;
+    const row = await prisma.sourceMapArtifact.update({
+      where,
+      data: { ...data, uploaded_at: new Date() },
+    });
+    return {
+      ok: true,
+      artifact: toSourceMapArtifactSummary(row),
+      created: false,
+    };
+  }
 }
 
 export async function listSourceMapArtifactSummaries(

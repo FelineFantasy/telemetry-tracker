@@ -32,8 +32,8 @@ describe("source-map-artifact", () => {
 
     const result = await findSourceMapArtifact(prisma as never, {
       projectId: "p1",
-      app: "web",
-      release: "1.0.0",
+      app: "  web  ",
+      release: " 1.0.0 ",
       bundleUrl: "https://cdn.example/app.js",
     });
 

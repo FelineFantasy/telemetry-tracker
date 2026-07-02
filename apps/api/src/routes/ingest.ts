@@ -15,6 +15,7 @@ import { maybeNotifyErrorSpike } from "../lib/error-spike-alert.js";
 import { maybeNotifyQuotaAlerts } from "../lib/quota-alert.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
 import {
+  ingestAppSchema,
   normalizeMapAppLabel,
   normalizeMapReleaseLabel,
 } from "../lib/source-map-artifact.js";
@@ -28,7 +29,7 @@ import {
  */
 
 const eventSchema = z.object({
-  app: z.string().min(1),
+  app: ingestAppSchema,
   platform: z.string().optional(),
   environment: z.string().optional(),
   release: z.string().optional(),
@@ -42,7 +43,7 @@ const eventSchema = z.object({
 
 const sessionSchema = z.object({
   session_id: z.string().min(1),
-  app: z.string().min(1),
+  app: ingestAppSchema,
   platform: z.string().optional(),
   user_id: z.string().optional(),
   anonymous_id: z.string().optional(),
@@ -52,7 +53,7 @@ const sessionSchema = z.object({
 });
 
 const errorSchema = z.object({
-  app: z.string().min(1),
+  app: ingestAppSchema,
   platform: z.string().optional(),
   environment: z.string().optional(),
   release: z.string().optional(),
