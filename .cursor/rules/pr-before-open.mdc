@@ -1,0 +1,12 @@
+---
+description: Run Bugbot locally and verify merge gates before opening a GitHub PR
+alwaysApply: true
+---
+
+# Before opening a pull request
+
+1. Run **`/review-bugbot`** on the branch diff against `develop` (or `main` for release PRs). Fix findings or update `.cursor/BUGBOT.md` for false positives.
+2. Run locally: `pnpm lint && pnpm test && pnpm build` (plus migrations if schema changed).
+3. Only then push and open the PR.
+
+**Merge gates:** `develop` uses **0 human approvals** + required checks `build`, `Cursor Bugbot`, `maintainer-review`. Maintainer-authored PRs pass `maintainer-review` automatically; do not ask the user to self-approve.
