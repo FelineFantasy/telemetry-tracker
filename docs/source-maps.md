@@ -98,7 +98,7 @@ X-Project-Id: <project-uuid>
 }
 ```
 
-Returns `201` on create, `200` on replace (same key). Max size: 10 MB (`MAX_SOURCE_MAP_BYTES`). `app` and `release` are trimmed on upload and on error ingest so keys align with symbolication and retention.
+Returns `201` on create, `200` on replace (same key). Max size: 10 MB (`MAX_SOURCE_MAP_BYTES`). `app` and `release` are trimmed on upload and on all ingest routes so keys align with symbolication and retention.
 
 **List** (any project member with read access):
 

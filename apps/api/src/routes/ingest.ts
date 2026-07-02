@@ -99,13 +99,14 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    if (!assertIngestAppAllowed(request, body.app, reply)) return;
-    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    const app = normalizeMapAppLabel(body.app);
+    if (!assertIngestAppAllowed(request, app, reply)) return;
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     await prisma.event.create({
       data: {
         project_id: projectId,
-        app: body.app,
+        app,
         platform: body.platform ?? null,
         environment: body.environment ?? null,
         release: body.release ?? null,
@@ -129,9 +130,10 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    if (!assertIngestAppAllowed(request, body.app, reply)) return;
+    const app = normalizeMapAppLabel(body.app);
+    if (!assertIngestAppAllowed(request, app, reply)) return;
     const existing = await prisma.session.findFirst({
-      where: { project_id: projectId, session_id: body.session_id, app: body.app },
+      where: { project_id: projectId, session_id: body.session_id, app },
       orderBy: { started_at: "desc" },
     });
     // Closing a session only sets `ended_at` — no new telemetry; must not be blocked by quota.
@@ -146,14 +148,14 @@ export async function ingestRoutes(
     if (existing && body.ended_at == null) {
       return reply.status(204).send();
     }
-    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     if (!existing) {
       await prisma.session.create({
         data: {
           project_id: projectId,
           session_id: body.session_id,
-          app: body.app,
+          app,
           platform: body.platform ?? null,
           user_id: body.user_id ?? null,
           anonymous_id: body.anonymous_id ?? null,
