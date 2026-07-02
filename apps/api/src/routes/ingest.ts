@@ -51,6 +51,7 @@ const errorSchema = z.object({
   app: z.string().min(1),
   platform: z.string().optional(),
   environment: z.string().optional(),
+  release: z.string().optional(),
   message: z.string().min(1),
   stack: z.string().optional(),
   context: z.record(z.unknown()).optional(),
@@ -220,11 +221,13 @@ export async function ingestRoutes(
       top_stack: body.stack?.split("\n")[0]?.trim() ?? null,
       app: body.app,
       environment: body.environment ?? null,
+      release: body.release ?? null,
     });
     await prisma.errorOccurrence.create({
       data: {
         error_group_id: errorGroup.id,
         stack: body.stack ?? null,
+        release: body.release ?? null,
         context: (body.context ?? undefined) as Prisma.InputJsonValue | undefined,
         session_id: body.session_id ?? null,
         user_id: body.user_id ?? null,

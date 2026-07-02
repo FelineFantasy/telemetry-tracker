@@ -258,6 +258,7 @@ model ErrorGroup {
   top_stack    String?
   app          String
   environment  String?
+  release      String?
   occurrences  Int       @default(1)
   first_seen   DateTime  @default(now()) @map("first_seen")
   last_seen    DateTime  @default(now()) @map("last_seen")
@@ -268,6 +269,7 @@ model ErrorGroup {
   @@index([project_id, last_seen])
   @@index([project_id, app])
   @@index([project_id, environment])
+  @@index([project_id, release])
 }
 
 model ErrorOccurrence {
@@ -275,6 +277,7 @@ model ErrorOccurrence {
   error_group_id String     @map("error_group_id")
   error_group    ErrorGroup @relation(fields: [error_group_id], references: [id], onDelete: Cascade)
   stack          String?
+  release        String?
   context        Json?
   session_id     String?
   user_id        String?
