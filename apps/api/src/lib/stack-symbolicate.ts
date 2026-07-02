@@ -273,7 +273,7 @@ function createSymbolicateContext(
     return artifacts;
   }
 
-  return { artifactsForStack };
+  return { artifactsForStack, refsForRelease };
 }
 
 export async function symbolicateOccurrenceStack(
@@ -299,6 +299,8 @@ export async function symbolicateOccurrenceStack(
   return symbolicated === stackText ? null : symbolicated;
 }
 
+export type SymbolicationStatus = "symbolicated" | "no_maps" | "no_match";
+
 type ErrorGroupWithOccurrences = {
   app: string;
   release?: string | null;
@@ -307,6 +309,7 @@ type ErrorGroupWithOccurrences = {
     stack?: string | null;
     release?: string | null;
     symbolicated_stack?: string | null;
+    symbolication_status?: SymbolicationStatus;
     [key: string]: unknown;
   }>;
   symbolicated_top_stack?: string | null;
@@ -317,7 +320,7 @@ export async function enrichErrorGroupWithSymbolicatedStacks<
   T extends ErrorGroupWithOccurrences,
 >(prisma: PrismaClient, projectId: string, group: T): Promise<T> {
   const app = normalizeMapAppLabel(group.app);
-  const { artifactsForStack } = createSymbolicateContext(prisma, projectId, app);
+  const { artifactsForStack, refsForRelease } = createSymbolicateContext(prisma, projectId, app);
 
   const newest = group.occurrences_list[0];
   let symbolicatedTop: string | null = null;
@@ -336,13 +339,22 @@ export async function enrichErrorGroupWithSymbolicatedStacks<
       occurrences_list.push(occ);
       continue;
     }
+    const refs = await refsForRelease(release);
+    if (refs.length === 0) {
+      occurrences_list.push({ ...occ, symbolication_status: "no_maps" });
+      continue;
+    }
     const artifacts = await artifactsForStack(occ.stack, release);
     const symbolicated = symbolicateStackTrace(occ.stack, artifacts);
     if (symbolicated === occ.stack) {
-      occurrences_list.push(occ);
+      occurrences_list.push({ ...occ, symbolication_status: "no_match" });
       continue;
     }
-    occurrences_list.push({ ...occ, symbolicated_stack: symbolicated });
+    occurrences_list.push({
+      ...occ,
+      symbolicated_stack: symbolicated,
+      symbolication_status: "symbolicated",
+    });
   }
 
   return {

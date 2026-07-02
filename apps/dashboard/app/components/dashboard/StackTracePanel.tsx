@@ -5,21 +5,36 @@ import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 
 type StackMode = "symbolicated" | "raw";
 
+export type SymbolicationStatus = "symbolicated" | "no_maps" | "no_match";
+
+function sourceMapsSettingsHref(app?: string | null, release?: string | null): string {
+  const params = new URLSearchParams();
+  if (app?.trim()) params.set("app", app.trim());
+  if (release?.trim()) params.set("release", release.trim());
+  const query = params.toString();
+  return query ? `/dashboard/settings/source-maps?${query}` : "/dashboard/settings/source-maps";
+}
+
 export function StackTracePanel({
   raw,
   symbolicated,
   title = "Stack trace",
   release,
+  app,
+  symbolicationStatus,
 }: {
   raw: string;
   symbolicated?: string | null;
   title?: string;
   release?: string | null;
+  app?: string | null;
+  symbolicationStatus?: SymbolicationStatus | null;
 }) {
   const hasSymbolicated = Boolean(symbolicated?.trim());
   const [mode, setMode] = useState<StackMode>(hasSymbolicated ? "symbolicated" : "raw");
   const activeMode = hasSymbolicated ? mode : "raw";
   const source = activeMode === "symbolicated" && symbolicated ? symbolicated : raw;
+  const settingsHref = sourceMapsSettingsHref(app, release);
 
   return (
     <div className="space-y-2">
@@ -58,13 +73,25 @@ export function StackTracePanel({
         source={source}
         title={hasSymbolicated && activeMode === "symbolicated" ? `${title} (symbolicated)` : title}
       />
-      {!hasSymbolicated && release?.trim() ? (
+      {!hasSymbolicated && symbolicationStatus === "no_maps" && release?.trim() ? (
         <p className="text-xs text-muted-foreground">
-          No source map found for release <span className="font-mono">{release}</span>. Upload maps in{" "}
-          <a href="/dashboard/settings/source-maps" className="text-brand hover:underline">
+          No source maps uploaded for release <span className="font-mono">{release}</span>. Upload
+          maps in{" "}
+          <a href={settingsHref} className="text-brand hover:underline">
             Settings → Source maps
           </a>{" "}
           or via the upload API.
+        </p>
+      ) : null}
+      {!hasSymbolicated && symbolicationStatus === "no_match" && release?.trim() ? (
+        <p className="text-xs text-muted-foreground">
+          Source maps exist for release <span className="font-mono">{release}</span>, but no stack
+          frame matched an uploaded <span className="font-mono">bundle_url</span>. Confirm the map
+          key matches the minified file URL in{" "}
+          <a href={settingsHref} className="text-brand hover:underline">
+            Settings → Source maps
+          </a>
+          .
         </p>
       ) : null}
     </div>

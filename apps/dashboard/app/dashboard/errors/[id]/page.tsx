@@ -20,6 +20,7 @@ type Occurrence = {
   created_at: string;
   stack?: string;
   symbolicated_stack?: string | null;
+  symbolication_status?: "symbolicated" | "no_maps" | "no_match" | null;
   release?: string | null;
   context?: unknown;
   user_id?: string | null;
@@ -190,6 +191,8 @@ export default async function ErrorDetailPage({
                         raw={o.stack}
                         symbolicated={o.symbolicated_stack}
                         release={o.release ?? group.release}
+                        app={group.app}
+                        symbolicationStatus={o.symbolication_status}
                       />
                     </div>
                   ) : null}

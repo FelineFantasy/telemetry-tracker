@@ -131,7 +131,7 @@ Symbolication is display-only; grouping fingerprints stay on raw minified stacks
 ## Phase 6 — quotas & release prep
 
 - Plan cap: `maxSourceMapArtifactsPerProject` (FREE 25, PRO 250, BUSINESS 2 500). Re-uploading the same `(app, release, bundle_url)` replaces in place and does not consume an extra slot.
-- Enforced in `checkSourceMapUploadQuota` before create on `POST /api/project/source-maps`.
+- Enforced inside `upsertSourceMapArtifact` (serializable transaction: count + create) on `POST /api/project/source-maps`.
 - README and this doc updated; closes implementation scope for [#98](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/98) pending v1.3.0 release promotion.
 
 ## Security

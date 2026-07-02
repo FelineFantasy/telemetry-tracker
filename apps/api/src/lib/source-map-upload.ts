@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { PrismaClient, SourceMapArtifact } from "@prisma/client";
+import { Prisma, type PrismaClient, type SourceMapArtifact } from "@prisma/client";
 import { z } from "zod";
 import {
-  findSourceMapArtifact,
   MAX_SOURCE_MAP_BYTES,
   ingestAppSchema,
   normalizeBundleUrl,
@@ -105,31 +104,23 @@ export function parseSourceMapContent(
 
 const SOURCE_MAP_QUOTA_MSG =
   "Source map storage limit reached for this project (plan limit).";
+export { SOURCE_MAP_QUOTA_MSG };
 
-/** Ensures a new artifact would stay within plan limits (replaces are always allowed). */
-export async function checkSourceMapUploadQuota(
-  prisma: PrismaClient,
-  projectId: string,
-  input: SourceMapUploadInput
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const existing = await findSourceMapArtifact(prisma, {
-    projectId,
-    app: input.app,
-    release: input.release,
-    bundleUrl: input.bundle_url,
-  });
-  if (existing) return { ok: true };
+const SERIALIZABLE_TX = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 5000,
+  timeout: 15000,
+} as const;
 
-  const ctx = await loadPlanContextForProject(prisma, projectId);
-  if (!ctx) return { ok: false, error: "Project not found." };
+const SERIALIZABLE_RETRY_ATTEMPTS = 5;
 
-  const count = await prisma.sourceMapArtifact.count({
-    where: { project_id: projectId },
-  });
-  if (count >= ctx.limits.maxSourceMapArtifactsPerProject) {
-    return { ok: false, error: SOURCE_MAP_QUOTA_MSG };
-  }
-  return { ok: true };
+function isPrismaTransactionConflict(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "P2034"
+  );
 }
 
 export function toSourceMapArtifactSummary(row: SourceMapArtifact): SourceMapArtifactSummary {
@@ -174,35 +165,72 @@ export async function upsertSourceMapArtifact(
     },
   };
 
-  try {
-    const row = await prisma.sourceMapArtifact.create({
-      data: {
-        id: randomUUID(),
-        project_id: projectId,
-        app,
-        release,
-        bundle_url: bundleUrl,
-        ...data,
-      },
-    });
-    return {
-      ok: true,
-      artifact: toSourceMapArtifactSummary(row),
-      created: true,
-    };
-  } catch (error) {
-    const code = (error as { code?: string }).code;
-    if (code !== "P2002") throw error;
-    const row = await prisma.sourceMapArtifact.update({
-      where,
-      data: { ...data, uploaded_at: new Date() },
-    });
-    return {
-      ok: true,
-      artifact: toSourceMapArtifactSummary(row),
-      created: false,
-    };
+  for (let attempt = 0; attempt < SERIALIZABLE_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const existing = await tx.sourceMapArtifact.findUnique({ where, select: { id: true } });
+        if (existing) {
+          const row = await tx.sourceMapArtifact.update({
+            where,
+            data: { ...data, uploaded_at: new Date() },
+          });
+          return {
+            ok: true as const,
+            artifact: toSourceMapArtifactSummary(row),
+            created: false,
+          };
+        }
+
+        const ctx = await loadPlanContextForProject(tx as PrismaClient, projectId);
+        if (!ctx) {
+          return { ok: false as const, error: "Project not found." };
+        }
+
+        const count = await tx.sourceMapArtifact.count({
+          where: { project_id: projectId },
+        });
+        if (count >= ctx.limits.maxSourceMapArtifactsPerProject) {
+          return { ok: false as const, error: SOURCE_MAP_QUOTA_MSG };
+        }
+
+        try {
+          const row = await tx.sourceMapArtifact.create({
+            data: {
+              id: randomUUID(),
+              project_id: projectId,
+              app,
+              release,
+              bundle_url: bundleUrl,
+              ...data,
+            },
+          });
+          return {
+            ok: true as const,
+            artifact: toSourceMapArtifactSummary(row),
+            created: true,
+          };
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+          if (code !== "P2002") throw error;
+          const row = await tx.sourceMapArtifact.update({
+            where,
+            data: { ...data, uploaded_at: new Date() },
+          });
+          return {
+            ok: true as const,
+            artifact: toSourceMapArtifactSummary(row),
+            created: false,
+          };
+        }
+      }, SERIALIZABLE_TX);
+    } catch (error) {
+      const retry =
+        isPrismaTransactionConflict(error) && attempt < SERIALIZABLE_RETRY_ATTEMPTS - 1;
+      if (!retry) throw error;
+    }
   }
+
+  throw new Error("upsertSourceMapArtifact: exhausted retries");
 }
 
 export async function listSourceMapArtifactSummaries(
