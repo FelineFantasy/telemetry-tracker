@@ -16,10 +16,10 @@ const sdks: Sdk[] = [
   {
     id: "next",
     label: "Next.js",
-    install: "pnpm add @tacko/telemetry-next",
+    install: "pnpm add @telemetry-tracker/next",
     docHref: "/docs/nextjs",
     code: `// app/layout.tsx
-import { TelemetryProvider } from "@tacko/telemetry-next";
+import { TelemetryProvider } from "@telemetry-tracker/next";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -38,9 +38,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   {
     id: "node",
     label: "Node.js",
-    install: "pnpm add @tacko/telemetry-node",
+    install: "pnpm add @telemetry-tracker/node",
     docHref: "/docs/node",
-    code: `import { init, middleware } from "@tacko/telemetry-node";
+    code: `import { init, middleware } from "@telemetry-tracker/node";
 
 init({
   ingestUrl: process.env.TELEMETRY_INGEST_URL!,
@@ -53,9 +53,9 @@ app.use(middleware());`,
   {
     id: "web",
     label: "Web / React",
-    install: "pnpm add @tacko/telemetry-core",
+    install: "pnpm add @telemetry-tracker/core",
     docHref: "/docs/sdk",
-    code: `import { init, trackEvent } from "@tacko/telemetry-core";
+    code: `import { init, trackEvent } from "@telemetry-tracker/core";
 
 init({
   ingestUrl: import.meta.env.VITE_TELEMETRY_INGEST_URL,
@@ -68,9 +68,9 @@ trackEvent("button_click", { id: "submit" });`,
   {
     id: "rn",
     label: "React Native",
-    install: "pnpm add @tacko/telemetry-react-native",
+    install: "pnpm add @telemetry-tracker/react-native",
     docHref: "/docs/react-native",
-    code: `import { init } from "@tacko/telemetry-react-native";
+    code: `import { init } from "@telemetry-tracker/react-native";
 
 init({
   ingestUrl: Config.TELEMETRY_INGEST_URL,

@@ -3,13 +3,17 @@
 All notable changes to the **Telemetry Tracker platform** (API + dashboard) are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).  
-App releases use semver tags on `main` (`v1.0.0`, `v1.1.0`, …). SDK packages (`@tacko/telemetry-*`) version independently on npm.
+App releases use semver tags on `main` (`v1.0.0`, `v1.1.0`, …). SDK packages (`@telemetry-tracker/*`) version independently on npm.
 
 Contributors: add user-facing changes under **[Unreleased]** in your PR to `develop`. Maintainers finalize the version section when promoting a milestone to `main`. See [docs/RELEASE.md](docs/RELEASE.md).
 
 ---
 
 ## [Unreleased]
+
+### Changed
+
+- **SDK npm scope** — packages renamed from `@tacko/telemetry-*` to `@telemetry-tracker/core`, `@telemetry-tracker/next`, `@telemetry-tracker/node`, and `@telemetry-tracker/react-native` (v1.3.0). Previous `@tacko/*` names are deprecated on npm after publish.
 
 ---
 
@@ -68,7 +72,7 @@ New migrations in this release:
 
 ### SDK compatibility
 
-- Platform v1.2.x works with `@tacko/telemetry-*` **>= 1.2.0** (no npm publish required for this release)
+- Platform v1.2.x works with `@telemetry-tracker/*` **>= 1.2.0** (no npm publish required for this release)
 
 ---
 
@@ -112,7 +116,7 @@ New migrations in this release:
 
 ### SDK compatibility
 
-- Platform v1.1.x works with `@tacko/telemetry-*` **>= 1.2.0** (no npm publish required for this release unless SDK APIs changed)
+- Platform v1.1.x works with `@telemetry-tracker/*` **>= 1.2.0** (no npm publish required for this release unless SDK APIs changed)
 
 ---
 

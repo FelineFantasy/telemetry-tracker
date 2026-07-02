@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "init(), events, identity, and app naming for Telemetry Tracker SDKs",
 };
 
-const FULL_EXAMPLE = `import { init, trackEvent, trackError, screen, identify } from "@tacko/telemetry-core";
+const FULL_EXAMPLE = `import { init, trackEvent, trackError, screen, identify } from "@telemetry-tracker/core";
 
 init({
   ingestUrl: "https://your-api.example.com",
@@ -27,7 +27,7 @@ export default function DocsSdkPage() {
       title="SDK"
       lede={
         <p>
-          The core library (<code>@tacko/telemetry-core</code>) exposes <code>init</code>, event and
+          The core library (<code>@telemetry-tracker/core</code>) exposes <code>init</code>, event and
           error helpers, screen/session tracking, and identity. Platform packages wrap the same
           config for Next.js, Nuxt, Node, and React Native.
         </p>

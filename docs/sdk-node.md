@@ -1,13 +1,13 @@
-# @tacko/telemetry-node
+# @telemetry-tracker/node
 
-Node.js integration: automatic reporting of `uncaughtException` and `unhandledRejection`, plus optional request middleware. Uses `@tacko/telemetry-core` under the hood; all payloads include anonymous id and SDK version (see [telemetry-core](sdk-core.md)).
+Node.js integration: automatic reporting of `uncaughtException` and `unhandledRejection`, plus optional request middleware. Uses `@telemetry-tracker/core` under the hood; all payloads include anonymous id and SDK version (see [telemetry-core](sdk-core.md)).
 
 ## Install
 
 In a monorepo workspace:
 
 ```bash
-pnpm add @tacko/telemetry-node
+pnpm add @telemetry-tracker/node
 ```
 
 ## Setup
@@ -18,7 +18,7 @@ Call **`init(config)`** once at process startup (e.g. before starting your HTTP 
 - Register `process.on("uncaughtException")` and `process.on("unhandledRejection")` to report those errors before rethrowing (or exiting).
 
 ```ts
-import { init, trackEvent, trackError } from "@tacko/telemetry-node";
+import { init, trackEvent, trackError } from "@telemetry-tracker/node";
 
 init({
   ingestUrl: "https://your-api.example.com",
@@ -66,7 +66,7 @@ It records a `$request` event with:
 The implementation assumes a minimal `req`: `method`, `url`, and optionally `body` and `on(event, listener)`. It is not tied to Express or Fastify; you can adapt it or use it in a custom stack. Example (conceptual):
 
 ```ts
-import { init, middleware } from "@tacko/telemetry-node";
+import { init, middleware } from "@telemetry-tracker/node";
 
 init({ ingestUrl: "http://localhost:3001", app: "api", apiKey: process.env.TELEMETRY_API_KEY, environment: "development" });
 

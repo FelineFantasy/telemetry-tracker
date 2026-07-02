@@ -12,7 +12,7 @@ const root = join(fileURLToPath(import.meta.url), "..", "..");
 const packagesDir = join(root, "packages");
 
 const coreName = "telemetry-core"; // folder name
-const coreDep = "@tacko/telemetry-core"; // package name for dependency
+const coreDep = "@telemetry-tracker/core"; // package name for dependency
 const dependents = ["telemetry-next", "telemetry-node", "telemetry-react-native"];
 
 function readJson(path) {
@@ -48,7 +48,7 @@ function assertNpmAuth() {
 npm publish failed: not logged in to https://registry.npmjs.org/
 
   1. npm login
-  2. Ensure your npm user can publish the @tacko scope (create org at npmjs.com/org/create if needed)
+  2. Ensure your npm user can publish the @telemetry-tracker scope (create org at npmjs.com/org/create if needed)
   3. pnpm publish:packages -- --otp=123456   (if 2FA is enabled)
 
 Dry run (no login): pnpm publish:dry

@@ -5,8 +5,8 @@
 ![GitHub Issues](https://img.shields.io/github/issues/Telemetry-Tracker/telemetry-tracker)
 ![CI](https://github.com/Telemetry-Tracker/telemetry-tracker/actions/workflows/ci.yml/badge.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
-[![npm version](https://img.shields.io/npm/v/@tacko/telemetry-core)](https://www.npmjs.com/package/@tacko/telemetry-core)
-[![npm downloads](https://img.shields.io/npm/dm/@tacko/telemetry-core)](https://www.npmjs.com/package/@tacko/telemetry-core)
+[![npm version](https://img.shields.io/npm/v/@telemetry-tracker/core)](https://www.npmjs.com/package/@telemetry-tracker/core)
+[![npm downloads](https://img.shields.io/npm/dm/@telemetry-tracker/core)](https://www.npmjs.com/package/@telemetry-tracker/core)
 
 <p align="center">
   <strong>Open-source error tracking, product analytics, and session telemetry.</strong>
@@ -49,7 +49,7 @@
 | API keys | ✅ |
 | Dashboard | ✅ |
 | REST API | ✅ |
-| SDKs (`@tacko/telemetry-*`) | ✅ |
+| SDKs (`@telemetry-tracker/*`) | ✅ |
 | Self-hosted | ✅ |
 | Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com)) | ✅ |
 | Paid plans (Free / Pro / Business, EUR via Stripe) | ✅ |
@@ -83,7 +83,7 @@ Client SDK
  PostgreSQL
 ```
 
-Apps send errors, events, and sessions to the **API** via `@tacko/telemetry-*`. The **dashboard** reads telemetry through the same API—never directly from the database.
+Apps send errors, events, and sessions to the **API** via `@telemetry-tracker/*`. The **dashboard** reads telemetry through the same API—never directly from the database.
 
 ---
 
@@ -123,11 +123,11 @@ Then:
 
 Works with:
 
-- ✓ **React** — `@tacko/telemetry-core`
-- ✓ **Next.js** — `@tacko/telemetry-next`
-- ✓ **Node** — `@tacko/telemetry-node`
-- ✓ **React Native** — `@tacko/telemetry-react-native`
-- ✓ **Vanilla JS** — `@tacko/telemetry-core`
+- ✓ **React** — `@telemetry-tracker/core`
+- ✓ **Next.js** — `@telemetry-tracker/next`
+- ✓ **Node** — `@telemetry-tracker/node`
+- ✓ **React Native** — `@telemetry-tracker/react-native`
+- ✓ **Vanilla JS** — `@telemetry-tracker/core`
 
 Guides: [core](docs/sdk-core.md) · [Next.js](docs/sdk-next.md) · [Node](docs/sdk-node.md) · [React Native](docs/sdk-react-native.md)
 
@@ -136,11 +136,11 @@ Guides: [core](docs/sdk-core.md) · [Next.js](docs/sdk-next.md) · [Node](docs/s
 Install from npm:
 
 ```bash
-pnpm add @tacko/telemetry-core
+pnpm add @telemetry-tracker/core
 ```
 
 ```ts
-import { init, trackEvent, trackError } from "@tacko/telemetry-core";
+import { init, trackEvent, trackError } from "@telemetry-tracker/core";
 
 init({
   ingestUrl: "http://localhost:3001",

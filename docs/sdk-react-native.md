@@ -1,13 +1,13 @@
-# @tacko/telemetry-react-native
+# @telemetry-tracker/react-native
 
-React Native integration: global error handler, session tracking, and screen helpers. Uses `@tacko/telemetry-core` under the hood; sessions and events include anonymous id and SDK version (see [telemetry-core](sdk-core.md)).
+React Native integration: global error handler, session tracking, and screen helpers. Uses `@telemetry-tracker/core` under the hood; sessions and events include anonymous id and SDK version (see [telemetry-core](sdk-core.md)).
 
 ## Install
 
 In a monorepo workspace:
 
 ```bash
-pnpm add @tacko/telemetry-react-native
+pnpm add @telemetry-tracker/react-native
 ```
 
 Peer dependency: `react-native`.
@@ -23,7 +23,7 @@ Call **`init(config)`** once at app startup (e.g. in your root component or entr
 Calling `init()` on native enables `screen()`, `endSession()`, and all other APIs; you do not need to guard `init()` for web only.
 
 ```tsx
-import { init } from "@tacko/telemetry-react-native";
+import { init } from "@telemetry-tracker/react-native";
 
 init({
   ingestUrl: "https://your-api.example.com",
@@ -54,7 +54,7 @@ When using React Navigation, call `screen` or `trackScreen` when the screen chan
 
 ```tsx
 import { useNavigationContainerRef } from "@react-navigation/native";
-import { trackScreen } from "@tacko/telemetry-react-native";
+import { trackScreen } from "@telemetry-tracker/react-native";
 import { useEffect } from "react";
 
 export function useTelemetryScreenTracking() {

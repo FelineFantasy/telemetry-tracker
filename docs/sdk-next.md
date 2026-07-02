@@ -1,13 +1,13 @@
-# @tacko/telemetry-next
+# @telemetry-tracker/next
 
-Next.js integration: provider, page tracking, and error boundary. Uses `@tacko/telemetry-core` under the hood; all events include anonymous device id and SDK version (see [telemetry-core](sdk-core.md)).
+Next.js integration: provider, page tracking, and error boundary. Uses `@telemetry-tracker/core` under the hood; all events include anonymous device id and SDK version (see [telemetry-core](sdk-core.md)).
 
 ## Install
 
 In a monorepo workspace:
 
 ```bash
-pnpm add @tacko/telemetry-next
+pnpm add @telemetry-tracker/next
 ```
 
 Peer dependencies: `next` (≥14), `react` (≥18).
@@ -25,7 +25,7 @@ Peer dependencies: `next` (≥14), `react` (≥18).
 ```tsx
 "use client";
 
-import { TelemetryProvider, useTrackPage } from "@tacko/telemetry-next";
+import { TelemetryProvider, useTrackPage } from "@telemetry-tracker/next";
 import { usePathname } from "next/navigation";
 
 const config = {
@@ -55,7 +55,7 @@ function TrackPage() {
 Wrap a section of the tree to report React errors and optionally show a fallback:
 
 ```tsx
-import { TelemetryErrorBoundary } from "@tacko/telemetry-next";
+import { TelemetryErrorBoundary } from "@telemetry-tracker/next";
 
 <TelemetryErrorBoundary fallback={<div>Something went wrong.</div>}>
   <MyComponent />
@@ -68,7 +68,7 @@ If you don’t pass `fallback`, the boundary renders nothing when it catches an 
 
 | Export | Description |
 |--------|-------------|
-| `init(config)` | Call `@tacko/telemetry-core`’s `init` (usually done via `TelemetryProvider`). |
+| `init(config)` | Call `@telemetry-tracker/core`’s `init` (usually done via `TelemetryProvider`). |
 | `identify(userId)` | Set current user id. |
 | `trackEvent(name, properties?)` | Send a named event (re-exported from core). |
 | `trackError(error, context?)` | Report an error with optional context. |
@@ -86,7 +86,7 @@ If you prefer not to use the provider:
 ```tsx
 "use client";
 
-import { init, useTrackPage } from "@tacko/telemetry-next";
+import { init, useTrackPage } from "@telemetry-tracker/next";
 import { usePathname } from "next/navigation";
 
 init({ ingestUrl: "http://localhost:3001", app: "my-app", apiKey: process.env.NEXT_PUBLIC_TELEMETRY_API_KEY });
@@ -102,10 +102,10 @@ Ensure `init` runs only on the client (e.g. inside a `"use client"` component or
 
 ## Custom events and identify
 
-Import `trackEvent`, `screen`, and `identify` from `@tacko/telemetry-next`:
+Import `trackEvent`, `screen`, and `identify` from `@telemetry-tracker/next`:
 
 ```tsx
-import { trackEvent, identify } from "@tacko/telemetry-next";
+import { trackEvent, identify } from "@telemetry-tracker/next";
 
 trackEvent("signup_clicked", { source: "hero" });
 identify(user.id);  // after login

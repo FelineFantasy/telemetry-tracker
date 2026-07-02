@@ -1,6 +1,6 @@
 # SDK packages (`packages/telemetry-*`) — Bugbot rules
 
-Published as `@tacko/telemetry-*` on npm. Semver is **per-package** in each `package.json`, independent of app releases on `main`.
+Published as `@telemetry-tracker/*` on npm. Semver is **per-package** in each `package.json`, independent of app releases on `main`.
 
 ## Breaking change bar
 
