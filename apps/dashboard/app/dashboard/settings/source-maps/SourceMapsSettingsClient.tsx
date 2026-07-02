@@ -1,19 +1,15 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import {
+  listProjectSourceMapsAction,
+  type SourceMapArtifactSummaryRow,
+} from "@/app/dashboard/actions";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Field } from "@/app/components/dashboard/settings/settings-ui";
 
-type ArtifactRow = {
-  id: string;
-  app: string;
-  release: string;
-  bundleUrl: string;
-  sha256: string;
-  sizeBytes: number;
-  uploadedAt: string;
-};
+type ArtifactRow = SourceMapArtifactSummaryRow;
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -45,16 +41,11 @@ export function SourceMapsSettingsClient({
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ app: appLabel, release: releaseLabel });
-      const res = await fetch(`/api/project/source-maps?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text.slice(0, 200) || `HTTP ${res.status}`);
+      const result = await listProjectSourceMapsAction(appLabel, releaseLabel);
+      if (!result.ok) {
+        throw new Error(result.error);
       }
-      const data = (await res.json()) as { artifacts?: ArtifactRow[] };
-      setArtifacts(data.artifacts ?? []);
+      setArtifacts(result.artifacts);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setArtifacts(null);

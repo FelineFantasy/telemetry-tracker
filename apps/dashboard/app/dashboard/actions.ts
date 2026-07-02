@@ -593,3 +593,39 @@ export async function saveProjectAlertSettingsAction(
     return { ok: false, error: "Invalid response from server" };
   }
 }
+
+export type SourceMapArtifactSummaryRow = {
+  id: string;
+  app: string;
+  release: string;
+  bundleUrl: string;
+  sha256: string;
+  sizeBytes: number;
+  uploadedAt: string;
+};
+
+export async function listProjectSourceMapsAction(
+  app: string,
+  release: string
+): Promise<
+  | { ok: true; artifacts: SourceMapArtifactSummaryRow[] }
+  | { ok: false; error: string }
+> {
+  const appLabel = app.trim();
+  const releaseLabel = release.trim();
+  if (!appLabel || !releaseLabel) {
+    return { ok: false, error: "Enter both app and release to list uploaded maps." };
+  }
+  const params = new URLSearchParams({ app: appLabel, release: releaseLabel });
+  const res = await dashboardApiFetch(`/api/project/source-maps?${params.toString()}`);
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { artifacts?: SourceMapArtifactSummaryRow[] };
+    return { ok: true, artifacts: data.artifacts ?? [] };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
