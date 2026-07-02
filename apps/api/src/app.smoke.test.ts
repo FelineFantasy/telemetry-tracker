@@ -43,6 +43,21 @@ describe("API smoke", () => {
     }
   });
 
+  it("POST /api/project/source-maps accepts bodies larger than the global 200 KB limit", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/project/source-maps",
+      payload: {
+        app: "web",
+        release: "1.0.0",
+        bundle_url: "https://cdn.example/app.js",
+        content: "x".repeat(300 * 1024),
+      },
+      headers: { "content-type": "application/json" },
+    });
+    expect(res.statusCode).not.toBe(413);
+  });
+
   it("GET /api/meta/projects returns 401 without session in production", async () => {
     const prevNodeEnv = process.env.NODE_ENV;
     const prevAllowReads = process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;

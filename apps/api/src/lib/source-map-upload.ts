@@ -8,9 +8,9 @@ import {
 } from "./source-map-artifact.js";
 
 const uploadBodySchema = z.object({
-  app: z.string().min(1).max(128),
-  release: z.string().min(1).max(256),
-  bundle_url: z.string().min(1).max(2048),
+  app: z.string().trim().min(1).max(128),
+  release: z.string().trim().min(1).max(256),
+  bundle_url: z.string().trim().min(1).max(2048),
   /** Source map JSON as a string or parsed object. */
   content: z.union([z.string().min(1), z.record(z.unknown())]),
 });
@@ -109,8 +109,8 @@ export async function upsertSourceMapArtifact(
   const parsed = parseSourceMapContent(input.content);
   if (!parsed.ok) return parsed;
 
-  const app = input.app.trim();
-  const release = input.release.trim();
+  const app = input.app;
+  const release = input.release;
   const bundleUrl = normalizeBundleUrl(input.bundle_url);
   const sha256 = sha256Hex(parsed.json);
   const sizeBytes = Buffer.byteLength(parsed.json, "utf8");

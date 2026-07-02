@@ -4,6 +4,9 @@ import type { PrismaClient, SourceMapArtifact } from "@prisma/client";
 /** Max source map JSON size per artifact (upload API enforces in phase 3). */
 export const MAX_SOURCE_MAP_BYTES = 10 * 1024 * 1024;
 
+/** Fastify `bodyLimit` for POST /api/project/source-maps (map JSON + request envelope). */
+export const SOURCE_MAP_UPLOAD_BODY_LIMIT = MAX_SOURCE_MAP_BYTES + 256 * 1024;
+
 export type SourceMapArtifactKey = {
   projectId: string;
   app: string;

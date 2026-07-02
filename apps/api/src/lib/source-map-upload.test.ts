@@ -32,6 +32,38 @@ describe("validateSourceMapUploadBody", () => {
     });
     expect(result).toEqual({ ok: false, error: "Invalid source map upload payload" });
   });
+
+  it("rejects whitespace-only app and release", () => {
+    expect(
+      validateSourceMapUploadBody({
+        app: "   ",
+        release: "1.0.0",
+        bundle_url: "https://cdn.example/app.js",
+        content: minimalMap,
+      })
+    ).toEqual({ ok: false, error: "Invalid source map upload payload" });
+    expect(
+      validateSourceMapUploadBody({
+        app: "web",
+        release: "\t\n",
+        bundle_url: "https://cdn.example/app.js",
+        content: minimalMap,
+      })
+    ).toEqual({ ok: false, error: "Invalid source map upload payload" });
+  });
+
+  it("trims app and release before returning input", () => {
+    const result = validateSourceMapUploadBody({
+      app: "  web  ",
+      release: " 1.0.0 ",
+      bundle_url: "https://cdn.example/app.js",
+      content: minimalMap,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.input.app).toBe("web");
+    expect(result.input.release).toBe("1.0.0");
+  });
 });
 
 describe("parseSourceMapContent", () => {
