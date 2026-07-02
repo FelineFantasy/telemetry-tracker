@@ -155,6 +155,41 @@ describe("enrichErrorGroupWithSymbolicatedStacks", () => {
       orderBy: { uploaded_at: "desc" },
     });
   });
+
+  it("derives symbolicated_top_stack only from the newest occurrence", async () => {
+    const list = vi.fn(async () => [
+      { bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap },
+    ]);
+    const prisma = {
+      sourceMapArtifact: { findMany: list },
+    };
+    const group = {
+      app: "web",
+      release: "1.0.0",
+      occurrences_list: [
+        {
+          id: "occ-new",
+          stack: "Error: no map\n    at x (https://other.example/other.js:1:0)",
+          release: "1.0.0",
+        },
+        {
+          id: "occ-old",
+          stack: "    at main (https://cdn.example.com/bundle.js:1:0)",
+          release: "1.0.0",
+        },
+      ],
+    };
+
+    const enriched = await enrichErrorGroupWithSymbolicatedStacks(
+      prisma as never,
+      "project-1",
+      group
+    );
+
+    expect(enriched.symbolicated_top_stack).toBeUndefined();
+    expect(enriched.occurrences_list[1]?.symbolicated_stack).toContain("src/index.ts");
+    expect(enriched.occurrences_list[0]?.symbolicated_stack).toBeUndefined();
+  });
 });
 
 describe("findMatchingArtifact", () => {

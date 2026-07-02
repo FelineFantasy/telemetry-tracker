@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   findSourceMapArtifact,
+  ingestAppSchema,
   normalizeBundleUrl,
   normalizeMapAppLabel,
   normalizeMapReleaseLabel,
@@ -13,6 +14,11 @@ describe("source-map-artifact", () => {
     expect(normalizeMapReleaseLabel(" 1.2.0 ")).toBe("1.2.0");
     expect(normalizeMapReleaseLabel("   ")).toBeNull();
     expect(normalizeMapReleaseLabel(undefined)).toBeNull();
+  });
+
+  it("rejects whitespace-only ingest app labels", () => {
+    expect(ingestAppSchema.safeParse("   ").success).toBe(false);
+    expect(ingestAppSchema.safeParse("web").success).toBe(true);
   });
 
   it("normalizes bundle URLs", () => {

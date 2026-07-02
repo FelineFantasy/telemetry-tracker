@@ -246,18 +246,24 @@ export async function enrichErrorGroupWithSymbolicatedStacks<
 >(prisma: PrismaClient, projectId: string, group: T): Promise<T> {
   const app = normalizeMapAppLabel(group.app);
   const artifactsForRelease = createArtifactsLoader(prisma, projectId, app);
+
+  const newest = group.occurrences_list[0];
   let symbolicatedTop: string | null = null;
+  if (newest?.stack?.trim()) {
+    const newestRelease = normalizeMapReleaseLabel(newest.release ?? group.release);
+    if (newestRelease) {
+      const artifacts = await artifactsForRelease(newestRelease);
+      symbolicatedTop = firstSymbolicatedFrameLine(newest.stack, artifacts);
+    }
+  }
 
   const occurrences_list = await Promise.all(
     group.occurrences_list.map(async (occ) => {
-      const release = occ.release ?? group.release;
-      if (!occ.stack?.trim() || !release?.trim()) return occ;
+      const release = normalizeMapReleaseLabel(occ.release ?? group.release);
+      if (!occ.stack?.trim() || !release) return occ;
       const artifacts = await artifactsForRelease(release);
       const symbolicated = symbolicateStackTrace(occ.stack, artifacts);
       if (symbolicated === occ.stack) return occ;
-      if (!symbolicatedTop) {
-        symbolicatedTop = firstSymbolicatedFrameLine(occ.stack, artifacts);
-      }
       return { ...occ, symbolicated_stack: symbolicated };
     })
   );
