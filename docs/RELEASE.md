@@ -41,10 +41,14 @@ Feature and fix PRs merge into **`develop`**. Branch protection (Settings → Br
 | CI must pass | Required status check: `build` ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) |
 | Bugbot | Required status check: `Cursor Bugbot` — see [CONTRIBUTING.md](../CONTRIBUTING.md#ai-code-review-bugbot) |
 | Branch up to date | Require branches to be up to date before merging |
-| Approvals | Optional (0 for solo maintainer, 1+ when collaborators review). Authors cannot approve their own PRs. |
-| **Not on `develop`** | `maintainer-review` — production gate only on **`main`** |
+| Human approvals | **0** — GitHub cannot require “approval only when author ≠ maintainer”; use `maintainer-review` check instead |
+| Maintainer gate | Required status check: `maintainer-review` — passes automatically when PR author is @unjica; otherwise requires your APPROVED review |
 
-**Adding status checks:** GitHub lists checks only after they have run at least once on a PR. Open or update a PR (e.g. trigger Bugbot with `bugbot run`), wait for `build` and `Cursor Bugbot` to finish, then edit the `develop` rule and select both under **Status checks that are required**.
+**GitHub settings (required):** On the `develop` rule, set **Required approvals to 0** and add **`maintainer-review`** to required status checks (with `build` and `Cursor Bugbot`). Do not rely on “1 approval” for solo PRs — authors cannot approve their own PRs.
+
+**Your own PRs to `develop`:** `maintainer-review` passes automatically after CI + Bugbot are green.
+
+**Adding status checks:** GitHub lists checks only after they have run at least once on a PR. Open or update a PR, wait for `build`, `Cursor Bugbot`, and `maintainer-review` to finish, then edit the `develop` rule if a check is missing.
 
 Bugbot findings default to a **`neutral`** check conclusion — they comment but do not block merge unless **fail on unresolved issues** is enabled in the Cursor Bugbot dashboard.
 

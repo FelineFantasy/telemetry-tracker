@@ -10,6 +10,7 @@ import {
   OccurrencePanel,
 } from "@/app/components/dashboard/DetailMetaPanel";
 import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
+import { StackTracePanel } from "@/app/components/dashboard/StackTracePanel";
 import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
@@ -18,6 +19,9 @@ type Occurrence = {
   id: string;
   created_at: string;
   stack?: string;
+  symbolicated_stack?: string | null;
+  symbolication_status?: "symbolicated" | "no_maps" | "no_match" | null;
+  release?: string | null;
   context?: unknown;
   user_id?: string | null;
   session_id?: string | null;
@@ -30,10 +34,12 @@ type ErrorGroup = {
   message: string;
   app: string;
   top_stack?: string | null;
+  symbolicated_top_stack?: string | null;
   occurrences: number;
   first_seen: string;
   last_seen: string;
   environment?: string | null;
+  release?: string | null;
   resolved_at?: string | null;
   occurrences_list?: Occurrence[];
 };
@@ -85,6 +91,7 @@ export default async function ErrorDetailPage({
   const contextLine = [
     group.app,
     group.environment ? `env ${group.environment}` : null,
+    group.release ? `release ${group.release}` : null,
     `${group.occurrences} occurrence${group.occurrences === 1 ? "" : "s"}`,
     resolved ? "Resolved" : "Open",
   ]
@@ -107,6 +114,7 @@ export default async function ErrorDetailPage({
             <>
               <Badge>{group.app}</Badge>
               {group.environment ? <Badge>{group.environment}</Badge> : null}
+              {group.release ? <Badge>{group.release}</Badge> : null}
               {resolved ? <ResolvedBadge /> : null}
             </>
           }
@@ -123,7 +131,14 @@ export default async function ErrorDetailPage({
           }
         />
 
-        {group.top_stack ? <StackTraceView source={group.top_stack} title="Top stack (group)" /> : null}
+        {group.symbolicated_top_stack ? (
+          <StackTraceView
+            source={group.symbolicated_top_stack}
+            title="Top frame (symbolicated, newest occurrence)"
+          />
+        ) : group.top_stack ? (
+          <StackTraceView source={group.top_stack} title="Top stack (group)" />
+        ) : null}
 
         <div>
           <h2 className="mb-3 text-sm font-medium">Recent occurrences</h2>
@@ -156,6 +171,12 @@ export default async function ErrorDetailPage({
                           <dd className="font-mono text-xs">{o.session_id}</dd>
                         </div>
                       ) : null}
+                      {o.release != null && o.release !== "" ? (
+                        <div>
+                          <dt className="text-muted-foreground">Release</dt>
+                          <dd>{o.release}</dd>
+                        </div>
+                      ) : null}
                       {o.sdk_version != null && o.sdk_version !== "" ? (
                         <div>
                           <dt className="text-muted-foreground">SDK</dt>
@@ -166,7 +187,13 @@ export default async function ErrorDetailPage({
                   </div>
                   {o.stack ? (
                     <div className="mt-4">
-                      <StackTraceView source={o.stack} title="Stack trace" />
+                      <StackTracePanel
+                        raw={o.stack}
+                        symbolicated={o.symbolicated_stack}
+                        release={o.release ?? group.release}
+                        app={group.app}
+                        symbolicationStatus={o.symbolication_status}
+                      />
                     </div>
                   ) : null}
                   {o.context != null &&

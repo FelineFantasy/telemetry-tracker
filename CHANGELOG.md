@@ -13,6 +13,31 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.3.0] - 2026-07-02
+
+### Added
+
+- **Source maps v1** — persist `release` on errors; upload JSON source maps via `POST /api/project/source-maps`; server-side stack symbolication on error detail (`symbolicated_stack`); dashboard raw/symbolicated toggle; Settings → Source maps listing; per-plan artifact storage quotas (FREE 25 / PRO 250 / BUSINESS 2 500)
+
+### Changed
+
+- **`maintainer-review` on `develop`** — same gate as `main`: 0 human approvals; check auto-passes for @unjica PRs, requires maintainer approval for others
+
+### Database
+
+After upgrading from v1.2.x, run:
+
+```bash
+pnpm --filter api exec prisma migrate deploy
+```
+
+New migrations in this release:
+
+- `20260703120000_error_release` — `release` column on `ErrorGroup` and `ErrorOccurrence`
+- `20260703130000_source_map_artifacts` — source map storage keyed by project, app, release, and bundle URL
+
+---
+
 ## [1.2.1] - 2026-06-28
 
 ### Changed

@@ -14,6 +14,12 @@ import { notifyNewErrorGroupEmail } from "../lib/notification-email-dispatch.js"
 import { maybeNotifyErrorSpike } from "../lib/error-spike-alert.js";
 import { maybeNotifyQuotaAlerts } from "../lib/quota-alert.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
+import { findIngestSession } from "../lib/ingest-session.js";
+import {
+  ingestAppSchema,
+  normalizeMapAppLabel,
+  normalizeMapReleaseLabel,
+} from "../lib/source-map-artifact.js";
 
 /**
  * Ingest pipeline (implement in order):
@@ -24,7 +30,7 @@ import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.j
  */
 
 const eventSchema = z.object({
-  app: z.string().min(1),
+  app: ingestAppSchema,
   platform: z.string().optional(),
   environment: z.string().optional(),
   release: z.string().optional(),
@@ -38,7 +44,7 @@ const eventSchema = z.object({
 
 const sessionSchema = z.object({
   session_id: z.string().min(1),
-  app: z.string().min(1),
+  app: ingestAppSchema,
   platform: z.string().optional(),
   user_id: z.string().optional(),
   anonymous_id: z.string().optional(),
@@ -48,9 +54,10 @@ const sessionSchema = z.object({
 });
 
 const errorSchema = z.object({
-  app: z.string().min(1),
+  app: ingestAppSchema,
   platform: z.string().optional(),
   environment: z.string().optional(),
+  release: z.string().optional(),
   message: z.string().min(1),
   stack: z.string().optional(),
   context: z.record(z.unknown()).optional(),
@@ -74,7 +81,7 @@ function assertIngestAppAllowed(
 ): boolean {
   const allowed = request.ingestApiKeyAllowedApp;
   if (allowed == null) return true;
-  if (app !== allowed) {
+  if (normalizeMapAppLabel(app) !== normalizeMapAppLabel(allowed)) {
     void reply.status(403).send({ error: APP_RESTRICT_MSG });
     return false;
   }
@@ -94,13 +101,14 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    if (!assertIngestAppAllowed(request, body.app, reply)) return;
-    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    const app = body.app;
+    if (!assertIngestAppAllowed(request, app, reply)) return;
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     await prisma.event.create({
       data: {
         project_id: projectId,
-        app: body.app,
+        app,
         platform: body.platform ?? null,
         environment: body.environment ?? null,
         release: body.release ?? null,
@@ -124,16 +132,17 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    if (!assertIngestAppAllowed(request, body.app, reply)) return;
-    const existing = await prisma.session.findFirst({
-      where: { project_id: projectId, session_id: body.session_id, app: body.app },
-      orderBy: { started_at: "desc" },
-    });
+    const app = body.app;
+    if (!assertIngestAppAllowed(request, app, reply)) return;
+    const existing = await findIngestSession(prisma, projectId, body.session_id, app);
     // Closing a session only sets `ended_at` — no new telemetry; must not be blocked by quota.
     if (existing && body.ended_at) {
       await prisma.session.update({
         where: { id: existing.id },
-        data: { ended_at: new Date(body.ended_at) },
+        data: {
+          ended_at: new Date(body.ended_at),
+          ...(existing.app !== app ? { app } : {}),
+        },
       });
       return reply.status(204).send();
     }
@@ -141,14 +150,14 @@ export async function ingestRoutes(
     if (existing && body.ended_at == null) {
       return reply.status(204).send();
     }
-    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     if (!existing) {
       await prisma.session.create({
         data: {
           project_id: projectId,
           session_id: body.session_id,
-          app: body.app,
+          app,
           platform: body.platform ?? null,
           user_id: body.user_id ?? null,
           anonymous_id: body.anonymous_id ?? null,
@@ -169,13 +178,8 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const n = parsed.data.events.length;
-    const allowed = request.ingestApiKeyAllowedApp;
-    if (allowed != null) {
-      for (const ev of parsed.data.events) {
-        if (ev.app !== allowed) {
-          return reply.status(403).send({ error: APP_RESTRICT_MSG });
-        }
-      }
+    for (const ev of parsed.data.events) {
+      if (!assertIngestAppAllowed(request, ev.app, reply)) return;
     }
     const batchApps = parsed.data.events.map((e) => e.app);
     const planOk = await assertIngestPlanOrReply(prisma, projectId, n, batchApps);
@@ -209,8 +213,10 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const body = parsed.data;
-    if (!assertIngestAppAllowed(request, body.app, reply)) return;
-    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [body.app]);
+    const app = body.app;
+    const release = normalizeMapReleaseLabel(body.release);
+    if (!assertIngestAppAllowed(request, app, reply)) return;
+    const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const fingerprint = computeFingerprint(body.message, body.stack);
     const { group: errorGroup, isNew } = await findOrCreateErrorGroup(prisma, {
@@ -218,13 +224,15 @@ export async function ingestRoutes(
       fingerprint,
       message: body.message,
       top_stack: body.stack?.split("\n")[0]?.trim() ?? null,
-      app: body.app,
+      app,
       environment: body.environment ?? null,
+      release,
     });
     await prisma.errorOccurrence.create({
       data: {
         error_group_id: errorGroup.id,
         stack: body.stack ?? null,
+        release,
         context: (body.context ?? undefined) as Prisma.InputJsonValue | undefined,
         session_id: body.session_id ?? null,
         user_id: body.user_id ?? null,

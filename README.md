@@ -53,8 +53,8 @@
 | Self-hosted | ✅ |
 | Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com)) | ✅ |
 | Paid plans (Free / Pro / Business, EUR via Stripe) | ✅ |
-| Alerting | 🚧 |
-| Source maps | 🚧 |
+| Alerting | ✅ |
+| Source maps | ✅ |
 
 Self-host setup: [DEPLOYMENT.md](DEPLOYMENT.md)
 
@@ -189,8 +189,8 @@ packages/
 - [x] Events
 - [x] Sessions
 - [x] Dashboard
-- [ ] Alerting
-- [ ] Source maps
+- [x] Alerting
+- [x] Source maps
 - [ ] Performance monitoring
 - [ ] Multi-project dashboards
 - [ ] Team audit logs
@@ -226,6 +226,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 | RBAC & org model | [docs/RBAC.md](docs/RBAC.md) |
 | Plans & ingest auth | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) |
 | SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
+| Source maps | [docs/source-maps.md](docs/source-maps.md) |
 
 **Publish SDK packages:** `npm login` → `pnpm publish:packages` (see [CONTRIBUTING.md](CONTRIBUTING.md) and root `package.json` scripts).
 

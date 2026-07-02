@@ -68,4 +68,19 @@ describe("assertIngestPlanOrReply", () => {
     expect(result.body.code).toBe("monthly_ingest_quota");
     expect(maybeNotifyQuotaAlerts).not.toHaveBeenCalled();
   });
+
+  it("matches legacy padded app labels when checking registered ingest apps", async () => {
+    vi.mocked(prisma.usageMonthly.findUnique).mockResolvedValueOnce({
+      ingest_units: 0,
+    } as Awaited<ReturnType<typeof prisma.usageMonthly.findUnique>>);
+    vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([{ app: "web" }]);
+
+    const result = await assertIngestPlanOrReply(prisma, "project-1", 1, ["web"]);
+
+    expect(result.ok).toBe(true);
+    const sqlArg = vi.mocked(prisma.$queryRaw).mock.calls[0]?.[0] as {
+      strings?: string[];
+    };
+    expect(sqlArg.strings?.join("") ?? "").toContain("TRIM(app)");
+  });
 });
