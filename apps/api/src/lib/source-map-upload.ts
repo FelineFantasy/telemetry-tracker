@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient, SourceMapArtifact } from "@prisma/client";
 import { z } from "zod";
 import {
+  findSourceMapArtifact,
   MAX_SOURCE_MAP_BYTES,
   ingestAppSchema,
   normalizeBundleUrl,
@@ -9,6 +10,7 @@ import {
   normalizeMapReleaseLabel,
   sha256Hex,
 } from "./source-map-artifact.js";
+import { loadPlanContextForProject } from "./plan-enforcement.js";
 
 const uploadBodySchema = z.object({
   app: ingestAppSchema,
@@ -99,6 +101,35 @@ export function parseSourceMapContent(
   }
 
   return { ok: true, json };
+}
+
+const SOURCE_MAP_QUOTA_MSG =
+  "Source map storage limit reached for this project (plan limit).";
+
+/** Ensures a new artifact would stay within plan limits (replaces are always allowed). */
+export async function checkSourceMapUploadQuota(
+  prisma: PrismaClient,
+  projectId: string,
+  input: SourceMapUploadInput
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const existing = await findSourceMapArtifact(prisma, {
+    projectId,
+    app: input.app,
+    release: input.release,
+    bundleUrl: input.bundle_url,
+  });
+  if (existing) return { ok: true };
+
+  const ctx = await loadPlanContextForProject(prisma, projectId);
+  if (!ctx) return { ok: false, error: "Project not found." };
+
+  const count = await prisma.sourceMapArtifact.count({
+    where: { project_id: projectId },
+  });
+  if (count >= ctx.limits.maxSourceMapArtifactsPerProject) {
+    return { ok: false, error: SOURCE_MAP_QUOTA_MSG };
+  }
+  return { ok: true };
 }
 
 export function toSourceMapArtifactSummary(row: SourceMapArtifact): SourceMapArtifactSummary {

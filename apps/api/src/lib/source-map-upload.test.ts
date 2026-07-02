@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  checkSourceMapUploadQuota,
   parseSourceMapContent,
   upsertSourceMapArtifact,
   validateSourceMapUploadBody,
@@ -141,5 +142,61 @@ describe("upsertSourceMapArtifact", () => {
     if (!result.ok) return;
     expect(result.created).toBe(false);
     expect(update).toHaveBeenCalledOnce();
+  });
+});
+
+describe("checkSourceMapUploadQuota", () => {
+  it("allows replace when at plan cap", async () => {
+    const findUnique = vi.fn(async () => ({ id: "existing" }));
+    const count = vi.fn(async () => 25);
+    const prisma = {
+      sourceMapArtifact: { findUnique, count },
+      project: {
+        findFirst: vi.fn(async () => ({
+          organization_id: "org-1",
+          organization: {
+            plan_tier: "FREE",
+            stripe_subscription_status: null,
+            deleted_at: null,
+          },
+        })),
+      },
+    };
+    const result = await checkSourceMapUploadQuota(prisma as never, "p1", {
+      app: "web",
+      release: "1.0.0",
+      bundle_url: "https://cdn.example/app.js",
+      content: minimalMap,
+    });
+    expect(result.ok).toBe(true);
+    expect(count).not.toHaveBeenCalled();
+  });
+
+  it("rejects new artifacts when at plan cap", async () => {
+    const findUnique = vi.fn(async () => null);
+    const count = vi.fn(async () => 25);
+    const prisma = {
+      sourceMapArtifact: { findUnique, count },
+      project: {
+        findFirst: vi.fn(async () => ({
+          organization_id: "org-1",
+          organization: {
+            plan_tier: "FREE",
+            stripe_subscription_status: null,
+            deleted_at: null,
+          },
+        })),
+      },
+    };
+    const result = await checkSourceMapUploadQuota(prisma as never, "p1", {
+      app: "web",
+      release: "1.0.0",
+      bundle_url: "https://cdn.example/app.js",
+      content: minimalMap,
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: "Source map storage limit reached for this project (plan limit).",
+    });
   });
 });

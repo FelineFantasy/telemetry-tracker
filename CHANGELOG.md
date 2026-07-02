@@ -17,6 +17,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Source maps (phase 2)** — `SourceMapArtifact` storage model, lookup helpers, and retention sweep integration
 - **Source maps (phase 3)** — `POST/GET /api/project/source-maps` for JSON source map upload and listing (EDITOR+ upload, metadata-only list)
 - **Source maps (phase 4)** — server-side stack symbolication on `GET /api/errors/:id` (`symbolicated_stack` / `symbolicated_top_stack`)
+- **Source maps (phase 5)** — error detail raw/symbolicated stack toggle and Settings → Source maps listing page
+- **Source maps (phase 6)** — per-plan source map artifact quotas and README/docs completion for v1.3.0
 
 ### Changed
 

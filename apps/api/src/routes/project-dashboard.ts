@@ -999,12 +999,15 @@ export async function projectDashboardRoutes(
       if (!canCreateApiKey(projRole)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
-      const { validateSourceMapUploadBody, upsertSourceMapArtifact } = await import(
-        "../lib/source-map-upload.js"
-      );
+      const { validateSourceMapUploadBody, checkSourceMapUploadQuota, upsertSourceMapArtifact } =
+        await import("../lib/source-map-upload.js");
       const validated = validateSourceMapUploadBody(request.body);
       if (!validated.ok) {
         return reply.status(400).send({ error: validated.error });
+      }
+      const quota = await checkSourceMapUploadQuota(prisma, projectId, validated.input);
+      if (!quota.ok) {
+        return reply.status(403).send({ error: quota.error });
       }
       const result = await upsertSourceMapArtifact(prisma, projectId, validated.input);
       if (!result.ok) {

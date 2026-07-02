@@ -9,7 +9,8 @@ Design for **[issue #98](https://github.com/Telemetry-Tracker/telemetry-tracker/
 | **Ingest** | `POST /ingest/error` accepts optional `stack` string; SDK sends `release` but API previously dropped it |
 | **Storage** | `ErrorGroup.top_stack` (first line), `ErrorOccurrence.stack` (full raw string) |
 | **Dashboard** | `StackTraceView` renders plain text — no frame parsing or symbolication |
-| **Upload** | No file/binary upload routes |
+| **Upload** | `POST/GET /api/project/source-maps` (JSON upload, metadata list); plan quotas per project |
+| **Symbolication** | Server-side on `GET /api/errors/:id`; dashboard raw/symbolicated toggle on error detail |
 
 Events already store `release`; errors must do the same before maps can be keyed.
 
@@ -65,8 +66,8 @@ Retention: align with plan `retentionDays`; the nightly retention job deletes ar
 | **2** | `SourceMapArtifact` schema + retention | Done |
 | **3** | Upload API (`POST /api/project/source-maps`) + CLI docs | Done (JSON upload/list; CLI follow-up) |
 | **4** | Symbolication engine + API field `symbolicated_stack` | Done |
-| **5** | Dashboard frame UI, settings/history page | Planned |
-| **6** | Quotas, tests, docs, README roadmap ✅ | Planned |
+| **5** | Dashboard frame UI, settings/history page | Done |
+| **6** | Quotas, tests, docs, README roadmap ✅ | Done |
 
 ## Phase 1 — release on errors
 
@@ -121,6 +122,17 @@ Server-side stack parsing (V8, Firefox-style) and source map lookup by `(project
 - `symbolicated_stack` on each occurrence in `occurrences_list`
 
 Symbolication is display-only; grouping fingerprints stay on raw minified stacks. Implementation: `apps/api/src/lib/stack-symbolicate.ts` (`@jridgewell/trace-mapping`).
+
+## Phase 5 — dashboard UI
+
+- Error detail (`/dashboard/errors/[id]`) — `StackTracePanel` with **Raw / Symbolicated** toggle per occurrence; empty-state hint links to source map settings when release has no maps.
+- Settings → **Source maps** (`/dashboard/settings/source-maps`) — list uploaded artifacts by app + release (metadata only).
+
+## Phase 6 — quotas & release prep
+
+- Plan cap: `maxSourceMapArtifactsPerProject` (FREE 25, PRO 250, BUSINESS 2 500). Re-uploading the same `(app, release, bundle_url)` replaces in place and does not consume an extra slot.
+- Enforced in `checkSourceMapUploadQuota` before create on `POST /api/project/source-maps`.
+- README and this doc updated; closes implementation scope for [#98](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/98) pending v1.3.0 release promotion.
 
 ## Security
 
