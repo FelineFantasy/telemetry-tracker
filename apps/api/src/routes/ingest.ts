@@ -174,22 +174,17 @@ export async function ingestRoutes(
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const n = parsed.data.events.length;
-    const allowed = request.ingestApiKeyAllowedApp;
-    if (allowed != null) {
-      for (const ev of parsed.data.events) {
-        if (ev.app !== allowed) {
-          return reply.status(403).send({ error: APP_RESTRICT_MSG });
-        }
-      }
+    for (const ev of parsed.data.events) {
+      if (!assertIngestAppAllowed(request, ev.app, reply)) return;
     }
-    const batchApps = parsed.data.events.map((e) => e.app);
+    const batchApps = parsed.data.events.map((e) => normalizeMapAppLabel(e.app));
     const planOk = await assertIngestPlanOrReply(prisma, projectId, n, batchApps);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     for (const body of parsed.data.events) {
       await prisma.event.create({
         data: {
           project_id: projectId,
-          app: body.app,
+          app: normalizeMapAppLabel(body.app),
           platform: body.platform ?? null,
           environment: body.environment ?? null,
           release: body.release ?? null,
