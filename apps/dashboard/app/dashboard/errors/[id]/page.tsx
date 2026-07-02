@@ -10,6 +10,7 @@ import {
   OccurrencePanel,
 } from "@/app/components/dashboard/DetailMetaPanel";
 import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
+import { StackTracePanel } from "@/app/components/dashboard/StackTracePanel";
 import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
@@ -18,6 +19,8 @@ type Occurrence = {
   id: string;
   created_at: string;
   stack?: string;
+  symbolicated_stack?: string | null;
+  symbolication_status?: "symbolicated" | "no_maps" | "no_match" | null;
   release?: string | null;
   context?: unknown;
   user_id?: string | null;
@@ -31,6 +34,7 @@ type ErrorGroup = {
   message: string;
   app: string;
   top_stack?: string | null;
+  symbolicated_top_stack?: string | null;
   occurrences: number;
   first_seen: string;
   last_seen: string;
@@ -127,7 +131,14 @@ export default async function ErrorDetailPage({
           }
         />
 
-        {group.top_stack ? <StackTraceView source={group.top_stack} title="Top stack (group)" /> : null}
+        {group.symbolicated_top_stack ? (
+          <StackTraceView
+            source={group.symbolicated_top_stack}
+            title="Top frame (symbolicated, newest occurrence)"
+          />
+        ) : group.top_stack ? (
+          <StackTraceView source={group.top_stack} title="Top stack (group)" />
+        ) : null}
 
         <div>
           <h2 className="mb-3 text-sm font-medium">Recent occurrences</h2>
@@ -176,7 +187,13 @@ export default async function ErrorDetailPage({
                   </div>
                   {o.stack ? (
                     <div className="mt-4">
-                      <StackTraceView source={o.stack} title="Stack trace" />
+                      <StackTracePanel
+                        raw={o.stack}
+                        symbolicated={o.symbolicated_stack}
+                        release={o.release ?? group.release}
+                        app={group.app}
+                        symbolicationStatus={o.symbolication_status}
+                      />
                     </div>
                   ) : null}
                   {o.context != null &&

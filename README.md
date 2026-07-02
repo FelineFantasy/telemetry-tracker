@@ -14,11 +14,11 @@
 
 <p align="center">
   Lightweight and self-hosted for your own infrastructure—or use the <strong>official hosted cloud</strong> at
-  <a href="https://telemetry-tracker.tacko.io">telemetry-tracker.tacko.io</a> with Stripe billing (EUR).
+  <a href="https://telemetry-tracker.com">telemetry-tracker.com</a> with Stripe billing (EUR).
 </p>
 
 <p align="center">
-  <a href="https://telemetry-tracker.tacko.io">
+  <a href="https://telemetry-tracker.com">
     <img src="apps/dashboard/public/screenshot-dashboard.jpg" alt="Dashboard overview with requests, error rate, top errors, and recent sessions" width="920" />
   </a>
 </p>
@@ -51,10 +51,10 @@
 | REST API | ✅ |
 | SDKs (`@tacko/telemetry-*`) | ✅ |
 | Self-hosted | ✅ |
-| Hosted cloud ([telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io)) | ✅ |
+| Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com)) | ✅ |
 | Paid plans (Free / Pro / Business, EUR via Stripe) | ✅ |
-| Alerting | 🚧 |
-| Source maps | 🚧 |
+| Alerting | ✅ |
+| Source maps | ✅ |
 
 Self-host setup: [DEPLOYMENT.md](DEPLOYMENT.md)
 
@@ -189,12 +189,12 @@ packages/
 - [x] Events
 - [x] Sessions
 - [x] Dashboard
-- [ ] Alerting
-- [ ] Source maps
+- [x] Alerting
+- [x] Source maps
 - [ ] Performance monitoring
 - [ ] Multi-project dashboards
 - [ ] Team audit logs
-- [x] Hosted cloud ([telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io))
+- [x] Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com))
 - [x] Paid plans (Stripe, EUR)
 
 ---
@@ -226,6 +226,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 | RBAC & org model | [docs/RBAC.md](docs/RBAC.md) |
 | Plans & ingest auth | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) |
 | SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
+| Source maps | [docs/source-maps.md](docs/source-maps.md) |
 
 **Publish SDK packages:** `npm login` → `pnpm publish:packages` (see [CONTRIBUTING.md](CONTRIBUTING.md) and root `package.json` scripts).
 
@@ -256,7 +257,7 @@ You may run Telemetry Tracker on infrastructure you control for your own applica
 
 ### Official hosted cloud
 
-The **managed service** at [telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io) is operated by [Tacko](https://tacko.io). **Pro** and **Business** plans there are billed in **EUR** via Stripe.
+The **managed service** at [telemetry-tracker.com](https://telemetry-tracker.com) is operated by [Tacko](https://tacko.io). **Pro** and **Business** plans there are billed in **EUR** via Stripe.
 
 ### Brand & competing hosted services
 

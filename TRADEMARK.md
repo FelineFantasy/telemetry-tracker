@@ -9,7 +9,7 @@ The **Telemetry Tracker** source code is open source under the [MIT License](LIC
 | Self-host for your own apps and infrastructure | ✅ Yes |
 | Modify, fork, and contribute changes under MIT | ✅ Yes |
 | Use the software internally or for your customers **without** implying it is the official Telemetry Tracker cloud | ✅ Yes (see naming below) |
-| Operate the **official** managed service at [telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io) | ✅ Tacko only |
+| Operate the **official** managed service at [telemetry-tracker.com](https://telemetry-tracker.com) | ✅ Tacko only |
 | Offer a **multi-tenant hosted service to third parties** marketed as **Telemetry Tracker**, using our name, logo, or look-and-feel | ❌ No — requires written permission |
 | Use **Telemetry Tracker** in a product or domain name in a way that suggests endorsement or affiliation with Tacko | ❌ No |
 
@@ -51,7 +51,7 @@ If you run a modified or unmodified copy for others, **do not** present it as th
 
 - Domains, app names, or marketing such as “Telemetry Tracker Cloud”, “Official Telemetry Tracker”, or “Telemetry Tracker as a Service” operated by a third party
 - Copying the official site, dashboard marketing, or logo treatment to resell hosted access to third parties
-- Suggesting your hosted offering **is** [telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io) or is affiliated with Tacko when it is not
+- Suggesting your hosted offering **is** [telemetry-tracker.com](https://telemetry-tracker.com) or is affiliated with Tacko when it is not
 
 ---
 
@@ -59,7 +59,9 @@ If you run a modified or unmodified copy for others, **do not** present it as th
 
 The **official managed service** is operated by Tacko at:
 
-**[https://telemetry-tracker.tacko.io](https://telemetry-tracker.tacko.io)**
+**[https://telemetry-tracker.com](https://telemetry-tracker.com)**
+
+The legacy hostname `telemetry-tracker.tacko.io` redirects to the same service.
 
 Paid **Pro** and **Business** plans on that offering are billed in **EUR** through Stripe. Other hosted deployments are not the official product unless explicitly agreed in writing with Tacko.
 

@@ -17,6 +17,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Source maps (phase 2)** — `SourceMapArtifact` storage model, lookup helpers, and retention sweep integration
 - **Source maps (phase 3)** — `POST/GET /api/project/source-maps` for JSON source map upload and listing (EDITOR+ upload, metadata-only list)
 - **Source maps (phase 4)** — server-side stack symbolication on `GET /api/errors/:id` (`symbolicated_stack` / `symbolicated_top_stack`)
+- **Source maps (phase 5)** — error detail raw/symbolicated stack toggle and Settings → Source maps listing page
+- **Source maps (phase 6)** — per-plan source map artifact quotas and README/docs completion for v1.3.0
 
 ### Changed
 
@@ -26,6 +28,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 - `20260703120000_error_release` — `release` column on `ErrorGroup` and `ErrorOccurrence`
 - `20260703130000_source_map_artifacts` — source map storage keyed by project, app, release, and bundle URL
+
+---
+
+## [1.2.1] - 2026-06-28
+
+### Changed
+
+- **Official hosted cloud URL** — documentation and env examples now use [telemetry-tracker.com](https://telemetry-tracker.com) as the canonical dashboard domain (legacy `telemetry-tracker.tacko.io` redirects)
 
 ---
 

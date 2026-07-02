@@ -144,6 +144,7 @@ describe("enrichErrorGroupWithSymbolicatedStacks", () => {
     expect(findUnique).toHaveBeenCalledOnce();
     expect(enriched.symbolicated_top_stack).toContain("src/index.ts");
     expect(enriched.occurrences_list[0]?.symbolicated_stack).toContain("src/index.ts");
+    expect(enriched.occurrences_list[0]?.symbolication_status).toBe("symbolicated");
   });
 
   it("normalizes legacy padded app labels when loading maps", async () => {
@@ -204,6 +205,58 @@ describe("enrichErrorGroupWithSymbolicatedStacks", () => {
 
     expect(enriched.symbolicated_top_stack).toBeUndefined();
     expect(enriched.occurrences_list[1]?.symbolicated_stack).toContain("src/index.ts");
+    expect(enriched.occurrences_list[1]?.symbolication_status).toBe("symbolicated");
+    expect(enriched.occurrences_list[0]?.symbolicated_stack).toBeUndefined();
+    expect(enriched.occurrences_list[0]?.symbolication_status).toBe("no_match");
+  });
+
+  it("marks occurrences as no_maps when nothing is uploaded for the release", async () => {
+    const findMany = vi.fn(async () => []);
+    const prisma = {
+      sourceMapArtifact: { findMany, findUnique: vi.fn() },
+    };
+    const stack = "    at main (https://cdn.example.com/bundle.js:1:0)";
+    const group = {
+      app: "web",
+      release: "1.0.0",
+      occurrences_list: [{ id: "occ-1", stack, release: "1.0.0" }],
+    };
+
+    const enriched = await enrichErrorGroupWithSymbolicatedStacks(
+      prisma as never,
+      "project-1",
+      group
+    );
+
+    expect(enriched.occurrences_list[0]?.symbolication_status).toBe("no_maps");
+    expect(enriched.occurrences_list[0]?.symbolicated_stack).toBeUndefined();
+  });
+
+  it("marks occurrences as no_match when maps exist but frames do not match", async () => {
+    const findMany = vi.fn(async () => [
+      { id: "map-1", bundle_url: "https://cdn.example.com/bundle.js" },
+    ]);
+    const findUnique = vi.fn(async () => ({
+      bundle_url: "https://cdn.example.com/bundle.js",
+      content: minimalMap,
+    }));
+    const prisma = {
+      sourceMapArtifact: { findMany, findUnique },
+    };
+    const stack = "    at main (https://other.example/other.js:1:0)";
+    const group = {
+      app: "web",
+      release: "1.0.0",
+      occurrences_list: [{ id: "occ-1", stack, release: "1.0.0" }],
+    };
+
+    const enriched = await enrichErrorGroupWithSymbolicatedStacks(
+      prisma as never,
+      "project-1",
+      group
+    );
+
+    expect(enriched.occurrences_list[0]?.symbolication_status).toBe("no_match");
     expect(enriched.occurrences_list[0]?.symbolicated_stack).toBeUndefined();
   });
 });

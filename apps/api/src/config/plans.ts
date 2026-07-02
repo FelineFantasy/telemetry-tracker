@@ -13,6 +13,8 @@ export type PlanLimits = {
   maxProjectsPerOrg: number;
   /** Active API keys per project. */
   maxApiKeysPerProject: number;
+  /** Stored source map artifacts per project (replace uploads do not consume extra slots). */
+  maxSourceMapArtifactsPerProject: number;
   /** Telemetry rows older than this (days) may be deleted by the retention job. */
   retentionDays: number;
 };
@@ -24,6 +26,7 @@ export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
     maxAppsPerProject: 5,
     maxProjectsPerOrg: 1,
     maxApiKeysPerProject: 2,
+    maxSourceMapArtifactsPerProject: 25,
     retentionDays: 14,
   },
   PRO: {
@@ -32,6 +35,7 @@ export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
     maxAppsPerProject: 50,
     maxProjectsPerOrg: 10,
     maxApiKeysPerProject: 10,
+    maxSourceMapArtifactsPerProject: 250,
     retentionDays: 90,
   },
   BUSINESS: {
@@ -40,6 +44,7 @@ export const PLAN_LIMITS: Record<"FREE" | "PRO" | "BUSINESS", PlanLimits> = {
     maxAppsPerProject: 500,
     maxProjectsPerOrg: 50,
     maxApiKeysPerProject: 50,
+    maxSourceMapArtifactsPerProject: 2_500,
     retentionDays: 365,
   },
 } as const;
