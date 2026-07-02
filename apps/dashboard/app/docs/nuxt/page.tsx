@@ -13,7 +13,7 @@ export default function DocsNuxtPage() {
       title="Nuxt"
       lede={
         <p>
-          Nuxt is Vue-based, so use <code>@tacko/telemetry-core</code> directly (there is no
+          Nuxt is Vue-based, so use <code>@telemetry-tracker/core</code> directly (there is no
           telemetry-nuxt package). Add a client plugin to init and a global middleware to track page
           views. After <code>init()</code>, uncaught errors and unhandled promise rejections in the
           browser are reported automatically.
@@ -22,9 +22,9 @@ export default function DocsNuxtPage() {
     >
       <h2>Install</h2>
       <CodeBlock
-        code={`pnpm add @tacko/telemetry-core
+        code={`pnpm add @telemetry-tracker/core
 # or
-npm install @tacko/telemetry-core`}
+npm install @telemetry-tracker/core`}
       />
 
       <h2>Runtime config</h2>
@@ -47,7 +47,7 @@ npm install @tacko/telemetry-core`}
         Create <code>plugins/telemetry.client.ts</code>:
       </p>
       <CodeBlock
-        code={`import { init } from "@tacko/telemetry-core";
+        code={`import { init } from "@telemetry-tracker/core";
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig();
@@ -66,7 +66,7 @@ export default defineNuxtPlugin(() => {
         Create <code>middleware/telemetry.global.ts</code> to send a screen event on each route:
       </p>
       <CodeBlock
-        code={`import { screen } from "@tacko/telemetry-core";
+        code={`import { screen } from "@telemetry-tracker/core";
 
 export default defineNuxtRouteMiddleware((to) => {
   if (import.meta.client) {
@@ -77,7 +77,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
       <h2>Custom events and errors</h2>
       <CodeBlock
-        code={`import { trackEvent, trackError } from "@tacko/telemetry-core";
+        code={`import { trackEvent, trackError } from "@telemetry-tracker/core";
 
 trackEvent("button_click", { id: "submit" });
 trackError(new Error("Something broke"), { page: "/checkout" });`}
@@ -91,7 +91,7 @@ trackError(new Error("Something broke"), { page: "/checkout" });`}
 
       <h2>Optional: identify user</h2>
       <CodeBlock
-        code={`import { identify } from "@tacko/telemetry-core";
+        code={`import { identify } from "@telemetry-tracker/core";
 
 identify(user.id);  // after login
 identify(null);     // on logout`}

@@ -1,6 +1,6 @@
 # Release and deployment process
 
-This document describes how we integrate, release, and deploy **Telemetry Tracker** (API + dashboard). SDK packages (`@tacko/telemetry-*`) use separate semver in `packages/*/package.json` and `pnpm publish:packages` — see [README](../README.md#publishing-sdk-packages-to-npm).
+This document describes how we integrate, release, and deploy **Telemetry Tracker** (API + dashboard). SDK packages (`@telemetry-tracker/*`) use separate semver in `packages/*/package.json` and `pnpm publish:packages` — see [README](../README.md#publishing-sdk-packages-to-npm).
 
 User-facing changes are recorded in [CHANGELOG.md](../CHANGELOG.md).
 
@@ -273,7 +273,7 @@ First production-ready self-hosted release. Full changelog: [CHANGELOG.md#100---
 - Email/password auth, org invites, password reset (Resend)
 - RBAC (OWNER / EDITOR / VIEWER)
 - Optional Stripe billing (checkout, portal, webhooks)
-- SDKs `@tacko/telemetry-*` v1.2.0 in-repo
+- SDKs `@telemetry-tracker/*` v1.3.0 in-repo (published as `@telemetry-tracker/core`, `@telemetry-tracker/next`, `@telemetry-tracker/node`, `@telemetry-tracker/react-native`)
 - Retention job, deployment docs, CI with DB integration tests
 
 **Known limitations:**

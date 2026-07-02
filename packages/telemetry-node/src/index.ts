@@ -5,7 +5,7 @@ import {
   trackError as coreTrackError,
   getConfigOrNull,
   type TelemetryConfig,
-} from "@tacko/telemetry-core";
+} from "@telemetry-tracker/core";
 
 export type TelemetryNodeConfig = TelemetryConfig & {
   app: string;

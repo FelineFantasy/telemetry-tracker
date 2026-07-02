@@ -55,7 +55,7 @@ New migrations in this release:
 
 <!-- Omit if platform release does not change ingest/SDK contract -->
 
-Platform v{{VERSION}} works with `@tacko/telemetry-*` **>= X.Y.Z**.
+Platform v{{VERSION}} works with `@telemetry-tracker/*` **>= X.Y.Z**.
 
 If SDK packages were published, link npm versions here.
 
@@ -104,7 +104,7 @@ New migrations:
 
 ## SDK compatibility
 
-Platform v1.1.x works with `@tacko/telemetry-*` **>= 1.2.0**.
+Platform v1.1.x works with `@telemetry-tracker/*` **>= 1.2.0**.
 
 ## Full changelog
 

@@ -10,7 +10,7 @@ import {
   getSessionId,
   endSession,
   type TelemetryConfig,
-} from "@tacko/telemetry-core";
+} from "@telemetry-tracker/core";
 
 let initialized = false;
 
