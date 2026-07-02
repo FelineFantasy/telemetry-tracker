@@ -3,9 +3,10 @@ import type { ReactNode } from "react";
 import { ContactEmailLink } from "@/app/components/legal/ContactEmailLink";
 import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
+import { HOSTED_DASHBOARD_URL, HOSTED_OPERATOR } from "@/lib/hosted-cloud";
 
-const EFFECTIVE = "June 28, 2026";
-const VERSION = "2026.06";
+const EFFECTIVE = "July 2, 2026";
+const VERSION = "2026.07";
 
 type TermsSection = {
   id: string;
@@ -29,6 +30,52 @@ const sections: TermsSection[] = [
           accept these Terms. If you are entering into these Terms on behalf of a company or other
           legal entity, you represent that you have authority to bind that entity.
         </p>
+        <p>
+          The Service is available as <strong>open-source software you self-host</strong> and as an{" "}
+          <strong>official hosted cloud</strong> operated by {HOSTED_OPERATOR} at{" "}
+          <a href={HOSTED_DASHBOARD_URL} className="text-foreground/85 hover:text-foreground">
+            telemetry-tracker.com
+          </a>
+          . The sections below apply to both unless a hosted-cloud provision says otherwise.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "hosted-cloud",
+    title: "Official hosted cloud",
+    body: (
+      <>
+        <p>
+          When you use the managed service at{" "}
+          <a href={HOSTED_DASHBOARD_URL} className="text-foreground/85 hover:text-foreground">
+            {HOSTED_DASHBOARD_URL.replace("https://", "")}
+          </a>{" "}
+          (&quot;Hosted Cloud&quot;), {HOSTED_OPERATOR} operates the dashboard, API, and database on
+          your behalf. You still own Customer Data you send through the Service; we process it to
+          provide observability features described in the documentation.
+        </p>
+        <ul>
+          <li>
+            <strong className="text-foreground/85">Accounts & billing</strong> — registration,
+            organizations, and paid plans (EUR via Stripe) are provided on the Hosted Cloud. Fees,
+            taxes, and refunds follow the plan you select and applicable law.
+          </li>
+          <li>
+            <strong className="text-foreground/85">Availability</strong> — we aim for reliable
+            operation of the Hosted Cloud but do not guarantee uninterrupted service. Maintenance,
+            incidents, and third-party outages may affect access. Self-hosted deployments remain
+            your responsibility.
+          </li>
+          <li>
+            <strong className="text-foreground/85">Support</strong> — contact{" "}
+            <ContactEmailLink className="text-foreground/85 hover:text-foreground" /> or the{" "}
+            <Link href="/contact" className="text-foreground/85 hover:text-foreground">
+              contact page
+            </Link>{" "}
+            for Hosted Cloud account issues.
+          </li>
+        </ul>
       </>
     ),
   },
@@ -103,14 +150,14 @@ const sections: TermsSection[] = [
       <>
         <p>
           Plan limits, retention windows, and feature gates are described in the project
-          documentation. When Stripe billing is enabled on your deployment, paid plans are billed in
-          advance on the cycle you select. Usage above plan limits may be blocked or billed according
-          to your configuration.
+          documentation. On the Hosted Cloud, paid plans are billed in advance in EUR via Stripe on
+          the cycle you select. Usage above plan limits may be blocked according to plan
+          enforcement.
         </p>
         <p>
-          Because you may self-host the Service, billing terms depend on how your operator configures
-          Stripe and plan enforcement. Fees, taxes, and refund policies for a hosted deployment are
-          set by your operator unless otherwise agreed in writing.
+          For self-hosted deployments, billing depends on how your operator configures Stripe and
+          plan enforcement. Fees, taxes, and refund policies for a private deployment are set by
+          your operator unless otherwise agreed in writing.
         </p>
       </>
     ),
@@ -122,12 +169,13 @@ const sections: TermsSection[] = [
       <>
         <p>
           When you self-host Telemetry Tracker, uptime, backups, and incident response are your
-          responsibility. We do not guarantee availability of deployments you operate. The software
-          is provided as-is; you configure PostgreSQL, the API, retention jobs, and access controls.
+          responsibility. For the Hosted Cloud, {HOSTED_OPERATOR} manages infrastructure, backups,
+          and retention jobs, but the Service is still provided as-is except where mandatory law
+          applies.
         </p>
         <p>
-          Community support is best-effort. If your organization needs formal SLAs or on-call
-          coverage, arrange that with your internal team or deployment vendor.
+          Community support is best-effort. Formal SLAs for the Hosted Cloud may be offered separately
+          in writing for Business customers.
         </p>
       </>
     ),
@@ -320,8 +368,13 @@ export function TermsPageContent() {
               <div className="rounded-2xl border border-border bg-surface/40 p-6 text-sm leading-relaxed text-muted-foreground">
                 <p className="text-foreground">
                   <span className="font-medium">TL;DR.</span> Use Telemetry Tracker responsibly,
-                  don&apos;t send secrets or personal data in payloads, secure your self-hosted
-                  deployment, and comply with applicable law. The full text below controls.
+                  don&apos;t send secrets or personal data in payloads, and comply with applicable
+                  law. Self-hosters operate their own infrastructure; Hosted Cloud users at{" "}
+                  <a href={HOSTED_DASHBOARD_URL} className="underline-offset-4 hover:underline">
+                    telemetry-tracker.com
+                  </a>{" "}
+                  contract with {HOSTED_OPERATOR} for the managed service. The full text below
+                  controls.
                 </p>
               </div>
 

@@ -11,9 +11,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Hosted cloud docs** — `/docs/hosted-cloud` getting-started guide for telemetry-tracker.com
+- **Open Graph image** — dynamic 1200×630 social preview at `/opengraph-image`
+
 ### Changed
 
 - **SDK npm scope** — packages renamed from `@tacko/telemetry-*` to `@telemetry-tracker/core`, `@telemetry-tracker/next`, `@telemetry-tracker/node`, and `@telemetry-tracker/react-native` (v1.3.0). Previous `@tacko/*` names are deprecated on npm after publish.
+- **Marketing & legal** — homepage features/hero mention alerting and source maps; Terms and Privacy tailored for official hosted cloud; alert quick action links to `/dashboard/alerts`
 
 ---
 
