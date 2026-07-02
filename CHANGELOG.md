@@ -16,6 +16,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Source maps (phase 1)** — persist `release` on error ingest and show release on error detail (foundation for v1.3.0 symbolication)
 - **Source maps (phase 2)** — `SourceMapArtifact` storage model, lookup helpers, and retention sweep integration
 
+### Changed
+
+- **`maintainer-review` on `develop`** — same gate as `main`: 0 human approvals; check auto-passes for @unjica PRs, requires maintainer approval for others
+
 ### Database
 
 - `20260703120000_error_release` — `release` column on `ErrorGroup` and `ErrorOccurrence`
