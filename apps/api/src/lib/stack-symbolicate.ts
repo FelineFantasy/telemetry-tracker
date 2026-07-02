@@ -206,6 +206,10 @@ function createSymbolicateContext(
 ) {
   const refsByRelease = new Map<string, Promise<SourceMapArtifactRef[]>>();
   const contentById = new Map<string, Pick<SourceMapArtifact, "bundle_url" | "content">>();
+  const contentPending = new Map<
+    string,
+    Promise<Pick<SourceMapArtifact, "bundle_url" | "content"> | null>
+  >();
   let contentLoads = 0;
 
   async function refsForRelease(release: string): Promise<SourceMapArtifactRef[]> {
@@ -215,6 +219,30 @@ function createSymbolicateContext(
       refsByRelease.set(release, load);
     }
     return load;
+  }
+
+  /** Reserve and share in-flight content loads (singleflight) so concurrent occurrence work cannot exceed the cap or duplicate fetches. */
+  function loadArtifactContent(
+    ref: SourceMapArtifactRef
+  ): Promise<Pick<SourceMapArtifact, "bundle_url" | "content"> | null> | null {
+    const cached = contentById.get(ref.id);
+    if (cached) return Promise.resolve(cached);
+
+    const inFlight = contentPending.get(ref.id);
+    if (inFlight) return inFlight;
+
+    if (contentLoads >= MAX_SOURCE_MAP_CONTENT_LOADS_PER_DETAIL) {
+      return null;
+    }
+    contentLoads += 1;
+
+    const pending = getSourceMapArtifactContentById(prisma, ref.id).then((row) => {
+      contentPending.delete(ref.id);
+      if (row) contentById.set(ref.id, row);
+      return row;
+    });
+    contentPending.set(ref.id, pending);
+    return pending;
   }
 
   async function artifactsForStack(
@@ -235,15 +263,10 @@ function createSymbolicateContext(
       if (!ref || seenIds.has(ref.id)) continue;
       seenIds.add(ref.id);
 
-      let artifact = contentById.get(ref.id);
-      if (!artifact) {
-        if (contentLoads >= MAX_SOURCE_MAP_CONTENT_LOADS_PER_DETAIL) break;
-        const row = await getSourceMapArtifactContentById(prisma, ref.id);
-        contentLoads += 1;
-        if (!row) continue;
-        artifact = row;
-        contentById.set(ref.id, row);
-      }
+      const load = loadArtifactContent(ref);
+      if (!load) break;
+      const artifact = await load;
+      if (!artifact) continue;
       artifacts.push(artifact);
     }
 
@@ -306,16 +329,21 @@ export async function enrichErrorGroupWithSymbolicatedStacks<
     }
   }
 
-  const occurrences_list = await Promise.all(
-    group.occurrences_list.map(async (occ) => {
-      const release = normalizeMapReleaseLabel(occ.release ?? group.release);
-      if (!occ.stack?.trim() || !release) return occ;
-      const artifacts = await artifactsForStack(occ.stack, release);
-      const symbolicated = symbolicateStackTrace(occ.stack, artifacts);
-      if (symbolicated === occ.stack) return occ;
-      return { ...occ, symbolicated_stack: symbolicated };
-    })
-  );
+  const occurrences_list: T["occurrences_list"] = [];
+  for (const occ of group.occurrences_list) {
+    const release = normalizeMapReleaseLabel(occ.release ?? group.release);
+    if (!occ.stack?.trim() || !release) {
+      occurrences_list.push(occ);
+      continue;
+    }
+    const artifacts = await artifactsForStack(occ.stack, release);
+    const symbolicated = symbolicateStackTrace(occ.stack, artifacts);
+    if (symbolicated === occ.stack) {
+      occurrences_list.push(occ);
+      continue;
+    }
+    occurrences_list.push({ ...occ, symbolicated_stack: symbolicated });
+  }
 
   return {
     ...group,
