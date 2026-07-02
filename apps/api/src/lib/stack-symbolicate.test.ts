@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  enrichErrorGroupWithSymbolicatedStacks,
   findMatchingArtifact,
+  firstSymbolicatedFrameLine,
   frameMatchesBundle,
   parseStackFrame,
   symbolicateStackTrace,
@@ -74,6 +76,53 @@ describe("symbolicateStackTrace", () => {
       { bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap },
     ]);
     expect(result).toBe(stack);
+  });
+});
+
+describe("firstSymbolicatedFrameLine", () => {
+  it("skips the error message line and symbolicates the first frame", () => {
+    const stack = [
+      "TypeError: boom",
+      "    at main (https://cdn.example.com/bundle.js:1:0)",
+    ].join("\n");
+    const artifacts = [{ bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap }];
+    const line = firstSymbolicatedFrameLine(stack, artifacts);
+    expect(line).toContain("src/index.ts");
+  });
+});
+
+describe("enrichErrorGroupWithSymbolicatedStacks", () => {
+  it("loads source maps once per release when many occurrences share it", async () => {
+    const list = vi.fn(async () => [
+      { bundle_url: "https://cdn.example.com/bundle.js", content: minimalMap },
+    ]);
+    const prisma = {
+      sourceMapArtifact: { findMany: list },
+    };
+    const stack = [
+      "Error: boom",
+      "    at main (https://cdn.example.com/bundle.js:1:0)",
+    ].join("\n");
+    const group = {
+      app: "web",
+      release: "1.0.0",
+      top_stack: "Error: boom",
+      occurrences_list: Array.from({ length: 5 }, (_, i) => ({
+        id: `occ-${i}`,
+        stack,
+        release: "1.0.0",
+      })),
+    };
+
+    const enriched = await enrichErrorGroupWithSymbolicatedStacks(
+      prisma as never,
+      "project-1",
+      group
+    );
+
+    expect(list).toHaveBeenCalledOnce();
+    expect(enriched.symbolicated_top_stack).toContain("src/index.ts");
+    expect(enriched.occurrences_list[0]?.symbolicated_stack).toContain("src/index.ts");
   });
 });
 

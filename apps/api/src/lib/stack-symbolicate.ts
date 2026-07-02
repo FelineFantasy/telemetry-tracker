@@ -159,6 +159,38 @@ export function symbolicateStackTrace(
   return changed ? out.join("\n") : stack;
 }
 
+/** First resolvable frame line in a stack, symbolicated when a map exists. */
+export function firstSymbolicatedFrameLine(
+  stack: string,
+  artifacts: Pick<SourceMapArtifact, "bundle_url" | "content">[]
+): string | null {
+  for (const line of stack.split(/\r?\n/)) {
+    const frame = parseStackFrame(line);
+    if (frame.file == null || frame.line == null || frame.column == null) continue;
+    const symbolicated = symbolicateStackTrace(line, artifacts);
+    if (symbolicated !== line) return symbolicated;
+  }
+  return null;
+}
+
+function createArtifactsLoader(
+  prisma: PrismaClient,
+  projectId: string,
+  app: string
+): (release: string | null | undefined) => Promise<Pick<SourceMapArtifact, "bundle_url" | "content">[]> {
+  const pending = new Map<string, Promise<Pick<SourceMapArtifact, "bundle_url" | "content">[]>>();
+  return (release: string | null | undefined) => {
+    const key = release?.trim() ?? "";
+    if (!key) return Promise.resolve([]);
+    let load = pending.get(key);
+    if (!load) {
+      load = listSourceMapArtifactsForRelease(prisma, projectId, app, key);
+      pending.set(key, load);
+    }
+    return load;
+  };
+}
+
 export async function symbolicateOccurrenceStack(
   prisma: PrismaClient,
   projectId: string,
@@ -194,25 +226,8 @@ type ErrorGroupWithOccurrences = {
 export async function enrichErrorGroupWithSymbolicatedStacks<
   T extends ErrorGroupWithOccurrences,
 >(prisma: PrismaClient, projectId: string, group: T): Promise<T> {
-  const artifactsByRelease = new Map<string, Pick<SourceMapArtifact, "bundle_url" | "content">[]>();
-
-  async function artifactsForRelease(release: string | null | undefined) {
-    const key = release?.trim() ?? "";
-    if (!key) return [];
-    const cached = artifactsByRelease.get(key);
-    if (cached) return cached;
-    const rows = await listSourceMapArtifactsForRelease(prisma, projectId, group.app, key);
-    artifactsByRelease.set(key, rows);
-    return rows;
-  }
-
-  const topRelease = group.release;
+  const artifactsForRelease = createArtifactsLoader(prisma, projectId, group.app);
   let symbolicatedTop: string | null = null;
-  if (group.top_stack?.trim() && topRelease?.trim()) {
-    const artifacts = await artifactsForRelease(topRelease);
-    const result = symbolicateStackTrace(group.top_stack, artifacts);
-    symbolicatedTop = result === group.top_stack ? null : result;
-  }
 
   const occurrences_list = await Promise.all(
     group.occurrences_list.map(async (occ) => {
@@ -221,6 +236,9 @@ export async function enrichErrorGroupWithSymbolicatedStacks<
       const artifacts = await artifactsForRelease(release);
       const symbolicated = symbolicateStackTrace(occ.stack, artifacts);
       if (symbolicated === occ.stack) return occ;
+      if (!symbolicatedTop) {
+        symbolicatedTop = firstSymbolicatedFrameLine(occ.stack, artifacts);
+      }
       return { ...occ, symbolicated_stack: symbolicated };
     })
   );

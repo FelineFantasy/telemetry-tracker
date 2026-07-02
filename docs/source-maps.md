@@ -117,7 +117,7 @@ Server-side stack parsing (V8, Firefox-style) and source map lookup by `(project
 
 `GET /api/errors/:id` adds optional fields when maps exist:
 
-- `symbolicated_top_stack` on the error group
+- `symbolicated_top_stack` on the error group — first symbolicated frame from the newest occurrence stack (not `top_stack`, which stores the error message line)
 - `symbolicated_stack` on each occurrence in `occurrences_list`
 
 Symbolication is display-only; grouping fingerprints stay on raw minified stacks. Implementation: `apps/api/src/lib/stack-symbolicate.ts` (`@jridgewell/trace-mapping`).
