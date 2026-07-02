@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.3.1] - 2026-07-02
+
 ### Added
 
 - **Hosted cloud docs** — `/docs/hosted-cloud` getting-started guide for telemetry-tracker.com
@@ -18,7 +22,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
-- **SDK npm scope** — packages renamed from `@tacko/telemetry-*` to `@telemetry-tracker/core`, `@telemetry-tracker/next`, `@telemetry-tracker/node`, and `@telemetry-tracker/react-native` (v1.3.0). Previous `@tacko/*` names are deprecated on npm after publish.
+- **SDK npm scope** — packages renamed from `@tacko/telemetry-*` to `@telemetry-tracker/core`, `@telemetry-tracker/next`, `@telemetry-tracker/node`, and `@telemetry-tracker/react-native` (v1.3.0 in-repo). Publish under `@telemetry-tracker/*` on npm; deprecate legacy `@tacko/*` names after publish.
 - **Marketing & legal** — homepage features/hero mention alerting and source maps; Terms and Privacy tailored for official hosted cloud; alert quick action links to `/dashboard/alerts`
 
 ---
