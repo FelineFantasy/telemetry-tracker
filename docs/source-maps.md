@@ -46,7 +46,7 @@ Proposed `SourceMapArtifact` table:
 | `sha256` | Dedupe / integrity |
 | `uploaded_at` | Audit |
 
-Retention: align with plan `retentionDays`; delete artifacts when release data ages out.
+Retention: align with plan `retentionDays`; the nightly retention job deletes artifacts where `uploaded_at` is older than the project cutoff (same as events/errors).
 
 ### Symbolication (Phase 4)
 
@@ -61,8 +61,8 @@ Retention: align with plan `retentionDays`; delete artifacts when release data a
 
 | Phase | Scope | Status |
 |-------|--------|--------|
-| **1** | Persist `release` on errors (ingest, schema, API, dashboard) | In progress — `feature/source-maps-v1` |
-| **2** | `SourceMapArtifact` schema + retention | Planned |
+| **1** | Persist `release` on errors (ingest, schema, API, dashboard) | Done |
+| **2** | `SourceMapArtifact` schema + retention | In progress — `feature/source-maps-phase2` |
 | **3** | Upload API (`POST /api/project/source-maps`) + CLI docs | Planned |
 | **4** | Symbolication engine + API field `symbolicated_stack` | Planned |
 | **5** | Dashboard frame UI, settings/history page | Planned |
@@ -74,6 +74,12 @@ Retention: align with plan `retentionDays`; delete artifacts when release data a
 - Accept `release` in `errorSchema` (SDK already sends it).
 - Update group `release` on new occurrences (same pattern as `environment`).
 - Show release on error detail meta and per occurrence.
+
+## Phase 2 — storage model
+
+- `SourceMapArtifact` table: unique `(project_id, app, release, bundle_url)`, `content` (TEXT), optional `storage_key`, `sha256`, `size_bytes`, `uploaded_at`.
+- Lookup helpers in `apps/api/src/lib/source-map-artifact.ts`.
+- Retention sweep deletes stale maps per project plan `retentionDays`.
 
 ## Phase 3 — upload API (sketch)
 
