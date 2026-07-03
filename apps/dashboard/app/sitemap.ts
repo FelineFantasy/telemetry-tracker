@@ -16,6 +16,7 @@ const PUBLIC_PATHS = [
   "/docs/nuxt",
   "/docs/vue",
   "/docs/react-native",
+  "/docs/releases",
   "/contact",
   "/privacy",
   "/terms",

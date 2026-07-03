@@ -50,6 +50,7 @@ export const docsNavSections: DocsNavSection[] = [
     heading: "Reference",
     items: [
       { id: "ingest", label: "Ingest API", href: "/docs#ingest" },
+      { id: "releases", label: "Release notes", href: "/docs/releases" },
       { id: "self-hosting", label: "Self-hosting", href: "/docs#self-hosting" },
     ],
   },
