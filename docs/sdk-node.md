@@ -80,4 +80,4 @@ function handleRequest(req, res) {
 }
 ```
 
-For Express you’d typically do `app.use(telemetryMiddleware)` if the middleware calls `next()` and matches Express’ (req, res, next) shape. Our middleware is generic and may need a thin wrapper to match your framework’s expectations.
+For Express you’d typically do `app.use(telemetryMiddleware)` if the middleware calls `next()` and matches Express’ (req, res, next) shape. Our middleware is generic and may need a thin wrapper to match your framework’s expectations. For **NestJS**, see [sdk-nestjs.md](sdk-nestjs.md).

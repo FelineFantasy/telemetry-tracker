@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CodeBlock } from "@/app/components/docs/CodeBlock";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
@@ -57,7 +58,7 @@ trackError(new Error("DB connection failed"), { db: "primary" });`}
       <p>
         Optional: use <code>middleware()</code> to send a <code>$request</code> event per HTTP
         request (method, url, duration). Attach it to your server framework (Express, Fastify,
-        etc.) so it runs for each request.
+        NestJS, etc.) so it runs for each request.
       </p>
       <CodeBlock
         code={`import { middleware } from "@telemetry-tracker/node";
@@ -77,7 +78,11 @@ app.use((req, res, next) => {
       <p>
         The middleware tracks <code>method</code>, <code>url</code>, and <code>duration_ms</code>.
         Set <code>trackRequestBody: true</code> to include the request body in the event (use with
-        care for PII/size).
+        care for PII/size). For NestJS, see the{" "}
+        <Link href="/docs/nestjs" className="text-brand hover:underline">
+          NestJS guide
+        </Link>
+        .
       </p>
     </DocsArticle>
   );

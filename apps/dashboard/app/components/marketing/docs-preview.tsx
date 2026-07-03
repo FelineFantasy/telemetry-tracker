@@ -33,6 +33,18 @@ const guides = [
     href: "/docs/nextjs",
   },
   {
+    title: "NestJS integration",
+    desc: "Init in main.ts, optional request middleware, and trackError in services.",
+    time: "5 min",
+    href: "/docs/nestjs",
+  },
+  {
+    title: "Vue & Nuxt",
+    desc: "Vue 3 SPAs and Nuxt apps with @telemetry-tracker/core.",
+    time: "5 min",
+    href: "/docs/vue",
+  },
+  {
     title: "Self-hosting",
     desc: "Run the API and dashboard on your own infrastructure.",
     time: "10 min",

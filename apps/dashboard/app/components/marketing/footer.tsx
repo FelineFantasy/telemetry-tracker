@@ -15,8 +15,10 @@ const cols: { heading: string; links: { label: string; href: string }[] }[] = [
     heading: "Resources",
     links: [
       { label: "Documentation", href: "/docs" },
+      { label: "Hosted cloud", href: "/docs/hosted-cloud" },
       { label: "Next.js SDK", href: "/docs/nextjs" },
-      { label: "Node SDK", href: "/docs/node" },
+      { label: "NestJS", href: "/docs/nestjs" },
+      { label: "Vue / Nuxt", href: "/docs/vue" },
       { label: "GitHub", href: "https://github.com/Telemetry-Tracker/telemetry-tracker" },
     ],
   },
