@@ -21,6 +21,7 @@ export function getGoogleAnalyticsMeasurementId(): string | null {
 }
 
 /** Marketing and public docs routes only — not authenticated dashboard product pages. */
-export function isMarketingAnalyticsPath(pathname: string): boolean {
+export function isMarketingAnalyticsPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
   return !pathname.startsWith("/dashboard");
 }

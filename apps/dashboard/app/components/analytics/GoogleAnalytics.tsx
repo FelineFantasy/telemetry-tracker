@@ -14,9 +14,19 @@ type GoogleAnalyticsProps = {
   serverChoice: CookieConsentChoice | null;
 };
 
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
 export function GoogleAnalytics({ measurementId, serverChoice }: GoogleAnalyticsProps) {
   const pathname = usePathname();
   const [consentAccepted, setConsentAccepted] = useState(serverChoice === "accepted");
+  const [gtagReady, setGtagReady] = useState(false);
+  const shouldTrack = Boolean(
+    measurementId && consentAccepted && isMarketingAnalyticsPath(pathname)
+  );
 
   useEffect(() => {
     setConsentAccepted(serverChoice === "accepted");
@@ -30,7 +40,16 @@ export function GoogleAnalytics({ measurementId, serverChoice }: GoogleAnalytics
     return () => window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, onConsentChanged);
   }, [serverChoice]);
 
-  if (!measurementId || !consentAccepted || !isMarketingAnalyticsPath(pathname)) return null;
+  useEffect(() => {
+    if (!gtagReady || !shouldTrack || !measurementId || !pathname) return;
+    window.gtag?.("config", measurementId, { page_path: pathname });
+  }, [gtagReady, shouldTrack, measurementId, pathname]);
+
+  useEffect(() => {
+    if (!shouldTrack) setGtagReady(false);
+  }, [shouldTrack]);
+
+  if (!shouldTrack) return null;
 
   return (
     <>
@@ -38,12 +57,16 @@ export function GoogleAnalytics({ measurementId, serverChoice }: GoogleAnalytics
         src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
         strategy="afterInteractive"
       />
-      <Script id="google-analytics" strategy="afterInteractive">
+      <Script
+        id="google-analytics"
+        strategy="afterInteractive"
+        onReady={() => setGtagReady(true)}
+      >
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
+          window.gtag = gtag;
           gtag('js', new Date());
-          gtag('config', '${measurementId}');
         `}
       </Script>
     </>

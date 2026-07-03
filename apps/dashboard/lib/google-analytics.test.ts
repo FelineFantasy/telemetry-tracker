@@ -60,4 +60,10 @@ describe("isMarketingAnalyticsPath", () => {
     expect(isMarketingAnalyticsPath("/dashboard/overview")).toBe(false);
     expect(isMarketingAnalyticsPath("/dashboard/settings/billing")).toBe(false);
   });
+
+  it("returns false when pathname is null or empty", () => {
+    expect(isMarketingAnalyticsPath(null)).toBe(false);
+    expect(isMarketingAnalyticsPath(undefined)).toBe(false);
+    expect(isMarketingAnalyticsPath("")).toBe(false);
+  });
 });

@@ -25,7 +25,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 - **Release notes parser** — render `Database` and `SDK compatibility` sections (migration commands, migration lists, SDK version notes) on `/docs/releases`
 - **Dashboard Docker image** — copy `CHANGELOG.md` into the runner stage so `/docs/releases` can load it at runtime
-- **Google Analytics** — resolve measurement id on the server; restore localStorage consent notifies GA; limit tracking to non-dashboard routes
+- **Google Analytics** — resolve measurement id on the server; restore localStorage consent notifies GA; limit tracking to non-dashboard routes; guard null pathname and send SPA pageviews on client navigations
 
 ---
 
