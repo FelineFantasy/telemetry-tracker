@@ -282,4 +282,4 @@ First production-ready self-hosted release. Full changelog: [CHANGELOG.md#100---
 - No built-in error spike alerts
 - Open sessions without `ended_at` are not pruned by retention until closed
 
-**Live reference deployment:** `telemetry-tracker.com` (dashboard) / `api.telemetry-tracker.com` (API). Legacy: `telemetry-tracker.tacko.io` / `telemetry-api.tacko.io`.
+**Live reference deployment:** `telemetry-tracker.com` (dashboard) / `api.telemetry-tracker.com` (API). Legacy: `telemetry-api.tacko.io`, `telemetry-tracker.tacko.io`.

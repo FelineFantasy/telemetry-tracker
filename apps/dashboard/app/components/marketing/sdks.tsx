@@ -51,6 +51,59 @@ init({
 app.use(middleware());`,
   },
   {
+    id: "nestjs",
+    label: "NestJS",
+    install: "pnpm add @telemetry-tracker/node",
+    docHref: "/docs/nestjs",
+    code: `import { NestFactory } from "@nestjs/core";
+import { init } from "@telemetry-tracker/node";
+
+async function bootstrap() {
+  init({
+    ingestUrl: process.env.TELEMETRY_INGEST_URL!,
+    app: "my-nest-api",
+    apiKey: process.env.TELEMETRY_API_KEY,
+  });
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
+}`,
+  },
+  {
+    id: "nuxt",
+    label: "Nuxt",
+    install: "pnpm add @telemetry-tracker/core",
+    docHref: "/docs/nuxt",
+    code: `// plugins/telemetry.client.ts
+import { init } from "@telemetry-tracker/core";
+
+export default defineNuxtPlugin(() => {
+  const config = useRuntimeConfig();
+  init({
+    ingestUrl: config.public.telemetryIngestUrl,
+    app: config.public.telemetryApp,
+    apiKey: config.public.telemetryApiKey,
+  });
+});`,
+  },
+  {
+    id: "vue",
+    label: "Vue",
+    install: "pnpm add @telemetry-tracker/core",
+    docHref: "/docs/vue",
+    code: `import { createApp } from "vue";
+import { init, screen } from "@telemetry-tracker/core";
+import router from "./router";
+
+init({
+  ingestUrl: import.meta.env.VITE_TELEMETRY_INGEST_URL,
+  app: "my-vue-app",
+  apiKey: import.meta.env.VITE_TELEMETRY_API_KEY,
+});
+
+router.afterEach((to) => screen(to.fullPath));
+createApp(App).use(router).mount("#app");`,
+  },
+  {
     id: "web",
     label: "Web / React",
     install: "pnpm add @telemetry-tracker/core",
@@ -89,11 +142,11 @@ export function Sdks() {
         <SectionHeading
           eyebrow="SDKs"
           title={<>Drop-in for the stack you already use.</>}
-          subtitle="Lightweight clients for web, Next.js, Node and React Native — one ingest API, consistent payloads."
+          subtitle="Lightweight clients for Next.js, Node, NestJS, Nuxt, Vue, React Native, and the web — one ingest API, consistent payloads."
         />
 
         <div className="mt-12 overflow-hidden rounded-2xl border border-border bg-surface/40">
-          <div className="flex items-center gap-1 border-b border-border bg-background/40 p-1.5">
+          <div className="flex flex-wrap items-center gap-1 border-b border-border bg-background/40 p-1.5">
             {sdks.map((s) => (
               <button
                 key={s.id}
@@ -109,7 +162,7 @@ export function Sdks() {
               </button>
             ))}
             <div className="tabular ml-auto hidden items-center gap-2 pr-2 text-xs text-muted-foreground sm:flex">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />v1.2.0
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />v1.3.0
             </div>
           </div>
 

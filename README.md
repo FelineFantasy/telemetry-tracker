@@ -123,13 +123,14 @@ Then:
 
 Works with:
 
-- ✓ **React** — `@telemetry-tracker/core`
+- ✓ **React / Vue** — `@telemetry-tracker/core`
 - ✓ **Next.js** — `@telemetry-tracker/next`
-- ✓ **Node** — `@telemetry-tracker/node`
+- ✓ **Node / NestJS** — `@telemetry-tracker/node`
+- ✓ **Nuxt** — `@telemetry-tracker/core` ([guide](docs/sdk-nuxt.md))
 - ✓ **React Native** — `@telemetry-tracker/react-native`
 - ✓ **Vanilla JS** — `@telemetry-tracker/core`
 
-Guides: [core](docs/sdk-core.md) · [Next.js](docs/sdk-next.md) · [Node](docs/sdk-node.md) · [React Native](docs/sdk-react-native.md)
+Guides: [core](docs/sdk-core.md) · [Next.js](docs/sdk-next.md) · [Node](docs/sdk-node.md) · [NestJS](docs/sdk-nestjs.md) · [Vue](docs/sdk-vue.md) · [Nuxt](docs/sdk-nuxt.md) · [React Native](docs/sdk-react-native.md)
 
 ### Example
 
@@ -225,7 +226,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | RBAC & org model | [docs/RBAC.md](docs/RBAC.md) |
 | Plans & ingest auth | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) |
-| SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
+| SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-nestjs.md](docs/sdk-nestjs.md), [docs/sdk-vue.md](docs/sdk-vue.md), [docs/sdk-nuxt.md](docs/sdk-nuxt.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
 | Source maps | [docs/source-maps.md](docs/source-maps.md) |
 
 **Publish SDK packages:** `npm login` → `pnpm publish:packages` (see [CONTRIBUTING.md](CONTRIBUTING.md) and root `package.json` scripts).

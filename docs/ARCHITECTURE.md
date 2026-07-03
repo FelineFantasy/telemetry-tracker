@@ -151,7 +151,7 @@ All SDKs depend on **`@telemetry-tracker/core`** for HTTP ingest:
 3. Optional batching (default flush interval 5s)
 4. Browser: `window.onerror` + `unhandledrejection` after `init()`
 
-Framework packages add ergonomics (Next.js provider, Node process handlers, RN screen helper). See `docs/sdk-*.md`.
+Framework packages add ergonomics (Next.js provider, Node process handlers, RN screen helper). Platform guides: `docs/sdk-*.md` and `/docs/*` on the dashboard (Next.js, Node, NestJS, Nuxt, Vue, React Native).
 
 ---
 
