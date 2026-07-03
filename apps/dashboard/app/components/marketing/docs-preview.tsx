@@ -50,6 +50,12 @@ const guides = [
     time: "10 min",
     href: "/docs#self-hosting",
   },
+  {
+    title: "Platform release notes",
+    desc: "What shipped in each API and dashboard version — upgrade paths and changelog.",
+    time: "3 min",
+    href: "/docs/releases",
+  },
 ];
 
 export function DocsPreview() {

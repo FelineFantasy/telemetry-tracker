@@ -15,6 +15,7 @@ const cols: { heading: string; links: { label: string; href: string }[] }[] = [
     heading: "Resources",
     links: [
       { label: "Documentation", href: "/docs" },
+      { label: "Release notes", href: "/docs/releases" },
       { label: "Hosted cloud", href: "/docs/hosted-cloud" },
       { label: "Next.js SDK", href: "/docs/nextjs" },
       { label: "NestJS", href: "/docs/nestjs" },
