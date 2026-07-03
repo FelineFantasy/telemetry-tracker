@@ -13,10 +13,32 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
-- **Docs** — Vue, NestJS, and Nuxt SDK guides on `/docs` plus matching repo markdown (`docs/sdk-vue.md`, `docs/sdk-nestjs.md`, `docs/sdk-nuxt.md`)
+- **Release notes** — `/docs/releases` renders platform semver history from `CHANGELOG.md`
+- **Marketing docs preview** — Platform release notes card on landing page
+- **Google Analytics** — GA4 (`G-VL5GTNNCHH`) on hosted cloud after cookie consent
 
 ### Changed
 
+- **Marketing home** — replace placeholder logo strip with Supported SDKs (React, Next.js, Vue, Nuxt, React Native, Node.js, NestJS)
+
+### Fixed
+
+- **Release notes parser** — render `Database` and `SDK compatibility` sections (migration commands, migration lists, SDK version notes) on `/docs/releases`
+- **Dashboard Docker image** — copy `CHANGELOG.md` into the runner stage so `/docs/releases` can load it at runtime
+- **Google Analytics** — resolve measurement id on the server; restore localStorage consent notifies GA; limit tracking to non-dashboard routes; guard null pathname; send SPA pageviews on client navigations; preserve gtag readiness after dashboard detours
+
+---
+
+## [1.4.0] - 2026-07-03
+
+### Added
+
+- **Docs** — Vue, NestJS, and Nuxt SDK guides on `/docs` plus matching repo markdown (`docs/sdk-vue.md`, `docs/sdk-nestjs.md`, `docs/sdk-nuxt.md`)
+- **Ops** — `scripts/smoke-production.sh` for repeatable production smoke checks (#87)
+
+### Changed
+
+- **Hosted cloud docs** — production ingest URL documented as `api.telemetry-tracker.com`
 - **Marketing docs** — SDK section tabs include Vue, Nuxt, and NestJS; version badge updated to v1.3.0; sitemap includes `/docs/hosted-cloud`
 
 ---

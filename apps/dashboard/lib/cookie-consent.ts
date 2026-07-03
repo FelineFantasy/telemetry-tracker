@@ -1,5 +1,7 @@
 export const COOKIE_CONSENT_STORAGE_KEY = "tt-cookie-consent";
 
+export const COOKIE_CONSENT_CHANGED_EVENT = "tt-cookie-consent-changed";
+
 export const COOKIE_CONSENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 export type CookieConsentChoice = "accepted" | "rejected";

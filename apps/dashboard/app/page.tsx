@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Nav } from "@/app/components/marketing/nav";
 import { Hero } from "@/app/components/marketing/hero";
-import { LogoStrip } from "@/app/components/marketing/logo-strip";
+import { SupportedSdks } from "@/app/components/marketing/supported-sdks";
 import { Features } from "@/app/components/marketing/features";
 import { Sdks } from "@/app/components/marketing/sdks";
 import { ProductShots } from "@/app/components/marketing/product-shots";
@@ -46,7 +46,7 @@ export default async function LandingPage() {
     <main id="main-content" className="min-h-screen bg-background text-foreground">
       <Nav isAuthenticated={isAuthenticated} />
       <Hero isAuthenticated={isAuthenticated} />
-      <LogoStrip />
+      <SupportedSdks />
       <Features />
       <Sdks />
       <ProductShots />

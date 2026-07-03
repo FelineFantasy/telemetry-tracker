@@ -1,0 +1,192 @@
+import Link from "next/link";
+import type {
+  ChangelogCategory,
+  ChangelogContentBlock,
+  ChangelogRelease,
+  ChangelogReleaseSection,
+} from "@/lib/changelog";
+import { GITHUB_RELEASES_BASE, resolveChangelogLinkHref } from "@/lib/changelog";
+
+const CATEGORY_LABEL: Record<ChangelogCategory, string> = {
+  Added: "Added",
+  Changed: "Changed",
+  Fixed: "Fixed",
+  Deprecated: "Deprecated",
+  Removed: "Removed",
+  Security: "Security",
+};
+
+function renderInline(text: string) {
+  const parts = text.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) {
+      const rawHref = link[2]!;
+      const { href: resolved, external } = resolveChangelogLinkHref(rawHref);
+      const className = "text-brand hover:underline";
+      if (external) {
+        return (
+          <a
+            key={i}
+            href={resolved}
+            className={className}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {link[1]}
+          </a>
+        );
+      }
+      return (
+        <Link key={i} href={resolved} className={className}>
+          {link[1]}
+        </Link>
+      );
+    }
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={i} className="font-medium text-foreground">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
+function CustomSectionBlocks({ blocks }: { blocks: ChangelogContentBlock[] }) {
+  return (
+    <div className="mt-2 space-y-3">
+      {blocks.map((block, i) => {
+        if (block.type === "paragraph") {
+          return (
+            <p key={i} className="text-[15px] leading-relaxed text-foreground/85">
+              {renderInline(block.text)}
+            </p>
+          );
+        }
+        if (block.type === "list") {
+          return (
+            <ul
+              key={i}
+              className="list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-foreground/85"
+            >
+              {block.items.map((item) => (
+                <li key={item}>{renderInline(item)}</li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <pre
+            key={i}
+            className="overflow-x-auto rounded-lg border border-border bg-surface/80 px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground/90"
+          >
+            <code>{block.code}</code>
+          </pre>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReleaseSection({ section }: { section: ChangelogReleaseSection }) {
+  if (section.kind === "category") {
+    return (
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {CATEGORY_LABEL[section.category]}
+        </h3>
+        <ul className="mt-2 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-foreground/85">
+          {section.items.map((item) => (
+            <li key={item}>{renderInline(item)}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {section.title}
+      </h3>
+      <CustomSectionBlocks blocks={section.blocks} />
+    </div>
+  );
+}
+
+function ReleaseCard({ release }: { release: ChangelogRelease }) {
+  const tag = release.prerelease ? null : `v${release.version}`;
+
+  return (
+    <section
+      id={release.anchor}
+      className="scroll-mt-32 border-b border-border pb-10 last:border-b-0 last:pb-0"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-xl font-semibold tracking-tight">
+          {release.prerelease ? (
+            <span className="text-foreground">{release.version}</span>
+          ) : (
+            <span className="font-mono text-foreground">v{release.version}</span>
+          )}
+        </h2>
+        {release.date ? (
+          <time dateTime={release.date} className="text-sm text-muted-foreground">
+            {release.date}
+          </time>
+        ) : null}
+        {tag ? (
+          <Link
+            href={`${GITHUB_RELEASES_BASE}/${tag}`}
+            className="text-sm text-brand hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub release →
+          </Link>
+        ) : null}
+      </div>
+
+      {release.summary.length > 0 ? (
+        <div className="mt-5 space-y-2">
+          {release.summary.map((paragraph) => (
+            <p key={paragraph} className="text-[15px] leading-relaxed text-foreground/85">
+              {renderInline(paragraph)}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      {release.sections.length === 0 && release.summary.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">No entries yet.</p>
+      ) : release.sections.length > 0 ? (
+        <div className="mt-5 space-y-5">
+          {release.sections.map((section) => (
+            <ReleaseSection
+              key={section.kind === "category" ? section.category : section.title}
+              section={section}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+export function ChangelogReleases({ releases }: { releases: ChangelogRelease[] }) {
+  const unreleased = releases.find((r) => r.prerelease);
+  const shipped = releases.filter((r) => !r.prerelease);
+
+  return (
+    <div className="space-y-10">
+      {unreleased && (unreleased.sections.length > 0 || unreleased.summary.length > 0) ? (
+        <ReleaseCard release={unreleased} />
+      ) : null}
+      {shipped.map((release) => (
+        <ReleaseCard key={release.version} release={release} />
+      ))}
+    </div>
+  );
+}

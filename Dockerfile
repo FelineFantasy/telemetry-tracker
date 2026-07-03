@@ -25,6 +25,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY apps apps
 COPY packages packages
+COPY CHANGELOG.md CHANGELOG.md
 COPY eslint.config.mjs ./eslint.config.mjs
 
 RUN pnpm --filter dashboard build
@@ -42,6 +43,7 @@ RUN pnpm install --frozen-lockfile --prod=false
 
 COPY --from=build /app/apps apps
 COPY --from=build /app/packages packages
+COPY --from=build /app/CHANGELOG.md /app/CHANGELOG.md
 
 WORKDIR /app/apps/dashboard
 

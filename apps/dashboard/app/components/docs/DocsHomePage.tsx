@@ -168,7 +168,11 @@ trackEvent("plan.upgraded", { from: "free", to: "pro" });`}</DocsCodeBlock>
           <Link href="/docs/react-native" className="text-brand hover:underline">
             React Native
           </Link>
-          , and other SDK guides.
+          . See{" "}
+          <Link href="/docs/releases" className="text-brand hover:underline">
+            Release notes
+          </Link>{" "}
+          for platform version history.
         </p>
       </DocsSection>
 
@@ -199,7 +203,11 @@ trackEvent("plan.upgraded", { from: "free", to: "pro" });`}</DocsCodeBlock>
           The monorepo includes a Fastify API (<DocsInlineCode>apps/api</DocsInlineCode>) and Next.js
           dashboard (<DocsInlineCode>apps/dashboard</DocsInlineCode>). Run both locally or deploy
           with Docker — see the repository README and DEPLOYMENT.md for environment variables,
-          database setup, and optional Stripe billing.
+          database setup, and optional Stripe billing. Upgrade paths by version:{" "}
+          <Link href="/docs/releases" className="text-brand hover:underline">
+            Release notes
+          </Link>
+          .
         </p>
         <p>
           Platform guides:{" "}
