@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.3.3] - 2026-07-03
+
+### Changed
+
+- **Logo** — nav and brand components use the new `telemetry-logo.jpg` mark
+
+---
+
 ## [1.3.2] - 2026-07-03
 
 ### Changed
