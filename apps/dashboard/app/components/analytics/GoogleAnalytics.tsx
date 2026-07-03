@@ -46,8 +46,14 @@ export function GoogleAnalytics({ measurementId, serverChoice }: GoogleAnalytics
   }, [gtagReady, shouldTrack, measurementId, pathname]);
 
   useEffect(() => {
-    if (!shouldTrack) setGtagReady(false);
-  }, [shouldTrack]);
+    if (!consentAccepted) {
+      setGtagReady(false);
+      return;
+    }
+    if (shouldTrack && typeof window.gtag === "function") {
+      setGtagReady(true);
+    }
+  }, [consentAccepted, shouldTrack]);
 
   if (!shouldTrack) return null;
 
