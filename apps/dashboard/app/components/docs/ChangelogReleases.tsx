@@ -20,9 +20,24 @@ const CATEGORY_LABEL: Record<ChangelogCategory, string> = {
   Security: "Security",
 };
 
-function renderItem(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+function renderInline(text: string) {
+  const parts = text.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) {
+      const href = link[2]!;
+      const external = href.startsWith("http");
+      return (
+        <Link
+          key={i}
+          href={href}
+          className="text-brand hover:underline"
+          {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        >
+          {link[1]}
+        </Link>
+      );
+    }
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
         <strong key={i} className="font-medium text-foreground">
@@ -68,9 +83,19 @@ function ReleaseCard({ release }: { release: ChangelogRelease }) {
         ) : null}
       </div>
 
-      {categories.length === 0 ? (
+      {release.summary.length > 0 ? (
+        <div className="mt-5 space-y-2">
+          {release.summary.map((paragraph) => (
+            <p key={paragraph} className="text-[15px] leading-relaxed text-foreground/85">
+              {renderInline(paragraph)}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      {categories.length === 0 && release.summary.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">No entries yet.</p>
-      ) : (
+      ) : categories.length > 0 ? (
         <div className="mt-5 space-y-5">
           {categories.map((cat) => (
             <div key={cat}>
@@ -79,13 +104,13 @@ function ReleaseCard({ release }: { release: ChangelogRelease }) {
               </h3>
               <ul className="mt-2 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-foreground/85">
                 {release.categories[cat]!.map((item) => (
-                  <li key={item}>{renderItem(item)}</li>
+                  <li key={item}>{renderInline(item)}</li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -96,7 +121,8 @@ export function ChangelogReleases({ releases }: { releases: ChangelogRelease[] }
 
   return (
     <div className="space-y-10">
-      {unreleased && Object.keys(unreleased.categories).length > 0 ? (
+      {unreleased &&
+      (Object.keys(unreleased.categories).length > 0 || unreleased.summary.length > 0) ? (
         <ReleaseCard release={unreleased} />
       ) : null}
       {shipped.map((release) => (

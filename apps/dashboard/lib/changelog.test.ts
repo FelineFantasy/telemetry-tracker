@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changelogAnchor, parseChangelog } from "./changelog";
+import { changelogAnchor, extractChangelogSummary, parseChangelog } from "./changelog";
 
 const SAMPLE = `# Changelog
 
@@ -28,12 +28,18 @@ const SAMPLE = `# Changelog
 ### Fixed
 
 - **Billing CTAs** — hide Pro upgrade when on Pro
+
+---
+
+## [1.0.0] - 2026-06-26
+
+First production-ready self-hosted release. See [docs/RELEASE.md](docs/RELEASE.md) for full notes.
 `;
 
 describe("parseChangelog", () => {
   it("parses version sections and categories", () => {
     const releases = parseChangelog(SAMPLE);
-    expect(releases).toHaveLength(3);
+    expect(releases).toHaveLength(4);
 
     const unreleased = releases[0]!;
     expect(unreleased.version).toBe("Unreleased");
@@ -45,6 +51,23 @@ describe("parseChangelog", () => {
     expect(v140.date).toBe("2026-07-03");
     expect(v140.categories.Added?.[0]).toContain("Vue");
     expect(v140.categories.Changed?.[0]).toContain("Marketing");
+
+    const v100 = releases[3]!;
+    expect(v100.version).toBe("1.0.0");
+    expect(v100.summary[0]).toContain("First production-ready");
+    expect(Object.keys(v100.categories)).toHaveLength(0);
+  });
+
+  it("extracts prose before category headings", () => {
+    const block = `## [1.0.0] - 2026-06-26
+
+Intro paragraph.
+
+### Added
+
+- **Item** — detail
+`;
+    expect(extractChangelogSummary(block)).toEqual(["Intro paragraph."]);
   });
 
   it("builds markdown-compatible anchors", () => {

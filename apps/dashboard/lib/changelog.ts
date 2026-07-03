@@ -13,6 +13,8 @@ export type ChangelogRelease = {
   version: string;
   date: string | null;
   prerelease: boolean;
+  /** Prose paragraphs before category headings (no ### lists). */
+  summary: string[];
   categories: Partial<Record<ChangelogCategory, string[]>>;
   anchor: string;
 };
@@ -45,6 +47,19 @@ export function changelogAnchor(version: string, date: string | null): string {
   return `${slug}---${dateSlug}`;
 }
 
+/** Paragraphs between the version heading and the first ### category (or end of section). */
+export function extractChangelogSummary(block: string): string[] {
+  const withoutHeader = block.replace(/^## \[[^\]]+\][^\n]*\n?/, "");
+  const prosePart =
+    withoutHeader.split(/\n(?=### (?:Added|Changed|Fixed|Removed|Deprecated|Security)\s*$)/m)[0] ??
+    "";
+
+  return prosePart
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && line !== "---" && !line.startsWith("- "));
+}
+
 export function parseChangelog(markdown: string): ChangelogRelease[] {
   const releases: ChangelogRelease[] = [];
   const blocks = markdown.split(/\n(?=## \[)/);
@@ -57,6 +72,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
     const dateRaw = header[2]?.trim();
     const date = dateRaw && dateRaw.length > 0 ? dateRaw : null;
     const prerelease = version === "Unreleased";
+    const summary = extractChangelogSummary(block);
 
     const categories: Partial<Record<ChangelogCategory, string[]>> = {};
     const headings = [...block.matchAll(CATEGORY_RE)];
@@ -76,12 +92,15 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
       if (items.length > 0) categories[cat] = items;
     }
 
-    if (Object.keys(categories).length === 0 && !prerelease) continue;
+    const hasContent =
+      summary.length > 0 || Object.keys(categories).length > 0 || prerelease;
+    if (!hasContent) continue;
 
     releases.push({
       version,
       date,
       prerelease,
+      summary,
       categories,
       anchor: changelogAnchor(version, date),
     });
