@@ -36,7 +36,17 @@ log ""
 
 # --- Pre-checks ---
 log "1. Infrastructure pre-checks"
-if curl -sf "$API/health" | grep -q '"database":"ok"'; then ok "GET /health + database"; else bad "GET /health"; fi
+HEALTH=$(curl -sf "$API/health" || true)
+if echo "$HEALTH" | grep -q '"database":"ok"'; then ok "GET /health + database"; else bad "GET /health"; fi
+if echo "$HEALTH" | grep -q '"email":"configured"'; then
+  ok "GET /health email configured (Resend)"
+elif echo "$HEALTH" | grep -q '"email":"not_configured"'; then
+  skip_step "Email not configured (set RESEND_API_KEY + TELEMETRY_EMAIL_FROM on API)"
+elif echo "$HEALTH" | grep -q '"email":'; then
+  bad "GET /health unexpected email value: $(echo "$HEALTH" | head -c 200)"
+else
+  skip_step "GET /health missing email field (deploy API with Resend #84)"
+fi
 if [[ "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$API/ingest/event" -H 'Content-Type: application/json' -d '{}')" == "401" ]]; then
   ok "POST /ingest/event without key → 401"
 else bad "ingest auth"; fi
