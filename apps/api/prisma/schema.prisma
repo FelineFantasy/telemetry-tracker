@@ -306,6 +306,28 @@ model Session {
   @@index([project_id, app])
 }
 
+/// Release / product-update mailing list (marketing site subscribe + registration opt-in).
+model MarketingSubscriber {
+  id                String                    @id @default(uuid())
+  email             String                    @unique
+  source            MarketingSubscriberSource
+  subscribed_at     DateTime                  @default(now()) @map("subscribed_at")
+  unsubscribed_at   DateTime?                 @map("unsubscribed_at")
+  /// When the subscriber last gave or renewed marketing consent (GDPR).
+  consent_at        DateTime                  @map("consent_at")
+  consent_metadata  Json?                     @map("consent_metadata")
+  /// SHA-256 hex of opaque one-click unsubscribe token (raw secret emailed only).
+  unsubscribe_token String                    @unique @map("unsubscribe_token")
+
+  @@index([unsubscribed_at])
+  @@index([source])
+}
+
+enum MarketingSubscriberSource {
+  subscribe_form
+  registration
+}
+
 /// Uploaded source map JSON keyed by release and minified bundle path (symbolication in phase 4).
 model SourceMapArtifact {
   id           String   @id @default(uuid())

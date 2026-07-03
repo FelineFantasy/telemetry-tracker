@@ -36,6 +36,7 @@ export function RegisterPageForm({ serverChoice }: RegisterPageFormProps) {
     password: "",
     confirm: "",
     termsAccepted: false,
+    marketingOptIn: true,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof RegisterPageValues, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -62,6 +63,7 @@ export function RegisterPageForm({ serverChoice }: RegisterPageFormProps) {
     formData.set("password", parsed.data.password);
     formData.set("displayName", parsed.data.name);
     formData.set("termsAccepted", "yes");
+    if (parsed.data.marketingOptIn) formData.set("marketingOptIn", "yes");
     if (inviteToken) formData.set("inviteToken", inviteToken);
     appendCookieConsentToFormData(formData, serverChoice);
 
@@ -160,6 +162,20 @@ export function RegisterPageForm({ serverChoice }: RegisterPageFormProps) {
         {errors.termsAccepted ? (
           <p className="-mt-2 text-xs text-destructive">{errors.termsAccepted}</p>
         ) : null}
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background/50 px-3 py-3 text-sm leading-relaxed text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={values.marketingOptIn}
+            onChange={(e) => update("marketingOptIn", e.target.checked)}
+            disabled={pending}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-brand"
+          />
+          <span>
+            Send me product updates and release notes about Telemetry Tracker. You can unsubscribe
+            anytime.
+          </span>
+        </label>
 
         {formError ? (
           <p className="text-sm text-destructive" role="alert">

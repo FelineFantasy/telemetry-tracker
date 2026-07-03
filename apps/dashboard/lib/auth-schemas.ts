@@ -12,6 +12,7 @@ export const registerPageSchema = z
     password: z.string().min(8, "At least 8 characters").max(256),
     confirm: z.string(),
     termsAccepted: z.boolean(),
+    marketingOptIn: z.boolean(),
   })
   .refine((v) => v.password === v.confirm, {
     message: "Passwords don't match",

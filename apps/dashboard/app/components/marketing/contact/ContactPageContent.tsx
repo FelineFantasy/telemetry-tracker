@@ -8,6 +8,7 @@ import {
   type ContactTopic,
 } from "@/app/contact/actions";
 import { Footer } from "@/app/components/marketing/footer";
+import { MarketingSubscribeForm } from "@/app/components/marketing/MarketingSubscribeForm";
 import { Nav } from "@/app/components/marketing/nav";
 import { gmailComposeUrl } from "@/lib/contact-email";
 import { authInputClassName } from "@/lib/input-classes";
@@ -431,6 +432,8 @@ export function ContactPageContent() {
                   Self-hosting guide →
                 </Link>
               </div>
+
+              <MarketingSubscribeForm idPrefix="contact" />
             </aside>
           </div>
         </section>

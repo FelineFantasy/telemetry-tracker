@@ -144,6 +144,7 @@ export async function register(
   const displayNameRaw = String(formData.get("displayName") ?? "").trim();
   const displayName = displayNameRaw ? displayNameRaw.slice(0, 120) : undefined;
   const inviteToken = String(formData.get("inviteToken") ?? "").trim();
+  const marketingOptIn = formData.get("marketingOptIn") === "yes";
   if (formData.get("termsAccepted") !== "yes") {
     return {
       ok: false,
@@ -161,6 +162,7 @@ export async function register(
       email,
       password,
       displayName,
+      marketingOptIn,
       ...(inviteToken ? { inviteToken } : {}),
     }),
   });
