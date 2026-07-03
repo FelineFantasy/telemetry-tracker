@@ -1,14 +1,29 @@
 import Link from "next/link";
+import type { ComponentType, SVGProps } from "react";
+import {
+  NestJsIcon,
+  NextJsIcon,
+  NodeJsIcon,
+  NuxtIcon,
+  ReactIcon,
+  ReactNativeIcon,
+  VueIcon,
+} from "./stack-icons";
 
 const sdks = [
-  { emoji: "⚛", label: "React", href: "/docs/sdk" },
-  { emoji: "▲", label: "Next.js", href: "/docs/nextjs" },
-  { emoji: "💚", label: "Vue", href: "/docs/vue" },
-  { emoji: "🟢", label: "Nuxt", href: "/docs/nuxt" },
-  { emoji: "📱", label: "React Native", href: "/docs/react-native" },
-  { emoji: "🟢", label: "Node.js", href: "/docs/node" },
-  { emoji: "🛡", label: "NestJS", href: "/docs/nestjs" },
-] as const;
+  { Icon: ReactIcon, label: "React", href: "/docs/sdk" },
+  { Icon: NextJsIcon, label: "Next.js", href: "/docs/nextjs", className: "text-foreground" },
+  { Icon: VueIcon, label: "Vue", href: "/docs/vue" },
+  { Icon: NuxtIcon, label: "Nuxt", href: "/docs/nuxt" },
+  { Icon: ReactNativeIcon, label: "React Native", href: "/docs/react-native" },
+  { Icon: NodeJsIcon, label: "Node.js", href: "/docs/node" },
+  { Icon: NestJsIcon, label: "NestJS", href: "/docs/nestjs" },
+] as const satisfies ReadonlyArray<{
+  Icon: ComponentType<SVGProps<SVGSVGElement>>;
+  label: string;
+  href: string;
+  className?: string;
+}>;
 
 export function SupportedSdks() {
   return (
@@ -21,17 +36,16 @@ export function SupportedSdks() {
           Works with your stack
         </h2>
         <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-7">
-          {sdks.map((sdk) => (
-            <li key={sdk.label}>
+          {sdks.map(({ Icon, label, href, className }) => (
+            <li key={label}>
               <Link
-                href={sdk.href}
+                href={href}
+                aria-label={`${label} SDK documentation`}
                 className="group flex flex-col items-center gap-1.5 text-center transition-colors"
               >
-                <span className="text-2xl leading-none" aria-hidden>
-                  {sdk.emoji}
-                </span>
+                <Icon className={`h-7 w-7 shrink-0 ${className ?? ""}`} />
                 <span className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-                  {sdk.label}
+                  {label}
                 </span>
               </Link>
             </li>
