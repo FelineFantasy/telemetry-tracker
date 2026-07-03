@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.3.2] - 2026-07-03
+
+### Changed
+
+- **Brand icons** — updated favicon, apple-touch-icon, Android chrome icons, and PWA manifest assets
+
+---
+
 ## [1.3.1] - 2026-07-02
 
 ### Added
