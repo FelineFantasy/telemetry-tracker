@@ -232,7 +232,7 @@ Same `DATABASE_URL` as the API. See [RAILWAY.md](./RAILWAY.md#retention-cron).
 
 ```bash
 curl -sS https://<api-host>/health
-# → {"ok":true,"database":"ok"}
+# → {"ok":true,"database":"ok","email":"configured"}
 
 curl -sS -o /dev/null -w "%{http_code}" -X POST https://<api-host>/ingest/event \
   -H "Content-Type: application/json" -d '{"app":"t","name":"t"}'

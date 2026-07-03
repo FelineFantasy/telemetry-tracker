@@ -1,4 +1,4 @@
-import { initSentryIfConfigured } from "./lib/observability.js";
+import { isTransactionalEmailConfigured } from "./lib/email.js";
 
 /** Sentry must init before any module that should be auto-instrumented (http, pg, …). Static imports of `./app.js` would load Fastify/Prisma/routes first. */
 await initSentryIfConfigured();
@@ -21,6 +21,12 @@ try {
   }
   const addr = (app.server as { address?: () => { address: string; port: number } | null }).address?.();
   console.log("[api] Listening on", addr ? `${addr.address}:${addr.port}` : `port ${port}`);
+  if (process.env.NODE_ENV === "production" && !isTransactionalEmailConfigured()) {
+    console.warn(
+      "[api] Transactional email is not configured (RESEND_API_KEY + TELEMETRY_EMAIL_FROM). " +
+        "Invites, password reset, notifications, and contact form delivery will be disabled."
+    );
+  }
 } catch (err) {
   console.error("[api] Startup failed:", err);
   process.exit(1);
