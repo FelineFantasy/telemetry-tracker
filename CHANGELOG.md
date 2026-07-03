@@ -13,6 +13,39 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.2] - 2026-07-03
+
+### Added
+
+- **Marketing email list** — `MarketingSubscriber` model with subscribe/unsubscribe API, footer and contact subscribe forms, registration opt-in (default on), privacy policy updates, and `scripts/send-release-email.ts` for manual release broadcasts via Resend
+- **Social share banner** — official marketing banner at `/og-banner.png` (1024×409) for Open Graph, Twitter cards, and GitHub social preview
+- **Ops** — Resend production setup runbook; production `/health` includes email provider status; `scripts/smoke-production.sh` asserts email configuration
+
+### Changed
+
+- **Marketing home** — Supported SDKs use brand SVG icons instead of emoji placeholders
+- **Marketing footer** — Resources column links to doc hubs (SDK guides, dashboard guide) instead of individual SDK pages
+- **Open Graph image** — replace dynamic `/opengraph-image` generator with static `/og-banner.png` marketing banner
+
+### Fixed
+
+- **API** — initialize Sentry on startup (`initSentryIfConfigured` in API entrypoint)
+- **Dashboard** — allow optional `className` on Supported SDKs list items
+
+### Database
+
+After upgrading from v1.4.1, run:
+
+```bash
+pnpm --filter api exec prisma migrate deploy
+```
+
+New migrations in this release:
+
+- `20260703140000_marketing_subscriber` — marketing email subscriber list with consent and unsubscribe tokens
+
+---
+
 ## [1.4.1] - 2026-07-03
 
 ### Added

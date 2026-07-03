@@ -21,7 +21,7 @@ Use this before exposing Telemetry Tracker on the public internet or handing it 
 | Migrations | Run `pnpm --filter api exec prisma migrate deploy` on every API deploy (CI does this on `main`). |
 | Retention | Schedule the retention job nightly (see [RAILWAY.md](./RAILWAY.md#retention-cron)). Without it, telemetry grows until manual cleanup. |
 | Health | Set `HEALTH_CHECK_DATABASE=true` on the API so `GET /health` verifies Postgres. |
-| Observability | Optional `SENTRY_DSN` on the API for uncaught errors. Monitor API 5xx, ingest 429 rate, and disk/DB size. |
+| Observability | Optional `SENTRY_DSN` on the API for uncaught errors. Monitor API 5xx, ingest 429 rate, and disk/DB size. `GET /health` reports `"email":"configured"` or `"not_configured"` when `HEALTH_CHECK_DATABASE=true`. |
 | Rate limits | Tune `RATE_LIMIT_*` env vars if you see false positives from shared IPs. Per-project ingest RPS follows plan tiers in `apps/api/src/config/plans.ts`. |
 
 ## Billing (optional)
@@ -55,5 +55,5 @@ Manually verify: login, overview loads, ingest with API key returns 200, ingest 
 ## Known limitations (v1)
 
 - Per-project ingest RPS bucket is **in-memory** (single API process). Horizontal scaling needs a shared rate limiter later.
-- Password reset in production requires **`RESEND_API_KEY`** and **`TELEMETRY_EMAIL_FROM`** on the API (see [BILLING.md](./BILLING.md)); without them, admins must share reset links manually.
+- Password reset in production requires **`RESEND_API_KEY`** and **`TELEMETRY_EMAIL_FROM`** on the API (see [BILLING.md](./BILLING.md)); without them, admins must share reset links manually. Setup runbook: [BILLING.md → Production setup](./BILLING.md#production-setup-hosted-cloud).
 - No built-in error spike alerts or Slack webhooks.

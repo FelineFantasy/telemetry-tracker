@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { prisma } from "./lib/db.js";
+import { isTransactionalEmailConfigured } from "./lib/email.js";
 import { buildCorsOptions } from "./lib/cors-config.js";
 import { genReqId, registerObservabilityHooks } from "./lib/observability.js";
 import {
@@ -15,6 +16,7 @@ import { ingestRoutes } from "./routes/ingest.js";
 import { apiRoutes } from "./routes/api.js";
 import { authRoutes } from "./routes/auth.js";
 import { contactRoutes } from "./routes/contact.js";
+import { marketingRoutes } from "./routes/marketing.js";
 import { projectDashboardRoutes } from "./routes/project-dashboard.js";
 import { billingRoutes } from "./routes/billing.js";
 import { registerStripeWebhookIfConfigured } from "./routes/stripe-webhook.js";
@@ -47,15 +49,16 @@ export async function createApp(): Promise<FastifyInstance> {
       });
       // Set HEALTH_CHECK_DATABASE=true in production (or staging) to verify DB connectivity; omit in dev if you prefer a dependency-free /health.
       f.get("/health", async (_req, reply) => {
+        const email = isTransactionalEmailConfigured() ? "configured" : "not_configured";
         if (process.env.HEALTH_CHECK_DATABASE === "true") {
           try {
             await prisma.$queryRaw`SELECT 1`;
-            return reply.code(200).send({ ok: true, database: "ok" });
+            return reply.code(200).send({ ok: true, database: "ok", email });
           } catch {
-            return reply.code(503).send({ ok: false, database: "unavailable" });
+            return reply.code(503).send({ ok: false, database: "unavailable", email });
           }
         }
-        return reply.code(200).send({ ok: true });
+        return reply.code(200).send({ ok: true, email });
       });
       f.get("/", async (_req, reply) =>
         reply.code(200).send({ service: "telemetry-api", ok: true })
@@ -92,6 +95,7 @@ export async function createApp(): Promise<FastifyInstance> {
         timeWindow: RATE_LIMIT_WINDOW_MS,
       });
       await f.register(contactRoutes);
+      await f.register(marketingRoutes);
     },
     { prefix: "/api" }
   );

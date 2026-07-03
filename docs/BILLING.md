@@ -4,16 +4,16 @@ Stripe billing and Resend email are **optional** for self-hosted installs. Core 
 
 ---
 
-## Resend (invites & password reset)
+## Resend (invites, password reset, notifications, contact)
 
-Without email configured, admins must share invite or reset links manually.
+Without email configured, admins must share invite or reset links manually. In production the API logs a startup warning and `/health` reports `"email": "not_configured"`.
 
 | Variable | Description |
 |----------|-------------|
 | `RESEND_API_KEY` | API key from [Resend](https://resend.com) |
-| `TELEMETRY_EMAIL_FROM` | Sender address, e.g. `Telemetry <noreply@yourdomain.com>` |
+| `TELEMETRY_EMAIL_FROM` | Sender address, e.g. `Telemetry Tracker <noreply@tacko.io>` |
 
-Both are required for outbound email. Verify your domain in Resend for production.
+Both are required for outbound email. Verify your sending domain in Resend for production.
 
 Optional for the marketing contact form (`POST /api/contact`):
 
@@ -27,6 +27,78 @@ The contact form uses the same Resend credentials as password reset. Resend will
 - the domain in `TELEMETRY_EMAIL_FROM` is not verified in [Resend → Domains](https://resend.com/domains)
 
 Check API logs for `[email] Resend failed:` for the exact rejection reason.
+
+### What uses email
+
+| Flow | Trigger | Notes |
+|------|---------|--------|
+| Organization invite | Team settings → invite by email | Requires `TELEMETRY_DASHBOARD_ORIGIN` for invite URL |
+| Password reset | `POST /api/auth/forgot-password` | Same origin requirement for reset link |
+| Notification email | Billing alerts, quota thresholds, new error groups, team joins | Respects per-user notification preferences |
+| Contact form | `POST /api/contact` | Delivers to `CONTACT_INBOX_EMAIL` with `replyTo` set to submitter |
+| Product updates | Footer subscribe, registration opt-in | Stored in `MarketingSubscriber`; see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md) |
+
+### Production setup (hosted cloud)
+
+Use this checklist for **telemetry-tracker.com** on Railway (API service only — dashboard does not need Resend vars).
+
+#### 1. Resend account and API key
+
+1. Sign in at [resend.com](https://resend.com).
+2. **API Keys** → Create key (e.g. `telemetry-tracker-production`) with **Sending access**.
+3. Copy the key (`re_…`) — shown once.
+
+#### 2. Verify sending domain
+
+The hosted cloud sends from **tacko.io** (operator domain). `telemetry-tracker.com` is the app URL, not the mail-from domain.
+
+1. **Domains** → **Add domain** → `tacko.io`.
+2. Add the DNS records Resend shows (typically **SPF**, **DKIM**, and optionally **DMARC**) at your DNS host for `tacko.io`.
+3. Wait until Resend shows the domain as **Verified**.
+
+Recommended sender:
+
+```env
+TELEMETRY_EMAIL_FROM=Telemetry Tracker <noreply@tacko.io>
+CONTACT_INBOX_EMAIL=info@tacko.io
+```
+
+You can use another verified domain if you prefer; `TELEMETRY_EMAIL_FROM` must match it exactly.
+
+#### 3. Railway API environment
+
+On the **API** Railway service (not dashboard), set:
+
+| Variable | Example |
+|----------|---------|
+| `RESEND_API_KEY` | `re_…` |
+| `TELEMETRY_EMAIL_FROM` | `Telemetry Tracker <noreply@tacko.io>` |
+| `CONTACT_INBOX_EMAIL` | `info@tacko.io` |
+| `TELEMETRY_DASHBOARD_ORIGIN` | `https://telemetry-tracker.com` |
+
+Redeploy the API after saving variables.
+
+#### 4. Verify delivery
+
+```bash
+# Health should show email configured
+curl -sS https://api.telemetry-tracker.com/health
+# → {"ok":true,"database":"ok","email":"configured"}
+
+# Contact form (expect 200 ok:true when Resend accepts)
+curl -sS -X POST https://api.telemetry-tracker.com/api/contact \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Test","email":"you@example.com","topic":"general","message":"Resend production verification — please ignore."}'
+
+# Password reset (always 200; check inbox for link)
+curl -sS -X POST https://api.telemetry-tracker.com/api/auth/forgot-password \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"your-account@example.com"}'
+```
+
+Also send a team invite from **Settings → Team** and confirm the invitee receives mail.
+
+If delivery fails, check Railway API logs for `[email] Resend failed:` and confirm domain verification in the Resend dashboard.
 
 ---
 
@@ -60,7 +132,9 @@ Test with Stripe CLI or Dashboard **Send test webhook** after deploy.
 
 ## Production checklist
 
-- [ ] Resend domain verified (if using email)
+- [ ] Resend domain verified (`tacko.io` or your sending domain) — see [Resend production setup](./BILLING.md#production-setup-hosted-cloud)
+- [ ] `RESEND_API_KEY` and `TELEMETRY_EMAIL_FROM` set on Railway API; `/health` shows `"email":"configured"`
+- [ ] Test invite, password reset, and contact form delivery
 - [ ] Stripe webhook URL reachable from the internet
 - [ ] Webhook secret matches `STRIPE_WEBHOOK_SECRET`
 - [ ] Test checkout completes and org tier updates

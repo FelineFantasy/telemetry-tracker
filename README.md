@@ -231,7 +231,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 
 **Publish SDK packages:** `npm login` → `pnpm publish:packages` (see [CONTRIBUTING.md](CONTRIBUTING.md) and root `package.json` scripts).
 
-**GitHub social preview:** In repo **Settings → General → Social preview**, use `https://telemetry-tracker.com/opengraph-image` (1200×630) once the dashboard is deployed. Install path for docs and marketing: `@telemetry-tracker/core` (see npm badges above).
+**GitHub social preview:** In repo **Settings → General → Social preview**, use `https://telemetry-tracker.com/og-banner.png` (1024×409 marketing banner) once the dashboard is deployed. Install path for docs and marketing: `@telemetry-tracker/core` (see npm badges above).
 
 ---
 

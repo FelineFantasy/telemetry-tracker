@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./logo";
+import { MarketingSubscribeForm } from "./MarketingSubscribeForm";
 
 const cols: { heading: string; links: { label: string; href: string }[] }[] = [
   {
@@ -17,9 +18,8 @@ const cols: { heading: string; links: { label: string; href: string }[] }[] = [
       { label: "Documentation", href: "/docs" },
       { label: "Release notes", href: "/docs/releases" },
       { label: "Hosted cloud", href: "/docs/hosted-cloud" },
-      { label: "Next.js SDK", href: "/docs/nextjs" },
-      { label: "NestJS", href: "/docs/nestjs" },
-      { label: "Vue / Nuxt", href: "/docs/vue" },
+      { label: "SDK guides", href: "/docs/sdk" },
+      { label: "Using the dashboard", href: "/docs/dashboard" },
       { label: "GitHub", href: "https://github.com/Telemetry-Tracker/telemetry-tracker" },
     ],
   },
@@ -52,6 +52,9 @@ export function Footer() {
               </span>
               Self-hosted ready
             </p>
+            <div className="mt-8 max-w-sm">
+              <MarketingSubscribeForm compact idPrefix="footer" />
+            </div>
           </div>
           {cols.map((c) => (
             <div key={c.heading}>

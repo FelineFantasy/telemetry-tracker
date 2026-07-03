@@ -4,20 +4,26 @@ import { createApp } from "./app.js";
 
 describe("API smoke", () => {
   let app: FastifyInstance;
+  let prevHealthCheck: string | undefined;
 
   beforeAll(async () => {
+    prevHealthCheck = process.env.HEALTH_CHECK_DATABASE;
+    delete process.env.HEALTH_CHECK_DATABASE;
     app = await createApp();
   });
 
   afterAll(async () => {
+    if (prevHealthCheck === undefined) delete process.env.HEALTH_CHECK_DATABASE;
+    else process.env.HEALTH_CHECK_DATABASE = prevHealthCheck;
     await app.close();
   });
 
   it("GET /health returns 200", async () => {
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { ok: boolean };
+    const body = JSON.parse(res.body) as { ok: boolean; email: string };
     expect(body.ok).toBe(true);
+    expect(body.email).toMatch(/^configured|not_configured$/);
   });
 
   it("POST /ingest/event without API key returns 401", async () => {
