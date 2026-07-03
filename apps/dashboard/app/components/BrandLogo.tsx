@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 /**
- * Official Telemetry Tracker mark (PNG with transparency).
+ * Official Telemetry Tracker mark.
  * Sizing is controlled via `size` and/or `className` + CSS.
  */
 export function BrandLogo({
@@ -16,11 +16,11 @@ export function BrandLogo({
 }) {
   return (
     <Image
-      src="/telemetry-logo.png"
+      src="/telemetry-logo.jpg"
       alt=""
       width={size}
       height={size}
-      className={className}
+      className={`rounded-xl object-cover ${className ?? ""}`}
       priority={priority}
     />
   );
