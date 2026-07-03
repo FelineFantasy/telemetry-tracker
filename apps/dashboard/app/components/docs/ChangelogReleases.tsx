@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ChangelogCategory, ChangelogRelease } from "@/lib/changelog";
-import { GITHUB_RELEASES_BASE } from "@/lib/changelog";
+import { GITHUB_RELEASES_BASE, resolveChangelogLinkHref } from "@/lib/changelog";
 
 const CATEGORY_ORDER: ChangelogCategory[] = [
   "Added",
@@ -25,15 +25,24 @@ function renderInline(text: string) {
   return parts.map((part, i) => {
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
-      const href = link[2]!;
-      const external = href.startsWith("http");
+      const rawHref = link[2]!;
+      const { href: resolved, external } = resolveChangelogLinkHref(rawHref);
+      const className = "text-brand hover:underline";
+      if (external) {
+        return (
+          <a
+            key={i}
+            href={resolved}
+            className={className}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {link[1]}
+          </a>
+        );
+      }
       return (
-        <Link
-          key={i}
-          href={href}
-          className="text-brand hover:underline"
-          {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-        >
+        <Link key={i} href={resolved} className={className}>
           {link[1]}
         </Link>
       );

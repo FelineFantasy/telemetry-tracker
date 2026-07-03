@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { changelogAnchor, extractChangelogSummary, parseChangelog } from "./changelog";
+import {
+  changelogAnchor,
+  extractChangelogSummary,
+  parseChangelog,
+  resolveChangelogLinkHref,
+} from "./changelog";
 
 const SAMPLE = `# Changelog
 
@@ -72,5 +77,20 @@ Intro paragraph.
 
   it("builds markdown-compatible anchors", () => {
     expect(changelogAnchor("1.4.0", "2026-07-03")).toBe("1-4-0---2026-07-03");
+  });
+
+  it("resolves changelog link targets", () => {
+    expect(resolveChangelogLinkHref("https://telemetry-tracker.com")).toEqual({
+      href: "https://telemetry-tracker.com",
+      external: true,
+    });
+    expect(resolveChangelogLinkHref("/docs/hosted-cloud")).toEqual({
+      href: "/docs/hosted-cloud",
+      external: false,
+    });
+    expect(resolveChangelogLinkHref("docs/RELEASE.md#v100-2026-06-26")).toEqual({
+      href: "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main/docs/RELEASE.md#v100-2026-06-26",
+      external: true,
+    });
   });
 });

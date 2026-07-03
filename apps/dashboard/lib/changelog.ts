@@ -116,3 +116,24 @@ export function loadChangelog(): ChangelogRelease[] {
 
 export const GITHUB_RELEASES_BASE =
   "https://github.com/Telemetry-Tracker/telemetry-tracker/releases/tag";
+
+export const GITHUB_REPO_BLOB_BASE =
+  "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main";
+
+/** Resolve markdown link targets from CHANGELOG (http, in-app, or repo-relative → GitHub). */
+export function resolveChangelogLinkHref(href: string): {
+  href: string;
+  external: boolean;
+} {
+  if (href.startsWith("http://") || href.startsWith("https://")) {
+    return { href, external: true };
+  }
+  if (href.startsWith("/")) {
+    return { href, external: false };
+  }
+  const normalized = href.replace(/^\.\//, "");
+  return {
+    href: `${GITHUB_REPO_BLOB_BASE}/${normalized}`,
+    external: true,
+  };
+}
