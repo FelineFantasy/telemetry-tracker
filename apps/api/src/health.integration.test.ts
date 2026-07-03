@@ -23,6 +23,6 @@ describe.skipIf(!runDbIntegration)("GET /health with database check (integration
   it("returns 200 and database ok when HEALTH_CHECK_DATABASE=true", async () => {
     const res = await app!.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({ ok: true, database: "ok" });
+    expect(JSON.parse(res.body)).toEqual({ ok: true, database: "ok", email: "not_configured" });
   });
 });

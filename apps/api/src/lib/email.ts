@@ -2,22 +2,28 @@
  * Optional transactional email. When `RESEND_API_KEY` and `TELEMETRY_EMAIL_FROM` are set,
  * sends via Resend API. Otherwise logs in non-production and no-ops in production.
  */
+export function isTransactionalEmailConfigured(): boolean {
+  return Boolean(
+    process.env.RESEND_API_KEY?.trim() && process.env.TELEMETRY_EMAIL_FROM?.trim()
+  );
+}
+
 export async function sendTransactionalEmail(opts: {
   to: string | string[];
   subject: string;
   html: string;
   replyTo?: string;
 }): Promise<{ sent: boolean; devLogged?: boolean; status?: number; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.TELEMETRY_EMAIL_FROM?.trim();
-
-  if (!apiKey || !from) {
+  if (!isTransactionalEmailConfigured()) {
     if (process.env.NODE_ENV !== "production") {
       console.info("[email:dev]", opts.to, opts.subject, opts.html.slice(0, 200));
       return { sent: false, devLogged: true };
     }
     return { sent: false };
   }
+
+  const apiKey = process.env.RESEND_API_KEY!.trim();
+  const from = process.env.TELEMETRY_EMAIL_FROM!.trim();
 
   let res: Response;
   try {

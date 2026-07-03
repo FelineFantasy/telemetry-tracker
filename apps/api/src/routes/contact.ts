@@ -1,5 +1,8 @@
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { sendTransactionalEmail } from "../lib/email.js";
+import {
+  isTransactionalEmailConfigured,
+  sendTransactionalEmail,
+} from "../lib/email.js";
 
 const CONTACT_INBOX =
   process.env.CONTACT_INBOX_EMAIL?.trim() || "info@tacko.io";
@@ -60,12 +63,6 @@ function parseContactBody(body: ContactBody) {
   return { name, email, company, topic, message, errors };
 }
 
-function emailConfigured(): boolean {
-  return Boolean(
-    process.env.RESEND_API_KEY?.trim() && process.env.TELEMETRY_EMAIL_FROM?.trim()
-  );
-}
-
 function contactDeliveryError(result: { status?: number; error?: string }): string {
   const resendMessage = result.error?.toLowerCase() ?? "";
   if (
@@ -98,7 +95,7 @@ export async function contactRoutes(
     const { name, email, company, topic, message } = parsed;
     const topicLabel = TOPIC_LABELS[topic] ?? topic;
 
-    if (!emailConfigured()) {
+    if (!isTransactionalEmailConfigured()) {
       if (process.env.NODE_ENV !== "production") {
         console.info("[contact:dev]", { name, email, company, topic, message });
         return reply.send({

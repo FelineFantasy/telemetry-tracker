@@ -45,6 +45,8 @@ DATABASE_URL="postgresql://..." pnpm --filter api exec prisma migrate deploy
 
 Optional: Resend, Stripe, registration flags — [BILLING.md](./BILLING.md) and [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md).
 
+**Resend (API service only):** set `RESEND_API_KEY`, `TELEMETRY_EMAIL_FROM`, and optionally `CONTACT_INBOX_EMAIL`. After deploy, `GET /health` should include `"email":"configured"`. Full DNS and verification steps: [BILLING.md → Production setup](./BILLING.md#production-setup-hosted-cloud).
+
 ---
 
 ## Dashboard service
