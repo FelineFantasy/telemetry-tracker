@@ -11,6 +11,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Docs** — Vue, NestJS, and Nuxt SDK guides on `/docs` plus matching repo markdown (`docs/sdk-vue.md`, `docs/sdk-nestjs.md`, `docs/sdk-nuxt.md`)
+
+### Changed
+
+- **Marketing docs** — SDK section tabs include Vue, Nuxt, and NestJS; version badge updated to v1.3.0; sitemap includes `/docs/hosted-cloud`
+
 ---
 
 ## [1.3.4] - 2026-07-03

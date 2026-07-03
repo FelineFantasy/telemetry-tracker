@@ -35,7 +35,7 @@ export default function DocsHostedCloudPage() {
         <h2 id="hosted-prereq-heading">Before you start</h2>
         <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
           <li>
-            A browser and an app you can instrument (web, Node, or React Native — see{" "}
+            A browser and an app you can instrument (web, Node, NestJS, or React Native — see{" "}
             <Link href="/docs/sdk" className="text-brand hover:underline">
               SDK guides
             </Link>
@@ -114,7 +114,19 @@ trackEvent("app.started");`}</DocsCodeBlock>
             @telemetry-tracker/next
           </Link>{" "}
           with <code className="text-foreground">NEXT_PUBLIC_TELEMETRY_INGEST_URL</code> set to{" "}
-          <code className="text-foreground">{HOSTED_API_URL}</code>.
+          <code className="text-foreground">{HOSTED_API_URL}</code>. For Vue, Nuxt, or NestJS see{" "}
+          <Link href="/docs/vue" className="text-brand hover:underline">
+            Vue
+          </Link>
+          ,{" "}
+          <Link href="/docs/nuxt" className="text-brand hover:underline">
+            Nuxt
+          </Link>
+          , and{" "}
+          <Link href="/docs/nestjs" className="text-brand hover:underline">
+            NestJS
+          </Link>{" "}
+          guides.
         </p>
       </section>
 

@@ -148,9 +148,21 @@ trackEvent("plan.upgraded", { from: "free", to: "pro" });`}</DocsCodeBlock>
         <p>
           Sessions mark the start and end of a user visit. The SDK sends session boundaries
           automatically; the dashboard shows duration and lets you filter errors and events by
-          session. For platform-specific setup (page tracking, app lifecycle), see the{" "}
+          session.           For platform-specific setup (page tracking, app lifecycle), see the{" "}
           <Link href="/docs/nextjs" className="text-brand hover:underline">
             Next.js
+          </Link>
+          ,{" "}
+          <Link href="/docs/vue" className="text-brand hover:underline">
+            Vue
+          </Link>
+          ,{" "}
+          <Link href="/docs/nuxt" className="text-brand hover:underline">
+            Nuxt
+          </Link>
+          ,{" "}
+          <Link href="/docs/nestjs" className="text-brand hover:underline">
+            NestJS
           </Link>
           ,{" "}
           <Link href="/docs/react-native" className="text-brand hover:underline">
@@ -203,8 +215,16 @@ trackEvent("plan.upgraded", { from: "free", to: "pro" });`}</DocsCodeBlock>
             Node.js
           </Link>
           ,{" "}
+          <Link href="/docs/nestjs" className="text-brand hover:underline">
+            NestJS
+          </Link>
+          ,{" "}
           <Link href="/docs/nuxt" className="text-brand hover:underline">
             Nuxt
+          </Link>
+          ,{" "}
+          <Link href="/docs/vue" className="text-brand hover:underline">
+            Vue
           </Link>
           ,{" "}
           <Link href="/docs/react-native" className="text-brand hover:underline">

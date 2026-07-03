@@ -29,7 +29,7 @@ export default function DocsSdkPage() {
         <p>
           The core library (<code>@telemetry-tracker/core</code>) exposes <code>init</code>, event and
           error helpers, screen/session tracking, and identity. Platform packages wrap the same
-          config for Next.js, Nuxt, Node, and React Native.
+          config for Next.js, NestJS, Nuxt, Vue, Node, and React Native.
         </p>
       }
     >

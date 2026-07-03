@@ -29,7 +29,7 @@ npm install @telemetry-tracker/core`}
 
       <h2>Runtime config</h2>
       <p>
-        In <code>nuxt.config.ts</code> expose the ingest URL and app name:
+        In <code>nuxt.config.ts</code> expose the ingest URL, app name, and API key:
       </p>
       <CodeBlock
         code={`export default defineNuxtConfig({
@@ -37,6 +37,7 @@ npm install @telemetry-tracker/core`}
     public: {
       telemetryIngestUrl: process.env.NUXT_PUBLIC_TELEMETRY_INGEST_URL || "https://your-api.example.com",
       telemetryApp: process.env.NUXT_PUBLIC_TELEMETRY_APP || "my-nuxt-app",
+      telemetryApiKey: process.env.NUXT_PUBLIC_TELEMETRY_API_KEY || "",
     },
   },
 });`}
