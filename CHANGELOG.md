@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.4.1] - 2026-07-03
+
 ### Added
 
 - **Release notes** — `/docs/releases` renders platform semver history from `CHANGELOG.md`
