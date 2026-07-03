@@ -52,11 +52,17 @@ const dataTable = [
     purpose: "Answer questions and improve documentation.",
     retention: "As long as needed to resolve the request.",
   },
+  {
+    kind: "Marketing / product updates",
+    examples: "Email address, consent timestamp, subscribe source (footer or registration).",
+    purpose: "Send optional release notes and feature announcements on the Hosted Cloud.",
+    retention: "Until you unsubscribe via the link in our emails.",
+  },
 ];
 
 const optionalServices = [
   { name: "Stripe", role: "Optional payment processing", note: "When configured on the API" },
-  { name: "Resend", role: "Optional transactional email", note: "Invites and password reset" },
+  { name: "Resend", role: "Optional transactional email", note: "Invites, password reset, contact, product updates" },
   { name: "Sentry", role: "Optional API error monitoring", note: "When SENTRY_DSN is set" },
 ];
 
@@ -191,8 +197,8 @@ export function PrivacyPageContent() {
                   <p>
                     Data is stored in managed PostgreSQL and object storage operated for the Hosted
                     Cloud. Retention follows your plan tier and runs on a scheduled job. Billing uses
-                    Stripe; transactional email (invites, password reset) may use Resend when
-                    configured.
+                    Stripe; transactional email (invites, password reset, contact form, optional
+                    product updates) may use Resend when configured.
                   </p>
                   <p>
                     Privacy requests for Hosted Cloud accounts:{" "}
@@ -270,7 +276,8 @@ export function PrivacyPageContent() {
                     </li>
                     <li>
                       <span className="text-foreground/85">Consent</span> — where required for
-                      optional features you enable.
+                      optional features you enable, including product update emails when you
+                      subscribe on the marketing site or opt in during registration.
                     </li>
                   </ul>
                 </Section>

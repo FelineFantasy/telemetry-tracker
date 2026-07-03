@@ -7,6 +7,8 @@ import { hashPassword, verifyPassword } from "../lib/password.js";
 import { hashPasswordResetToken } from "../lib/password-reset-token.js";
 import { sendTransactionalEmail } from "../lib/email.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
+import { subscribeMarketingEmail, REGISTRATION_CONSENT_LABEL } from "../lib/marketing-subscriber.js";
+import { MarketingSubscriberSource } from "@prisma/client";
 
 const SESSION_DAYS = 30;
 const RESET_TOKEN_HOURS = 1;
@@ -29,6 +31,7 @@ export async function authRoutes(
       password?: string;
       displayName?: string;
       inviteToken?: string;
+      marketingOptIn?: boolean;
     };
     const email = typeof body.email === "string" ? normalizeEmail(body.email) : "";
     const password = typeof body.password === "string" ? body.password : "";
@@ -38,6 +41,7 @@ export async function authRoutes(
         : null;
     const inviteToken =
       typeof body.inviteToken === "string" ? body.inviteToken.trim() : "";
+    const marketingOptIn = body.marketingOptIn !== false;
 
     if (!email.includes("@")) {
       return reply.status(400).send({ error: "Invalid email" });
@@ -151,6 +155,21 @@ export async function authRoutes(
         },
       });
 
+      if (marketingOptIn) {
+        await subscribeMarketingEmail(prisma, {
+          email: user.email,
+          source: MarketingSubscriberSource.registration,
+          consentLabel: REGISTRATION_CONSENT_LABEL,
+          consentMetadata: {
+            ip: request.ip,
+            userAgent:
+              typeof request.headers["user-agent"] === "string"
+                ? request.headers["user-agent"].slice(0, 512)
+                : undefined,
+          },
+        });
+      }
+
       return reply.status(201).send({
         sessionId,
         expiresAt: expiresAt.toISOString(),
@@ -194,6 +213,21 @@ export async function authRoutes(
         expires_at: expiresAt,
       },
     });
+
+    if (marketingOptIn) {
+      await subscribeMarketingEmail(prisma, {
+        email: user.email,
+        source: MarketingSubscriberSource.registration,
+        consentLabel: REGISTRATION_CONSENT_LABEL,
+        consentMetadata: {
+          ip: request.ip,
+          userAgent:
+            typeof request.headers["user-agent"] === "string"
+              ? request.headers["user-agent"].slice(0, 512)
+              : undefined,
+        },
+      });
+    }
 
     return reply.status(201).send({
       sessionId,

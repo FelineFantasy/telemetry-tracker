@@ -36,6 +36,7 @@ Check API logs for `[email] Resend failed:` for the exact rejection reason.
 | Password reset | `POST /api/auth/forgot-password` | Same origin requirement for reset link |
 | Notification email | Billing alerts, quota thresholds, new error groups, team joins | Respects per-user notification preferences |
 | Contact form | `POST /api/contact` | Delivers to `CONTACT_INBOX_EMAIL` with `replyTo` set to submitter |
+| Product updates | Footer subscribe, registration opt-in | Stored in `MarketingSubscriber`; see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md) |
 
 ### Production setup (hosted cloud)
 

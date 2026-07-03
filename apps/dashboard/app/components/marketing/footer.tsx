@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./logo";
+import { MarketingSubscribeForm } from "./MarketingSubscribeForm";
 
 const cols: { heading: string; links: { label: string; href: string }[] }[] = [
   {
@@ -51,6 +52,9 @@ export function Footer() {
               </span>
               Self-hosted ready
             </p>
+            <div className="mt-8 max-w-sm">
+              <MarketingSubscribeForm compact idPrefix="footer" />
+            </div>
           </div>
           {cols.map((c) => (
             <div key={c.heading}>
