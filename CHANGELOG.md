@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.3.4] - 2026-07-03
+
+### Fixed
+
+- **Billing CTAs** — hide “Upgrade to Pro” when already on Pro; highlight the next applicable upgrade or Manage billing
+
+---
+
 ## [1.3.3] - 2026-07-03
 
 ### Changed

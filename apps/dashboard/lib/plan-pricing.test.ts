@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   billingStatusHint,
+  billingUpgradeActions,
   formatPlanPriceEur,
   PLAN_LIST_PRICES_EUR,
   resolveEffectivePlanTier,
@@ -43,6 +44,24 @@ describe("plan-pricing", () => {
         capabilitiesLoaded: true,
       })
     ).toMatch(/unavailable for the selected project/);
+  });
+
+  it("hides Pro upgrade CTA when already on Pro", () => {
+    expect(billingUpgradeActions("PRO")).toEqual({
+      showPro: false,
+      showBusiness: true,
+      primaryUpgrade: "BUSINESS",
+    });
+    expect(billingUpgradeActions("BUSINESS")).toEqual({
+      showPro: false,
+      showBusiness: false,
+      primaryUpgrade: null,
+    });
+    expect(billingUpgradeActions("FREE")).toEqual({
+      showPro: true,
+      showBusiness: true,
+      primaryUpgrade: "PRO",
+    });
   });
 
   it("avoids upgrade hint when checkout controls are not shown", () => {

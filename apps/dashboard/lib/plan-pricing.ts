@@ -55,6 +55,24 @@ export function resolveEffectivePlanTier(
   return billing?.effectivePlanTier ?? usage?.planTier ?? null;
 }
 
+export type BillingUpgradeActions = {
+  showPro: boolean;
+  showBusiness: boolean;
+  primaryUpgrade: "PRO" | "BUSINESS" | null;
+};
+
+/** Which upgrade CTAs to show for the org's current effective plan. */
+export function billingUpgradeActions(planTier: string | null | undefined): BillingUpgradeActions {
+  const tier = (planTier ?? "FREE").toUpperCase();
+  if (tier === "BUSINESS") {
+    return { showPro: false, showBusiness: false, primaryUpgrade: null };
+  }
+  if (tier === "PRO") {
+    return { showPro: false, showBusiness: true, primaryUpgrade: "BUSINESS" };
+  }
+  return { showPro: true, showBusiness: true, primaryUpgrade: "PRO" };
+}
+
 export function billingStatusHint({
   billing,
   hasStripeCustomer,
