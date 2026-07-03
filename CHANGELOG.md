@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Changed
+
+- **Marketing footer** — Resources column links to doc hubs (SDK guides, dashboard guide) instead of individual SDK pages
+
 ---
 
 ## [1.4.1] - 2026-07-03
