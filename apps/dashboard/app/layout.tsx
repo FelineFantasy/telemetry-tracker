@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/app/components/ThemeProvider";
 import { NavigationProgress } from "@/app/components/ui/NavigationProgress";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
 import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
+import { getGoogleAnalyticsMeasurementId } from "@/lib/google-analytics";
 import { socialPreviewImage } from "@/lib/social-image";
 import { resolveMetadataBase } from "@/lib/site-url";
 import "./globals.css";
@@ -78,6 +79,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const serverChoice = await getCookieConsentChoiceFromCookies();
+  const measurementId = getGoogleAnalyticsMeasurementId();
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
@@ -91,7 +93,7 @@ export default async function RootLayout({
             <NavigationProgress />
           </Suspense>
           {children}
-          <GoogleAnalytics serverChoice={serverChoice} />
+          <GoogleAnalytics measurementId={measurementId} serverChoice={serverChoice} />
           <CookieConsent serverChoice={serverChoice} />
         </ThemeProvider>
       </body>

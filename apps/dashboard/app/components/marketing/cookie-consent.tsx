@@ -12,6 +12,10 @@ import {
 } from "@/lib/cookie-consent";
 import { syncClientCookieConsentStorage } from "@/lib/cookie-consent-client";
 
+function notifyConsentChanged(choice: CookieConsentChoice) {
+  window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_CHANGED_EVENT, { detail: choice }));
+}
+
 type CookieConsentProps = {
   serverChoice: CookieConsentChoice | null;
 };
@@ -36,6 +40,7 @@ export function CookieConsent({ serverChoice }: CookieConsentProps) {
         void restoreCookieConsentAction(localValue);
         setChoice(localValue);
         setExpanded(false);
+        notifyConsentChanged(localValue);
       } else {
         setExpanded(true);
       }
@@ -54,7 +59,7 @@ export function CookieConsent({ serverChoice }: CookieConsentProps) {
     }
     setChoice(next);
     setExpanded(false);
-    window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_CHANGED_EVENT, { detail: next }));
+    notifyConsentChanged(next);
     startTransition(() => {
       void syncCookieConsentAction(next);
     });

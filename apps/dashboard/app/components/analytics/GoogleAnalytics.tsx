@@ -1,19 +1,21 @@
 "use client";
 
 import Script from "next/script";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   COOKIE_CONSENT_CHANGED_EVENT,
   type CookieConsentChoice,
 } from "@/lib/cookie-consent";
-import { getGoogleAnalyticsMeasurementId } from "@/lib/google-analytics";
+import { isMarketingAnalyticsPath } from "@/lib/google-analytics";
 
 type GoogleAnalyticsProps = {
+  measurementId: string | null;
   serverChoice: CookieConsentChoice | null;
 };
 
-export function GoogleAnalytics({ serverChoice }: GoogleAnalyticsProps) {
-  const measurementId = getGoogleAnalyticsMeasurementId();
+export function GoogleAnalytics({ measurementId, serverChoice }: GoogleAnalyticsProps) {
+  const pathname = usePathname();
   const [consentAccepted, setConsentAccepted] = useState(serverChoice === "accepted");
 
   useEffect(() => {
@@ -28,7 +30,7 @@ export function GoogleAnalytics({ serverChoice }: GoogleAnalyticsProps) {
     return () => window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, onConsentChanged);
   }, [serverChoice]);
 
-  if (!measurementId || !consentAccepted) return null;
+  if (!measurementId || !consentAccepted || !isMarketingAnalyticsPath(pathname)) return null;
 
   return (
     <>

@@ -1,5 +1,9 @@
 import { describe, expect, it, afterEach } from "vitest";
-import { getGoogleAnalyticsMeasurementId } from "./google-analytics";
+import {
+  getGoogleAnalyticsMeasurementId,
+  HOSTED_CLOUD_GA_ID,
+  isMarketingAnalyticsPath,
+} from "./google-analytics";
 
 describe("getGoogleAnalyticsMeasurementId", () => {
   const env = process.env;
@@ -13,11 +17,19 @@ describe("getGoogleAnalyticsMeasurementId", () => {
     expect(getGoogleAnalyticsMeasurementId()).toBe("G-TEST123");
   });
 
-  it("returns hosted-cloud default in production when site URL matches", () => {
+  it("returns hosted-cloud default when metadata base hostname matches", () => {
     delete process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_SITE_URL = "https://telemetry-tracker.com";
-    expect(getGoogleAnalyticsMeasurementId()).toBe("G-VL5GTNNCHH");
+    expect(getGoogleAnalyticsMeasurementId()).toBe(HOSTED_CLOUD_GA_ID);
+  });
+
+  it("resolves hosted-cloud default from RAILWAY_PUBLIC_DOMAIN at runtime", () => {
+    delete process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    process.env.NODE_ENV = "production";
+    process.env.RAILWAY_PUBLIC_DOMAIN = "telemetry-tracker.com";
+    expect(getGoogleAnalyticsMeasurementId()).toBe(HOSTED_CLOUD_GA_ID);
   });
 
   it("returns null for self-hosted production without env", () => {
@@ -33,5 +45,19 @@ describe("getGoogleAnalyticsMeasurementId", () => {
     delete process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
     process.env.NODE_ENV = "development";
     expect(getGoogleAnalyticsMeasurementId()).toBeNull();
+  });
+});
+
+describe("isMarketingAnalyticsPath", () => {
+  it("allows marketing and docs routes", () => {
+    expect(isMarketingAnalyticsPath("/")).toBe(true);
+    expect(isMarketingAnalyticsPath("/docs/releases")).toBe(true);
+    expect(isMarketingAnalyticsPath("/login")).toBe(true);
+  });
+
+  it("blocks dashboard product routes", () => {
+    expect(isMarketingAnalyticsPath("/dashboard")).toBe(false);
+    expect(isMarketingAnalyticsPath("/dashboard/overview")).toBe(false);
+    expect(isMarketingAnalyticsPath("/dashboard/settings/billing")).toBe(false);
   });
 });
