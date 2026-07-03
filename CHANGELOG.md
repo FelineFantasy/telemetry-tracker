@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Changed
+
+- **Marketing home** — replace placeholder logo strip with Supported SDKs (React, Next.js, Vue, Nuxt, React Native, Node.js, NestJS)
+
 ---
 
 ## [1.4.0] - 2026-07-03
