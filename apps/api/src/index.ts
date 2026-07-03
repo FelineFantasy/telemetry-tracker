@@ -1,4 +1,5 @@
 import { isTransactionalEmailConfigured } from "./lib/email.js";
+import { initSentryIfConfigured } from "./lib/observability.js";
 
 /** Sentry must init before any module that should be auto-instrumented (http, pg, …). Static imports of `./app.js` would load Fastify/Prisma/routes first. */
 await initSentryIfConfigured();
