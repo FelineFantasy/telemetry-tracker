@@ -7,18 +7,26 @@ import {
   createBillingPortalAction,
 } from "@/app/dashboard/actions";
 import { SettingsBtn } from "@/app/components/dashboard/settings/settings-ui";
-import { formatPlanPriceEur, PLAN_LIST_PRICES_EUR } from "@/lib/plan-pricing";
+import {
+  billingUpgradeActions,
+  formatPlanPriceEur,
+  PLAN_LIST_PRICES_EUR,
+} from "@/lib/plan-pricing";
 
 export function OrganizationBillingActions({
   organizationId,
   canManageBilling,
   hasStripeCustomer,
+  planTier,
 }: {
   organizationId: string;
   canManageBilling: boolean;
   hasStripeCustomer: boolean;
+  planTier: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const upgrades = billingUpgradeActions(planTier);
+  const hasUpgradeCta = upgrades.showPro || upgrades.showBusiness;
 
   if (!canManageBilling) return null;
 
@@ -44,26 +52,37 @@ export function OrganizationBillingActions({
     });
   }
 
+  if (!hasUpgradeCta && !hasStripeCustomer) return null;
+
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      <SettingsBtn
-        type="button"
-        variant="primary"
-        disabled={pending}
-        onClick={() => goCheckout("PRO")}
-      >
-        Upgrade to Pro ({formatPlanPriceEur(PLAN_LIST_PRICES_EUR.PRO)}/mo)
-      </SettingsBtn>
-      <SettingsBtn
-        type="button"
-        variant="outline"
-        disabled={pending}
-        onClick={() => goCheckout("BUSINESS")}
-      >
-        Upgrade to Business ({formatPlanPriceEur(PLAN_LIST_PRICES_EUR.BUSINESS)}/mo)
-      </SettingsBtn>
+      {upgrades.showPro ? (
+        <SettingsBtn
+          type="button"
+          variant={upgrades.primaryUpgrade === "PRO" ? "primary" : "outline"}
+          disabled={pending}
+          onClick={() => goCheckout("PRO")}
+        >
+          Upgrade to Pro ({formatPlanPriceEur(PLAN_LIST_PRICES_EUR.PRO)}/mo)
+        </SettingsBtn>
+      ) : null}
+      {upgrades.showBusiness ? (
+        <SettingsBtn
+          type="button"
+          variant={upgrades.primaryUpgrade === "BUSINESS" ? "primary" : "outline"}
+          disabled={pending}
+          onClick={() => goCheckout("BUSINESS")}
+        >
+          Upgrade to Business ({formatPlanPriceEur(PLAN_LIST_PRICES_EUR.BUSINESS)}/mo)
+        </SettingsBtn>
+      ) : null}
       {hasStripeCustomer ? (
-        <SettingsBtn type="button" variant="outline" disabled={pending} onClick={goPortal}>
+        <SettingsBtn
+          type="button"
+          variant={hasUpgradeCta ? "outline" : "primary"}
+          disabled={pending}
+          onClick={goPortal}
+        >
           Manage billing
         </SettingsBtn>
       ) : null}
