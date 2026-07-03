@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { CookieConsent } from "@/app/components/marketing/cookie-consent";
+import { GoogleAnalytics } from "@/app/components/analytics/GoogleAnalytics";
 import { ThemeColorMeta } from "@/app/components/ThemeColorMeta";
 import { ThemeProvider } from "@/app/components/ThemeProvider";
 import { NavigationProgress } from "@/app/components/ui/NavigationProgress";
@@ -90,6 +91,7 @@ export default async function RootLayout({
             <NavigationProgress />
           </Suspense>
           {children}
+          <GoogleAnalytics serverChoice={serverChoice} />
           <CookieConsent serverChoice={serverChoice} />
         </ThemeProvider>
       </body>

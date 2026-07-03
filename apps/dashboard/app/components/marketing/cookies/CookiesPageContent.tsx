@@ -5,12 +5,12 @@ import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
 import { COOKIE_CONSENT_STORAGE_KEY } from "@/lib/cookie-consent";
 
-const EFFECTIVE = "June 28, 2026";
+const EFFECTIVE = "July 3, 2026";
 
 type Row = {
   name: string;
   purpose: string;
-  type: "Essential" | "Preferences";
+  type: "Essential" | "Preferences" | "Analytics";
   retention: string;
 };
 
@@ -38,6 +38,12 @@ const rows: Row[] = [
     purpose: "Remembers your selected project in the dashboard.",
     type: "Preferences",
     retention: "Up to 400 days",
+  },
+  {
+    name: "_ga / _ga_*",
+    purpose: "Google Analytics — page views and traffic on the marketing site (hosted cloud only, when you accept cookies).",
+    type: "Analytics",
+    retention: "Up to 2 years (Google)",
   },
 ];
 
@@ -106,8 +112,8 @@ export function CookiesPageContent() {
               <p className="text-xs uppercase tracking-[0.16em] text-foreground">In short</p>
               <p className="mt-2 text-foreground/85">
                 Essential cookies always run — they sign you in and remember your consent choice.
-                We do not use advertising or cross-site tracking cookies. Preference cookies help
-                the dashboard remember your workspace selection.
+                Optional analytics (Google Analytics on the official hosted site) and preference
+                cookies load only when you accept in the banner.
               </p>
             </div>
 
@@ -123,9 +129,16 @@ export function CookiesPageContent() {
             <Section id="use" title="How we use them">
               <p>
                 We use cookies to keep you signed in, remember your dashboard workspace, and record
-                your cookie banner choice. We do not use cookies for advertising or cross-site
-                tracking. When you self-host, your operator controls which cookies are set on your
-                deployment.
+                your cookie banner choice. When you accept optional cookies on{" "}
+                <Link
+                  href="https://telemetry-tracker.com"
+                  className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+                >
+                  telemetry-tracker.com
+                </Link>
+                , we also load Google Analytics to understand marketing traffic — not for
+                advertising. When you self-host, your operator controls which cookies are set on
+                your deployment.
               </p>
             </Section>
 
@@ -173,9 +186,10 @@ export function CookiesPageContent() {
 
             <Section id="third" title="Third parties">
               <p>
-                We do not embed third-party advertising or social trackers on the marketing site. If
-                you enable optional services on a self-hosted deployment (for example Stripe or
-                Resend), those vendors may set cookies strictly to deliver their service — see our{" "}
+                On the official hosted site, Google Analytics loads only after you accept cookies in
+                the banner. We do not embed advertising or social trackers. If you enable optional
+                services on a self-hosted deployment (for example Stripe or Resend), those vendors
+                may set cookies strictly to deliver their service — see our{" "}
                 <Link
                   href="/privacy"
                   className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"

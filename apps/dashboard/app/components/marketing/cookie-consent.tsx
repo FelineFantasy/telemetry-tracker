@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { restoreCookieConsentAction, syncCookieConsentAction } from "@/app/cookie-consent/actions";
 import {
+  COOKIE_CONSENT_CHANGED_EVENT,
   COOKIE_CONSENT_STORAGE_KEY,
   cookieConsentDocumentCookie,
   isCookieConsentChoice,
@@ -53,6 +54,7 @@ export function CookieConsent({ serverChoice }: CookieConsentProps) {
     }
     setChoice(next);
     setExpanded(false);
+    window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_CHANGED_EVENT, { detail: next }));
     startTransition(() => {
       void syncCookieConsentAction(next);
     });
@@ -107,7 +109,8 @@ export function CookieConsent({ serverChoice }: CookieConsentProps) {
               className="mt-0.5 h-2 w-2 shrink-0 animate-pulse-dot rounded-full bg-brand"
             />
             <p className="text-sm leading-relaxed text-muted-foreground">
-              We use a minimal set of cookies to keep the product running. Read our{" "}
+              We use a minimal set of cookies to keep the product running. Optional analytics load
+              when you accept. Read our{" "}
               <Link
                 href="/cookies"
                 className="text-foreground underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"

@@ -15,6 +15,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 - **Release notes** — `/docs/releases` renders platform semver history from `CHANGELOG.md`
 - **Marketing docs preview** — Platform release notes card on landing page
+- **Google Analytics** — GA4 (`G-VL5GTNNCHH`) on hosted cloud after cookie consent
 
 ### Changed
 
