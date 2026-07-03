@@ -1,15 +1,11 @@
 import Link from "next/link";
-import type { ChangelogCategory, ChangelogRelease } from "@/lib/changelog";
+import type {
+  ChangelogCategory,
+  ChangelogContentBlock,
+  ChangelogRelease,
+  ChangelogReleaseSection,
+} from "@/lib/changelog";
 import { GITHUB_RELEASES_BASE, resolveChangelogLinkHref } from "@/lib/changelog";
-
-const CATEGORY_ORDER: ChangelogCategory[] = [
-  "Added",
-  "Changed",
-  "Fixed",
-  "Deprecated",
-  "Removed",
-  "Security",
-];
 
 const CATEGORY_LABEL: Record<ChangelogCategory, string> = {
   Added: "Added",
@@ -58,9 +54,70 @@ function renderInline(text: string) {
   });
 }
 
+function CustomSectionBlocks({ blocks }: { blocks: ChangelogContentBlock[] }) {
+  return (
+    <div className="mt-2 space-y-3">
+      {blocks.map((block, i) => {
+        if (block.type === "paragraph") {
+          return (
+            <p key={i} className="text-[15px] leading-relaxed text-foreground/85">
+              {renderInline(block.text)}
+            </p>
+          );
+        }
+        if (block.type === "list") {
+          return (
+            <ul
+              key={i}
+              className="list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-foreground/85"
+            >
+              {block.items.map((item) => (
+                <li key={item}>{renderInline(item)}</li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <pre
+            key={i}
+            className="overflow-x-auto rounded-lg border border-border bg-surface/80 px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground/90"
+          >
+            <code>{block.code}</code>
+          </pre>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReleaseSection({ section }: { section: ChangelogReleaseSection }) {
+  if (section.kind === "category") {
+    return (
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {CATEGORY_LABEL[section.category]}
+        </h3>
+        <ul className="mt-2 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-foreground/85">
+          {section.items.map((item) => (
+            <li key={item}>{renderInline(item)}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {section.title}
+      </h3>
+      <CustomSectionBlocks blocks={section.blocks} />
+    </div>
+  );
+}
+
 function ReleaseCard({ release }: { release: ChangelogRelease }) {
   const tag = release.prerelease ? null : `v${release.version}`;
-  const categories = CATEGORY_ORDER.filter((c) => release.categories[c]?.length);
 
   return (
     <section
@@ -102,21 +159,15 @@ function ReleaseCard({ release }: { release: ChangelogRelease }) {
         </div>
       ) : null}
 
-      {categories.length === 0 && release.summary.length === 0 ? (
+      {release.sections.length === 0 && release.summary.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">No entries yet.</p>
-      ) : categories.length > 0 ? (
+      ) : release.sections.length > 0 ? (
         <div className="mt-5 space-y-5">
-          {categories.map((cat) => (
-            <div key={cat}>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {CATEGORY_LABEL[cat]}
-              </h3>
-              <ul className="mt-2 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-foreground/85">
-                {release.categories[cat]!.map((item) => (
-                  <li key={item}>{renderInline(item)}</li>
-                ))}
-              </ul>
-            </div>
+          {release.sections.map((section) => (
+            <ReleaseSection
+              key={section.kind === "category" ? section.category : section.title}
+              section={section}
+            />
           ))}
         </div>
       ) : null}
@@ -130,8 +181,7 @@ export function ChangelogReleases({ releases }: { releases: ChangelogRelease[] }
 
   return (
     <div className="space-y-10">
-      {unreleased &&
-      (Object.keys(unreleased.categories).length > 0 || unreleased.summary.length > 0) ? (
+      {unreleased && (unreleased.sections.length > 0 || unreleased.summary.length > 0) ? (
         <ReleaseCard release={unreleased} />
       ) : null}
       {shipped.map((release) => (

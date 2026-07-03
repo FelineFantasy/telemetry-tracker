@@ -9,18 +9,36 @@ export type ChangelogCategory =
   | "Deprecated"
   | "Security";
 
+export type ChangelogContentBlock =
+  | { type: "paragraph"; text: string }
+  | { type: "list"; items: string[] }
+  | { type: "code"; language: string | null; code: string };
+
+export type ChangelogReleaseSection =
+  | { kind: "category"; category: ChangelogCategory; items: string[] }
+  | { kind: "custom"; title: string; blocks: ChangelogContentBlock[] };
+
 export type ChangelogRelease = {
   version: string;
   date: string | null;
   prerelease: boolean;
-  /** Prose paragraphs before category headings (no ### lists). */
+  /** Prose paragraphs before ### headings (no lists). */
   summary: string[];
-  categories: Partial<Record<ChangelogCategory, string[]>>;
+  /** Category and custom sections in document order. */
+  sections: ChangelogReleaseSection[];
   anchor: string;
 };
 
-const CATEGORY_RE =
-  /^### (Added|Changed|Fixed|Removed|Deprecated|Security)\s*$/gm;
+const STANDARD_CATEGORIES = new Set<ChangelogCategory>([
+  "Added",
+  "Changed",
+  "Fixed",
+  "Removed",
+  "Deprecated",
+  "Security",
+]);
+
+const HEADING_RE = /^### (.+)\s*$/gm;
 
 function resolveChangelogPath(): string {
   const candidates = [
@@ -47,12 +65,74 @@ export function changelogAnchor(version: string, date: string | null): string {
   return `${slug}---${dateSlug}`;
 }
 
-/** Paragraphs between the version heading and the first ### category (or end of section). */
+function extractListItems(body: string): string[] {
+  return body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.replace(/^-\s+/, "").trim())
+    .filter(Boolean);
+}
+
+/** Parse prose, lists, and fenced code blocks for custom ### sections (Database, SDK compatibility, …). */
+export function parseCustomSectionBody(body: string): ChangelogContentBlock[] {
+  const blocks: ChangelogContentBlock[] = [];
+  const parts = body.split(/(```[\s\S]*?```)/g);
+
+  for (const part of parts) {
+    if (part.startsWith("```")) {
+      const match = part.match(/^```(\w*)\n?([\s\S]*?)```$/);
+      if (match) {
+        blocks.push({
+          type: "code",
+          language: match[1] || null,
+          code: match[2]!.trim(),
+        });
+      }
+      continue;
+    }
+
+    let paragraph: string[] = [];
+    let list: string[] = [];
+
+    const flushParagraph = () => {
+      const text = paragraph.join(" ").trim();
+      if (text) blocks.push({ type: "paragraph", text });
+      paragraph = [];
+    };
+
+    const flushList = () => {
+      if (list.length > 0) blocks.push({ type: "list", items: list });
+      list = [];
+    };
+
+    for (const line of part.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "---") {
+        flushParagraph();
+        flushList();
+        continue;
+      }
+      if (trimmed.startsWith("- ")) {
+        flushParagraph();
+        list.push(trimmed.replace(/^-\s+/, ""));
+      } else {
+        flushList();
+        paragraph.push(trimmed);
+      }
+    }
+
+    flushParagraph();
+    flushList();
+  }
+
+  return blocks;
+}
+
+/** Paragraphs between the version heading and the first ### heading (or end of section). */
 export function extractChangelogSummary(block: string): string[] {
   const withoutHeader = block.replace(/^## \[[^\]]+\][^\n]*\n?/, "");
-  const prosePart =
-    withoutHeader.split(/\n(?=### (?:Added|Changed|Fixed|Removed|Deprecated|Security)\s*$)/m)[0] ??
-    "";
+  const prosePart = withoutHeader.split(/\n(?=### )/m)[0] ?? "";
 
   return prosePart
     .split("\n")
@@ -74,26 +154,33 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
     const prerelease = version === "Unreleased";
     const summary = extractChangelogSummary(block);
 
-    const categories: Partial<Record<ChangelogCategory, string[]>> = {};
-    const headings = [...block.matchAll(CATEGORY_RE)];
+    const sections: ChangelogReleaseSection[] = [];
+    const headings = [...block.matchAll(HEADING_RE)];
 
     for (let i = 0; i < headings.length; i++) {
-      const match = headings[i]!;
-      const cat = match[1] as ChangelogCategory;
-      const start = match.index! + match[0].length;
+      const title = headings[i]![1]!.trim();
+      const start = headings[i]!.index! + headings[i]![0].length;
       const end = headings[i + 1]?.index ?? block.length;
       const body = block.slice(start, end);
-      const items = body
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.startsWith("- "))
-        .map((line) => line.replace(/^-\s+/, "").trim())
-        .filter(Boolean);
-      if (items.length > 0) categories[cat] = items;
+
+      if (STANDARD_CATEGORIES.has(title as ChangelogCategory)) {
+        const items = extractListItems(body);
+        if (items.length > 0) {
+          sections.push({
+            kind: "category",
+            category: title as ChangelogCategory,
+            items,
+          });
+        }
+      } else {
+        const customBlocks = parseCustomSectionBody(body);
+        if (customBlocks.length > 0) {
+          sections.push({ kind: "custom", title, blocks: customBlocks });
+        }
+      }
     }
 
-    const hasContent =
-      summary.length > 0 || Object.keys(categories).length > 0 || prerelease;
+    const hasContent = summary.length > 0 || sections.length > 0 || prerelease;
     if (!hasContent) continue;
 
     releases.push({
@@ -101,7 +188,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
       date,
       prerelease,
       summary,
-      categories,
+      sections,
       anchor: changelogAnchor(version, date),
     });
   }

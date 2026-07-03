@@ -20,6 +20,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 - **Marketing home** — replace placeholder logo strip with Supported SDKs (React, Next.js, Vue, Nuxt, React Native, Node.js, NestJS)
 
+### Fixed
+
+- **Release notes parser** — render `Database` and `SDK compatibility` sections (migration commands, migration lists, SDK version notes) on `/docs/releases`
+
 ---
 
 ## [1.4.0] - 2026-07-03

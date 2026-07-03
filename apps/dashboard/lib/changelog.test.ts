@@ -3,6 +3,7 @@ import {
   changelogAnchor,
   extractChangelogSummary,
   parseChangelog,
+  parseCustomSectionBody,
   resolveChangelogLinkHref,
 } from "./changelog";
 
@@ -36,6 +37,39 @@ const SAMPLE = `# Changelog
 
 ---
 
+## [1.3.0] - 2026-07-02
+
+### Added
+
+- **Source maps v1** — upload and symbolication
+
+### Database
+
+After upgrading from v1.2.x, run:
+
+\`\`\`bash
+pnpm --filter api exec prisma migrate deploy
+\`\`\`
+
+New migrations in this release:
+
+- \`20260703120000_error_release\` — release column
+- \`20260703130000_source_map_artifacts\` — source map storage
+
+---
+
+## [1.2.0] - 2026-07-01
+
+### Added
+
+- **Alerting v1** — spike rules
+
+### SDK compatibility
+
+- Platform v1.2.x works with \`@telemetry-tracker/*\` **>= 1.2.0**
+
+---
+
 ## [1.0.0] - 2026-06-26
 
 First production-ready self-hosted release. See [docs/RELEASE.md](docs/RELEASE.md) for full notes.
@@ -44,23 +78,79 @@ First production-ready self-hosted release. See [docs/RELEASE.md](docs/RELEASE.m
 describe("parseChangelog", () => {
   it("parses version sections and categories", () => {
     const releases = parseChangelog(SAMPLE);
-    expect(releases).toHaveLength(4);
+    expect(releases).toHaveLength(6);
 
     const unreleased = releases[0]!;
     expect(unreleased.version).toBe("Unreleased");
     expect(unreleased.prerelease).toBe(true);
-    expect(unreleased.categories.Added).toEqual(["**Feature** — coming soon"]);
+    expect(unreleased.sections[0]).toEqual({
+      kind: "category",
+      category: "Added",
+      items: ["**Feature** — coming soon"],
+    });
 
     const v140 = releases[1]!;
     expect(v140.version).toBe("1.4.0");
     expect(v140.date).toBe("2026-07-03");
-    expect(v140.categories.Added?.[0]).toContain("Vue");
-    expect(v140.categories.Changed?.[0]).toContain("Marketing");
+    expect(v140.sections[0]?.kind).toBe("category");
+    if (v140.sections[0]?.kind === "category") {
+      expect(v140.sections[0].items[0]).toContain("Vue");
+    }
 
-    const v100 = releases[3]!;
+    const v100 = releases[5]!;
     expect(v100.version).toBe("1.0.0");
     expect(v100.summary[0]).toContain("First production-ready");
-    expect(Object.keys(v100.categories)).toHaveLength(0);
+    expect(v100.sections).toHaveLength(0);
+  });
+
+  it("parses Database sections with prose, code, and migration lists", () => {
+    const v130 = parseChangelog(SAMPLE).find((r) => r.version === "1.3.0")!;
+    const database = v130.sections.find((s) => s.kind === "custom" && s.title === "Database");
+    expect(database?.kind).toBe("custom");
+    if (database?.kind !== "custom") return;
+
+    expect(database.blocks[0]).toEqual({
+      type: "paragraph",
+      text: "After upgrading from v1.2.x, run:",
+    });
+    expect(database.blocks[1]).toEqual({
+      type: "code",
+      language: "bash",
+      code: "pnpm --filter api exec prisma migrate deploy",
+    });
+    expect(database.blocks[2]).toEqual({
+      type: "paragraph",
+      text: "New migrations in this release:",
+    });
+    expect(database.blocks[3]).toEqual({
+      type: "list",
+      items: [
+        "`20260703120000_error_release` — release column",
+        "`20260703130000_source_map_artifacts` — source map storage",
+      ],
+    });
+  });
+
+  it("parses SDK compatibility sections", () => {
+    const v120 = parseChangelog(SAMPLE).find((r) => r.version === "1.2.0")!;
+    const sdk = v120.sections.find((s) => s.kind === "custom" && s.title === "SDK compatibility");
+    expect(sdk?.kind).toBe("custom");
+    if (sdk?.kind !== "custom") return;
+
+    expect(sdk.blocks).toEqual([
+      {
+        type: "list",
+        items: ["Platform v1.2.x works with `@telemetry-tracker/*` **>= 1.2.0**"],
+      },
+    ]);
+  });
+
+  it("preserves section order (categories before custom sections)", () => {
+    const v130 = parseChangelog(SAMPLE).find((r) => r.version === "1.3.0")!;
+    expect(v130.sections.map((s) => (s.kind === "category" ? s.category : s.title))).toEqual([
+      "Added",
+      "Database",
+    ]);
   });
 
   it("extracts prose before category headings", () => {
@@ -92,5 +182,26 @@ Intro paragraph.
       href: "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main/docs/RELEASE.md#v100-2026-06-26",
       external: true,
     });
+  });
+});
+
+describe("parseCustomSectionBody", () => {
+  it("handles mixed prose, code, and lists", () => {
+    const body = `After upgrading, run:
+
+\`\`\`bash
+pnpm migrate deploy
+\`\`\`
+
+New migrations:
+
+- \`abc\` — first
+`;
+    expect(parseCustomSectionBody(body)).toEqual([
+      { type: "paragraph", text: "After upgrading, run:" },
+      { type: "code", language: "bash", code: "pnpm migrate deploy" },
+      { type: "paragraph", text: "New migrations:" },
+      { type: "list", items: ["`abc` — first"] },
+    ]);
   });
 });
