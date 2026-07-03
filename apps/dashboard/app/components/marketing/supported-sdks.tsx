@@ -18,7 +18,7 @@ const sdks = [
   { Icon: ReactNativeIcon, label: "React Native", href: "/docs/react-native" },
   { Icon: NodeJsIcon, label: "Node.js", href: "/docs/node" },
   { Icon: NestJsIcon, label: "NestJS", href: "/docs/nestjs" },
-] as const satisfies ReadonlyArray<{
+] satisfies ReadonlyArray<{
   Icon: ComponentType<SVGProps<SVGSVGElement>>;
   label: string;
   href: string;
