@@ -14,10 +14,12 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Added
 
 - **Marketing email list** — `MarketingSubscriber` model with subscribe/unsubscribe API, footer and contact subscribe forms, registration opt-in (default on), privacy policy updates, and `scripts/send-release-email.ts` for manual release broadcasts via Resend
+- **Social share banner** — official marketing banner at `/og-banner.png` (1024×409) for Open Graph, Twitter cards, and GitHub social preview
 
 ### Changed
 
 - **Marketing footer** — Resources column links to doc hubs (SDK guides, dashboard guide) instead of individual SDK pages
+- **Open Graph image** — replace dynamic `/opengraph-image` generator with static `/og-banner.png` marketing banner
 
 ---
 
