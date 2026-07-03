@@ -14,6 +14,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Added
 
 - **Release notes** — `/docs/releases` renders platform semver history from `CHANGELOG.md`
+- **Marketing docs preview** — Platform release notes card on landing page
 
 ### Changed
 
