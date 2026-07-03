@@ -182,6 +182,7 @@ export default async function BillingSettingsPage() {
               organizationId={resolvedOrgId}
               canManageBilling={canManageBilling}
               hasStripeCustomer={hasStripeCustomer}
+              planTier={effectivePlanTier ?? "FREE"}
             />
           ) : null}
           <p className="mt-4 text-[13px] text-muted-foreground">

@@ -49,6 +49,7 @@ export function OrganizationUsageCard({
             organizationId={organizationId}
             canManageBilling={canManageBilling}
             hasStripeCustomer={hasStripeCustomer === true}
+            planTier={usage.planTier}
           />
         </div>
       ) : null}
