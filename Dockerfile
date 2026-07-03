@@ -43,6 +43,7 @@ RUN pnpm install --frozen-lockfile --prod=false
 
 COPY --from=build /app/apps apps
 COPY --from=build /app/packages packages
+COPY --from=build /app/CHANGELOG.md /app/CHANGELOG.md
 
 WORKDIR /app/apps/dashboard
 
