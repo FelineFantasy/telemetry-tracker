@@ -13,6 +13,16 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.3] - 2026-07-04
+
+### Added
+
+- **Ops** — Maintainer workflow for manual product update emails ([MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md), [RELEASE.md](docs/RELEASE.md) step 8); `send-release-email.ts` adds `--help`, requires `--version` for live sends, and prints a CHANGELOG preview on dry-run
+
+---
+
+
+
 ## [1.4.2] - 2026-07-03
 
 ### Added
