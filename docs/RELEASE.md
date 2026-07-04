@@ -110,10 +110,11 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
 - [ ] [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` section complete
 - [ ] CI green on `develop` (`pnpm lint`, `pnpm test`, `pnpm -r run build`)
 - [ ] Self-host upgrade notes ready (migrations, env vars)
+- [ ] If this is a **MINOR** or **MAJOR** release: plan the [product update email](./MARKETING-EMAIL.md#maintainer-workflow-each-qualifying-release) for after deploy (manual; not CI)
 
 ### On `main` after promotion
 
-1. **Finalize CHANGELOG** — rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`. Prefer doing this in the **`develop` → `main`** release PR so `develop` and `main` stay aligned; if you commit on `main` after promotion, you **must** sync `develop` in step 8.
+1. **Finalize CHANGELOG** — rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`. Prefer doing this in the **`develop` → `main`** release PR so `develop` and `main` stay aligned; if you commit on `main` after promotion, you **must** sync `develop` in step 9.
 2. **Tag:**
    ```bash
    git checkout main && git pull origin main
@@ -135,7 +136,14 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
 5. **Production DB** — run [migrations](#3-database-migrations-production) (CI does not touch prod).
 6. **Post-deploy** — [verification](#post-deploy-verification).
 7. **SDK** — if ingest/SDK contract changed, bump `packages/*/package.json` and `pnpm publish:packages`.
-8. **Sync `develop`** — merge **`main` into `develop`** and push after every release (milestone promotion or hotfix). Required whenever `main` has commits not on `develop` — including squash merges, merge commits from the release PR, and any post-promotion edits on `main`:
+8. **Product update email** — for **MINOR** and **MAJOR** releases (and notable PATCH releases), send the subscriber broadcast manually after deploy is verified. See [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#when-to-send-maintainer-policy):
+   ```bash
+   cd apps/api
+   pnpm exec tsx scripts/send-release-email.ts --dry-run --version=${VERSION}
+   pnpm exec tsx scripts/send-release-email.ts --version=${VERSION}
+   ```
+   Requires production `DATABASE_URL`, `RESEND_API_KEY`, `TELEMETRY_EMAIL_FROM`, and `TELEMETRY_DASHBOARD_ORIGIN` on the operator machine. Note send date and recipient count in the GitHub Release when done. **Not automated** — CI does not send marketing email.
+9. **Sync `develop`** — merge **`main` into `develop`** and push after every release (milestone promotion or hotfix). Required whenever `main` has commits not on `develop` — including squash merges, merge commits from the release PR, and any post-promotion edits on `main`:
    ```bash
    git checkout develop && git pull origin develop
    git merge origin/main
