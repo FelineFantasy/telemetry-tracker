@@ -1,9 +1,9 @@
-import cors from "@fastify/cors";
+import cors, { type FastifyCorsOptionsDelegateCallback } from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { prisma } from "./lib/db.js";
 import { isTransactionalEmailConfigured } from "./lib/email.js";
-import { buildCorsOptions } from "./lib/cors-config.js";
+import { resolveCorsOptionsForRequest } from "./lib/cors-config.js";
 import { genReqId, registerObservabilityHooks } from "./lib/observability.js";
 import {
   rateLimitMaxApi,
@@ -37,7 +37,11 @@ export async function createApp(): Promise<FastifyInstance> {
 
   registerObservabilityHooks(app);
 
-  await app.register(cors, buildCorsOptions());
+  const corsDelegator: FastifyCorsOptionsDelegateCallback = (req, callback) => {
+    callback(null, resolveCorsOptionsForRequest(req));
+  };
+
+  await app.register(cors, { delegator: corsDelegator });
 
   await registerStripeWebhookIfConfigured(app);
 
