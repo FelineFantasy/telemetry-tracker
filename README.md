@@ -186,17 +186,44 @@ packages/
 
 ## Roadmap
 
-- [x] Errors
-- [x] Events
-- [x] Sessions
-- [x] Dashboard
-- [x] Alerting
-- [x] Source maps
-- [ ] Performance monitoring
-- [ ] Multi-project dashboards
-- [ ] Team audit logs
-- [x] Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com))
-- [x] Paid plans (Stripe, EUR)
+Shipped capabilities are in **[Features](#features)** above. What follows is **planned and exploring work**—grouped by area, not a release schedule. Items marked *Coming soon* in the dashboard match this list ([#96](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/96)).
+
+| Status | Meaning |
+|--------|---------|
+| **Planned** | Scoped or tracked in a GitHub issue |
+| **Exploring** | Labeled *Coming soon* in the product; timing and scope TBD |
+
+<details>
+<summary><strong>Planned & exploring</strong> (11 areas — Observability, Platform, Account)</summary>
+
+### Observability
+
+| Area | Status |
+|------|--------|
+| [Performance / Web Vitals](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/99) | Planned |
+| Traces | Exploring |
+| Logs | Exploring |
+
+### Platform
+
+| Area | Status |
+|------|--------|
+| Custom dashboards | Planned |
+| Releases | Exploring |
+| Feature flags | Exploring |
+| Export reports | Exploring |
+
+### Account & organization
+
+| Area | Status |
+|------|--------|
+| Team audit log | Planned |
+| Integrations | Exploring |
+| Profile, preferences & security | Exploring |
+
+</details>
+
+Have an idea? [Open a feature request](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/new?template=feature_request.md).
 
 ---
 

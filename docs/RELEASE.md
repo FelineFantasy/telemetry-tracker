@@ -79,7 +79,25 @@ Releases are **milestone-driven**:
 4. Tag **`main`**, publish GitHub Release, migrate production DB, verify deploy.
 5. **Sync `develop` with `main`** — always merge `main` back into `develop` after promotion (see [checklist](#on-main-after-promotion)). Squash merges, merge commits, and post-promotion commits on `main` (e.g. CHANGELOG finalization) leave `develop` behind otherwise.
 
-**Hotfixes** on production: branch from **`main`**, fix, merge to **`main`**, tag a **patch** version, then merge **`main` → `develop`** so branches stay aligned.
+**Hotfixes** on production: branch from **`main`**, fix, merge to **`main`**, tag a **patch** version, then merge **`main` → `develop`** so branches stay aligned. Assign PRs and release PRs to a milestone per [Milestones vs hotfixes](#milestones-vs-hotfixes-audit-trail).
+
+---
+
+## Milestones vs hotfixes (audit trail)
+
+**Milestone-driven releases** (typical **MINOR** / **MAJOR** promotion) follow the cadence above: scope work in a GitHub milestone, merge into `develop`, then promote `develop` → `main`.
+
+**PATCH releases** (production hotfixes, docs-only promotions, and other small semver bumps on `main`) use the same promote → tag → GitHub Release → sync `develop` flow, but they are not required to open a new product milestone for every patch.
+
+For **audit trail**, PATCH and docs hotfixes **should** still:
+
+1. Assign the integrating PR(s) on `develop` to a milestone — typically the **active patch-line milestone** (e.g. `v1.4.x — Platform releases`).
+2. Assign the **`develop` → `main` release PR** to that same milestone.
+3. Update the milestone **description** with the shipped semver (e.g. **v1.4.3**, **v1.4.4**) when the release completes.
+
+If the patch-line milestone is **closed**, you may still assign merged PRs to it retroactively, or open a new patch-line milestone if you prefer a clean bucket for the next patches.
+
+Product update emails remain policy-driven ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md)); docs-only PATCH releases usually **skip** subscriber email.
 
 ---
 
