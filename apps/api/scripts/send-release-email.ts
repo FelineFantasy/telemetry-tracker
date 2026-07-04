@@ -9,7 +9,26 @@ import {
 import { sendTransactionalEmail, isTransactionalEmailConfigured } from "../src/lib/email.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
+const SHOW_HELP = process.argv.includes("--help") || process.argv.includes("-h");
 const VERSION_ARG = process.argv.find((a) => a.startsWith("--version="))?.split("=")[1]?.trim();
+
+const USAGE = `Usage: pnpm exec tsx scripts/send-release-email.ts [options]
+
+Broadcast a product update email to active marketing subscribers via Resend.
+
+Options:
+  --version=X.Y.Z   CHANGELOG section to send (required for live send)
+  --dry-run         Print subject, recipient count, and preview; do not send
+  --help, -h        Show this help
+
+Examples:
+  pnpm exec tsx scripts/send-release-email.ts --dry-run --version=1.4.2
+  pnpm exec tsx scripts/send-release-email.ts --version=1.4.2
+
+Requires: DATABASE_URL, RESEND_API_KEY, TELEMETRY_EMAIL_FROM
+Optional: TELEMETRY_DASHBOARD_ORIGIN (default https://telemetry-tracker.com)
+
+See docs/MARKETING-EMAIL.md for maintainer workflow.`;
 
 function escapeHtml(value: string): string {
   return value
@@ -49,8 +68,26 @@ function extractChangelogSection(version: string): string | null {
   return section || null;
 }
 
+function changelogPreview(section: string, maxLines = 6): string {
+  const lines = section.split("\n").filter((line) => line.trim());
+  const preview = lines.slice(0, maxLines).join("\n");
+  const suffix = lines.length > maxLines ? `\n... (${lines.length - maxLines} more line(s))` : "";
+  return `${preview}${suffix}`;
+}
+
 async function main() {
+  if (SHOW_HELP) {
+    console.log(USAGE);
+    return;
+  }
+
   const version = VERSION_ARG ?? "Unreleased";
+  if (!DRY_RUN && version === "Unreleased") {
+    console.error("Live send requires --version=X.Y.Z (use --dry-run to preview [Unreleased]).");
+    console.error(USAGE);
+    process.exit(1);
+  }
+
   const section = extractChangelogSection(version);
   if (!section) {
     console.error(`Could not find CHANGELOG section for ${version}`);
@@ -90,6 +127,7 @@ async function main() {
 
   console.log(`Prepared release email for ${subscribers.length} subscriber(s).`);
   console.log(`Subject: ${subject}`);
+  console.log(`CHANGELOG [${version}] preview:\n${changelogPreview(section)}`);
   if (DRY_RUN) {
     console.log("--dry-run: not sending.");
     return;
