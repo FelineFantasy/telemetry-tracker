@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.5] - 2026-07-04
+
+### Fixed
+
+- **API** — CORS on `/ingest/*` reflects the request `Origin` (no credentials) so browser SDKs on customer domains can send authenticated ingest traffic; dashboard `/api/*` routes keep the configured allowlist with credentials
+
+---
+
 ## [1.4.4] - 2026-07-04
 
 ### Changed
