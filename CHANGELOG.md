@@ -13,6 +13,36 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.5] - 2026-07-04
+
+### Fixed
+
+- **API** — CORS on `/ingest/*` reflects the request `Origin` (no credentials) so browser SDKs on customer domains can send authenticated ingest traffic; dashboard `/api/*` routes keep the configured allowlist with credentials
+
+---
+
+## [1.4.4] - 2026-07-04
+
+### Changed
+
+- **Docs** — README roadmap uses a compact, collapsible format with **Planned** vs **Exploring** tiers; Features table unchanged
+
+### Added
+
+- **Ops** — [RELEASE.md](docs/RELEASE.md): PATCH and docs hotfixes **should** be assigned to a GitHub milestone for audit trail (typically the active patch-line milestone)
+
+---
+
+## [1.4.3] - 2026-07-04
+
+### Added
+
+- **Ops** — Maintainer workflow for manual product update emails ([MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md), [RELEASE.md](docs/RELEASE.md) step 8); `send-release-email.ts` adds `--help`, requires `--version` for live sends, and prints a CHANGELOG preview on dry-run
+
+---
+
+
+
 ## [1.4.2] - 2026-07-03
 
 ### Added
