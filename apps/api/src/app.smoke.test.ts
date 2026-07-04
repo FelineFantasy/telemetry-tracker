@@ -64,6 +64,64 @@ describe("API smoke", () => {
     expect(res.statusCode).not.toBe(413);
   });
 
+  it("OPTIONS /ingest/event allows arbitrary browser origins in production", async () => {
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevCors = process.env.CORS_ORIGINS;
+    process.env.NODE_ENV = "production";
+    process.env.CORS_ORIGINS = "https://telemetry-tracker.com";
+
+    try {
+      const prodApp = await createApp();
+      const res = await prodApp.inject({
+        method: "OPTIONS",
+        url: "/ingest/event",
+        headers: {
+          origin: "https://customer-app.example.com",
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "authorization,content-type",
+        },
+      });
+      await prodApp.close();
+      expect(res.statusCode).toBe(204);
+      expect(res.headers["access-control-allow-origin"]).toBe(
+        "https://customer-app.example.com"
+      );
+      expect(res.headers["access-control-allow-credentials"]).toBeUndefined();
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNodeEnv;
+      if (prevCors === undefined) delete process.env.CORS_ORIGINS;
+      else process.env.CORS_ORIGINS = prevCors;
+    }
+  });
+
+  it("OPTIONS /api/auth/me rejects unknown origins in production", async () => {
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevCors = process.env.CORS_ORIGINS;
+    process.env.NODE_ENV = "production";
+    process.env.CORS_ORIGINS = "https://telemetry-tracker.com";
+
+    try {
+      const prodApp = await createApp();
+      const res = await prodApp.inject({
+        method: "OPTIONS",
+        url: "/api/auth/me",
+        headers: {
+          origin: "https://customer-app.example.com",
+          "access-control-request-method": "GET",
+          "access-control-request-headers": "authorization",
+        },
+      });
+      await prodApp.close();
+      expect(res.statusCode).toBe(404);
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNodeEnv;
+      if (prevCors === undefined) delete process.env.CORS_ORIGINS;
+      else process.env.CORS_ORIGINS = prevCors;
+    }
+  });
+
   it("GET /api/meta/projects returns 401 without session in production", async () => {
     const prevNodeEnv = process.env.NODE_ENV;
     const prevAllowReads = process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;
