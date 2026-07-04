@@ -13,6 +13,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.4] - 2026-07-04
+
+### Changed
+
+- **Docs** — README roadmap uses a compact, collapsible format with **Planned** vs **Exploring** tiers; Features table unchanged
+
+### Added
+
+- **Ops** — [RELEASE.md](docs/RELEASE.md): PATCH and docs hotfixes **should** be assigned to a GitHub milestone for audit trail (typically the active patch-line milestone)
+
+---
+
 ## [1.4.3] - 2026-07-04
 
 ### Added
