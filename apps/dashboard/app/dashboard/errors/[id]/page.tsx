@@ -85,8 +85,7 @@ export default async function ErrorDetailPage({
     );
   }
 
-  const title =
-    group.message.length > 80 ? group.message.slice(0, 80) + "\u2026" : group.message;
+  const title = group.message;
   const resolved = Boolean(group.resolved_at);
   const contextLine = [
     group.app,
@@ -159,7 +158,7 @@ export default async function ErrorDetailPage({
                         return uid != null && uid !== "" ? (
                           <div>
                             <dt className="text-muted-foreground">Identity</dt>
-                            <dd className="font-mono" title={uid}>
+                            <dd className="break-all font-mono" title={uid}>
                               {uid.length > 24 ? uid.slice(0, 24) + "\u2026" : uid}
                             </dd>
                           </div>
@@ -168,7 +167,9 @@ export default async function ErrorDetailPage({
                       {o.session_id != null && o.session_id !== "" ? (
                         <div>
                           <dt className="text-muted-foreground">Session</dt>
-                          <dd className="font-mono text-xs">{o.session_id}</dd>
+                          <dd className="break-all font-mono text-xs" title={o.session_id}>
+                            {o.session_id}
+                          </dd>
                         </div>
                       ) : null}
                       {o.release != null && o.release !== "" ? (

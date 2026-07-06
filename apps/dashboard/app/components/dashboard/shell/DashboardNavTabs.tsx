@@ -11,18 +11,18 @@ export function DashboardNavTabs() {
   const searchParams = useSearchParams();
 
   return (
-    <nav className="border-t border-border">
-      <div className="mx-auto flex max-w-7xl items-center px-4 sm:px-6 lg:px-8">
-        <ul className="flex items-center gap-0.5 overflow-x-auto py-0.5">
+    <nav className="border-t border-border" aria-label="Dashboard sections">
+      <div className="mx-auto max-w-7xl overflow-hidden px-4 sm:px-6 lg:px-8">
+        <ul className="scrollbar-hide flex snap-x snap-mandatory items-center gap-0.5 overflow-x-auto scroll-smooth py-0.5 [-webkit-overflow-scrolling:touch]">
           {DASHBOARD_NAV.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const href = buildDashboardNavTabHref(item.href, searchParams);
             return (
-              <li key={item.href} className="shrink-0">
+              <li key={item.href} className="shrink-0 snap-start">
                 <Link
                   href={href}
-                  className={`relative inline-flex items-center gap-1.5 px-3 py-2.5 text-[13px] transition-colors ${
+                  className={`relative inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-[13px] transition-colors ${
                     active
                       ? "text-foreground"
                       : "text-muted-foreground hover:text-foreground"

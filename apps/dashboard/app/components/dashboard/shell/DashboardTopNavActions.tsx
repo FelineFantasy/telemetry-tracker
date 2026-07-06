@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { DashboardCommandPalette } from "./DashboardCommandPalette";
 import { DashboardQuickActions } from "./DashboardQuickActions";
 import { DashboardUserMenu } from "./DashboardUserMenu";
@@ -11,12 +12,14 @@ import type { DashboardUser } from "@/lib/dashboard-user";
 export function DashboardTopNavActions({
   user,
   notificationsSlot,
+  className,
 }: {
   user: DashboardUser | null;
   notificationsSlot: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div className={cn("flex shrink-0 items-center gap-1.5", className)}>
       <DashboardCommandPalette />
       <DashboardQuickActions />
       {notificationsSlot}
