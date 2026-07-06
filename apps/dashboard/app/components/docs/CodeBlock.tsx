@@ -25,7 +25,7 @@ export function CodeBlock({ code, lang, caption }: CodeBlockProps) {
   }, [trimmed]);
 
   return (
-    <figure className="not-prose my-6 overflow-hidden rounded-lg border border-code-border bg-code-bg shadow-sm">
+    <figure className="not-prose my-6 max-w-full rounded-lg border border-code-border bg-code-bg shadow-sm">
       <div className="flex min-h-[2.5rem] flex-wrap items-center justify-between gap-2 border-b border-code-border/80 bg-muted/40 px-3 py-2">
         <figcaption className="text-xs font-medium text-code-foreground/80">
           {caption ?? "Code"}
@@ -41,7 +41,7 @@ export function CodeBlock({ code, lang, caption }: CodeBlockProps) {
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="m-0 max-h-[min(70vh,28rem)] overflow-x-auto overflow-y-auto p-4 text-sm leading-relaxed">
+      <pre className="code-scroll m-0 max-h-[min(70vh,28rem)] overflow-y-auto p-4 text-sm leading-relaxed">
         <code className={cn("font-mono text-code-foreground", lang ? `language-${lang}` : undefined)}>
           {trimmed}
         </code>

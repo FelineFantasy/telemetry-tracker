@@ -80,7 +80,7 @@ function CustomSectionBlocks({ blocks }: { blocks: ChangelogContentBlock[] }) {
         return (
           <pre
             key={i}
-            className="overflow-x-auto rounded-lg border border-border bg-surface/80 px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground/90"
+            className="overflow-x-auto rounded-lg border border-border bg-surface/80 px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground/90 code-scroll"
           >
             <code>{block.code}</code>
           </pre>
