@@ -13,6 +13,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.7] - 2026-07-06
+
+### Fixed
+
+- **Dashboard (mobile)** — contain nav scope-picker overflow so the header stays within the viewport and the user menu remains visible
+- **Dashboard (mobile)** — restore portaled `TimeRangePicker` popover so the Filter by date panel is not clipped on Overview and list pages
+
+---
+
 ## [1.4.6] - 2026-07-06
 
 ### Fixed
