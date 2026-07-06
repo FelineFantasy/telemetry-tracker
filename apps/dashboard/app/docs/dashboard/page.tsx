@@ -54,8 +54,10 @@ export default function DocsDashboardPage() {
         <p>
           Presets include 1 hour, 24 hours, 7 days, 14 days, 30 days, and 90 days. On{" "}
           <strong className="text-foreground">Overview</strong>, charts and key metrics follow the
-          selected window; with no filter, metrics use a sensible default window for rates and
-          comparisons.
+          selected window. With no filter, error and event lists stay all-time (latest rows first),
+          while headline metrics, charts, and comparisons use a data-aware window: the time span
+          covered by your most recent telemetry (up to 10k events and 10k errors), clamped between
+          7 and 90 days, or 30 days when nothing has been recorded yet.
         </p>
         <p>
           On <strong className="text-foreground">Issues</strong>, a separate{" "}

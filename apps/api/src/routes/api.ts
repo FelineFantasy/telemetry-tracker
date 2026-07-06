@@ -46,7 +46,8 @@ import {
 import { requireSessionUser } from "../lib/auth-session.js";
 import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
-import { effectiveOverviewWindow, parseOverviewTimeRangeQuery } from "../lib/time-range.js";
+import { effectiveOverviewWindow, isUnselectedTimeRange, parseOverviewTimeRangeQuery, chooseTimeRangeBucket } from "../lib/time-range.js";
+import { resolveUnselectedMetricsWindow } from "../lib/overview-metrics-window.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -135,9 +136,25 @@ export async function apiRoutes(
     const timeRange = timeRangeParsed.range;
     const since = timeRange.gte;
     const until = timeRange.lte;
-    const metricsWindow = effectiveOverviewWindow(timeRange);
     const appFilter = queryApp(query.app);
     const environment = queryString(query.environment);
+    const metricsWindow = isUnselectedTimeRange(timeRange.key)
+      ? await resolveUnselectedMetricsWindow(prisma, {
+          projectId,
+          until,
+          app: appFilter,
+          environment,
+        })
+      : effectiveOverviewWindow(timeRange);
+    const metricsBucket = chooseTimeRangeBucket(metricsWindow.durationMs);
+    const chartSince = isUnselectedTimeRange(timeRange.key) ? metricsWindow.gte : since;
+    const chartUntil = isUnselectedTimeRange(timeRange.key) ? metricsWindow.lte : until;
+    const chartBucket = isUnselectedTimeRange(timeRange.key)
+      ? metricsBucket.bucket
+      : timeRange.bucket;
+    const chartBucketSeconds = isUnselectedTimeRange(timeRange.key)
+      ? metricsBucket.bucketSeconds
+      : timeRange.bucketSeconds;
     const compare: OverviewCompareMode =
       queryString(query.compare) === "week-ago" ? "week-ago" : "previous";
     const errSortParsed = parseOverviewErrorSortParam(queryString(query.errorsSort));
@@ -266,9 +283,9 @@ export async function apiRoutes(
       getOverviewTimeSeries(
         prisma,
         projectId,
-        since,
-        until,
-        timeRange.bucket,
+        chartSince,
+        chartUntil,
+        chartBucket,
         appFilter,
         environment
       ),
@@ -283,9 +300,9 @@ export async function apiRoutes(
       getSessionDurationSeries(
         prisma,
         projectId,
-        timeRange.bucket,
-        since,
-        until,
+        chartBucket,
+        chartSince,
+        chartUntil,
         appFilter,
         environment
       ),
@@ -314,7 +331,7 @@ export async function apiRoutes(
       eventsPrevious,
       errorsPrevious,
       series.events,
-      timeRange.bucketSeconds
+      chartBucketSeconds
     );
 
     const latestByName = await fetchLatestEventsByName(prisma, {
@@ -344,7 +361,10 @@ export async function apiRoutes(
       rangeLabel: timeRange.label,
       since: since.toISOString(),
       until: until.toISOString(),
-      bucket: timeRange.bucket,
+      metricsSince: metricsWindow.gte.toISOString(),
+      metricsUntil: metricsWindow.lte.toISOString(),
+      metricsDurationMs: metricsWindow.durationMs,
+      bucket: chartBucket,
       compare,
       errorsLast24h: errorsCount,
       eventsLast24h: eventsCount,
