@@ -19,9 +19,11 @@ export function DashboardTopNavActions({
   className?: string;
 }) {
   return (
-    <div className={cn("flex shrink-0 items-center gap-1.5", className)}>
+    <div className={cn("flex shrink-0 items-center gap-1", className)}>
       <DashboardCommandPalette />
-      <DashboardQuickActions />
+      <div className="hidden sm:contents">
+        <DashboardQuickActions />
+      </div>
       {notificationsSlot}
       <Link
         href="/docs"

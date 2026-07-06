@@ -12,7 +12,7 @@ export function DashboardNavTabs() {
 
   return (
     <nav className="border-t border-border" aria-label="Dashboard sections">
-      <div className="mx-auto max-w-7xl overflow-hidden px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full min-w-0 max-w-7xl overflow-hidden px-4 sm:px-6 lg:px-8">
         <ul className="scrollbar-hide flex snap-x snap-mandatory items-center gap-0.5 overflow-x-auto scroll-smooth py-0.5 [-webkit-overflow-scrolling:touch]">
           {DASHBOARD_NAV.map((item) => {
             const active =
