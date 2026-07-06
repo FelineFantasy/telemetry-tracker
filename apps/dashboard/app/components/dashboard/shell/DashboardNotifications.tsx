@@ -120,7 +120,7 @@ export function DashboardNotifications({ initialItems }: Props) {
         </button>
       )}
     >
-      {() => (
+      {(close) => (
         <div>
           <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
             <div className="flex items-center gap-1.5">
@@ -134,7 +134,10 @@ export function DashboardNotifications({ initialItems }: Props) {
             {viewItems.length > 0 ? (
               <button
                 type="button"
-                onClick={markAllRead}
+                onClick={() => {
+                  markAllRead();
+                  close();
+                }}
                 className="text-[11px] text-muted-foreground hover:text-foreground"
               >
                 Mark all read
@@ -185,7 +188,10 @@ export function DashboardNotifications({ initialItems }: Props) {
                   {n.href ? (
                     <Link
                       href={n.href}
-                      onClick={() => markRead(n.id)}
+                      onClick={() => {
+                        markRead(n.id);
+                        close();
+                      }}
                       className="flex cursor-pointer gap-2.5 px-3 py-2.5 hover:bg-surface/60"
                     >
                       {content}
@@ -193,7 +199,10 @@ export function DashboardNotifications({ initialItems }: Props) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => markRead(n.id)}
+                      onClick={() => {
+                        markRead(n.id);
+                        close();
+                      }}
                       className="flex w-full cursor-pointer gap-2.5 px-3 py-2.5 text-left hover:bg-surface/60"
                     >
                       {content}
@@ -213,6 +222,7 @@ export function DashboardNotifications({ initialItems }: Props) {
           <div className="flex items-center justify-between border-t border-border px-3 py-2">
             <Link
               href="/dashboard/settings/notifications"
+              onClick={close}
               className="text-[11px] text-muted-foreground hover:text-foreground"
             >
               Notification settings
