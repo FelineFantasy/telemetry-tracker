@@ -7,6 +7,7 @@ import { Menu, X } from "lucide-react";
 import { Footer } from "@/app/components/marketing/footer";
 import { Nav } from "@/app/components/marketing/nav";
 import { docsHomeAnchors, docsNavSections, type DocsNavSection } from "./docs-nav";
+import { useBodyScrollLock } from "@/lib/body-scroll-lock";
 import { settingsInputClassName } from "@/lib/input-classes";
 
 function isNavItemActive(href: string, pathname: string, hash: string): boolean {
@@ -85,14 +86,7 @@ export function DocsPageShell({ children }: { children: ReactNode }) {
     closeSidebar();
   }, [pathname, closeSidebar]);
 
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [sidebarOpen]);
+  useBodyScrollLock(sidebarOpen);
 
   useEffect(() => {
     if (!sidebarOpen) return;
