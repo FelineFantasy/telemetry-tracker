@@ -1,4 +1,4 @@
-import { OVERVIEW_CHART_MAX_BUCKETS } from "./overview-timeseries.js";
+import { UNSELECTED_METRICS_FALLBACK_MS } from "./overview-metrics-window.js";
 
 /**
  * Flexible time ranges for overview and list endpoints.
@@ -232,18 +232,12 @@ export function buildUnselectedTimeRange(now: Date = new Date()): ParsedTimeRang
   };
 }
 
-/** Duration for ingest-rate display when the selected window spans all history. */
+/** Duration for ingest-rate display when no time filter is selected (sync fallback). */
 export function effectiveIngestRateDurationMs(range: ParsedTimeRange): number {
   if (!isUnselectedTimeRange(range.key)) {
     return Math.max(range.durationMs, 1);
   }
-  const stepMs =
-    range.bucket === "hour"
-      ? 60 * 60 * 1000
-      : range.bucket === "day"
-        ? 86_400_000
-        : 7 * 86_400_000;
-  return OVERVIEW_CHART_MAX_BUCKETS * stepMs;
+  return UNSELECTED_METRICS_FALLBACK_MS;
 }
 
 /** Metrics/compare window — unselected ranges use the recent chart span, not epoch→now. */

@@ -7,6 +7,7 @@ import {
   effectiveOverviewWindow,
   buildUnselectedTimeRange,
 } from "./time-range.js";
+import { UNSELECTED_METRICS_FALLBACK_MS } from "./overview-metrics-window.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 
 describe("parseTimeRangeQuery", () => {
@@ -70,9 +71,9 @@ describe("tryParseCustomRelativeInput", () => {
 describe("effectiveIngestRateDurationMs", () => {
   const now = new Date("2026-06-28T12:00:00.000Z");
 
-  it("uses chart window length for unselected ranges", () => {
+  it("uses fallback window length for unselected ranges", () => {
     const range = buildUnselectedTimeRange(now);
-    expect(effectiveIngestRateDurationMs(range)).toBe(120 * 7 * 86_400_000);
+    expect(effectiveIngestRateDurationMs(range)).toBe(UNSELECTED_METRICS_FALLBACK_MS);
   });
 
   it("uses actual duration for preset ranges", () => {
@@ -86,10 +87,10 @@ describe("effectiveIngestRateDurationMs", () => {
 describe("effectiveOverviewWindow", () => {
   const now = new Date("2026-06-28T12:00:00.000Z");
 
-  it("anchors unselected ranges on the recent chart span", () => {
+  it("anchors unselected ranges on the sync fallback span", () => {
     const range = buildUnselectedTimeRange(now);
     const window = effectiveOverviewWindow(range);
-    const durationMs = 120 * 7 * 86_400_000;
+    const durationMs = UNSELECTED_METRICS_FALLBACK_MS;
 
     expect(window.durationMs).toBe(durationMs);
     expect(window.lte).toEqual(now);

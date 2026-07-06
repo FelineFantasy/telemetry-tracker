@@ -406,7 +406,9 @@ export default async function OverviewPage({
       <Suspense fallback={null}>
         <OverviewMetricsSection
           rangeLabel={displayRangeLabel}
-          rangeDurationMs={effectiveIngestRateDurationMs(parsedRange)}
+          rangeDurationMs={
+            overviewData.metricsDurationMs ?? effectiveIngestRateDurationMs(parsedRange)
+          }
           overviewPath={OVERVIEW_PATH}
           currentParams={currentOverviewParams}
           eventsCount={overviewData.eventsLast24h}
