@@ -8,13 +8,30 @@ function timeGreeting(): string {
   return "Good evening";
 }
 
-function displayName(user: DashboardUser | null): string {
-  if (user?.displayName?.trim()) {
-    return user.displayName.trim().split(/\s+/)[0] ?? user.displayName;
+function capitalizeFirst(value: string): string {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+function nameFromEmail(email: string): string {
+  const local = email.split("@")[0]?.trim() ?? "";
+  if (!local) return "there";
+  const first = local.split(/[._-]/)[0] ?? local;
+  return capitalizeFirst(first);
+}
+
+function greetingName(user: DashboardUser | null): string {
+  if (!user) return "there";
+
+  const rawDisplayName = user.displayName?.trim();
+  if (rawDisplayName && !rawDisplayName.includes("@")) {
+    return rawDisplayName.split(/\s+/)[0] ?? rawDisplayName;
   }
-  if (user?.email) {
-    return user.email.split("@")[0] ?? "there";
+
+  if (user.email?.trim()) {
+    return nameFromEmail(user.email);
   }
+
   return "there";
 }
 
@@ -25,11 +42,11 @@ export function OverviewGreeting({
   user: DashboardUser | null;
   actions?: ReactNode;
 }) {
-  const name = displayName(user);
+  const name = greetingName(user);
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
           {timeGreeting()}, {name}
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
