@@ -51,7 +51,7 @@ export function DashboardShell({
   return (
     <DashboardCapabilitiesSetterContext.Provider value={setCapabilities}>
       <DashboardKeyboardShortcuts />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="main-content">
+      <main className="mx-auto w-full min-w-0 max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="main-content">
         {capabilitiesLoader}
         <DashboardCapabilitiesProvider value={capabilities}>
           {capabilities?.billingHealth?.billingAlertVariant ? (

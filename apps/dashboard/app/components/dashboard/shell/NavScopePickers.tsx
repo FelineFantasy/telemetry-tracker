@@ -28,7 +28,7 @@ export function NavScopePickers({
   appNavSummaries: Record<string, AppNavSummary>;
 }) {
   return (
-    <div className="flex w-max min-w-full items-center gap-1.5 sm:w-auto sm:min-w-0 [&_button]:shrink-0 sm:[&_button]:shrink">
+    <div className="flex w-max items-center gap-1.5 sm:w-auto sm:min-w-0 [&_button]:shrink-0 sm:[&_button]:shrink">
       <TopNavOrgSwitcher
         organizations={organizations}
         currentOrganizationId={currentOrganizationId}
