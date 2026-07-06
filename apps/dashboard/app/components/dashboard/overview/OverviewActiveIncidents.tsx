@@ -34,13 +34,16 @@ export function OverviewActiveIncidents({ issues }: { issues: OverviewActiveIssu
           {issues.map((inc) => (
             <li key={inc.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-start gap-2">
                   <SeverityBadge severity={inc.severity} />
-                  <Link href={inc.href} className="text-[13px] font-medium hover:underline">
+                  <Link
+                    href={inc.href}
+                    className="min-w-0 flex-1 line-clamp-2 break-all text-[13px] font-medium hover:underline"
+                  >
                     {inc.title}
                   </Link>
                 </div>
-                <p className="mt-1 text-[12px] text-muted-foreground">{inc.meta}</p>
+                <p className="mt-1 break-words text-[12px] text-muted-foreground">{inc.meta}</p>
               </div>
               <span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
                 {inc.status}

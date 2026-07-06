@@ -35,13 +35,15 @@ export function IssueListItem({
           {environment ? <Badge>{environment}</Badge> : null}
           {resolved ? <ResolvedBadge /> : null}
         </div>
-        <p className="mt-2 text-[15px] font-medium text-destructive">{message}</p>
+        <p className="mt-2 line-clamp-3 break-all text-[15px] font-medium text-destructive">
+          {message}
+        </p>
         {topStack ? (
-          <pre className="mt-2 max-h-24 overflow-hidden text-ellipsis font-mono text-[11px] leading-relaxed text-muted-foreground">
+          <pre className="mt-2 max-h-24 overflow-hidden break-all font-mono text-[11px] leading-relaxed text-muted-foreground">
             {topStack}
           </pre>
         ) : null}
-        <p className="mt-2 font-mono text-[11px] text-muted-foreground">{meta}</p>
+        <p className="mt-2 break-words font-mono text-[11px] text-muted-foreground">{meta}</p>
       </Link>
     </li>
   );
@@ -68,11 +70,9 @@ export function OverviewListItem({
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              {badges}
-              <span className={`truncate ${titleClassName}`}>{title}</span>
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">{meta}</div>
+            {badges ? <div className="flex flex-wrap items-center gap-2">{badges}</div> : null}
+            <p className={`mt-1 line-clamp-2 break-all ${titleClassName}`}>{title}</p>
+            <div className="mt-1 break-words text-sm text-muted-foreground">{meta}</div>
           </div>
         </div>
       </Link>

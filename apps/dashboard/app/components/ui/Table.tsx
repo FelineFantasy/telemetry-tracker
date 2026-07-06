@@ -41,7 +41,10 @@ export function TableListLink({ className, ...props }: TableListLinkProps) {
   return (
     <Link
       {...props}
-      className={cn("font-medium text-foreground underline-offset-4 hover:text-brand hover:underline", className)}
+      className={cn(
+        "block max-w-[12rem] break-all font-medium text-foreground underline-offset-4 hover:text-brand hover:underline sm:max-w-none",
+        className
+      )}
     />
   );
 }
@@ -51,7 +54,7 @@ export function TablePropertiesCell({ data }: { data: unknown }) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
-    <pre className="max-h-24 max-w-md overflow-auto rounded-md border border-border bg-background/80 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+    <pre className="max-h-24 max-w-full overflow-auto break-all rounded-md border border-border bg-background/80 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground sm:max-w-md">
       {JSON.stringify(data, null, 2)}
     </pre>
   );

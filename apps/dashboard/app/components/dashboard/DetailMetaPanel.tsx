@@ -46,7 +46,7 @@ export function DetailSummaryPanel({
 }) {
   return (
     <section className="rounded-xl border border-border bg-surface/40 p-5" aria-label={title}>
-      <h2 className="text-[15px] font-medium leading-snug text-destructive">{title}</h2>
+      <h2 className="break-words text-[15px] font-medium leading-snug text-destructive">{title}</h2>
       {badges ? <div className="mt-3 flex flex-wrap gap-2">{badges}</div> : null}
       {meta ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{meta}</div> : null}
       {children}
