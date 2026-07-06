@@ -43,7 +43,7 @@ export default async function LandingPage() {
   const isAuthenticated = Boolean(await getDashboardSessionId());
 
   return (
-    <main id="main-content" className="min-h-screen bg-background text-foreground">
+    <main id="main-content" className="marketing-main-offset min-h-screen bg-background text-foreground">
       <Nav isAuthenticated={isAuthenticated} />
       <Hero isAuthenticated={isAuthenticated} />
       <SupportedSdks />

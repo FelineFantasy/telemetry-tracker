@@ -68,10 +68,10 @@ function Section({ id, title, children }: { id: string; title: string; children:
 export function CookiesPageContent() {
   return (
     <div className="relative min-h-screen bg-background text-foreground">
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] glow-blue opacity-60" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] glow-blue opacity-60" />
       <Nav />
 
-      <main id="main-content" className="relative mx-auto max-w-6xl px-6 pb-24 pt-36">
+      <main id="main-content" className="marketing-main-offset relative mx-auto max-w-6xl px-6 pb-24 pt-36">
         <header className="max-w-3xl">
           <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-brand" />

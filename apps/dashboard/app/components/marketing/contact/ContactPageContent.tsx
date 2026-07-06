@@ -175,7 +175,7 @@ export function ContactPageContent() {
     <div className="min-h-screen bg-background text-foreground">
       <Nav />
 
-      <main id="main-content" className="pt-32">
+      <main id="main-content" className="marketing-main-offset pt-32">
         <section className="relative overflow-hidden border-b border-border">
           <div aria-hidden className="glow-blue absolute inset-0 opacity-60" />
           <div aria-hidden className="grid-bg absolute inset-0 opacity-[0.35]" />
@@ -410,7 +410,7 @@ export function ContactPageContent() {
                     </svg>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{c.desc}</p>
-                  <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                  <div className="mt-3 flex flex-col gap-1 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="font-mono text-xs text-foreground/80">{c.detail}</span>
                     <span className="text-[11px] text-muted-foreground">{c.sla}</span>
                   </div>

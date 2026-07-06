@@ -285,6 +285,29 @@
   text-wrap: balance;
 }
 
+/* Fixed marketing nav (~top-3 + pill height) — pad main content and anchor scroll targets */
+.marketing-main-offset {
+  scroll-padding-top: 6.5rem;
+}
+
+.code-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prose-docs pre,
+.prose-docs code,
+article pre {
+  max-width: 100%;
+}
+
+.prose-docs pre,
+article pre {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }

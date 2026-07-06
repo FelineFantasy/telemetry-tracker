@@ -60,7 +60,7 @@ const guides = [
 
 export function DocsPreview() {
   return (
-    <section id="docs" className="relative py-28">
+    <section id="docs" className="relative scroll-mt-28 py-28">
       <div className="mx-auto max-w-6xl px-6">
         <SectionHeading
           eyebrow="Documentation"

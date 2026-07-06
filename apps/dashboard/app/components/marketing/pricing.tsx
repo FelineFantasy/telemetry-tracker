@@ -67,7 +67,7 @@ const tiers = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="relative py-28">
+    <section id="pricing" className="relative scroll-mt-28 py-28">
       <div className="mx-auto max-w-6xl px-6">
         <SectionHeading
           eyebrow="Pricing"

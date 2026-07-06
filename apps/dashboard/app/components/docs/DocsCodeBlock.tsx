@@ -22,7 +22,7 @@ export function DocsCodeBlock({
   }, [children]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface/60">
+    <div className="max-w-full rounded-xl border border-border bg-surface/60">
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
           {language}
@@ -35,7 +35,7 @@ export function DocsCodeBlock({
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed text-foreground/90">
+      <pre className="code-scroll p-4 font-mono text-[13px] leading-relaxed text-foreground/90">
         <code>{children}</code>
       </pre>
     </div>
