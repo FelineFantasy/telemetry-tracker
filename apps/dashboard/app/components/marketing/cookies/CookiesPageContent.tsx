@@ -71,7 +71,10 @@ export function CookiesPageContent() {
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] glow-blue opacity-60" />
       <Nav />
 
-      <main id="main-content" className="marketing-main-offset relative mx-auto max-w-6xl px-6 pb-24 pt-36">
+      <main
+        id="main-content"
+        className="marketing-main-offset relative mx-auto w-full min-w-0 max-w-6xl px-6 pb-24 pt-36"
+      >
         <header className="max-w-3xl">
           <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-brand" />
@@ -86,7 +89,7 @@ export function CookiesPageContent() {
           </p>
         </header>
 
-        <div className="mt-16 grid gap-12 lg:grid-cols-[220px_1fr]">
+        <div className="mt-16 grid min-w-0 gap-12 lg:grid-cols-[220px_1fr]">
           <aside className="hidden lg:block">
             <div className="sticky top-28">
               <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -107,10 +110,10 @@ export function CookiesPageContent() {
             </div>
           </aside>
 
-          <article className="max-w-3xl space-y-12 text-[15px] leading-7 text-muted-foreground">
-            <div className="rounded-2xl border border-border bg-surface/60 p-5">
+          <article className="min-w-0 max-w-3xl space-y-12 break-words text-[15px] leading-7 text-muted-foreground">
+            <div className="max-w-full rounded-2xl border border-border bg-surface/60 p-5">
               <p className="text-xs uppercase tracking-[0.16em] text-foreground">In short</p>
-              <p className="mt-2 text-foreground/85">
+              <p className="mt-2 break-words text-foreground/85">
                 Essential cookies always run — they sign you in and remember your consent choice.
                 Optional analytics (Google Analytics on the official hosted site) and preference
                 cookies load only when you accept in the banner.
@@ -146,8 +149,27 @@ export function CookiesPageContent() {
               <h2 className="text-2xl font-semibold tracking-tight text-foreground">
                 Cookies we set
               </h2>
-              <div className="mt-6 overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
+
+              <div className="mt-6 space-y-3 md:hidden">
+                {rows.map((r) => (
+                  <div
+                    key={r.name}
+                    className="rounded-xl border border-border bg-surface/40 p-4"
+                  >
+                    <p className="font-mono text-xs text-foreground">{r.name}</p>
+                    <p className="mt-2 text-sm text-foreground/85">{r.purpose}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-foreground">
+                        {r.type}
+                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">{r.retention}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 hidden overflow-x-auto rounded-xl border border-border md:block">
+                <table className="w-full min-w-[640px] text-left text-sm">
                   <thead className="bg-surface/60">
                     <tr className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                       <th className="px-4 py-3 font-normal">Name</th>
