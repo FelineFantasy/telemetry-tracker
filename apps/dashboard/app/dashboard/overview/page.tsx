@@ -388,6 +388,7 @@ export default async function OverviewPage({
             path={OVERVIEW_PATH}
             currentParams={currentOverviewParams}
             includeAll
+            align="right"
             range={{
               key: parsedRange.key,
               label: displayRangeLabel,
