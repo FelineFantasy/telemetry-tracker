@@ -12,7 +12,7 @@ export function PageTitle({
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0 flex-1">
-        <h1 className="line-clamp-3 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h1 className="line-clamp-4 break-all text-xl font-semibold tracking-tight sm:line-clamp-3 sm:break-words sm:text-2xl lg:text-3xl">
           {title}
         </h1>
         {context ? (

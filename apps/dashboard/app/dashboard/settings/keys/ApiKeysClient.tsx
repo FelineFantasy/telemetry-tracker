@@ -14,7 +14,7 @@ import {
   SettingsInput,
   SettingsPill,
 } from "@/app/components/dashboard/settings/settings-ui";
-import { Table, TableWrap } from "@/app/components/ui/Table";
+import { Table, TableWrap, tableDateColumnClass } from "@/app/components/ui/Table";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { toast } from "sonner";
 
@@ -168,10 +168,10 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
               <thead>
                 <tr>
                   <th>Label</th>
-                  <th>Allowed app</th>
-                  <th>Public id</th>
-                  <th>Created</th>
-                  <th>Last used</th>
+                  <th className="hidden md:table-cell">Allowed app</th>
+                  <th className="hidden lg:table-cell">Public id</th>
+                  <th className={tableDateColumnClass}>Created</th>
+                  <th className={`hidden sm:table-cell ${tableDateColumnClass}`}>Last used</th>
                   <th>Status</th>
                   <th />
                 </tr>
@@ -182,14 +182,16 @@ export function ApiKeysClient({ keys }: { keys: ApiKeyRow[] }) {
                   return (
                     <tr key={k.publicId}>
                       <td>{k.name ?? "—"}</td>
-                      <td>{k.allowedApp ?? "—"}</td>
-                      <td>
+                      <td className="hidden md:table-cell">{k.allowedApp ?? "—"}</td>
+                      <td className="hidden lg:table-cell">
                         <code className="font-mono text-[11px]">{k.publicId}</code>
                       </td>
-                      <td>
+                      <td className={tableDateColumnClass}>
                         <TimeAgo iso={k.createdAt} />
                       </td>
-                      <td>{k.lastUsedAt ? <TimeAgo iso={k.lastUsedAt} /> : "—"}</td>
+                      <td className={`hidden sm:table-cell ${tableDateColumnClass}`}>
+                        {k.lastUsedAt ? <TimeAgo iso={k.lastUsedAt} /> : "—"}
+                      </td>
                       <td>
                         {revoked ? (
                           <SettingsPill tone="muted">Revoked</SettingsPill>

@@ -43,6 +43,9 @@ export type OverviewApiResponse = {
   rangeLabel?: string;
   since: string;
   until?: string;
+  metricsSince?: string;
+  metricsUntil?: string;
+  metricsDurationMs?: number;
   bucket?: "hour" | "day" | "week";
   compare?: "previous" | "week-ago";
   errorsLast24h: number;

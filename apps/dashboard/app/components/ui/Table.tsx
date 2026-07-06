@@ -60,6 +60,9 @@ export function TablePropertiesCell({ data }: { data: unknown }) {
   );
 }
 
+/** Apply to date/time column headers and cells to prevent word-by-word wrapping. */
+export const tableDateColumnClass = "whitespace-nowrap";
+
 export function TableViewLink({
   href,
   children = "View",

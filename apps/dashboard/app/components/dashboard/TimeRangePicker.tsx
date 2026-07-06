@@ -126,7 +126,7 @@ export function TimeRangePicker({
 
   return (
     <DashboardPopover
-      width="w-72"
+      width="w-72 max-w-[calc(100vw-2rem)]"
       align={align}
       onOpenChange={(open) => {
         if (!open) setShowAbsolute(false);
