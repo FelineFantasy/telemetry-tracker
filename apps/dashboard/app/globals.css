@@ -145,6 +145,8 @@
     color-scheme: light;
     accent-color: var(--accent-color);
     @apply scroll-smooth;
+    width: 100%;
+    overflow-x: clip;
   }
 
   html.dark {
@@ -159,7 +161,8 @@
   }
 
   body {
-    @apply m-0 min-h-screen bg-background p-0 font-sans text-base text-foreground antialiased;
+    @apply m-0 min-h-screen w-full bg-background p-0 font-sans text-base text-foreground antialiased;
+    overflow-x: clip;
     font-size: var(--font-size-body);
     line-height: var(--line-height);
     font-feature-settings: "ss01", "cv11", "rlig" 1, "calt" 1;

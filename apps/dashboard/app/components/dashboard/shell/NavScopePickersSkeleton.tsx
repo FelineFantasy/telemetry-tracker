@@ -1,6 +1,6 @@
 export function NavScopePickersSkeleton() {
   return (
-    <div className="flex w-max min-w-full items-center gap-1.5 sm:w-auto sm:min-w-0">
+    <div className="flex w-max items-center gap-1.5 sm:w-auto sm:min-w-0">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}

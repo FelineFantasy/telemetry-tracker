@@ -10,7 +10,7 @@ export function DashboardLayoutShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen w-full overflow-x-clip bg-background text-foreground">
       <Suspense fallback={<DashboardTopNavFallback />}>
         <DashboardTopNavLoader />
       </Suspense>
