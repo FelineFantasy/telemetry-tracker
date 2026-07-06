@@ -13,6 +13,17 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.6] - 2026-07-06
+
+### Fixed
+
+- **Dashboard (mobile)** — compact top nav with scrollable scope pickers and tab bar; Overview greeting shows a short first name instead of a full email
+- **Dashboard** — clamp long error titles in issue lists and open-incident cards (full message remains on error detail); collapse Filters & sort on small viewports; improve overflow handling on tables and page titles
+
+---
+
+
+
 ## [1.4.5] - 2026-07-04
 
 ### Fixed
