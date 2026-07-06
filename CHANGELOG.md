@@ -14,6 +14,20 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ---
 
 
+## [1.4.11] - 2026-07-06
+
+### Fixed
+
+- **Mobile dashboard UX** — nowrap date columns and responsive table columns; stacked overview greeting; popover width caps for notifications, filters, and profile menu (dropdown closes after item selection); full-width open-issues severity on narrow viewports; compact top errors/events layout; issue title wrapping ([#173](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/173))
+- **Overview bar chart flash** — defer Recharts mount until after layout so top errors/events bars no longer flash full-width on first paint ([#173](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/173))
+- **Overview metrics window** — when time range is unselected, headline metrics, charts, and compare use a data-adaptive 7–90 day window (30-day fallback when empty) instead of ~840 days; event/error lists stay all-time ([#174](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/174))
+
+### Changed
+
+- Overview API returns `metricsSince`, `metricsUntil`, and `metricsDurationMs` for the resolved metrics window; dashboard docs updated ([#174](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/174))
+
+---
+
 ## [1.4.9] - 2026-07-06
 
 ### Fixed
