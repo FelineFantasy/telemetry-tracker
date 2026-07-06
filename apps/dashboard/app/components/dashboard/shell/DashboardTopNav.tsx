@@ -39,16 +39,28 @@ export function DashboardTopNav({
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
-      <div className="relative z-50 mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5 sm:px-6 lg:px-8">
-        <Link
-          href="/dashboard/overview"
-          className="inline-flex shrink-0 items-center"
-          aria-label="Telemetry Tracker"
-        >
-          <Logo />
-        </Link>
+      <div className="relative z-50 mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-2 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center justify-between gap-2 sm:contents">
+          <Link
+            href="/dashboard/overview"
+            className="inline-flex shrink-0 items-center sm:order-1"
+            aria-label="Telemetry Tracker"
+          >
+            <Logo compact />
+          </Link>
 
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-visible">
+          <DashboardTopNavActions
+            className="sm:order-3"
+            user={user}
+            notificationsSlot={
+              <Suspense fallback={<NotificationsFallback />}>
+                <DashboardNotificationsLoader />
+              </Suspense>
+            }
+          />
+        </div>
+
+        <div className="-mx-4 min-w-0 flex-1 overflow-x-auto px-4 scrollbar-hide sm:order-2 sm:mx-0 sm:overflow-visible sm:px-0">
           <Suspense fallback={<NavScopePickersSkeleton />}>
             <NavScopePickersLoader
               organizations={organizations}
@@ -60,15 +72,6 @@ export function DashboardTopNav({
             />
           </Suspense>
         </div>
-
-        <DashboardTopNavActions
-          user={user}
-          notificationsSlot={
-            <Suspense fallback={<NotificationsFallback />}>
-              <DashboardNotificationsLoader />
-            </Suspense>
-          }
-        />
       </div>
       <div className="relative z-10">
         <DashboardNavTabs />
