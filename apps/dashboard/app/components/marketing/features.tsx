@@ -67,7 +67,7 @@ const features = [
 
 export function Features() {
   return (
-    <section id="features" className="relative py-28">
+    <section id="features" className="relative scroll-mt-28 py-28">
       <div className="mx-auto max-w-6xl px-6">
         <SectionHeading
           eyebrow="Platform"

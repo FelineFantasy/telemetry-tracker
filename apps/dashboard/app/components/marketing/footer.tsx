@@ -52,7 +52,7 @@ export function Footer() {
               </span>
               Self-hosted ready
             </p>
-            <div className="mt-8 max-w-sm">
+            <div className="mt-8 w-full max-w-sm">
               <MarketingSubscribeForm compact idPrefix="footer" />
             </div>
           </div>

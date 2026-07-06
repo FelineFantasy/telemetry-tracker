@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { MarketingNavLink } from "@/app/components/marketing/MarketingNavLink";
+import { useBodyScrollLock } from "@/lib/body-scroll-lock";
 import { Logo } from "./logo";
 
 const links = [
@@ -27,14 +28,7 @@ export function Nav({ isAuthenticated = false }: { isAuthenticated?: boolean }) 
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [menuOpen]);
+  useBodyScrollLock(menuOpen);
 
   useEffect(() => {
     if (!menuOpen) return;

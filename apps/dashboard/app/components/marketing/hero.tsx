@@ -38,7 +38,7 @@ export function Hero({ isAuthenticated = false }: { isAuthenticated?: boolean })
           </svg>
         </Link>
 
-        <h1 className="mt-7 text-balance text-5xl font-semibold leading-[1.02] tracking-tight sm:text-6xl md:text-7xl">
+        <h1 className="mt-7 text-balance text-3xl font-semibold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
           Observability for
           <br />
           <span className="text-muted-foreground">teams that ship.</span>
