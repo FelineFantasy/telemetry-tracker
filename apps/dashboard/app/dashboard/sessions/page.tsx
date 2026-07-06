@@ -7,7 +7,7 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import { Table, TableListLink, TableViewLink, TableWrap } from "@/app/components/ui/Table";
+import { Table, TableListLink, TableViewLink, TableWrap, tableDateColumnClass } from "@/app/components/ui/Table";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -171,10 +171,12 @@ export default async function SessionsPage({
             <thead>
               <tr>
                 <th>Session ID</th>
-                <th>Identity</th>
-                <th>Started</th>
-                <th>Ended</th>
-                <th aria-hidden>View</th>
+                <th className="hidden sm:table-cell">Identity</th>
+                <th className={tableDateColumnClass}>Started</th>
+                <th className={`hidden sm:table-cell ${tableDateColumnClass}`}>Ended</th>
+                <th className="hidden sm:table-cell" aria-hidden>
+                  View
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -191,16 +193,18 @@ export default async function SessionsPage({
                       {truncate(s.session_id, 24)}
                     </TableListLink>
                   </td>
-                  <td title={s.user_id ?? s.anonymous_id ?? undefined}>
+                  <td title={s.user_id ?? s.anonymous_id ?? undefined} className="hidden sm:table-cell">
                     {(s.user_id ?? s.anonymous_id)
                       ? truncate(s.user_id ?? s.anonymous_id ?? "", 20)
                       : "—"}
                   </td>
-                  <td>
+                  <td className={tableDateColumnClass}>
                     <TimeAgo iso={s.started_at} />
                   </td>
-                  <td>{s.ended_at ? <TimeAgo iso={s.ended_at} /> : "—"}</td>
-                  <td>
+                  <td className={`hidden sm:table-cell ${tableDateColumnClass}`}>
+                    {s.ended_at ? <TimeAgo iso={s.ended_at} /> : "—"}
+                  </td>
+                  <td className="hidden sm:table-cell">
                     <TableViewLink
                       href={
                         appFilter

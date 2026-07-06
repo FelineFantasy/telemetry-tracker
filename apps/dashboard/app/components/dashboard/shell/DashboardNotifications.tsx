@@ -102,7 +102,7 @@ export function DashboardNotifications({ initialItems }: Props) {
   return (
     <DashboardPopover
       align="right"
-      width="w-[380px]"
+      width="w-[calc(100vw-2rem)] max-w-[380px]"
       trigger={(toggle, open) => (
         <button
           type="button"
@@ -166,7 +166,7 @@ export function DashboardNotifications({ initialItems }: Props) {
                     <div className="flex items-start gap-2">
                       <p className="flex-1 truncate text-[13px]">{n.title}</p>
                       <span
-                        className="shrink-0 font-mono text-[10px] text-muted-foreground"
+                        className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground"
                         title={n.occurredAt}
                       >
                         {n.timeLabel}

@@ -7,7 +7,7 @@ import {
   updateOrganizationMemberRoleAction,
 } from "@/app/dashboard/actions";
 import { Section, SettingsBtn, SettingsInput } from "@/app/components/dashboard/settings/settings-ui";
-import { Table, TableWrap } from "@/app/components/ui/Table";
+import { Table, TableWrap, tableDateColumnClass } from "@/app/components/ui/Table";
 import { TimeAgo } from "@/app/components/TimeAgo";
 
 export type TeamMemberRow = {
@@ -162,9 +162,9 @@ export function TeamMembersClient({
               <thead>
                 <tr>
                   <th>Email</th>
-                  <th>Name</th>
+                  <th className="hidden sm:table-cell">Name</th>
                   <th>Role</th>
-                  <th>Joined</th>
+                  <th className={tableDateColumnClass}>Joined</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,7 +175,7 @@ export function TeamMembersClient({
                   return (
                     <tr key={m.userId}>
                       <td>{m.email}</td>
-                      <td>{m.displayName ?? "—"}</td>
+                      <td className="hidden sm:table-cell">{m.displayName ?? "—"}</td>
                       <td>
                         {canEditRole ? (
                           <select
@@ -195,7 +195,7 @@ export function TeamMembersClient({
                           m.role
                         )}
                       </td>
-                      <td>
+                      <td className={tableDateColumnClass}>
                         <TimeAgo iso={m.joinedAt} />
                       </td>
                     </tr>

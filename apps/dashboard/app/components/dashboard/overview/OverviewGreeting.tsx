@@ -46,8 +46,9 @@ export function OverviewGreeting({
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-          {timeGreeting()}, {name}
+        <h1 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl lg:text-3xl">
+          <span className="block sm:inline">{timeGreeting()},</span>{" "}
+          <span className="block sm:inline">{name}</span>
         </h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Here&apos;s what&apos;s happening across your workspace today.

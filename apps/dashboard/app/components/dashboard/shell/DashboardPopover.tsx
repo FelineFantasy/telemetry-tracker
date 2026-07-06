@@ -37,7 +37,7 @@ export function DashboardPopover({
     open,
     placement,
     strategy: "fixed",
-    middleware: [offset(8), flip(), shift({ padding: 8 })],
+    middleware: [offset(8), flip({ padding: 16 }), shift({ padding: 16 })],
     whileElementsMounted: autoUpdate,
   });
 
@@ -82,7 +82,7 @@ export function DashboardPopover({
           <div
             ref={refs.setFloating}
             className={cn(
-              "z-[9999] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/60",
+              "z-[9999] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl shadow-black/60",
               width
             )}
             style={floatingStyles}
