@@ -76,7 +76,7 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
         </button>
       )}
     >
-      {() => (
+      {(close) => (
         <div>
           <div className="flex items-center gap-3 border-b border-border px-3 py-3">
             <span className="grid h-9 w-9 place-items-center rounded-full bg-brand text-xs font-semibold text-primary-foreground">
@@ -92,22 +92,23 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
           <div className="p-1.5">
             <MenuGroup label="Account">
               {ACCOUNT_LINKS.map((item) => (
-                <MenuLink key={item.href} {...item} />
+                <MenuLink key={item.href} {...item} onClick={close} />
               ))}
             </MenuGroup>
             <MenuGroup label="Preferences">
               {PREFERENCE_LINKS.map((item) => (
-                <MenuLink key={item.href} {...item} />
+                <MenuLink key={item.href} {...item} onClick={close} />
               ))}
-              <ThemeMenuLink />
+              <ThemeMenuLink onClick={close} />
             </MenuGroup>
             <MenuGroup label="Help">
               {HELP_LINKS.map((item) => (
-                <MenuLink key={item.href} {...item} />
+                <MenuLink key={item.href} {...item} onClick={close} />
               ))}
             </MenuGroup>
             <Link
               href="/dashboard/settings/profile"
+              onClick={close}
               className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface"
             >
               <Settings className="h-3.5 w-3.5 text-muted-foreground" />
@@ -117,6 +118,7 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
             <form action={logoutAction}>
               <button
                 type="submit"
+                onClick={close}
                 className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-surface"
               >
                 <LogOut className="h-3.5 w-3.5" />
@@ -146,15 +148,18 @@ function MenuLink({
   label,
   icon: Icon,
   shortcut,
+  onClick,
 }: {
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
   shortcut?: string;
+  onClick?: () => void;
 }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface"
     >
       <Icon className="h-3.5 w-3.5 text-muted-foreground" />

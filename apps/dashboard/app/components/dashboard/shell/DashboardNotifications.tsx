@@ -102,7 +102,7 @@ export function DashboardNotifications({ initialItems }: Props) {
   return (
     <DashboardPopover
       align="right"
-      width="w-[380px]"
+      width="w-[calc(100vw-2rem)] max-w-[380px]"
       trigger={(toggle, open) => (
         <button
           type="button"
@@ -120,7 +120,7 @@ export function DashboardNotifications({ initialItems }: Props) {
         </button>
       )}
     >
-      {() => (
+      {(close) => (
         <div>
           <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
             <div className="flex items-center gap-1.5">
@@ -134,7 +134,10 @@ export function DashboardNotifications({ initialItems }: Props) {
             {viewItems.length > 0 ? (
               <button
                 type="button"
-                onClick={markAllRead}
+                onClick={() => {
+                  markAllRead();
+                  close();
+                }}
                 className="text-[11px] text-muted-foreground hover:text-foreground"
               >
                 Mark all read
@@ -166,7 +169,7 @@ export function DashboardNotifications({ initialItems }: Props) {
                     <div className="flex items-start gap-2">
                       <p className="flex-1 truncate text-[13px]">{n.title}</p>
                       <span
-                        className="shrink-0 font-mono text-[10px] text-muted-foreground"
+                        className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground"
                         title={n.occurredAt}
                       >
                         {n.timeLabel}
@@ -185,7 +188,10 @@ export function DashboardNotifications({ initialItems }: Props) {
                   {n.href ? (
                     <Link
                       href={n.href}
-                      onClick={() => markRead(n.id)}
+                      onClick={() => {
+                        markRead(n.id);
+                        close();
+                      }}
                       className="flex cursor-pointer gap-2.5 px-3 py-2.5 hover:bg-surface/60"
                     >
                       {content}
@@ -193,7 +199,10 @@ export function DashboardNotifications({ initialItems }: Props) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => markRead(n.id)}
+                      onClick={() => {
+                        markRead(n.id);
+                        close();
+                      }}
                       className="flex w-full cursor-pointer gap-2.5 px-3 py-2.5 text-left hover:bg-surface/60"
                     >
                       {content}
@@ -213,6 +222,7 @@ export function DashboardNotifications({ initialItems }: Props) {
           <div className="flex items-center justify-between border-t border-border px-3 py-2">
             <Link
               href="/dashboard/settings/notifications"
+              onClick={close}
               className="text-[11px] text-muted-foreground hover:text-foreground"
             >
               Notification settings

@@ -9,15 +9,15 @@ export function OverviewActiveIncidents({ issues }: { issues: OverviewActiveIssu
 
   return (
     <DashboardPanel className="mb-6">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <div>
+      <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-sm font-medium">Open issues</h2>
           <p className="text-[12px] text-muted-foreground">
             Unresolved error groups active in this period
           </p>
         </div>
         {issues.length > 0 ? (
-          <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[12px] font-medium text-destructive">
+          <span className="w-full rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-1 text-center text-[12px] font-medium text-destructive sm:w-auto sm:py-0.5 sm:text-left">
             {p1} P1 · {p3} P3
           </span>
         ) : null}

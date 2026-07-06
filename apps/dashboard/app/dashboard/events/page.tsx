@@ -8,7 +8,7 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import { Table, TableListLink, TablePropertiesCell, TableViewLink, TableWrap } from "@/app/components/ui/Table";
+import { Table, TableListLink, TablePropertiesCell, TableViewLink, TableWrap, tableDateColumnClass } from "@/app/components/ui/Table";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -212,9 +212,11 @@ export default async function EventsPage({
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Properties</th>
-                <th>When</th>
-                <th aria-hidden>View</th>
+                <th className="hidden md:table-cell">Properties</th>
+                <th className={tableDateColumnClass}>When</th>
+                <th className="hidden sm:table-cell" aria-hidden>
+                  View
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -231,13 +233,13 @@ export default async function EventsPage({
                       {e.name}
                     </TableListLink>
                   </td>
-                  <td className="max-w-md">
+                  <td className="hidden max-w-md md:table-cell">
                     <TablePropertiesCell data={e.properties} />
                   </td>
-                  <td>
+                  <td className={tableDateColumnClass}>
                     <TimeAgo iso={e.created_at} />
                   </td>
-                  <td>
+                  <td className="hidden sm:table-cell">
                     <TableViewLink
                       href={
                         appFilter
