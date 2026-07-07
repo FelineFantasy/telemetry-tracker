@@ -138,6 +138,45 @@ export function enrichErrorListFilterForMetrics(
   };
 }
 
+export function shouldScopeEventsToFilteredErrors(f: ErrorListFilterInput): boolean {
+  return (f.q != null && f.q.trim() !== "") || f.status !== "all";
+}
+
+export function buildEventSessionScopeSql(
+  f: ErrorListFilterInput,
+  projectId: string,
+  previousSince: Date,
+  until: Date
+): Prisma.Sql {
+  if (!shouldScopeEventsToFilteredErrors(f)) return Prisma.empty;
+  return Prisma.sql`AND EXISTS (
+      SELECT 1
+      FROM "ErrorOccurrence" seo
+      INNER JOIN "ErrorGroup" seg ON seg."id" = seo."error_group_id"
+      WHERE ${buildErrorGroupScopeSql(f, projectId, "seg")}
+        ${f.release ? Prisma.sql`AND seo."release" = ${f.release}` : Prisma.empty}
+        AND seo."created_at" >= ${previousSince}
+        AND seo."created_at" <= ${until}
+        AND (
+          (
+            e."session_id" IS NOT NULL
+            AND TRIM(e."session_id") <> ''
+            AND seo."session_id" = e."session_id"
+          )
+          OR (
+            e."user_id" IS NOT NULL
+            AND TRIM(e."user_id") <> ''
+            AND seo."user_id" = e."user_id"
+          )
+          OR (
+            e."anonymous_id" IS NOT NULL
+            AND TRIM(e."anonymous_id") <> ''
+            AND seo."anonymous_id" = e."anonymous_id"
+          )
+        )
+    )`;
+}
+
 export async function fetchErrorsPageSummary(
   prisma: PrismaClient,
   f: ErrorListFilterInput,
@@ -155,35 +194,12 @@ export async function fetchErrorsPageSummary(
     ? Prisma.sql`AND eo."release" = ${f.release}`
     : Prisma.empty;
   const groupScopeSql = buildErrorGroupScopeSql(f, projectId, "eg");
-  const eventSessionScope =
-    f.q != null && f.q.trim() !== ""
-      ? Prisma.sql`AND EXISTS (
-          SELECT 1
-          FROM "ErrorOccurrence" seo
-          INNER JOIN "ErrorGroup" seg ON seg."id" = seo."error_group_id"
-          WHERE ${buildErrorGroupScopeSql(f, projectId, "seg")}
-            ${f.release ? Prisma.sql`AND seo."release" = ${f.release}` : Prisma.empty}
-            AND seo."created_at" >= ${previousSince}
-            AND seo."created_at" <= ${until}
-            AND (
-              (
-                e."session_id" IS NOT NULL
-                AND TRIM(e."session_id") <> ''
-                AND seo."session_id" = e."session_id"
-              )
-              OR (
-                e."user_id" IS NOT NULL
-                AND TRIM(e."user_id") <> ''
-                AND seo."user_id" = e."user_id"
-              )
-              OR (
-                e."anonymous_id" IS NOT NULL
-                AND TRIM(e."anonymous_id") <> ''
-                AND seo."anonymous_id" = e."anonymous_id"
-              )
-            )
-        )`
-      : Prisma.empty;
+  const eventSessionScope = buildEventSessionScopeSql(
+    f,
+    projectId,
+    previousSince,
+    until
+  );
 
   const rows = await prisma.$queryRaw<
     [
