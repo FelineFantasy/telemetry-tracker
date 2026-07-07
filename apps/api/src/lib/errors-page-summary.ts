@@ -39,6 +39,16 @@ export type ResolvedSummaryWindow = {
 
 const DEFAULT_SUMMARY_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Shared anchor for default 7-day metrics when list range is all-time. */
+export function parseErrorsMetricsAnchor(value: string | undefined): Date {
+  const raw = value?.trim();
+  if (raw) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
 /** Resolve KPI window from list filters; defaults to last 7 days when range is all-time. */
 export function resolveErrorsSummaryWindow(
   range: { gte?: Date; lte?: Date },

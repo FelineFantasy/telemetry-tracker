@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
 import { mergeListQuery } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
+import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { IssuesTable } from "@/app/components/dashboard/IssueList";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
@@ -141,6 +141,7 @@ export default async function ErrorsListPage({
   }>;
 }) {
   const sp = await searchParams;
+  const pageAnchor = new Date();
   const currentParams = buildErrorsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
@@ -188,6 +189,9 @@ export default async function ErrorsListPage({
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
+  if (isUnselectedTimeRange(timeRange.key)) {
+    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  }
 
   const summaryQuery = new URLSearchParams(apiQuery);
   summaryQuery.delete("page");

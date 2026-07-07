@@ -18,6 +18,7 @@ import {
 import {
   enrichErrorListFilterForMetrics,
   fetchErrorsPageSummary,
+  parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
 } from "../lib/errors-page-summary.js";
 import { parseCreatedRange } from "../lib/list-query.js";
@@ -409,6 +410,7 @@ export async function apiRoutes(
       release?: string;
       q?: string;
       status?: string;
+      metricsUntil?: string;
     };
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -416,6 +418,7 @@ export async function apiRoutes(
     const q = queryString(query.q);
     const status = queryString(query.status) ?? "all";
     const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
 
     const filter: ErrorListFilterInput = {
       appId,
@@ -431,7 +434,7 @@ export async function apiRoutes(
             : "all",
     };
 
-    const window = resolveErrorsSummaryWindow(range);
+    const window = resolveErrorsSummaryWindow(range, metricsAnchor);
     const summary = await fetchErrorsPageSummary(prisma, filter, projectId, window);
     return reply.send(summary);
   });
@@ -456,6 +459,7 @@ export async function apiRoutes(
       trendWindow?: string;
       trendFrom?: string;
       trendTo?: string;
+      metricsUntil?: string;
     };
     const pageSize = parseListPageSize(query.pageSize, query.limit);
     const page = parsePositivePage(query.page, 1);
@@ -466,6 +470,7 @@ export async function apiRoutes(
     const q = queryString(query.q);
     const status = queryString(query.status) ?? "all";
     const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
 
     const sortParsed = parseErrorListSortParam(queryString(query.sort));
     if (!sortParsed.ok) {
@@ -502,7 +507,7 @@ export async function apiRoutes(
             ? "resolved"
             : "all",
     };
-    const metricsFilter = enrichErrorListFilterForMetrics(filter, range);
+    const metricsFilter = enrichErrorListFilterForMetrics(filter, range, metricsAnchor);
 
     if (isAggregateSort(sortParsed.sort)) {
       const { total, rows } = await listErrorGroupsAggregated(

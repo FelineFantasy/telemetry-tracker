@@ -3,6 +3,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   buildErrorGroupScopeSql,
   enrichErrorListFilterForMetrics,
+  parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
 } from "./errors-page-summary.js";
 
@@ -10,6 +11,40 @@ function prismaSqlText(fragment: Prisma.Sql): string {
   const parts = fragment as unknown as { strings: string[] };
   return parts.strings.join("?");
 }
+
+describe("parseErrorsMetricsAnchor", () => {
+  it("parses ISO metricsUntil", () => {
+    const iso = "2026-06-28T12:00:00.000Z";
+    expect(parseErrorsMetricsAnchor(iso).toISOString()).toBe(iso);
+  });
+
+  it("falls back to now when metricsUntil is missing or invalid", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-28T12:00:00.000Z"));
+    expect(parseErrorsMetricsAnchor(undefined).toISOString()).toBe(
+      "2026-06-28T12:00:00.000Z"
+    );
+    expect(parseErrorsMetricsAnchor("not-a-date").toISOString()).toBe(
+      "2026-06-28T12:00:00.000Z"
+    );
+    vi.useRealTimers();
+  });
+});
+
+describe("default metrics window alignment", () => {
+  const anchor = new Date("2026-06-28T12:00:00.000Z");
+
+  it("uses the same bounds for summary and in-range counts", () => {
+    const window = resolveErrorsSummaryWindow({}, anchor);
+    const enriched = enrichErrorListFilterForMetrics(
+      { range: {}, status: "all" },
+      {},
+      anchor
+    );
+    expect(enriched.occurrenceCountRange?.gte).toEqual(window.since);
+    expect(enriched.occurrenceCountRange?.lte).toEqual(window.until);
+  });
+});
 
 describe("buildErrorGroupScopeSql", () => {
   it("applies last_seen bounds so summary matches the issues list date filter", () => {
