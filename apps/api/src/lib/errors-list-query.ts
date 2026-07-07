@@ -143,8 +143,6 @@ function prismaOrderBy(
   switch (sort) {
     case "first_seen":
       return { first_seen: o };
-    case "occurrences":
-      return { occurrences: o };
     case "message":
       return { message: o };
     case "app":
