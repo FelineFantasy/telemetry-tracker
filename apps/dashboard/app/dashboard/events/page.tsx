@@ -36,6 +36,7 @@ type EventNameRow = {
   users_affected?: number;
   last_seen: string;
   latest_event_id?: string | null;
+  capture_kind?: "auto" | "custom";
   sparkline?: { t: string; count: number }[];
 };
 

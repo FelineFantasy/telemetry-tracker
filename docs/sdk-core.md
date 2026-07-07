@@ -70,7 +70,7 @@ try {
 
 ### `screen(name)`
 
-Record a screen/view (sent as an event with name `$screen` and property `name`).
+Record a screen/view (sent as an event with name `$screen` and property `name`). Names starting with `$` are **auto-captured** SDK events; other names are **custom** events in the dashboard.
 
 ```ts
 import { screen } from "@telemetry-tracker/core";
