@@ -162,10 +162,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Upload Source Maps
-        uses: ./
+        uses: ./.github/actions/upload-source-maps
         with:
-          api_key: ${{ secrets.TT_API_KEY }}
-          release: ${{ github.event.release.tag_name }}
+          session_cookie: \${{ secrets.TT_SESSION_COOKIE }}
+          project_id: "your-project-uuid-here"
+          release: \${{ github.event.release.tag_name }}
           app: "my-telemetry-app"
-          artifact_path: "./build"
+          artifact_path: "./dist"
+          base_url: "https://example.com"
 ```
