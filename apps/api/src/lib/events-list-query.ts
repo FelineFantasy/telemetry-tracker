@@ -5,6 +5,8 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { buildEventWhereSql } from "./list-query-helpers.js";
 import { fetchLatestEventsByName } from "./latest-events-by-name.js";
+import { generateOverviewChartBuckets } from "./overview-timeseries.js";
+import { chooseTimeRangeBucket } from "./time-range.js";
 
 export const EVENT_LIST_SORTS = [
   "last_seen",
@@ -68,6 +70,11 @@ export function isEventAggregateSort(sort: EventListSort): boolean {
   return sort === "users" || sort === "sessions" || sort === "count";
 }
 
+export type EventSparklinePoint = {
+  t: string;
+  count: number;
+};
+
 export type EventNameListRow = {
   name: string;
   app: string;
@@ -82,7 +89,21 @@ export type EventNameListRow = {
   sessions_affected: number;
   share_pct: number;
   latest_event_id?: string;
+  sparkline?: EventSparklinePoint[];
 };
+
+const DEFAULT_SPARKLINE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Sparkline window aligned with in-range counts (list range or enriched metrics window). */
+export function resolveEventSparklineWindow(
+  f: EventListFilterInput
+): { since: Date; until: Date; durationMs: number } {
+  const { gte, lte } = resolveEventCountRangeBounds(f);
+  const until = lte ?? new Date();
+  const since = gte ?? new Date(until.getTime() - DEFAULT_SPARKLINE_MS);
+  const durationMs = Math.max(until.getTime() - since.getTime(), 1);
+  return { since, until, durationMs };
+}
 
 function eventIdentityExpr(alias = "e"): Prisma.Sql {
   const a = Prisma.raw(`"${alias}"`);
@@ -287,6 +308,55 @@ export async function listEventNamesGrouped(
   return { total, rows, totalInRange };
 }
 
+/** Per-event-name buckets for table sparklines (metrics / list window). */
+export async function fetchSparklinesForEventNames(
+  prisma: PrismaClient,
+  names: string[],
+  f: EventListFilterInput,
+  projectId: string
+): Promise<Map<string, EventSparklinePoint[]>> {
+  const out = new Map<string, EventSparklinePoint[]>();
+  if (names.length === 0) return out;
+
+  const { since, until, durationMs } = resolveEventSparklineWindow(f);
+  const { bucket } = chooseTimeRangeBucket(durationMs);
+  const expected = generateOverviewChartBuckets(since, until, bucket);
+  const nameList = names.map((n) => Prisma.sql`${n}`);
+
+  const rows = await prisma.$queryRaw<
+    { name: string; bucket: Date; c: bigint }[]
+  >(Prisma.sql`
+    SELECT
+      e."name",
+      (date_trunc(${bucket}, e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
+      COUNT(*)::bigint AS c
+    FROM "Event" e
+    WHERE ${buildGroupedBaseWhereSql(f, projectId)}
+      AND e."name" IN (${Prisma.join(nameList)})
+      AND e."created_at" >= ${since}
+      AND e."created_at" <= ${until}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `);
+
+  for (const name of names) {
+    out.set(
+      name,
+      expected.map((d) => ({ t: d.toISOString(), count: 0 }))
+    );
+  }
+
+  for (const r of rows) {
+    const series = out.get(String(r.name));
+    if (!series) continue;
+    const key = r.bucket.toISOString();
+    const point = series.find((p) => p.t === key);
+    if (point) point.count = Number(r.c);
+  }
+
+  return out;
+}
+
 /** Attach latest event ids for row drill-down links. */
 export async function attachLatestEventIds(
   prisma: PrismaClient,
@@ -331,5 +401,6 @@ export function serializeEventNameListItem(
     sessions_affected: row.sessions_affected,
     share_pct: row.share_pct,
     latest_event_id: row.latest_event_id ?? null,
+    sparkline: row.sparkline ?? [],
   };
 }

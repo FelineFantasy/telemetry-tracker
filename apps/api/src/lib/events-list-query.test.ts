@@ -3,6 +3,7 @@ import {
   isEventAggregateSort,
   parseEventListSortParam,
   resolveEventCountRangeBounds,
+  resolveEventSparklineWindow,
   serializeEventNameListItem,
 } from "./events-list-query.js";
 
@@ -114,5 +115,40 @@ describe("serializeEventNameListItem", () => {
     const { latest_event_id: _, ...row } = baseRow;
     const item = serializeEventNameListItem(row);
     expect(item.latest_event_id).toBeNull();
+  });
+
+  it("includes sparkline defaults", () => {
+    const item = serializeEventNameListItem(baseRow);
+    expect(item.sparkline).toEqual([]);
+  });
+
+  it("serializes sparkline points", () => {
+    const item = serializeEventNameListItem({
+      ...baseRow,
+      sparkline: [{ t: "2026-06-01T00:00:00.000Z", count: 3 }],
+    });
+    expect(item.sparkline).toEqual([{ t: "2026-06-01T00:00:00.000Z", count: 3 }]);
+  });
+});
+
+describe("resolveEventSparklineWindow", () => {
+  it("uses explicit list range bounds", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const w = resolveEventSparklineWindow({ range: { gte: since, lte: until } });
+    expect(w.since).toEqual(since);
+    expect(w.until).toEqual(until);
+    expect(w.durationMs).toBe(until.getTime() - since.getTime());
+  });
+
+  it("uses enriched eventCountRange when list range is all-time", () => {
+    const since = new Date("2026-06-21T12:00:00.000Z");
+    const until = new Date("2026-06-28T12:00:00.000Z");
+    const w = resolveEventSparklineWindow({
+      range: {},
+      eventCountRange: { gte: since, lte: until },
+    });
+    expect(w.since).toEqual(since);
+    expect(w.until).toEqual(until);
   });
 });
