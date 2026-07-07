@@ -11,6 +11,11 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Sessions page summary KPIs** — total sessions, users, avg duration, bounce rate, and crash-free rate with prior-period compare and sparklines ([#189](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/189))
+- **`GET /api/sessions/summary`** — filtered-window session KPIs for the sessions list
+
 ---
 
 ## [1.5.6] - 2026-07-07

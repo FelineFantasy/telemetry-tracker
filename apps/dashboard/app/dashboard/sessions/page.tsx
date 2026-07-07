@@ -1,7 +1,11 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListToolbar";
+import {
+  SessionsSummaryMetrics,
+  type SessionsPageSummary,
+} from "@/app/components/dashboard/SessionsSummaryMetrics";
 import { mergeListQuery } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { EmptyState } from "@/app/components/EmptyState";
@@ -45,6 +49,12 @@ async function getSessions(search: URLSearchParams) {
     page: number;
     pageSize: number;
   }>;
+}
+
+async function getSessionsSummary(search: URLSearchParams): Promise<SessionsPageSummary | null> {
+  const res = await dashboardApiFetch(`/api/sessions/summary?${search.toString()}`);
+  if (!res.ok) return null;
+  return res.json();
 }
 
 async function getFilterOptions(app?: string) {
@@ -112,17 +122,31 @@ export default async function SessionsPage({
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
 
+  const pageAnchor = new Date();
+  if (isUnselectedTimeRange(timeRange.key)) {
+    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  }
+
+  const summaryQuery = new URLSearchParams(apiQuery);
+  summaryQuery.delete("page");
+  summaryQuery.delete("pageSize");
+  summaryQuery.delete("sort");
+  summaryQuery.delete("order");
+
   let items: SessionRow[] = [];
   let total = 0;
+  let summary: SessionsPageSummary | null = null;
   let platforms: string[] = [];
   try {
-    const [data, opts] = await Promise.all([
+    const [data, opts, summaryData] = await Promise.all([
       getSessions(apiQuery),
       getFilterOptions(appFilter || undefined),
+      getSessionsSummary(summaryQuery),
     ]);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
     platforms = opts.platforms;
+    summary = summaryData;
   } catch (e) {
     return (
       <>
@@ -164,6 +188,8 @@ export default async function SessionsPage({
         order={order ?? "desc"}
         platforms={platforms}
         />
+
+        {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
 
         <ListResultCount total={total} noun={total === 1 ? "session" : "sessions"} />
 
