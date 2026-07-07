@@ -11,11 +11,21 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.10] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#192](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/192)).
+
 ### Added
 
-- **Sessions filters and context** — search by user id/email/country/device; Environment, Release, and Country filters; country flag and browser/OS columns; optional user email from `identify()` ([#192](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/192))
+- **Sessions filters and context** — search by user id/email/country/device; Environment, Release, and Country filters; country flag and browser/OS columns; optional user email from `identify()` ([#269](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/269), [#192](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/192))
 - **Session ingest** — `country`, `device_browser`, `device_os`, and `user_email` on `POST /ingest/session`; SDK sends device/country context and patches identity on `identify()`
 - **`GET /api/sessions`** — list/detail rows include geo/device/email context; summary and analytics honor the expanded filter set
+
+### Database
+
+- Migration `20260708120000_session_geo_device_email` — session geo, device, and email columns
 
 ---
 
