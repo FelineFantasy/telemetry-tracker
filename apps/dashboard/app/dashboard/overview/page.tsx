@@ -14,6 +14,9 @@ import { OverviewTrendsChart } from "@/app/components/dashboard/OverviewTrendsCh
 import { TimeRangePicker } from "@/app/components/dashboard/TimeRangePicker";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { DashboardSection, StatCard } from "@/app/components/dashboard/dashboard-ui";
+import {
+  AnalyticsViewAllLink,
+} from "@/app/components/dashboard/analytics-ui";
 import { IssueList, OverviewListItem } from "@/app/components/dashboard/IssueList";
 import { OverviewGreeting } from "@/app/components/dashboard/overview/OverviewGreeting";
 import { OverviewIngestSetupBanner } from "@/app/components/dashboard/overview/OverviewIngestSetupBanner";
@@ -167,6 +170,14 @@ function eventListHref(eventName: string, app: string | null, environment: strin
   if (app) params.set("app", app);
   if (environment) params.set("environment", environment);
   return `/dashboard/events?${params.toString()}`;
+}
+
+function scopedListHref(path: string, app: string | null, environment: string | null): string {
+  const params = new URLSearchParams();
+  if (app) params.set("app", app);
+  if (environment) params.set("environment", environment);
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
 }
 
 function formatDeltaLine(
@@ -482,7 +493,8 @@ export default async function OverviewPage({
 
         <h3 className="text-sm font-medium">Top error groups</h3>
         {overviewData.topErrorGroups?.length ? (
-          <IssueList>
+          <>
+            <IssueList>
             {overviewData.topErrorGroups.map(
               (g: {
                 id: string;
@@ -507,6 +519,12 @@ export default async function OverviewPage({
               )
             )}
           </IssueList>
+            <div className="mt-3">
+              <AnalyticsViewAllLink href={scopedListHref("/dashboard/errors", app, environment)}>
+                View all errors
+              </AnalyticsViewAllLink>
+            </div>
+          </>
         ) : (
           <EmptyState
             title="No errors recorded"
@@ -541,7 +559,8 @@ export default async function OverviewPage({
 
         <h3 className="text-sm font-medium">Top event names</h3>
         {overviewData.topEvents?.length ? (
-          <IssueList>
+          <>
+            <IssueList>
             {overviewData.topEvents.map(
               (e: {
                 name: string;
@@ -575,6 +594,12 @@ export default async function OverviewPage({
               )
             )}
           </IssueList>
+            <div className="mt-3">
+              <AnalyticsViewAllLink href={scopedListHref("/dashboard/events", app, environment)}>
+                View all events
+              </AnalyticsViewAllLink>
+            </div>
+          </>
         ) : (
           <EmptyState
             title="No events recorded"
