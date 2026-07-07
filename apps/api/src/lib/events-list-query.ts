@@ -93,10 +93,17 @@ function eventIdentityExpr(alias = "e"): Prisma.Sql {
   )`;
 }
 
-function countRangeBounds(f: EventListFilterInput): { gte?: Date; lte?: Date } {
+/** Bounds for in-range counts and drill-down — merges list range with enriched metrics window. */
+export function resolveEventCountRangeBounds(
+  f: EventListFilterInput
+): { gte?: Date; lte?: Date } {
   const gte = f.range.gte ?? f.eventCountRange?.gte;
   const lte = f.range.lte ?? f.eventCountRange?.lte;
   return { gte, lte };
+}
+
+function countRangeBounds(f: EventListFilterInput): { gte?: Date; lte?: Date } {
+  return resolveEventCountRangeBounds(f);
 }
 
 function hasCountRangeBounds(f: EventListFilterInput): boolean {
@@ -271,10 +278,11 @@ export async function attachLatestEventIds(
   projectId: string
 ): Promise<EventNameListRow[]> {
   if (rows.length === 0) return rows;
+  const { gte, lte } = resolveEventCountRangeBounds(f);
   const latest = await fetchLatestEventsByName(prisma, {
     projectId,
-    since: f.range.gte,
-    until: f.range.lte,
+    since: gte,
+    until: lte,
     app: f.appId,
     environment: f.environment,
     platform: f.platform,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isEventAggregateSort,
   parseEventListSortParam,
+  resolveEventCountRangeBounds,
   serializeEventNameListItem,
 } from "./events-list-query.js";
 
@@ -29,6 +30,33 @@ describe("parseEventListSortParam", () => {
     const legacy = parseEventListSortParam("created_at");
     expect(legacy.ok).toBe(true);
     if (legacy.ok) expect(legacy.sort).toBe("last_seen");
+  });
+});
+
+describe("resolveEventCountRangeBounds", () => {
+  it("uses enriched eventCountRange when list range is all-time", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    expect(
+      resolveEventCountRangeBounds({
+        range: {},
+        eventCountRange: { gte: since, lte: until },
+      })
+    ).toEqual({ gte: since, lte: until });
+  });
+
+  it("prefers explicit list range bounds over eventCountRange", () => {
+    const since = new Date("2026-05-01T00:00:00.000Z");
+    const until = new Date("2026-05-08T00:00:00.000Z");
+    expect(
+      resolveEventCountRangeBounds({
+        range: { gte: since, lte: until },
+        eventCountRange: {
+          gte: new Date("2026-06-01T00:00:00.000Z"),
+          lte: new Date("2026-06-08T00:00:00.000Z"),
+        },
+      })
+    ).toEqual({ gte: since, lte: until });
   });
 });
 
