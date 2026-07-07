@@ -31,6 +31,10 @@ import {
   resolveEventsSummaryWindow,
 } from "../lib/events-page-summary.js";
 import {
+  fetchSessionsAnalytics,
+  parseChartBucketParam,
+} from "../lib/sessions-analytics.js";
+import {
   fetchSessionsPageSummary,
   parseSessionsMetricsAnchor,
   resolveSessionListStartedAtBounds,
@@ -958,6 +962,36 @@ export async function apiRoutes(
     const window = resolveSessionsSummaryWindow(range, metricsAnchor);
     const summary = await fetchSessionsPageSummary(prisma, filter, projectId, window);
     return reply.send(summary);
+  });
+
+  app.get("/sessions/analytics", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      metricsUntil?: string;
+      chartBucket?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
+    const chartBucket = parseChartBucketParam(queryString(query.chartBucket));
+
+    const filter = { appId, platform, range };
+    const window = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const analytics = await fetchSessionsAnalytics(
+      prisma,
+      filter,
+      projectId,
+      window,
+      chartBucket
+    );
+    return reply.send(analytics);
   });
 
   app.get("/sessions", async (request, reply) => {
