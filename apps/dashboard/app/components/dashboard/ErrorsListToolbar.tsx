@@ -41,10 +41,12 @@ type Props = {
   defaultPageSize: number;
   q: string;
   environment: string;
+  release: string;
   status: string;
   sort: string;
   order: string;
   environments: string[];
+  releases: string[];
 };
 
 export function ErrorsListToolbar({
@@ -61,10 +63,12 @@ export function ErrorsListToolbar({
   defaultPageSize,
   q,
   environment,
+  release,
   status,
   sort,
   order,
   environments,
+  releases,
 }: Props) {
   const fieldIds = useId();
 
@@ -111,6 +115,14 @@ export function ErrorsListToolbar({
       ...environments.map((e) => ({ value: e, label: e })),
     ],
     [environments]
+  );
+
+  const releaseOptions: DashboardSelectOption[] = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      ...releases.map((e) => ({ value: e, label: e })),
+    ],
+    [releases]
   );
 
   const statusOptions: DashboardSelectOption[] = useMemo(
@@ -174,6 +186,16 @@ export function ErrorsListToolbar({
               options={statusOptions}
               triggerId={id("status-t")}
               listLabelledBy={id("status-l")}
+            />
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("release-l")}>Release</FilterLabel>
+            <DashboardCustomSelect
+              name="release"
+              value={release}
+              options={releaseOptions}
+              triggerId={id("release-t")}
+              listLabelledBy={id("release-l")}
             />
           </FilterField>
         </FilterRow>
