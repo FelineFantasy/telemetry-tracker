@@ -11,9 +11,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.6] - 2026-07-07
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#188](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/188)).
+
 ### Added
 
-- **Events capture taxonomy** — Auto-captured vs Custom badges on grouped event names (`$`-prefixed SDK events vs custom names) ([#188](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/188))
+- **Events capture taxonomy** — Auto-captured vs Custom badges on grouped event names (`$`-prefixed SDK events vs custom names) ([#259](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/259), [#188](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/188))
 
 ---
 
