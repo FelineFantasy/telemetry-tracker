@@ -134,6 +134,30 @@ function countInRangeWhereSql(f: EventListFilterInput, alias = "e"): Prisma.Sql 
   return Prisma.sql`AND ${countInRangeConditionSql(f, alias)}`;
 }
 
+/** PostgreSQL aggregate FILTER for in-range bounds (empty when all-time). */
+function inRangeAggregateFilterSql(f: EventListFilterInput, alias = "e"): Prisma.Sql {
+  if (!hasCountRangeBounds(f)) {
+    return Prisma.empty;
+  }
+  return Prisma.sql`FILTER (WHERE ${countInRangeConditionSql(f, alias)})`;
+}
+
+function latestInRangeFieldExpr(
+  f: EventListFilterInput,
+  field: "app" | "platform" | "environment" | "release"
+): Prisma.Sql {
+  const col = Prisma.raw(`e."${field}"`);
+  return Prisma.sql`(array_agg(${col} ORDER BY e."created_at" DESC) ${inRangeAggregateFilterSql(f, "e")})[1]`;
+}
+
+function sessionsAffectedExpr(f: EventListFilterInput): Prisma.Sql {
+  const validSession = Prisma.sql`e."session_id" IS NOT NULL AND TRIM(e."session_id") <> ''`;
+  if (!hasCountRangeBounds(f)) {
+    return Prisma.sql`COUNT(DISTINCT e."session_id") FILTER (WHERE ${validSession})::bigint`;
+  }
+  return Prisma.sql`COUNT(DISTINCT e."session_id") FILTER (WHERE ${countInRangeConditionSql(f, "e")} AND ${validSession})::bigint`;
+}
+
 function buildGroupedVisibilityHavingSql(f: EventListFilterInput): Prisma.Sql {
   if (!hasCountRangeBounds(f)) {
     return Prisma.empty;
@@ -215,18 +239,16 @@ export async function listEventNamesGrouped(
     WITH grouped AS (
       SELECT
         e."name",
-        (array_agg(e."app" ORDER BY e."created_at" DESC))[1] AS app,
-        (array_agg(e."platform" ORDER BY e."created_at" DESC))[1] AS platform,
-        (array_agg(e."environment" ORDER BY e."created_at" DESC))[1] AS environment,
-        (array_agg(e."release" ORDER BY e."created_at" DESC))[1] AS release,
+        ${latestInRangeFieldExpr(f, "app")} AS app,
+        ${latestInRangeFieldExpr(f, "platform")} AS platform,
+        ${latestInRangeFieldExpr(f, "environment")} AS environment,
+        ${latestInRangeFieldExpr(f, "release")} AS release,
         COUNT(*)::bigint AS count,
         ${inRangeExpr} AS count_in_range,
-        MIN(e."created_at") AS first_seen,
-        MAX(e."created_at") AS last_seen,
-        COUNT(DISTINCT ${identity})::bigint AS users_affected,
-        COUNT(DISTINCT e."session_id") FILTER (
-          WHERE e."session_id" IS NOT NULL AND TRIM(e."session_id") <> ''
-        )::bigint AS sessions_affected
+        MIN(e."created_at") ${inRangeAggregateFilterSql(f, "e")} AS first_seen,
+        MAX(e."created_at") ${inRangeAggregateFilterSql(f, "e")} AS last_seen,
+        COUNT(DISTINCT ${identity}) ${inRangeAggregateFilterSql(f, "e")} AS users_affected,
+        ${sessionsAffectedExpr(f)} AS sessions_affected
       FROM "Event" e
       WHERE ${baseWhere}
       GROUP BY e."name"

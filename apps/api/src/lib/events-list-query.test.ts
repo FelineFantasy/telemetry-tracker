@@ -69,6 +69,18 @@ describe("resolveEventCountRangeBounds", () => {
       })
     ).toEqual({ gte: since, lte: until });
   });
+
+  it("has count-range bounds when only eventCountRange is enriched", () => {
+    expect(
+      resolveEventCountRangeBounds({
+        range: {},
+        eventCountRange: {
+          gte: new Date("2026-06-21T12:00:00.000Z"),
+          lte: new Date("2026-06-28T12:00:00.000Z"),
+        },
+      }).lte
+    ).toBeDefined();
+  });
 });
 
 describe("serializeEventNameListItem", () => {
