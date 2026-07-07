@@ -127,7 +127,7 @@ function sessionStartedInPreviousWindow(
   return Prisma.sql`${a}."started_at" >= ${previousSince} AND ${a}."started_at" < ${previousUntil}`;
 }
 
-function sessionHasNoProjectErrorsSql(
+export function sessionHasNoProjectErrorsSql(
   projectId: string,
   sessionAlias = "s"
 ): Prisma.Sql {
@@ -148,7 +148,7 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
   )`;
 }
 
-function sessionFilterSql(
+export function sessionFilterSql(
   projectId: string,
   f: SessionListFilterInput
 ): Prisma.Sql {
