@@ -125,45 +125,60 @@ export function resolveCompareWindow(
   return { previousSince, previousUntil: currentSince };
 }
 
+/** @internal Exported for unit tests. */
+export function overviewEnvironmentSessionCountUpperClauses(
+  scope: Scope,
+  exclusiveUntil?: Date
+): { session: Prisma.Sql; event: Prisma.Sql } {
+  if (exclusiveUntil !== undefined) {
+    return {
+      session: Prisma.sql`s."started_at" < ${exclusiveUntil}`,
+      event: Prisma.sql`e."created_at" < ${exclusiveUntil}`,
+    };
+  }
+  if (scope.until !== undefined) {
+    return {
+      session: Prisma.sql`s."started_at" <= ${scope.until}`,
+      event: Prisma.sql`e."created_at" <= ${scope.until}`,
+    };
+  }
+  return { session: Prisma.empty, event: Prisma.empty };
+}
+
 export async function countSessions(
   prisma: PrismaClient,
   scope: Scope,
-  until?: Date
+  exclusiveUntil?: Date
 ): Promise<number> {
   if (scope.environment) {
     const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
-    const untilClause =
-      until === undefined
-        ? Prisma.empty
-        : Prisma.sql`AND s."started_at" < ${until}`;
-    const eventUntilClause =
-      until === undefined
-        ? Prisma.empty
-        : Prisma.sql`AND e."created_at" < ${until}`;
+    const { session: sessionUpperClause, event: eventUpperClause } =
+      overviewEnvironmentSessionCountUpperClauses(scope, exclusiveUntil);
     const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
       SELECT COUNT(*)::bigint AS c
       FROM "Session" s
       WHERE s."project_id" = ${scope.projectId}
         AND s."started_at" >= ${scope.since}
-        ${untilClause}
+        ${sessionUpperClause}
         ${appClause}
         AND EXISTS (
           SELECT 1 FROM "Event" e
           WHERE e."project_id" = s."project_id"
             AND e."session_id" = s."session_id"
+            AND e."app" = s."app"
             AND e."environment" = ${scope.environment}
             AND e."created_at" >= ${scope.since}
-            ${eventUntilClause}
+            ${eventUpperClause}
         )
     `);
     return Number(rows[0]?.c ?? 0);
   }
 
   const where = sessionScopeWhere(scope);
-  if (until) {
+  if (exclusiveUntil) {
     (where as { started_at: { gte: Date; lt: Date } }).started_at = {
       gte: scope.since,
-      lt: until,
+      lt: exclusiveUntil,
     };
   }
   return prisma.session.count({ where });

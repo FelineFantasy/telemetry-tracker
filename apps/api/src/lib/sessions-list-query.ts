@@ -217,7 +217,7 @@ export async function listSessionsEnriched(
   skip: number,
   take: number
 ): Promise<{ total: number; rows: SessionListRow[]; maxDurationSec: number }> {
-  const filters = sessionFilterSql(projectId, f);
+  const filters = sessionFilterSql(projectId, f, startedAt);
   const bounds = sessionStartedBoundsSql(startedAt.gte, startedAt.lte);
   const orderSql = orderByEnrichedSql(sort, order);
 
