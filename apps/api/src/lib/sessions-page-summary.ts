@@ -51,8 +51,7 @@ export type SessionsPageSummary = {
 };
 
 export type ResolvedSummaryWindow = {
-  /** Undefined when list filter has only an upper bound (open start). */
-  since?: Date;
+  since: Date;
   until: Date;
   previousSince: Date;
   previousUntil: Date;
@@ -71,33 +70,23 @@ export function parseSessionsMetricsAnchor(value: string | undefined): Date {
   return new Date();
 }
 
-/** Resolve KPI window from list filters; defaults to last 7 days when range is all-time. */
+/** Resolve KPI window from list filters; defaults to last 7 days when range is all-time or open-ended. */
 export function resolveSessionsSummaryWindow(
   range: { gte?: Date; lte?: Date },
   anchor: Date = new Date()
 ): ResolvedSummaryWindow {
-  const hasLower = range.gte != null;
-  const hasUpper = range.lte != null;
-
   const until = range.lte ?? anchor;
-  let since: Date | undefined;
-  if (hasLower) {
-    since = range.gte;
-  } else if (!hasUpper) {
-    since = new Date(until.getTime() - DEFAULT_SUMMARY_MS);
-  }
-
-  const compareStart =
-    since ?? new Date(until.getTime() - DEFAULT_SUMMARY_MS);
-  const durationMs = Math.max(until.getTime() - compareStart.getTime(), 1);
+  const since =
+    range.gte ?? new Date(until.getTime() - DEFAULT_SUMMARY_MS);
+  const durationMs = Math.max(until.getTime() - since.getTime(), 1);
   const { previousSince, previousUntil } = resolveCompareWindow(
     durationMs,
     "previous",
-    compareStart,
+    since,
     until
   );
-  const prevUntil = previousUntil ?? compareStart;
-  const label = hasLower || hasUpper ? "Selected period" : "Last 7 days";
+  const prevUntil = previousUntil ?? since;
+  const label = range.gte ? "Selected period" : "Last 7 days";
   return {
     since,
     until,
@@ -110,14 +99,11 @@ export function resolveSessionsSummaryWindow(
 
 function sessionStartedInCurrentWindow(
   alias: string,
-  since: Date | undefined,
+  since: Date,
   until: Date
 ): Prisma.Sql {
   const a = Prisma.raw(`"${alias}"`);
-  if (since) {
-    return Prisma.sql`${a}."started_at" >= ${since} AND ${a}."started_at" <= ${until}`;
-  }
-  return Prisma.sql`${a}."started_at" <= ${until}`;
+  return Prisma.sql`${a}."started_at" >= ${since} AND ${a}."started_at" <= ${until}`;
 }
 
 function sessionStartedInPreviousWindow(
@@ -196,7 +182,7 @@ async function fetchSessionSummaryScalars(
   );
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
   const queryLowerBound = new Date(
-    Math.min(since?.getTime() ?? 0, previousSince.getTime())
+    Math.min(since.getTime(), previousSince.getTime())
   );
 
   const rows = await prisma.$queryRaw<[SummaryRow]>(Prisma.sql`
@@ -288,22 +274,13 @@ async function fetchSessionSummarySparklines(
   window: ResolvedSummaryWindow
 ): Promise<SessionsPageSummary["sparklines"]> {
   const { since, until } = window;
-  const durationMs = Math.max(
-    until.getTime() - (since?.getTime() ?? 0),
-    1
-  );
-  const { bucket } = chooseTimeRangeBucket(
-    since ? durationMs : DEFAULT_SUMMARY_MS
-  );
+  const durationMs = Math.max(until.getTime() - since.getTime(), 1);
+  const { bucket } = chooseTimeRangeBucket(durationMs);
   const trunc = bucket === "week" ? "week" : bucket;
   const filters = sessionFilterSql(projectId, f);
   const identity = sessionIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
-  const chartSince = overviewChartQuerySince(
-    since ?? new Date(0),
-    until,
-    bucket
-  );
+  const chartSince = overviewChartQuerySince(since, until, bucket);
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
 
   const rows = await prisma.$queryRaw<SparklineBucketRow[]>(Prisma.sql`
@@ -391,7 +368,7 @@ export async function fetchSessionsPageSummary(
 
   return {
     window: {
-      since: (window.since ?? new Date(0)).toISOString(),
+      since: window.since.toISOString(),
       until: window.until.toISOString(),
       label: window.label,
       compareLabel: window.compareLabel,

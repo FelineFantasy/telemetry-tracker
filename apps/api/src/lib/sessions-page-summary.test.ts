@@ -34,20 +34,21 @@ describe("resolveSessionsSummaryWindow", () => {
     vi.setSystemTime(anchor);
     const w = resolveSessionsSummaryWindow({}, anchor);
     expect(w.until).toEqual(anchor);
-    expect(w.since?.getTime()).toBe(anchor.getTime() - sevenDaysMs);
+    expect(w.since.getTime()).toBe(anchor.getTime() - sevenDaysMs);
     expect(w.label).toBe("Last 7 days");
     vi.useRealTimers();
   });
 
-  it("uses open lower bound when range has only an upper bound", () => {
+  it("defaults to last 7 days ending at upper bound when range has no lower bound", () => {
     vi.useFakeTimers();
     vi.setSystemTime(anchor);
     const until = new Date("2026-06-28T00:00:00.000Z");
     const w = resolveSessionsSummaryWindow({ lte: until }, anchor);
     expect(w.until).toEqual(until);
-    expect(w.since).toBeUndefined();
-    expect(w.label).toBe("Selected period");
-    expect(w.previousUntil.getTime()).toBe(until.getTime() - sevenDaysMs);
+    expect(w.since.getTime()).toBe(until.getTime() - sevenDaysMs);
+    expect(w.label).toBe("Last 7 days");
+    expect(w.previousUntil.getTime()).toBe(w.since.getTime());
+    expect(w.previousSince.getTime()).toBe(w.since.getTime() - sevenDaysMs);
     vi.useRealTimers();
   });
 
