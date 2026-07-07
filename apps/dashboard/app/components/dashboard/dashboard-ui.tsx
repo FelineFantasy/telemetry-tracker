@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { AnalyticsPanel, analyticsPanelClass } from "@/app/components/dashboard/analytics-ui";
+import { cn } from "@/lib/cn";
 
 export function StatCard({
   label,
@@ -18,11 +20,11 @@ export function StatCard({
         ? "text-destructive"
         : "text-muted-foreground";
   return (
-    <div className="rounded-xl border border-border bg-surface/40 p-5">
+    <AnalyticsPanel className="p-5">
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{value}</p>
       {delta ? <p className={`mt-2 text-sm ${deltaClass}`}>{delta}</p> : null}
-    </div>
+    </AnalyticsPanel>
   );
 }
 
@@ -56,9 +58,7 @@ export function DashboardSection({
 }
 
 export function DashboardPanel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`overflow-hidden rounded-xl border border-border bg-surface/40 ${className}`}>
-      {children}
-    </div>
-  );
+  return <AnalyticsPanel className={cn(className)}>{children}</AnalyticsPanel>;
 }
+
+export { analyticsPanelClass };

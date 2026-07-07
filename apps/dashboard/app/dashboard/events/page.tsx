@@ -4,6 +4,7 @@ import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar"
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
+import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -179,7 +180,8 @@ export default async function EventsPage({
         }
       />
 
-      <EventsListToolbar
+      <AnalyticsListShell>
+        <EventsListToolbar
         path={EVENTS_PATH}
         currentParams={currentParams}
         timeRange={timeRange}
@@ -198,16 +200,16 @@ export default async function EventsPage({
         environments={filterOptions.environments}
         platforms={filterOptions.platforms}
         releases={filterOptions.releases}
-      />
+        />
 
-      <p className="mb-4 text-sm text-muted-foreground">
-        Properties search matches raw JSON text (useful for known keys or values).
-      </p>
+        <p className="text-sm text-muted-foreground">
+          Properties search matches raw JSON text (useful for known keys or values).
+        </p>
 
-      <ListResultCount total={total} noun={total === 1 ? "event" : "events"} />
+        <ListResultCount total={total} noun={total === 1 ? "event" : "events"} />
 
-      {items.length ? (
-        <TableWrap>
+        {items.length ? (
+          <TableWrap>
           <Table>
             <thead>
               <tr>
@@ -262,8 +264,9 @@ export default async function EventsPage({
               : "No events have been recorded yet. Instrument your app and send events to see them here."
           }
         />
-      )}
-      <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
+        )}
+        <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
+      </AnalyticsListShell>
     </>
   );
 }

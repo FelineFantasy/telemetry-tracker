@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { OverviewSeries } from "@/lib/overview-api";
+import { AnalyticsPanel, AnalyticsPanelHeader } from "@/app/components/dashboard/analytics-ui";
 import { chartTooltipStyle, useChartColors } from "@/lib/use-chart-colors";
 
 type Props = {
@@ -44,16 +45,12 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
   const tooltipStyle = chartTooltipStyle(colors);
 
   return (
-    <section
-      className="overview-trends mb-6 overflow-hidden rounded-xl border border-border bg-surface/40 p-4"
-      aria-label="Volume trends"
-    >
-      <div className="mb-3">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">Volume over time</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Error occurrences and event rows ({rangeLabel.toLowerCase()}, UTC buckets)
-        </p>
-      </div>
+    <AnalyticsPanel className="overview-trends p-4 sm:p-5" aria-label="Volume trends">
+      <AnalyticsPanelHeader
+        title="Volume over time"
+        description={`Error occurrences and event rows (${rangeLabel.toLowerCase()}, UTC buckets)`}
+        className="border-0 px-0 pt-0"
+      />
       <div
         className="overview-trends__chart w-full min-h-[260px]"
         role="img"
@@ -113,6 +110,6 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-    </section>
+    </AnalyticsPanel>
   );
 }

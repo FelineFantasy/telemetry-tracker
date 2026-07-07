@@ -2,9 +2,25 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge, ResolvedBadge } from "@/app/components/Badge";
 import { TimeAgo } from "@/app/components/TimeAgo";
+import {
+  AnalyticsPanel,
+  AnalyticsPanelList,
+  IssueStatusBadge,
+} from "@/app/components/dashboard/analytics-ui";
+import {
+  Table,
+  TableListLink,
+  TableViewLink,
+  TableWrap,
+  tableDateColumnClass,
+} from "@/app/components/ui/Table";
 
 export function IssueList({ children }: { children: ReactNode }) {
-  return <ul className="space-y-2">{children}</ul>;
+  return (
+    <AnalyticsPanel>
+      <AnalyticsPanelList>{children}</AnalyticsPanelList>
+    </AnalyticsPanel>
+  );
 }
 
 export function IssueListItem({
@@ -28,18 +44,18 @@ export function IssueListItem({
     <li>
       <Link
         href={href}
-        className="block rounded-xl border border-border bg-surface/40 p-4 transition-colors hover:bg-surface/70"
+        className="block px-4 py-3.5 transition-colors hover:bg-surface/60 sm:px-5"
       >
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{app}</Badge>
           {environment ? <Badge>{environment}</Badge> : null}
           {resolved ? <ResolvedBadge /> : null}
         </div>
-        <p className="mt-2 line-clamp-3 break-all text-[15px] font-medium text-destructive">
+        <p className="mt-2 line-clamp-2 break-all text-[14px] font-medium text-destructive">
           {message}
         </p>
         {topStack ? (
-          <pre className="mt-2 max-h-24 overflow-hidden break-all font-mono text-[11px] leading-relaxed text-muted-foreground">
+          <pre className="mt-2 max-h-20 overflow-hidden break-all font-mono text-[11px] leading-relaxed text-muted-foreground">
             {topStack}
           </pre>
         ) : null}
@@ -66,17 +82,83 @@ export function OverviewListItem({
     <li>
       <Link
         href={href}
-        className="block rounded-xl border border-border bg-surface/40 px-4 py-3 transition-colors hover:bg-surface/70"
+        className="block px-4 py-3 transition-colors hover:bg-surface/60 sm:px-5"
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             {badges ? <div className="flex flex-wrap items-center gap-2">{badges}</div> : null}
-            <p className={`mt-1 line-clamp-2 break-all ${titleClassName}`}>{title}</p>
-            <div className="mt-1 break-words text-sm text-muted-foreground">{meta}</div>
+            <p className={`mt-1 line-clamp-2 break-all text-[13px] ${titleClassName}`}>{title}</p>
+            <div className="mt-1 break-words text-[12px] text-muted-foreground">{meta}</div>
           </div>
         </div>
       </Link>
     </li>
+  );
+}
+
+type IssuesTableRow = {
+  id: string;
+  message: string;
+  app: string;
+  environment?: string | null;
+  occurrences: number;
+  last_seen: string;
+  resolved_at?: string | null;
+  users_affected?: number;
+};
+
+export function IssuesTable({
+  rows,
+  hrefForRow,
+}: {
+  rows: IssuesTableRow[];
+  hrefForRow: (row: IssuesTableRow) => string;
+}) {
+  return (
+    <TableWrap>
+      <Table>
+        <thead>
+          <tr>
+            <th>Error</th>
+            <th className="hidden md:table-cell">App</th>
+            <th className="hidden lg:table-cell">Environment</th>
+            <th className="hidden sm:table-cell">Status</th>
+            <th className="text-right">Count</th>
+            <th className={tableDateColumnClass}>Last seen</th>
+            <th className="hidden sm:table-cell" aria-hidden>
+              View
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td className="max-w-xs sm:max-w-md">
+                <TableListLink href={hrefForRow(row)} className="line-clamp-2 text-destructive">
+                  {row.message}
+                </TableListLink>
+              </td>
+              <td className="hidden md:table-cell">
+                <Badge>{row.app}</Badge>
+              </td>
+              <td className="hidden lg:table-cell">
+                {row.environment ? <Badge>{row.environment}</Badge> : "—"}
+              </td>
+              <td className="hidden sm:table-cell">
+                <IssueStatusBadge resolved={Boolean(row.resolved_at)} />
+              </td>
+              <td className="text-right tabular-nums">{row.occurrences.toLocaleString()}</td>
+              <td className={tableDateColumnClass}>
+                <TimeAgo iso={row.last_seen} />
+              </td>
+              <td className="hidden sm:table-cell">
+                <TableViewLink href={hrefForRow(row)} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </TableWrap>
   );
 }
 

@@ -4,9 +4,9 @@ import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar"
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
-import { IssueList, IssueListItem } from "@/app/components/dashboard/IssueList";
+import { IssuesTable } from "@/app/components/dashboard/IssueList";
+import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { EmptyState } from "@/app/components/EmptyState";
-import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import {
@@ -213,87 +213,50 @@ export default async function ErrorsListPage({
         }
       />
 
-      <ErrorsListToolbar
-        path={ERRORS_PATH}
-        currentParams={currentParams}
-        timeRange={timeRange}
-        fromParam={from}
-        toParam={to}
-        appFilter={appFilter}
-        pageSize={String(pageSize)}
-        defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
-        q={q ?? ""}
-        environment={environment ?? ""}
-        status={status ?? "all"}
-        sort={sort ?? "last_seen"}
-        order={order ?? "desc"}
-        trendTimeRange={trendTimeRange}
-        trendFromParam={trendFrom}
-        trendToParam={trendTo}
-        environments={filterOptions.environments}
-      />
-
-      <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
-
-      {items.length ? (
-        <IssueList>
-          {items.map((g) => {
-            const metaParts = [
-              `${g.occurrences} occurrences`,
-              <>first <TimeAgo iso={g.first_seen} /></>,
-              <>last <TimeAgo iso={g.last_seen} /></>,
-            ];
-            if (g.users_affected != null && g.users_affected > 0) {
-              metaParts.push(`Users: ${g.users_affected}`);
-            }
-            if (g.sessions_affected != null && g.sessions_affected > 0) {
-              metaParts.push(`Sessions: ${g.sessions_affected}`);
-            }
-            if ((g.occurrences_recent ?? 0) + (g.occurrences_previous ?? 0) > 0) {
-              metaParts.push(
-                `Trend (${trendTimeRange.label}): ${g.occurrences_recent ?? 0} recent / ${g.occurrences_previous ?? 0} prior${
-                  g.trend_ratio != null ? ` (×${g.trend_ratio.toFixed(2)})` : ""
-                }`
-              );
-            }
-            return (
-              <IssueListItem
-                key={g.id}
-                href={
-                  appFilter
-                    ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
-                    : `/dashboard/errors/${g.id}`
-                }
-                message={g.message}
-                app={g.app}
-                environment={g.environment}
-                resolved={Boolean(g.resolved_at)}
-                topStack={g.top_stack}
-                meta={
-                  <>
-                    {metaParts.map((part, i) => (
-                      <span key={i}>
-                        {i > 0 ? " · " : null}
-                        {part}
-                      </span>
-                    ))}
-                  </>
-                }
-              />
-            );
-          })}
-        </IssueList>
-      ) : (
-        <EmptyState
-          title="No errors recorded"
-          message={
-            appFilter
-              ? `No error groups for "${appFilter}" with these filters.`
-              : "No error groups match these filters. Try another date range or clear filters."
-          }
+      <AnalyticsListShell>
+        <ErrorsListToolbar
+          path={ERRORS_PATH}
+          currentParams={currentParams}
+          timeRange={timeRange}
+          fromParam={from}
+          toParam={to}
+          appFilter={appFilter}
+          pageSize={String(pageSize)}
+          defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
+          q={q ?? ""}
+          environment={environment ?? ""}
+          status={status ?? "all"}
+          sort={sort ?? "last_seen"}
+          order={order ?? "desc"}
+          trendTimeRange={trendTimeRange}
+          trendFromParam={trendFrom}
+          trendToParam={trendTo}
+          environments={filterOptions.environments}
         />
-      )}
-      <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
+
+        <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
+
+        {items.length ? (
+          <IssuesTable
+            rows={items}
+            hrefForRow={(g) =>
+              appFilter
+                ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
+                : `/dashboard/errors/${g.id}`
+            }
+          />
+        ) : (
+          <EmptyState
+            title="No errors recorded"
+            message={
+              appFilter
+                ? `No error groups for "${appFilter}" with these filters.`
+                : "No error groups match these filters. Try another date range or clear filters."
+            }
+          />
+        )}
+        <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
+      </AnalyticsListShell>
     </>
   );
 }
