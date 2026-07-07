@@ -36,10 +36,10 @@ import {
 } from "../lib/sessions-analytics.js";
 import {
   fetchSessionsPageSummary,
+  buildSessionListFilter,
   parseSessionsMetricsAnchor,
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
-  type SessionListFilterInput,
 } from "../lib/sessions-page-summary.js";
 import {
   attachLatestEventIds,
@@ -957,14 +957,30 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       platform?: string;
+      environment?: string;
+      release?: string;
+      country?: string;
+      q?: string;
       metricsUntil?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const country = queryString(query.country);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
 
-    const filter = { appId, platform, range };
+    const filter = buildSessionListFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      country,
+      q,
+      range,
+    });
     const window = resolveSessionsSummaryWindow(range, metricsAnchor);
     const summary = await fetchSessionsPageSummary(prisma, filter, projectId, window);
     return reply.send(summary);
@@ -979,16 +995,32 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       platform?: string;
+      environment?: string;
+      release?: string;
+      country?: string;
+      q?: string;
       metricsUntil?: string;
       chartBucket?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const country = queryString(query.country);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
     const chartBucket = parseChartBucketParam(queryString(query.chartBucket));
 
-    const filter = { appId, platform, range };
+    const filter = buildSessionListFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      country,
+      q,
+      range,
+    });
     const window = resolveSessionsSummaryWindow(range, metricsAnchor);
     const analytics = await fetchSessionsAnalytics(
       prisma,
@@ -1012,6 +1044,10 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       platform?: string;
+      environment?: string;
+      release?: string;
+      country?: string;
+      q?: string;
       sort?: string;
       order?: string;
       metricsUntil?: string;
@@ -1021,6 +1057,10 @@ export async function apiRoutes(
     const skip = (page - 1) * pageSize;
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const country = queryString(query.country);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
     const sortParsed = parseSessionListSortParam(queryString(query.sort));
@@ -1032,7 +1072,15 @@ export async function apiRoutes(
       return reply.status(400).send({ error: "Invalid order" });
     }
 
-    const filter: SessionListFilterInput = { appId, platform, range };
+    const filter = buildSessionListFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      country,
+      q,
+      range,
+    });
     const startedAt = resolveSessionListStartedAtBounds(range, metricsAnchor);
     const { total, rows, maxDurationSec } = await listSessionsEnriched(
       prisma,
@@ -1077,7 +1125,8 @@ export async function apiRoutes(
       ? { ...whereSessionProject(projectId), app: appFilter }
       : whereSessionProject(projectId);
 
-    const [environments, platEvents, platSessions, relEvents, relErrors] = await Promise.all([
+    const [environments, platEvents, platSessions, relEvents, relErrors, countrySessions] =
+      await Promise.all([
       distinctEnvironmentsForProject(prisma, projectId, appFilter),
       prisma.event.groupBy({
         by: ["platform"],
@@ -1100,6 +1149,10 @@ export async function apiRoutes(
             : { project_id: projectId },
         },
       }),
+      prisma.session.groupBy({
+        by: ["country"],
+        where: { ...baseSession, country: { not: null } },
+      }),
     ]);
 
     const platforms = [
@@ -1114,8 +1167,12 @@ export async function apiRoutes(
         ...relErrors.map((r) => r.release).filter(Boolean) as string[],
       ]),
     ].sort();
+    const countries = countrySessions
+      .map((r) => r.country)
+      .filter((x): x is string => x != null && x !== "")
+      .sort();
 
-    return reply.send({ environments, platforms, releases });
+    return reply.send({ environments, platforms, releases, countries });
   });
 
   app.get("/apps", async (request, reply) => {

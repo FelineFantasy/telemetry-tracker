@@ -47,11 +47,37 @@ const sessionSchema = z.object({
   app: ingestAppSchema,
   platform: z.string().optional(),
   user_id: z.string().optional(),
+  user_email: z.string().optional().nullable(),
   anonymous_id: z.string().optional(),
+  country: z.string().max(8).optional().nullable(),
+  device_browser: z.string().max(64).optional().nullable(),
+  device_os: z.string().max(64).optional().nullable(),
   sdk_version: z.string().optional(),
   started_at: z.string().datetime().optional(),
   ended_at: z.string().datetime().optional().nullable(),
 });
+
+function sessionContextPatch(body: z.infer<typeof sessionSchema>): {
+  user_id?: string | null;
+  user_email?: string | null;
+  anonymous_id?: string | null;
+  country?: string | null;
+  device_browser?: string | null;
+  device_os?: string | null;
+  sdk_version?: string | null;
+  platform?: string | null;
+} {
+  const patch: ReturnType<typeof sessionContextPatch> = {};
+  if (body.user_id !== undefined) patch.user_id = body.user_id ?? null;
+  if (body.user_email !== undefined) patch.user_email = body.user_email ?? null;
+  if (body.anonymous_id !== undefined) patch.anonymous_id = body.anonymous_id ?? null;
+  if (body.country !== undefined) patch.country = body.country ?? null;
+  if (body.device_browser !== undefined) patch.device_browser = body.device_browser ?? null;
+  if (body.device_os !== undefined) patch.device_os = body.device_os ?? null;
+  if (body.sdk_version !== undefined) patch.sdk_version = body.sdk_version ?? null;
+  if (body.platform !== undefined) patch.platform = body.platform ?? null;
+  return patch;
+}
 
 const errorSchema = z.object({
   app: ingestAppSchema,
@@ -142,12 +168,20 @@ export async function ingestRoutes(
         data: {
           ended_at: new Date(body.ended_at),
           ...(existing.app !== app ? { app } : {}),
+          ...sessionContextPatch(body),
         },
       });
       return reply.status(204).send();
     }
-    // Same session already recorded, no end time — idempotent retry; nothing to write, bill, or quota-check.
+    // Same session already recorded, no end time — update identity/context fields on retry.
     if (existing && body.ended_at == null) {
+      const patch = sessionContextPatch(body);
+      if (Object.keys(patch).length > 0) {
+        await prisma.session.update({
+          where: { id: existing.id },
+          data: patch,
+        });
+      }
       return reply.status(204).send();
     }
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
@@ -160,7 +194,11 @@ export async function ingestRoutes(
           app,
           platform: body.platform ?? null,
           user_id: body.user_id ?? null,
+          user_email: body.user_email ?? null,
           anonymous_id: body.anonymous_id ?? null,
+          country: body.country ?? null,
+          device_browser: body.device_browser ?? null,
+          device_os: body.device_os ?? null,
           sdk_version: body.sdk_version ?? null,
           started_at: body.started_at ? new Date(body.started_at) : undefined,
         },

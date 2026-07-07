@@ -61,9 +61,26 @@ async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
   const res = await dashboardApiFetch(`/api/filter-options?${p.toString()}`);
-  if (!res.ok) return { platforms: [] as string[] };
-  const data = (await res.json()) as { platforms?: string[] };
-  return { platforms: data.platforms ?? [] };
+  if (!res.ok) {
+    return {
+      environments: [] as string[],
+      platforms: [] as string[],
+      releases: [] as string[],
+      countries: [] as string[],
+    };
+  }
+  const data = (await res.json()) as {
+    environments?: string[];
+    platforms?: string[];
+    releases?: string[];
+    countries?: string[];
+  };
+  return {
+    environments: data.environments ?? [],
+    platforms: data.platforms ?? [],
+    releases: data.releases ?? [],
+    countries: data.countries ?? [],
+  };
 }
 
 function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefined>) {
@@ -75,6 +92,10 @@ function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefi
     "range",
     "from",
     "to",
+    "q",
+    "environment",
+    "release",
+    "country",
     "platform",
     "sort",
     "order",
@@ -117,10 +138,18 @@ export default async function SessionsPage({
   apiQuery.set("pageSize", String(pageSize));
   appendListTimeRangeToParams(apiQuery, timeRange, from, to);
   const platform = firstQueryValue(sp.platform);
+  const environment = firstQueryValue(sp.environment);
+  const release = firstQueryValue(sp.release);
+  const country = firstQueryValue(sp.country);
+  const q = firstQueryValue(sp.q);
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
   const chartBucket = firstQueryValue(sp.chartBucket);
   if (platform) apiQuery.set("platform", platform);
+  if (environment) apiQuery.set("environment", environment);
+  if (release) apiQuery.set("release", release);
+  if (country) apiQuery.set("country", country);
+  if (q) apiQuery.set("q", q);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
   if (chartBucket) apiQuery.set("chartBucket", chartBucket);
@@ -142,6 +171,9 @@ export default async function SessionsPage({
   let summary: SessionsPageSummary | null = null;
   let analytics: SessionsAnalyticsData | null = null;
   let platforms: string[] = [];
+  let environments: string[] = [];
+  let releases: string[] = [];
+  let countries: string[] = [];
   try {
     const [data, opts, summaryData, analyticsData] = await Promise.all([
       getSessions(apiQuery),
@@ -153,6 +185,9 @@ export default async function SessionsPage({
     total = resolveApiListTotal(data.total, items.length);
     maxDurationSec = data.max_duration_sec ?? 0;
     platforms = opts.platforms;
+    environments = opts.environments;
+    releases = opts.releases;
+    countries = opts.countries;
     summary = summaryData;
     analytics = analyticsData;
   } catch (e) {
@@ -213,9 +248,16 @@ export default async function SessionsPage({
         appFilter={appFilter}
         pageSize={String(pageSize)}
         defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
+        q={q ?? ""}
+        environment={environment ?? ""}
+        release={release ?? ""}
+        country={country ?? ""}
         platform={platform ?? ""}
         sort={effectiveSort}
         order={effectiveOrder}
+        environments={environments}
+        releases={releases}
+        countries={countries}
         platforms={platforms}
         />
 

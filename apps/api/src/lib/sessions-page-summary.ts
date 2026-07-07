@@ -7,6 +7,7 @@
  */
 
 import { Prisma, PrismaClient } from "@prisma/client";
+import { escapeLikePattern } from "./list-query.js";
 import { generateOverviewChartBuckets, overviewChartQuerySince } from "./overview-timeseries.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
@@ -16,8 +17,32 @@ export const BOUNCE_MAX_DURATION_SECONDS = 10;
 export type SessionListFilterInput = {
   appId?: string;
   platform?: string;
+  environment?: string;
+  release?: string;
+  country?: string;
+  /** Search user id, email, country, or device fields. */
+  q?: string;
   range: { gte?: Date; lte?: Date };
 };
+
+export function buildSessionListFilter(input: {
+  appId?: string;
+  platform?: string;
+  environment?: string;
+  release?: string;
+  country?: string;
+  q?: string;
+  range: { gte?: Date; lte?: Date };
+}): SessionListFilterInput {
+  const filter: SessionListFilterInput = { range: input.range };
+  if (input.appId) filter.appId = input.appId;
+  if (input.platform) filter.platform = input.platform;
+  if (input.environment) filter.environment = input.environment;
+  if (input.release) filter.release = input.release;
+  if (input.country) filter.country = input.country;
+  if (input.q?.trim()) filter.q = input.q.trim();
+  return filter;
+}
 
 export type SessionsSummarySparklinePoint = {
   t: string;
@@ -148,6 +173,37 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
   )`;
 }
 
+function sessionEventExistsSql(
+  projectId: string,
+  sessionAlias: string,
+  extra: Prisma.Sql[] = []
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  const clauses =
+    extra.length > 0
+      ? Prisma.sql` AND ${Prisma.join(extra, " AND ")}`
+      : Prisma.empty;
+  return Prisma.sql`EXISTS (
+    SELECT 1 FROM "Event" e
+    WHERE e."project_id" = ${projectId}
+      AND e."session_id" = ${s}."session_id"
+      AND e."app" = ${s}."app"
+      ${clauses}
+  )`;
+}
+
+function sessionSearchSql(q: string): Prisma.Sql {
+  const pat = `%${escapeLikePattern(q.trim())}%`;
+  return Prisma.sql`(
+    COALESCE(s."user_id", '') ILIKE ${pat} ESCAPE '\\'
+    OR COALESCE(s."anonymous_id", '') ILIKE ${pat} ESCAPE '\\'
+    OR COALESCE(s."user_email", '') ILIKE ${pat} ESCAPE '\\'
+    OR COALESCE(s."country", '') ILIKE ${pat} ESCAPE '\\'
+    OR COALESCE(s."device_browser", '') ILIKE ${pat} ESCAPE '\\'
+    OR COALESCE(s."device_os", '') ILIKE ${pat} ESCAPE '\\'
+  )`;
+}
+
 export function sessionFilterSql(
   projectId: string,
   f: SessionListFilterInput
@@ -155,6 +211,22 @@ export function sessionFilterSql(
   const parts: Prisma.Sql[] = [Prisma.sql`s."project_id" = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
   if (f.platform) parts.push(Prisma.sql`s."platform" = ${f.platform}`);
+  if (f.country) parts.push(Prisma.sql`s."country" = ${f.country}`);
+  if (f.environment) {
+    parts.push(
+      sessionEventExistsSql(projectId, "s", [
+        Prisma.sql`e."environment" = ${f.environment}`,
+      ])
+    );
+  }
+  if (f.release) {
+    parts.push(
+      sessionEventExistsSql(projectId, "s", [
+        Prisma.sql`e."release" = ${f.release}`,
+      ])
+    );
+  }
+  if (f.q?.trim()) parts.push(sessionSearchSql(f.q));
   return Prisma.join(parts, " AND ");
 }
 

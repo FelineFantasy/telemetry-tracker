@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   BOUNCE_MAX_DURATION_SECONDS,
+  buildSessionListFilter,
   parseSessionsMetricsAnchor,
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
@@ -99,5 +100,38 @@ describe("resolveSessionListStartedAtBounds", () => {
 describe("BOUNCE_MAX_DURATION_SECONDS", () => {
   it("is 10 seconds", () => {
     expect(BOUNCE_MAX_DURATION_SECONDS).toBe(10);
+  });
+});
+
+describe("buildSessionListFilter", () => {
+  const range = {
+    gte: new Date("2026-06-01T00:00:00.000Z"),
+    lte: new Date("2026-06-08T00:00:00.000Z"),
+  };
+
+  it("includes optional scope fields when provided", () => {
+    const filter = buildSessionListFilter({
+      appId: "web",
+      platform: "web",
+      environment: "production",
+      release: "1.2.0",
+      country: "US",
+      q: "  user-1 ",
+      range,
+    });
+    expect(filter).toEqual({
+      appId: "web",
+      platform: "web",
+      environment: "production",
+      release: "1.2.0",
+      country: "US",
+      q: "user-1",
+      range,
+    });
+  });
+
+  it("omits empty search and unset filters", () => {
+    const filter = buildSessionListFilter({ range, q: "   " });
+    expect(filter).toEqual({ range });
   });
 });
