@@ -13,6 +13,24 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.12] - 2026-07-07
+
+### Added
+
+- **Analytics UI design system** — shared panel components, metric rows, and list shells for consistent dark analytics chrome across overview, issues, events, sessions, and alerts ([#178](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/178))
+
+### Changed
+
+- **Issue detail** — Sentry-style layout with metrics row, stack trace / occurrences tabs, and sidebar tags and timeline ([#178](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/178))
+- **Issues list** — dense table view (error, app, environment, status, count, last seen) instead of card list ([#178](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/178))
+
+### Fixed
+
+- **Issue detail tab** — reset active tab when navigating between issue URLs ([#178](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/178))
+- **Issue detail KPI** — `GET /api/errors/:id` now includes `users_affected` and `sessions_affected` (same logic as the issues list) ([#178](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/178))
+- **Issue detail metrics** — occurrence count labeled **Occurrences** instead of **Events** ([#178](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/178))
+
+---
 
 ## [1.4.11] - 2026-07-06
 
