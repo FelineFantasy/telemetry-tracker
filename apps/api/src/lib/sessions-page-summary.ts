@@ -46,7 +46,7 @@ export function buildSessionListFilter(input: {
 
 export type SessionsSummarySparklinePoint = {
   t: string;
-  count: number;
+  count: number | null;
 };
 
 export type SessionsPageSummary = {
@@ -481,7 +481,7 @@ async function fetchSessionSummarySparklines(
   );
 
   const pick = (
-    mapper: (r: SparklineBucketRow | undefined, total: number) => number
+    mapper: (r: SparklineBucketRow | undefined, total: number) => number | null
   ): SessionsSummarySparklinePoint[] =>
     buckets.map((bucketDate) => {
       const t = bucketDate.toISOString();
@@ -493,12 +493,15 @@ async function fetchSessionSummarySparklines(
   return {
     totalSessions: pick((r) => Number(r?.total_sessions ?? 0)),
     distinctUsers: pick((r) => Number(r?.distinct_users ?? 0)),
-    avgDurationSec: pick((r) => Math.round(Number(r?.avg_duration_sec ?? 0))),
+    avgDurationSec: pick((r, total) => {
+      if (total <= 0 || r?.avg_duration_sec == null) return null;
+      return Math.round(Number(r.avg_duration_sec));
+    }),
     bounceRatePct: pick((r, total) =>
-      pct(Number(r?.bounce_sessions ?? 0), total)
+      total <= 0 ? null : pct(Number(r?.bounce_sessions ?? 0), total)
     ),
     crashFreeRatePct: pick((r, total) =>
-      pct(Number(r?.crash_free_sessions ?? 0), total)
+      total <= 0 ? null : pct(Number(r?.crash_free_sessions ?? 0), total)
     ),
   };
 }

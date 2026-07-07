@@ -38,12 +38,12 @@ function SessionIdentity({ row }: { row: SessionsTableRow }) {
   return (
     <div className="space-y-0.5">
       {email ? (
-        <span title={email} className="block text-[13px]">
+        <span title={email} className="block truncate text-[13px]">
           {truncate(email, 28)}
         </span>
       ) : null}
       {identity ? (
-        <span title={identity} className="block font-mono text-[13px] text-muted-foreground">
+        <span title={identity} className="block truncate font-mono text-[13px] text-muted-foreground">
           {truncate(identity, 24)}
         </span>
       ) : null}
@@ -92,12 +92,12 @@ function DurationCell({
       : 0;
 
   return (
-    <div className="min-w-[7rem]">
+    <div className="min-w-0 max-w-[8rem]">
       <div className="flex items-center justify-between gap-2">
-        <span className="tabular-nums text-[13px]">{label}</span>
+        <span className="whitespace-nowrap tabular-nums text-[13px]">{label}</span>
       </div>
       <div
-        className="mt-1.5 h-1.5 w-full max-w-[8rem] overflow-hidden rounded-full bg-surface"
+        className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface"
         role="presentation"
         aria-hidden
       >
@@ -145,17 +145,17 @@ export function SessionsTable({
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td className="max-w-[10rem]">
-                <div className="space-y-1">
+              <td className="min-w-0 max-w-[9rem]">
+                <TableListLink
+                  href={hrefForSession(row)}
+                  className="block min-w-0 max-w-full space-y-1 break-normal"
+                  title={row.session_id}
+                >
                   <SessionIdentity row={row} />
-                  <TableListLink
-                    href={hrefForSession(row)}
-                    className="block font-mono text-[11px] text-muted-foreground"
-                    title={row.session_id}
-                  >
+                  <span className="hidden font-mono text-[11px] text-muted-foreground sm:block">
                     {truncate(row.session_id, 18)}
-                  </TableListLink>
-                </div>
+                  </span>
+                </TableListLink>
               </td>
               <td className="hidden md:table-cell">
                 <CountryCell country={row.country} />
@@ -163,7 +163,7 @@ export function SessionsTable({
               <td className="hidden lg:table-cell max-w-[9rem]">
                 <DeviceCell browser={row.device_browser} os={row.device_os} />
               </td>
-              <td>
+              <td className="min-w-0">
                 <DurationCell durationSec={row.duration_sec} maxDurationSec={pageMax} />
               </td>
               <td className="hidden sm:table-cell text-right tabular-nums">
