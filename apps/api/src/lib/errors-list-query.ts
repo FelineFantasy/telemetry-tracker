@@ -8,6 +8,11 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
 import { parseTimeRangeQuery } from "./time-range.js";
+import { parseErrorTypeFromMessage } from "./error-type.js";
+import {
+  generateOverviewChartBuckets,
+} from "./overview-timeseries.js";
+import { chooseTimeRangeBucket } from "./time-range.js";
 
 export const ERROR_LIST_SORTS = [
   "last_seen",
@@ -132,7 +137,7 @@ export function buildErrorGroupWhereInput(
 
 export type ScalarErrorListSort = Exclude<
   ErrorListSort,
-  "users" | "sessions" | "trend"
+  "users" | "sessions" | "trend" | "occurrences"
 >;
 
 function prismaOrderBy(
@@ -143,8 +148,6 @@ function prismaOrderBy(
   switch (sort) {
     case "first_seen":
       return { first_seen: o };
-    case "occurrences":
-      return { occurrences: o };
     case "message":
       return { message: o };
     case "app":
@@ -157,10 +160,20 @@ function prismaOrderBy(
   }
 }
 
-/** Scalar sorts only — users/sessions/trend use raw SQL. */
+/** Scalar sorts only — users/sessions/trend/occurrences use raw SQL aggregates. */
 export function isAggregateSort(sort: ErrorListSort): boolean {
-  return sort === "users" || sort === "sessions" || sort === "trend";
+  return (
+    sort === "users" ||
+    sort === "sessions" ||
+    sort === "trend" ||
+    sort === "occurrences"
+  );
 }
+
+export type ErrorSparklinePoint = {
+  t: string;
+  count: number;
+};
 
 export type ErrorGroupListRow = {
   id: string;
@@ -179,6 +192,8 @@ export type ErrorGroupListRow = {
   occurrences_recent?: number;
   occurrences_previous?: number;
   trend_ratio?: number;
+  error_type?: ReturnType<typeof parseErrorTypeFromMessage>;
+  sparkline?: ErrorSparklinePoint[];
 };
 
 function mapRawRow(r: Record<string, unknown>): ErrorGroupListRow {
@@ -283,6 +298,9 @@ function orderByAggregateSql(
   }
   if (sort === "sessions") {
     return Prisma.sql`ORDER BY COALESCE(agg.sessions_affected, 0) ${dir} ${nulls}`;
+  }
+  if (sort === "occurrences") {
+    return Prisma.sql`ORDER BY COALESCE(agg.occurrences_in_range, 0) ${dir} ${nulls}, eg.last_seen DESC`;
   }
   const trendExpr = Prisma.sql`(COALESCE(agg.occurrences_recent, 0)::float / GREATEST(COALESCE(agg.occurrences_previous, 0), 1))`;
   return Prisma.sql`ORDER BY ${trendExpr} ${dir} ${nulls}, eg.last_seen DESC`;
@@ -435,6 +453,59 @@ export async function fetchMetricsForGroupIds(
   return out;
 }
 
+/** Per-group occurrence buckets for table sparklines (trend window). */
+export async function fetchSparklinesForGroupIds(
+  prisma: PrismaClient,
+  ids: string[],
+  trendDurationMs: number,
+  trendEnd: Date,
+  release?: string
+): Promise<Map<string, ErrorSparklinePoint[]>> {
+  const out = new Map<string, ErrorSparklinePoint[]>();
+  if (ids.length === 0) return out;
+
+  const since = new Date(trendEnd.getTime() - trendDurationMs);
+  const { bucket } = chooseTimeRangeBucket(trendDurationMs);
+  const expected = generateOverviewChartBuckets(since, trendEnd, bucket);
+  const releaseClause = release
+    ? Prisma.sql`AND o."release" = ${release}`
+    : Prisma.empty;
+  const idList = ids.map((id) => Prisma.sql`${id}`);
+
+  const rows = await prisma.$queryRaw<
+    { id: string; bucket: Date; c: bigint }[]
+  >(Prisma.sql`
+    SELECT
+      o."error_group_id" AS id,
+      (date_trunc(${bucket}, o."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
+      COUNT(*)::bigint AS c
+    FROM "ErrorOccurrence" o
+    WHERE o."error_group_id" IN (${Prisma.join(idList)})
+      ${releaseClause}
+      AND o."created_at" >= ${since}
+      AND o."created_at" < ${trendEnd}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `);
+
+  for (const id of ids) {
+    out.set(
+      id,
+      expected.map((d) => ({ t: d.toISOString(), count: 0 }))
+    );
+  }
+
+  for (const r of rows) {
+    const series = out.get(String(r.id));
+    if (!series) continue;
+    const key = r.bucket.toISOString();
+    const point = series.find((p) => p.t === key);
+    if (point) point.count = Number(r.c);
+  }
+
+  return out;
+}
+
 /** Distinct users/sessions impacted by all occurrences in one error group. */
 export async function fetchImpactMetricsForGroupId(
   prisma: PrismaClient,
@@ -510,5 +581,7 @@ export function serializeErrorGroupListItem(
     occurrences_recent: row.occurrences_recent,
     occurrences_previous: row.occurrences_previous,
     trend_ratio: row.trend_ratio,
+    error_type: row.error_type ?? parseErrorTypeFromMessage(row.message),
+    sparkline: row.sparkline ?? [],
   };
 }

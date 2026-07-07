@@ -1,5 +1,12 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { parseTrendWindowParam, serializeErrorGroupListItem } from "./errors-list-query.js";
+import { parseTrendWindowParam, serializeErrorGroupListItem, isAggregateSort } from "./errors-list-query.js";
+
+describe("isAggregateSort", () => {
+  it("routes occurrences sort through the in-range aggregate path", () => {
+    expect(isAggregateSort("occurrences")).toBe(true);
+    expect(isAggregateSort("last_seen")).toBe(false);
+  });
+});
 
 describe("serializeErrorGroupListItem", () => {
   const baseRow = {
@@ -27,6 +34,15 @@ describe("serializeErrorGroupListItem", () => {
       occurrences_in_range: 0,
     });
     expect(item.occurrences_in_range).toBe(0);
+  });
+
+  it("includes error type and sparkline defaults", () => {
+    const item = serializeErrorGroupListItem({
+      ...baseRow,
+      message: "TypeError: boom",
+    });
+    expect(item.error_type).toBe("TypeError");
+    expect(item.sparkline).toEqual([]);
   });
 });
 
