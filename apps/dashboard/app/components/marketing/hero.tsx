@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { HeroDashboardScreenshot } from "@/app/components/marketing/HeroDashboardScreenshot";
 import { MarketingNavLink } from "@/app/components/marketing/MarketingNavLink";
 
 const DASHBOARD_HREF = "/dashboard/overview";
@@ -97,14 +97,7 @@ export function Hero({ isAuthenticated = false }: { isAuthenticated?: boolean })
       <div className="mx-auto mt-16 max-w-6xl px-6 sm:mt-24">
         <div className="relative rounded-2xl border border-border-strong bg-surface/50 p-1.5 shadow-[0_30px_120px_-20px_rgba(80,140,255,0.25)] backdrop-blur">
           <div className="overflow-hidden rounded-xl border border-border">
-            <Image
-              src="/screenshot-dashboard.jpg"
-              alt="Telemetry Tracker dashboard showing requests, error rate, latency and active sessions"
-              width={1664}
-              height={1024}
-              className="block h-auto w-full"
-              priority
-            />
+            <HeroDashboardScreenshot />
           </div>
         </div>
       </div>
