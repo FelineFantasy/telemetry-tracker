@@ -13,6 +13,7 @@ import {
   listSessionsEnriched,
   serializeSessionListItem,
 } from "./sessions-list-query.js";
+import { whereErrorGroupProject } from "./prisma-project-scope.js";
 import {
   buildSessionListFilter,
   type SessionListFilterInput,
@@ -58,6 +59,14 @@ export type OverviewRecentSession = {
   duration_sec: number;
   event_count: number;
   status: "healthy" | "warning";
+};
+
+export type OverviewTopErrorGroup = {
+  id: string;
+  message: string;
+  app: string;
+  occurrences: number;
+  last_seen: string;
 };
 
 type Scope = {
@@ -276,6 +285,43 @@ export async function fetchOverviewRequestMetrics(
       }),
     },
   };
+}
+
+/** @internal Exported for unit tests. */
+export function overviewTopErrorGroupWhere(
+  projectId: string,
+  scope: Pick<Scope, "app" | "environment">,
+  window: { gte: Date; lte: Date }
+) {
+  return {
+    ...whereErrorGroupProject(projectId),
+    last_seen: { gte: window.gte, lte: window.lte },
+    ...(scope.app ? { app: scope.app } : {}),
+    ...(scope.environment ? { environment: scope.environment } : {}),
+  };
+}
+
+export async function listOverviewTopErrorGroups(
+  prisma: PrismaClient,
+  scope: Scope,
+  limit = 8
+): Promise<OverviewTopErrorGroup[]> {
+  const rows = await prisma.errorGroup.findMany({
+    where: overviewTopErrorGroupWhere(scope.projectId, scope, {
+      gte: scope.since,
+      lte: scope.until,
+    }),
+    orderBy: { occurrences: "desc" },
+    take: limit,
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    message: row.message,
+    app: row.app,
+    occurrences: row.occurrences,
+    last_seen: row.last_seen.toISOString(),
+  }));
 }
 
 export async function listOverviewRecentSessions(

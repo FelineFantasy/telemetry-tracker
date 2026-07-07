@@ -78,6 +78,7 @@ import {
   buildOverviewSessionFilter,
   fetchOverviewRequestMetrics,
   listOverviewRecentSessions,
+  listOverviewTopErrorGroups,
   sparklinesFromTimeSeries,
 } from "../lib/overview-kpi.js";
 import { getAppNavSummariesForProject } from "../lib/app-nav-summary.js";
@@ -306,6 +307,7 @@ export async function apiRoutes(
       activeIssues,
       requestMetrics,
       recentSessions,
+      metricsTopErrorGroups,
     ] = await Promise.all([
       getOverviewErrorCountsPair(prisma, windowParams),
       getOverviewEventWindowStats(prisma, windowParams),
@@ -374,6 +376,7 @@ export async function apiRoutes(
         { gte: metricsWindow.gte, lte: metricsWindow.lte },
         8
       ),
+      listOverviewTopErrorGroups(prisma, metricsScope, 8),
     ]);
 
     const errorsCount = errorCounts.current;
@@ -457,6 +460,7 @@ export async function apiRoutes(
       kpiSparklines: sparklinesFromTimeSeries(series),
       requestMetrics,
       recentSessions,
+      metricsTopErrorGroups,
     });
   });
 

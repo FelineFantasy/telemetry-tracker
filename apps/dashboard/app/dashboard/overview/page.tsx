@@ -462,7 +462,7 @@ export default async function OverviewPage({
 
       <section className="mb-8 grid gap-4 lg:grid-cols-2">
         <OverviewTopErrorsPanel
-          groups={overviewData.topErrorGroups ?? []}
+          groups={overviewData.metricsTopErrorGroups ?? []}
           rangeLabel={displayRangeLabel}
           errorsHref={scopedListHref("/dashboard/errors", app, environment)}
           buildHref={(id) => buildErrorGroupDetailHref(id, { app, environment })}

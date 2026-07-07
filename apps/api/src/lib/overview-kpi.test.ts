@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   apdexPctFromScore,
   apdexScore,
+  overviewTopErrorGroupWhere,
   REQUEST_APDEX_THRESHOLD_MS,
   sparklinesFromTimeSeries,
 } from "./overview-kpi.js";
@@ -46,5 +47,24 @@ describe("sparklinesFromTimeSeries", () => {
 describe("REQUEST_APDEX_THRESHOLD_MS", () => {
   it("uses a 300ms satisfied threshold for Node request events", () => {
     expect(REQUEST_APDEX_THRESHOLD_MS).toBe(300);
+  });
+});
+
+describe("overviewTopErrorGroupWhere", () => {
+  it("scopes top error groups to the metrics window", () => {
+    const since = new Date("2026-03-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const where = overviewTopErrorGroupWhere(
+      "proj_1",
+      { app: "web", environment: "production" },
+      { gte: since, lte: until }
+    );
+
+    expect(where).toMatchObject({
+      project_id: "proj_1",
+      app: "web",
+      environment: "production",
+      last_seen: { gte: since, lte: until },
+    });
   });
 });

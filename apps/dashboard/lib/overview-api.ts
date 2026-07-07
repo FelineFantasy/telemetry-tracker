@@ -121,6 +121,14 @@ export type OverviewApiResponse = {
   kpiSparklines?: OverviewKpiSparklines;
   requestMetrics?: OverviewRequestMetrics;
   recentSessions?: OverviewRecentSession[];
+  /** Top error groups scoped to the metrics window (breakdown grid). */
+  metricsTopErrorGroups?: Array<{
+    id: string;
+    message: string;
+    app: string;
+    occurrences: number;
+    last_seen: string;
+  }>;
 };
 
 export type OverviewWorkspaceStats = {
