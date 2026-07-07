@@ -190,6 +190,27 @@ export function AnalyticsSidebarRow({
   );
 }
 
+export function SessionStatusBadge({
+  status,
+}: {
+  status: "healthy" | "warning";
+}) {
+  if (status === "healthy") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-success">
+        <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
+        Healthy
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-warning">
+      <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
+      Warning
+    </span>
+  );
+}
+
 export function IssueStatusBadge({ resolved }: { resolved: boolean }) {
   if (resolved) {
     return (

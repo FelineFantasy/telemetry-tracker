@@ -3,8 +3,10 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { NavBack } from "@/app/components/dashboard/NavBack";
 import { DetailMetaItem, DetailMetaPanel } from "@/app/components/dashboard/DetailMetaPanel";
+import { SessionStatusBadge } from "@/app/components/dashboard/analytics-ui";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
+import { formatDurationSec } from "@/lib/format-duration";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 type SessionDetail = {
@@ -17,6 +19,10 @@ type SessionDetail = {
   sdk_version?: string | null;
   started_at: string;
   ended_at?: string | null;
+  duration_sec: number;
+  event_count: number;
+  page_count: number;
+  status: "healthy" | "warning";
 };
 
 async function getSession(id: string): Promise<SessionDetail | null> {
@@ -75,6 +81,15 @@ export default async function SessionDetailPage({
         <DetailMetaItem label="Platform" value={session.platform} />
         <DetailMetaItem label="Identity" value={identity} />
         <DetailMetaItem label="SDK version" value={session.sdk_version} />
+        <DetailMetaItem label="Duration" value={formatDurationSec(session.duration_sec)} />
+        <DetailMetaItem
+          label="Pages / Events"
+          value={`${session.page_count.toLocaleString()} / ${session.event_count.toLocaleString()}`}
+        />
+        <DetailMetaItem
+          label="Status"
+          value={<SessionStatusBadge status={session.status} />}
+        />
         <DetailMetaItem label="Started" value={<TimeAgo iso={session.started_at} />} />
         <DetailMetaItem
           label="Ended"
