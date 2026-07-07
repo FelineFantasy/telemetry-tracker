@@ -1,8 +1,9 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
+import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
 import { mergeListQuery } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
+import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { IssuesTable } from "@/app/components/dashboard/IssueList";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
@@ -27,6 +28,7 @@ type ErrorGroupRow = {
   app: string;
   top_stack?: string;
   occurrences: number;
+  occurrences_in_range?: number;
   first_seen: string;
   last_seen: string;
   resolved_at?: string | null;
@@ -54,13 +56,22 @@ async function getErrors(
   return res.json();
 }
 
+async function getErrorsSummary(search: URLSearchParams): Promise<ErrorsPageSummary | null> {
+  const res = await dashboardApiFetch(`/api/errors/summary?${search.toString()}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
   const res = await dashboardApiFetch(`/api/filter-options?${p.toString()}`);
-  if (!res.ok) return { environments: [] as string[], platforms: [], releases: [] };
-  const data = (await res.json()) as { environments?: string[] };
-  return { environments: data.environments ?? [] };
+  if (!res.ok) return { environments: [] as string[], releases: [] as string[] };
+  const data = (await res.json()) as { environments?: string[]; releases?: string[] };
+  return {
+    environments: data.environments ?? [],
+    releases: data.releases ?? [],
+  };
 }
 
 function buildErrorsParamsRecord(sp: {
@@ -72,6 +83,7 @@ function buildErrorsParamsRecord(sp: {
   from?: string | string[];
   to?: string | string[];
   environment?: string | string[];
+  release?: string | string[];
   q?: string | string[];
   status?: string | string[];
   sort?: string | string[];
@@ -89,6 +101,7 @@ function buildErrorsParamsRecord(sp: {
     "from",
     "to",
     "environment",
+    "release",
     "q",
     "status",
     "sort",
@@ -117,6 +130,7 @@ export default async function ErrorsListPage({
     from?: string | string[];
     to?: string | string[];
     environment?: string | string[];
+    release?: string | string[];
     q?: string | string[];
     status?: string | string[];
     sort?: string | string[];
@@ -127,9 +141,11 @@ export default async function ErrorsListPage({
   }>;
 }) {
   const sp = await searchParams;
+  const pageAnchor = new Date();
   const currentParams = buildErrorsParamsRecord(sp);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
+  const rawRelease = firstQueryValue(sp.release)?.trim() || null;
 
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
@@ -168,23 +184,39 @@ export default async function ErrorsListPage({
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
   if (rawEnv) apiQuery.set("environment", rawEnv);
+  if (rawRelease) apiQuery.set("release", rawRelease);
   if (q) apiQuery.set("q", q);
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
+  if (isUnselectedTimeRange(timeRange.key)) {
+    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  }
+
+  const summaryQuery = new URLSearchParams(apiQuery);
+  summaryQuery.delete("page");
+  summaryQuery.delete("pageSize");
+  summaryQuery.delete("sort");
+  summaryQuery.delete("order");
+  summaryQuery.delete("trendWindow");
+  summaryQuery.delete("trendFrom");
+  summaryQuery.delete("trendTo");
 
   let items: ErrorGroupRow[] = [];
   let total = 0;
-  let filterOptions = { environments: [] as string[] };
+  let summary: ErrorsPageSummary | null = null;
+  let filterOptions = { environments: [] as string[], releases: [] as string[] };
 
   try {
-    const [opts, data] = await Promise.all([
+    const [opts, data, summaryData] = await Promise.all([
       getFilterOptions(appFilter || undefined),
       getErrors(apiQuery),
+      getErrorsSummary(summaryQuery),
     ]);
     filterOptions = opts;
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
+    summary = summaryData;
   } catch (e) {
     return (
       <>
@@ -197,6 +229,11 @@ export default async function ErrorsListPage({
   const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
   if (rawEnv !== environment) {
     redirect(mergeListQuery(ERRORS_PATH, currentParams, { environment }));
+  }
+
+  const release = resolveScopedQueryValue(rawRelease, filterOptions.releases);
+  if (rawRelease !== release) {
+    redirect(mergeListQuery(ERRORS_PATH, currentParams, { release }));
   }
 
   const hrefForPage = (p: number) =>
@@ -214,6 +251,8 @@ export default async function ErrorsListPage({
       />
 
       <AnalyticsListShell>
+        {summary ? <ErrorsSummaryMetrics summary={summary} /> : null}
+
         <ErrorsListToolbar
           path={ERRORS_PATH}
           currentParams={currentParams}
@@ -225,6 +264,7 @@ export default async function ErrorsListPage({
           defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
           q={q ?? ""}
           environment={environment ?? ""}
+          release={release ?? ""}
           status={status ?? "all"}
           sort={sort ?? "last_seen"}
           order={order ?? "desc"}
@@ -232,6 +272,7 @@ export default async function ErrorsListPage({
           trendFromParam={trendFrom}
           trendToParam={trendTo}
           environments={filterOptions.environments}
+          releases={filterOptions.releases}
         />
 
         <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />

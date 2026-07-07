@@ -102,6 +102,7 @@ type IssuesTableRow = {
   app: string;
   environment?: string | null;
   occurrences: number;
+  occurrences_in_range?: number;
   last_seen: string;
   resolved_at?: string | null;
   users_affected?: number;
@@ -147,7 +148,9 @@ export function IssuesTable({
               <td className="hidden sm:table-cell">
                 <IssueStatusBadge resolved={Boolean(row.resolved_at)} />
               </td>
-              <td className="text-right tabular-nums">{row.occurrences.toLocaleString()}</td>
+              <td className="text-right tabular-nums">
+                {(row.occurrences_in_range ?? 0).toLocaleString()}
+              </td>
               <td className={tableDateColumnClass}>
                 <TimeAgo iso={row.last_seen} />
               </td>
