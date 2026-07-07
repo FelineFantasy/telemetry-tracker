@@ -97,6 +97,18 @@ export function resolveSessionsSummaryWindow(
   };
 }
 
+/** started_at bounds for list queries — aligned with summary KPI window. */
+export function resolveSessionListStartedAtBounds(
+  range: { gte?: Date; lte?: Date },
+  anchor: Date = new Date()
+): { gte: Date; lte: Date } {
+  const w = resolveSessionsSummaryWindow(range, anchor);
+  return {
+    gte: range.gte ?? w.since,
+    lte: range.lte ?? w.until,
+  };
+}
+
 function sessionStartedInCurrentWindow(
   alias: string,
   since: Date,

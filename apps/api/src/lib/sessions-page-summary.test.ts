@@ -2,6 +2,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   BOUNCE_MAX_DURATION_SECONDS,
   parseSessionsMetricsAnchor,
+  resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
 } from "./sessions-page-summary.js";
 
@@ -67,6 +68,31 @@ describe("resolveSessionsSummaryWindow", () => {
     expect(w.since).toEqual(since);
     expect(w.until).toEqual(until);
     expect(w.label).toBe("Selected period");
+  });
+});
+
+describe("resolveSessionListStartedAtBounds", () => {
+  const anchor = new Date("2026-06-28T12:00:00.000Z");
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+
+  it("applies default 7-day window for all-time list filters", () => {
+    const bounds = resolveSessionListStartedAtBounds({}, anchor);
+    expect(bounds.lte).toEqual(anchor);
+    expect(bounds.gte.getTime()).toBe(anchor.getTime() - sevenDaysMs);
+  });
+
+  it("applies 7-day window ending at upper bound when only to is set", () => {
+    const until = new Date("2026-06-20T00:00:00.000Z");
+    const bounds = resolveSessionListStartedAtBounds({ lte: until }, anchor);
+    expect(bounds.lte).toEqual(until);
+    expect(bounds.gte.getTime()).toBe(until.getTime() - sevenDaysMs);
+  });
+
+  it("uses explicit range bounds unchanged", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const bounds = resolveSessionListStartedAtBounds({ gte: since, lte: until }, anchor);
+    expect(bounds).toEqual({ gte: since, lte: until });
   });
 });
 
