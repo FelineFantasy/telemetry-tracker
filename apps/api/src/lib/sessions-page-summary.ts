@@ -7,7 +7,7 @@
  */
 
 import { Prisma, PrismaClient } from "@prisma/client";
-import { generateOverviewChartBuckets } from "./overview-timeseries.js";
+import { generateOverviewChartBuckets, overviewChartQuerySince } from "./overview-timeseries.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 
@@ -51,7 +51,8 @@ export type SessionsPageSummary = {
 };
 
 export type ResolvedSummaryWindow = {
-  since: Date;
+  /** Undefined when list filter has only an upper bound (open start). */
+  since?: Date;
   until: Date;
   previousSince: Date;
   previousUntil: Date;
@@ -70,21 +71,33 @@ export function parseSessionsMetricsAnchor(value: string | undefined): Date {
   return new Date();
 }
 
+/** Resolve KPI window from list filters; defaults to last 7 days when range is all-time. */
 export function resolveSessionsSummaryWindow(
   range: { gte?: Date; lte?: Date },
   anchor: Date = new Date()
 ): ResolvedSummaryWindow {
+  const hasLower = range.gte != null;
+  const hasUpper = range.lte != null;
+
   const until = range.lte ?? anchor;
-  const since = range.gte ?? new Date(until.getTime() - DEFAULT_SUMMARY_MS);
-  const durationMs = Math.max(until.getTime() - since.getTime(), 1);
+  let since: Date | undefined;
+  if (hasLower) {
+    since = range.gte;
+  } else if (!hasUpper) {
+    since = new Date(until.getTime() - DEFAULT_SUMMARY_MS);
+  }
+
+  const compareStart =
+    since ?? new Date(until.getTime() - DEFAULT_SUMMARY_MS);
+  const durationMs = Math.max(until.getTime() - compareStart.getTime(), 1);
   const { previousSince, previousUntil } = resolveCompareWindow(
     durationMs,
     "previous",
-    since,
+    compareStart,
     until
   );
-  const prevUntil = previousUntil ?? since;
-  const label = range.gte ? "Selected period" : "Last 7 days";
+  const prevUntil = previousUntil ?? compareStart;
+  const label = hasLower || hasUpper ? "Selected period" : "Last 7 days";
   return {
     since,
     until,
@@ -93,6 +106,40 @@ export function resolveSessionsSummaryWindow(
     label,
     compareLabel: "vs prior period",
   };
+}
+
+function sessionStartedInCurrentWindow(
+  alias: string,
+  since: Date | undefined,
+  until: Date
+): Prisma.Sql {
+  const a = Prisma.raw(`"${alias}"`);
+  if (since) {
+    return Prisma.sql`${a}."started_at" >= ${since} AND ${a}."started_at" <= ${until}`;
+  }
+  return Prisma.sql`${a}."started_at" <= ${until}`;
+}
+
+function sessionStartedInPreviousWindow(
+  alias: string,
+  previousSince: Date,
+  previousUntil: Date
+): Prisma.Sql {
+  const a = Prisma.raw(`"${alias}"`);
+  return Prisma.sql`${a}."started_at" >= ${previousSince} AND ${a}."started_at" < ${previousUntil}`;
+}
+
+function sessionHasNoProjectErrorsSql(
+  projectId: string,
+  sessionAlias = "s"
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`NOT EXISTS (
+    SELECT 1 FROM "ErrorOccurrence" eo
+    INNER JOIN "ErrorGroup" eg ON eg."id" = eo."error_group_id"
+    WHERE eo."session_id" = ${s}."session_id"
+      AND eg."project_id" = ${projectId}
+  )`;
 }
 
 function sessionIdentityExpr(alias = "s"): Prisma.Sql {
@@ -141,34 +188,41 @@ async function fetchSessionSummaryScalars(
   const filters = sessionFilterSql(projectId, f);
   const identity = sessionIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
+  const currentWindow = sessionStartedInCurrentWindow("s", since, until);
+  const previousWindow = sessionStartedInPreviousWindow(
+    "s",
+    previousSince,
+    previousUntil
+  );
+  const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
+  const queryLowerBound = new Date(
+    Math.min(since?.getTime() ?? 0, previousSince.getTime())
+  );
 
   const rows = await prisma.$queryRaw<[SummaryRow]>(Prisma.sql`
     SELECT
       COUNT(*) FILTER (
-        WHERE s."started_at" >= ${since} AND s."started_at" <= ${until}
+        WHERE ${currentWindow}
       )::bigint AS total_sessions,
       COUNT(*) FILTER (
-        WHERE s."started_at" >= ${previousSince} AND s."started_at" < ${previousUntil}
+        WHERE ${previousWindow}
       )::bigint AS total_sessions_previous,
       COUNT(DISTINCT ${identity}) FILTER (
-        WHERE s."started_at" >= ${since} AND s."started_at" <= ${until}
+        WHERE ${currentWindow}
       )::bigint AS distinct_users,
       COUNT(DISTINCT ${identity}) FILTER (
-        WHERE s."started_at" >= ${previousSince} AND s."started_at" < ${previousUntil}
+        WHERE ${previousWindow}
       )::bigint AS distinct_users_previous,
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) FILTER (
-        WHERE s."started_at" >= ${since}
-          AND s."started_at" <= ${until}
+        WHERE ${currentWindow}
           AND s."ended_at" IS NOT NULL
       ) AS avg_duration_sec,
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) FILTER (
-        WHERE s."started_at" >= ${previousSince}
-          AND s."started_at" < ${previousUntil}
+        WHERE ${previousWindow}
           AND s."ended_at" IS NOT NULL
       ) AS avg_duration_sec_previous,
       COUNT(*) FILTER (
-        WHERE s."started_at" >= ${since}
-          AND s."started_at" <= ${until}
+        WHERE ${currentWindow}
           AND (
             (s."ended_at" IS NOT NULL
               AND EXTRACT(EPOCH FROM (s."ended_at" - s."started_at")) < ${bounceSec})
@@ -176,8 +230,7 @@ async function fetchSessionSummaryScalars(
           )
       )::bigint AS bounce_sessions,
       COUNT(*) FILTER (
-        WHERE s."started_at" >= ${previousSince}
-          AND s."started_at" < ${previousUntil}
+        WHERE ${previousWindow}
           AND (
             (s."ended_at" IS NOT NULL
               AND EXTRACT(EPOCH FROM (s."ended_at" - s."started_at")) < ${bounceSec})
@@ -185,20 +238,12 @@ async function fetchSessionSummaryScalars(
           )
       )::bigint AS bounce_sessions_previous,
       COUNT(*) FILTER (
-        WHERE s."started_at" >= ${since}
-          AND s."started_at" <= ${until}
-          AND NOT EXISTS (
-            SELECT 1 FROM "ErrorOccurrence" eo
-            WHERE eo."session_id" = s."session_id"
-          )
+        WHERE ${currentWindow}
+          AND ${noErrors}
       )::bigint AS crash_free_sessions,
       COUNT(*) FILTER (
-        WHERE s."started_at" >= ${previousSince}
-          AND s."started_at" < ${previousUntil}
-          AND NOT EXISTS (
-            SELECT 1 FROM "ErrorOccurrence" eo
-            WHERE eo."session_id" = s."session_id"
-          )
+        WHERE ${previousWindow}
+          AND ${noErrors}
       )::bigint AS crash_free_sessions_previous
     FROM "Session" s
     LEFT JOIN LATERAL (
@@ -206,9 +251,10 @@ async function fetchSessionSummaryScalars(
       FROM "Event" e
       WHERE e."project_id" = s."project_id"
         AND e."session_id" = s."session_id"
+        AND e."app" = s."app"
     ) ev ON TRUE
     WHERE ${filters}
-      AND s."started_at" >= ${previousSince}
+      AND s."started_at" >= ${queryLowerBound}
       AND s."started_at" <= ${until}
   `);
 
@@ -242,12 +288,23 @@ async function fetchSessionSummarySparklines(
   window: ResolvedSummaryWindow
 ): Promise<SessionsPageSummary["sparklines"]> {
   const { since, until } = window;
-  const durationMs = Math.max(until.getTime() - since.getTime(), 1);
-  const { bucket } = chooseTimeRangeBucket(durationMs);
+  const durationMs = Math.max(
+    until.getTime() - (since?.getTime() ?? 0),
+    1
+  );
+  const { bucket } = chooseTimeRangeBucket(
+    since ? durationMs : DEFAULT_SUMMARY_MS
+  );
   const trunc = bucket === "week" ? "week" : bucket;
   const filters = sessionFilterSql(projectId, f);
   const identity = sessionIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
+  const chartSince = overviewChartQuerySince(
+    since ?? new Date(0),
+    until,
+    bucket
+  );
+  const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
 
   const rows = await prisma.$queryRaw<SparklineBucketRow[]>(Prisma.sql`
     SELECT
@@ -263,10 +320,7 @@ async function fetchSessionSummarySparklines(
           OR COALESCE(ev.event_count, 0) = 1
       )::bigint AS bounce_sessions,
       COUNT(*) FILTER (
-        WHERE NOT EXISTS (
-          SELECT 1 FROM "ErrorOccurrence" eo
-          WHERE eo."session_id" = s."session_id"
-        )
+        WHERE ${noErrors}
       )::bigint AS crash_free_sessions
     FROM "Session" s
     LEFT JOIN LATERAL (
@@ -274,15 +328,16 @@ async function fetchSessionSummarySparklines(
       FROM "Event" e
       WHERE e."project_id" = s."project_id"
         AND e."session_id" = s."session_id"
+        AND e."app" = s."app"
     ) ev ON TRUE
     WHERE ${filters}
-      AND s."started_at" >= ${since}
+      AND s."started_at" >= ${chartSince}
       AND s."started_at" <= ${until}
     GROUP BY 1
     ORDER BY 1
   `);
 
-  const buckets = generateOverviewChartBuckets(since, until, bucket);
+  const buckets = generateOverviewChartBuckets(chartSince, until, bucket);
   const byBucket = new Map(
     rows.map((r) => [r.bucket.toISOString(), r])
   );
@@ -336,7 +391,7 @@ export async function fetchSessionsPageSummary(
 
   return {
     window: {
-      since: window.since.toISOString(),
+      since: (window.since ?? new Date(0)).toISOString(),
       until: window.until.toISOString(),
       label: window.label,
       compareLabel: window.compareLabel,
