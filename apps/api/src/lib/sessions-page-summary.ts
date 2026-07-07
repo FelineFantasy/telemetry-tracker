@@ -173,11 +173,32 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
   )`;
 }
 
+function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
+  const eventClauses: Prisma.Sql[] = [];
+  if (f.environment) {
+    eventClauses.push(Prisma.sql`e."environment" = ${f.environment}`);
+  }
+  if (f.release) {
+    eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
+  }
+  return eventClauses;
+}
+
+function sessionHasEventScope(f: SessionListFilterInput): boolean {
+  return sessionEventScopeClauses(f).length > 0;
+}
+
+export type SessionEventWindow = {
+  gte?: Date;
+  lte?: Date;
+  exclusiveLte?: boolean;
+};
+
 function sessionEventExistsSql(
   projectId: string,
   sessionAlias: string,
   extra: Prisma.Sql[] = [],
-  eventWindow?: { gte?: Date; lte?: Date }
+  eventWindow?: SessionEventWindow
 ): Prisma.Sql {
   const s = Prisma.raw(`"${sessionAlias}"`);
   const clauses =
@@ -189,7 +210,11 @@ function sessionEventExistsSql(
     windowParts.push(Prisma.sql`e."created_at" >= ${eventWindow.gte}`);
   }
   if (eventWindow?.lte) {
-    windowParts.push(Prisma.sql`e."created_at" <= ${eventWindow.lte}`);
+    windowParts.push(
+      eventWindow.exclusiveLte
+        ? Prisma.sql`e."created_at" < ${eventWindow.lte}`
+        : Prisma.sql`e."created_at" <= ${eventWindow.lte}`
+    );
   }
   const windowClause =
     windowParts.length > 0
@@ -207,11 +232,33 @@ function sessionEventExistsSql(
 
 function resolveSessionEventWindow(
   f: SessionListFilterInput,
-  eventWindow?: { gte?: Date; lte?: Date }
-): { gte?: Date; lte?: Date } | undefined {
+  eventWindow?: SessionEventWindow
+): SessionEventWindow | undefined {
   if (eventWindow?.gte || eventWindow?.lte) return eventWindow;
   if (f.range.gte || f.range.lte) return { gte: f.range.gte, lte: f.range.lte };
   return undefined;
+}
+
+/** @internal Exported for unit tests. */
+export function sessionWindowWithEventScope(
+  projectId: string,
+  f: SessionListFilterInput,
+  sessionAlias: string,
+  since: Date,
+  until: Date,
+  exclusiveUntil = false
+): Prisma.Sql {
+  const startedAt = exclusiveUntil
+    ? sessionStartedInPreviousWindow(sessionAlias, since, until)
+    : sessionStartedInCurrentWindow(sessionAlias, since, until);
+  const eventClauses = sessionEventScopeClauses(f);
+  if (eventClauses.length === 0) return startedAt;
+  return Prisma.sql`(${startedAt} AND ${sessionEventExistsSql(
+    projectId,
+    sessionAlias,
+    eventClauses,
+    { gte: since, lte: until, exclusiveLte: exclusiveUntil }
+  )})`;
 }
 
 function sessionSearchSql(q: string): Prisma.Sql {
@@ -229,20 +276,15 @@ function sessionSearchSql(q: string): Prisma.Sql {
 export function sessionFilterSql(
   projectId: string,
   f: SessionListFilterInput,
-  eventWindow?: { gte?: Date; lte?: Date }
+  eventWindow?: SessionEventWindow,
+  omitEventScope = false
 ): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`s."project_id" = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
   if (f.platform) parts.push(Prisma.sql`s."platform" = ${f.platform}`);
   if (f.country) parts.push(Prisma.sql`s."country" = ${f.country}`);
-  const eventClauses: Prisma.Sql[] = [];
-  if (f.environment) {
-    eventClauses.push(Prisma.sql`e."environment" = ${f.environment}`);
-  }
-  if (f.release) {
-    eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
-  }
-  if (eventClauses.length > 0) {
+  const eventClauses = sessionEventScopeClauses(f);
+  if (eventClauses.length > 0 && !omitEventScope) {
     parts.push(
       sessionEventExistsSql(
         projectId,
@@ -281,14 +323,23 @@ async function fetchSessionSummaryScalars(
   window: ResolvedSummaryWindow
 ): Promise<SummaryRow> {
   const { since, until, previousSince, previousUntil } = window;
-  const filters = sessionFilterSql(projectId, f);
+  const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
   const identity = sessionIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
-  const currentWindow = sessionStartedInCurrentWindow("s", since, until);
-  const previousWindow = sessionStartedInPreviousWindow(
+  const currentWindow = sessionWindowWithEventScope(
+    projectId,
+    f,
+    "s",
+    since,
+    until
+  );
+  const previousWindow = sessionWindowWithEventScope(
+    projectId,
+    f,
     "s",
     previousSince,
-    previousUntil
+    previousUntil,
+    true
   );
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
   const queryLowerBound = new Date(
@@ -387,10 +438,10 @@ async function fetchSessionSummarySparklines(
   const durationMs = Math.max(until.getTime() - since.getTime(), 1);
   const { bucket } = chooseTimeRangeBucket(durationMs);
   const trunc = bucket === "week" ? "week" : bucket;
-  const filters = sessionFilterSql(projectId, f);
+  const chartSince = overviewChartQuerySince(since, until, bucket);
+  const filters = sessionFilterSql(projectId, f, { gte: chartSince, lte: until });
   const identity = sessionIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
-  const chartSince = overviewChartQuerySince(since, until, bucket);
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
 
   const rows = await prisma.$queryRaw<SparklineBucketRow[]>(Prisma.sql`
