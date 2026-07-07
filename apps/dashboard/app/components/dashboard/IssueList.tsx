@@ -149,7 +149,7 @@ export function IssuesTable({
                 <IssueStatusBadge resolved={Boolean(row.resolved_at)} />
               </td>
               <td className="text-right tabular-nums">
-                {(row.occurrences_in_range ?? row.occurrences).toLocaleString()}
+                {(row.occurrences_in_range ?? 0).toLocaleString()}
               </td>
               <td className={tableDateColumnClass}>
                 <TimeAgo iso={row.last_seen} />

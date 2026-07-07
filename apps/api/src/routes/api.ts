@@ -559,7 +559,7 @@ export async function apiRoutes(
         occurrences_recent: m?.occurrences_recent ?? 0,
         occurrences_previous: m?.occurrences_previous ?? 0,
         trend_ratio: m?.trend_ratio ?? 0,
-        occurrences_in_range: m?.occurrences_in_range ?? g.occurrences,
+        occurrences_in_range: m?.occurrences_in_range ?? 0,
       };
       return serializeErrorGroupListItem(row);
     });
