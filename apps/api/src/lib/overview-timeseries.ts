@@ -19,6 +19,7 @@ export type OverviewTimeSeries = {
   bucket: OverviewSeriesBucket;
   errors: OverviewTimeSeriesPoint[];
   events: OverviewTimeSeriesPoint[];
+  sessions: OverviewTimeSeriesPoint[];
 };
 
 /** Truncate to UTC hour start (aligned with date_trunc hour in UTC). */
@@ -151,6 +152,44 @@ async function queryEventBuckets(
   `);
 }
 
+async function querySessionBuckets(
+  prisma: PrismaClient,
+  bucket: OverviewSeriesBucket,
+  projectId: string,
+  since: Date,
+  until: Date,
+  appFilter: string | undefined,
+  environmentFilter: string | undefined
+): Promise<{ bucket: Date; c: bigint }[]> {
+  const appClause = appFilter ? Prisma.sql`AND s."app" = ${appFilter}` : Prisma.empty;
+  const sessionUntilClause = environmentFilter
+    ? Prisma.empty
+    : Prisma.sql`AND s."started_at" <= ${until}`;
+  const envClause = environmentFilter
+    ? Prisma.sql`AND EXISTS (
+        SELECT 1 FROM "Event" e
+        WHERE e."project_id" = s."project_id"
+          AND e."session_id" = s."session_id"
+          AND e."environment" = ${environmentFilter}
+          AND e."created_at" >= ${since}
+      )`
+    : Prisma.empty;
+  const trunc = bucket === "week" ? "week" : bucket;
+  return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
+    SELECT
+      (date_trunc(${trunc}, s."started_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
+      COUNT(*)::bigint AS c
+    FROM "Session" s
+    WHERE s."project_id" = ${projectId}
+      AND s."started_at" >= ${since}
+      ${sessionUntilClause}
+      ${appClause}
+      ${envClause}
+    GROUP BY 1
+    ORDER BY 1
+  `);
+}
+
 async function queryErrorBuckets(
   prisma: PrismaClient,
   bucket: OverviewSeriesBucket,
@@ -195,7 +234,7 @@ export async function getOverviewTimeSeries(
   const expected = generateBuckets(since, until, bucket);
   const querySince = overviewChartQuerySince(since, until, bucket);
 
-  const [eventRows, errorRows] = await Promise.all([
+  const [eventRows, errorRows, sessionRows] = await Promise.all([
     queryEventBuckets(
       prisma,
       bucket,
@@ -214,11 +253,21 @@ export async function getOverviewTimeSeries(
       appFilter,
       environmentFilter
     ),
+    querySessionBuckets(
+      prisma,
+      bucket,
+      projectId,
+      querySince,
+      until,
+      appFilter,
+      environmentFilter
+    ),
   ]);
 
   return {
     bucket,
     events: mergeBuckets(expected, eventRows),
     errors: mergeBuckets(expected, errorRows),
+    sessions: mergeBuckets(expected, sessionRows),
   };
 }

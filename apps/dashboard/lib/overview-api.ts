@@ -9,6 +9,41 @@ export type OverviewSeries = {
   bucket: "hour" | "day" | "week";
   errors: OverviewTimeSeriesPoint[];
   events: OverviewTimeSeriesPoint[];
+  sessions?: OverviewTimeSeriesPoint[];
+};
+
+export type OverviewKpiSparklines = {
+  errors: OverviewTimeSeriesPoint[];
+  events: OverviewTimeSeriesPoint[];
+  sessions: OverviewTimeSeriesPoint[];
+};
+
+export type OverviewRequestMetrics =
+  | { available: false }
+  | {
+      available: true;
+      avgResponseMs: number;
+      avgResponseMsPrevious: number;
+      apdex: number;
+      apdexPrevious: number;
+      requestCount: number;
+      sparklines: {
+        avgResponseMs: OverviewTimeSeriesPoint[];
+        apdexPct: OverviewTimeSeriesPoint[];
+      };
+    };
+
+export type OverviewRecentSession = {
+  id: string;
+  session_id: string;
+  app: string;
+  user_id: string | null;
+  anonymous_id: string | null;
+  user_email: string | null;
+  started_at: string;
+  duration_sec: number;
+  event_count: number;
+  status: "healthy" | "warning";
 };
 
 export type OverviewHealth = {
@@ -83,6 +118,9 @@ export type OverviewApiResponse = {
   listPageSize?: number;
   series: OverviewSeries;
   sessionDurationSeries?: OverviewTimeSeriesPoint[];
+  kpiSparklines?: OverviewKpiSparklines;
+  requestMetrics?: OverviewRequestMetrics;
+  recentSessions?: OverviewRecentSession[];
 };
 
 export type OverviewWorkspaceStats = {
