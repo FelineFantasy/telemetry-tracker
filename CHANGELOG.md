@@ -13,6 +13,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.13] - 2026-07-07
+
+### Changed
+
+- **Marketing screenshots** — homepage hero and product errors section use theme-aware light/dark PNGs aligned to the v1.4.12 analytics UI ([#198](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/198))
+- **README** — dashboard and errors screenshots use `<picture>` with `prefers-color-scheme` for GitHub rendering ([#198](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/198))
+
+---
+
 ## [1.4.12] - 2026-07-07
 
 ### Added

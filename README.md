@@ -19,20 +19,26 @@
 
 <p align="center">
   <a href="https://telemetry-tracker.com">
-    <img src="apps/dashboard/public/screenshot-dashboard.jpg" alt="Dashboard overview with requests, error rate, top errors, and recent sessions" width="920" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="apps/dashboard/public/screenshot-dashboard-dark.png" />
+      <img src="apps/dashboard/public/screenshot-dashboard-light.png" alt="Dashboard overview with errors, events, sessions, and performance metrics" width="920" />
+    </picture>
   </a>
 </p>
 
 <p align="center">
-  <sub><strong>Overview</strong> — trend charts, top errors, and recent sessions filtered by app and time range.</sub>
+  <sub><strong>Overview</strong> — KPI cards, event trends, top errors, releases, and performance metrics (light/dark).</sub>
 </p>
 
 <p align="center">
-  <img src="apps/dashboard/public/screenshot-errors.jpg" alt="Error detail with stack trace, occurrence history, and metadata" width="920" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="apps/dashboard/public/screenshot-errors-dark.png" />
+    <img src="apps/dashboard/public/screenshot-errors-light.png" alt="Errors page with KPIs, trends, top error types, and grouped error table" width="920" />
+  </picture>
 </p>
 
 <p align="center">
-  <sub><strong>Error detail</strong> — grouped exceptions with stack traces, occurrence context, and release tags.</sub>
+  <sub><strong>Errors</strong> — KPIs, trends by type, top errors, and a filterable grouped error table (light/dark).</sub>
 </p>
 
 ---

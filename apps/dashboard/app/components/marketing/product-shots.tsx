@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { ProductErrorsScreenshot } from "@/app/components/marketing/ProductErrorsScreenshot";
 import { SectionHeading } from "./features";
 
 export function ProductShots() {
@@ -8,20 +8,13 @@ export function ProductShots() {
         <SectionHeading
           eyebrow="Product"
           title={<>Built to be fast under your fingers.</>}
-          subtitle="Filter by app and date range, drill into grouped errors, and inspect sessions — without wading through clutter."
+          subtitle="Filter by app and date range, triage grouped errors from KPIs and trends, then drill into stack traces — without wading through clutter."
         />
 
         <div className="mt-14 grid gap-6 lg:grid-cols-5">
           <div className="rounded-2xl border border-border-strong bg-surface/40 p-1.5 lg:col-span-3">
             <div className="overflow-hidden rounded-xl border border-border">
-              <Image
-                src="/screenshot-errors.jpg"
-                alt="Error detail view with stack trace and occurrence history"
-                width={1664}
-                height={1024}
-                className="block h-auto w-full"
-                loading="lazy"
-              />
+              <ProductErrorsScreenshot />
             </div>
           </div>
 
