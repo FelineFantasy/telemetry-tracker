@@ -117,6 +117,11 @@ describe("serializeEventNameListItem", () => {
     expect(item.latest_event_id).toBeNull();
   });
 
+  it("includes capture_kind from event name taxonomy", () => {
+    expect(serializeEventNameListItem(baseRow).capture_kind).toBe("custom");
+    expect(serializeEventNameListItem({ ...baseRow, name: "$screen" }).capture_kind).toBe("auto");
+  });
+
   it("includes sparkline defaults", () => {
     const item = serializeEventNameListItem(baseRow);
     expect(item.sparkline).toEqual([]);
