@@ -96,6 +96,9 @@ export function SessionsListToolbar({
         {Number(pageSize) !== defaultPageSize ? (
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}
+        {currentParams.chartBucket ? (
+          <input type="hidden" name="chartBucket" value={currentParams.chartBucket} />
+        ) : null}
 
         <FilterRow>
           <FilterField grow>

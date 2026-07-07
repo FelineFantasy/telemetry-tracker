@@ -4,6 +4,10 @@ import {
   SessionsSummaryMetrics,
   type SessionsPageSummary,
 } from "@/app/components/dashboard/SessionsSummaryMetrics";
+import {
+  SessionsAnalyticsPanels,
+  type SessionsAnalyticsData,
+} from "@/app/components/dashboard/SessionsAnalyticsPanels";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -57,6 +61,12 @@ async function getSessionsSummary(search: URLSearchParams): Promise<SessionsPage
   return res.json();
 }
 
+async function getSessionsAnalytics(search: URLSearchParams): Promise<SessionsAnalyticsData | null> {
+  const res = await dashboardApiFetch(`/api/sessions/analytics?${search.toString()}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
@@ -78,6 +88,7 @@ function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefi
     "platform",
     "sort",
     "order",
+    "chartBucket",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -118,9 +129,11 @@ export default async function SessionsPage({
   const platform = firstQueryValue(sp.platform);
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
+  const chartBucket = firstQueryValue(sp.chartBucket);
   if (platform) apiQuery.set("platform", platform);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
+  if (chartBucket) apiQuery.set("chartBucket", chartBucket);
 
   const pageAnchor = new Date();
   if (isUnselectedTimeRange(timeRange.key)) {
@@ -136,17 +149,20 @@ export default async function SessionsPage({
   let items: SessionRow[] = [];
   let total = 0;
   let summary: SessionsPageSummary | null = null;
+  let analytics: SessionsAnalyticsData | null = null;
   let platforms: string[] = [];
   try {
-    const [data, opts, summaryData] = await Promise.all([
+    const [data, opts, summaryData, analyticsData] = await Promise.all([
       getSessions(apiQuery),
       getFilterOptions(appFilter || undefined),
       getSessionsSummary(summaryQuery),
+      getSessionsAnalytics(summaryQuery),
     ]);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
     platforms = opts.platforms;
     summary = summaryData;
+    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -174,6 +190,16 @@ export default async function SessionsPage({
       />
 
       <AnalyticsListShell>
+        {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
+
+        {analytics ? (
+          <SessionsAnalyticsPanels
+            analytics={analytics}
+            path={SESSIONS_PATH}
+            currentParams={currentParams}
+          />
+        ) : null}
+
         <SessionsListToolbar
         path={SESSIONS_PATH}
         currentParams={currentParams}
@@ -188,8 +214,6 @@ export default async function SessionsPage({
         order={order ?? "desc"}
         platforms={platforms}
         />
-
-        {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
 
         <ListResultCount total={total} noun={total === 1 ? "session" : "sessions"} />
 
