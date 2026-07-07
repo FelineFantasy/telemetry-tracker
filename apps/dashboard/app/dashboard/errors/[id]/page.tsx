@@ -180,6 +180,7 @@ export default async function ErrorDetailPage({
     <>
       <NavBack href={`/dashboard/errors${appQuery}`}>Issues</NavBack>
       <IssueDetailView
+        issueId={group.id}
         title={group.message}
         resolved={resolved}
         badges={
@@ -192,11 +193,11 @@ export default async function ErrorDetailPage({
         }
         actions={<ErrorResolveButton errorGroupId={group.id} resolved={resolved} />}
         metrics={[
-          { label: "Events", value: group.occurrences.toLocaleString() },
+          { label: "Occurrences", value: group.occurrences.toLocaleString() },
           {
             label: "Users affected",
             value:
-              group.users_affected != null && group.users_affected > 0
+              group.users_affected != null
                 ? group.users_affected.toLocaleString()
                 : "—",
           },

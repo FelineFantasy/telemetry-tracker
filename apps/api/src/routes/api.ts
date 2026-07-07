@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
+  fetchImpactMetricsForGroupId,
   fetchMetricsForGroupIds,
   isAggregateSort,
   listErrorGroupsAggregated,
@@ -543,8 +544,11 @@ export async function apiRoutes(
     });
     if (!group) return reply.status(404).send({ error: "Not found" });
     const { enrichErrorGroupWithSymbolicatedStacks } = await import("../lib/stack-symbolicate.js");
-    const enriched = await enrichErrorGroupWithSymbolicatedStacks(prisma, projectId, group);
-    return reply.send(enriched);
+    const [enriched, impact] = await Promise.all([
+      enrichErrorGroupWithSymbolicatedStacks(prisma, projectId, group),
+      fetchImpactMetricsForGroupId(prisma, id),
+    ]);
+    return reply.send({ ...enriched, ...impact });
   });
 
   app.get("/events", async (request, reply) => {

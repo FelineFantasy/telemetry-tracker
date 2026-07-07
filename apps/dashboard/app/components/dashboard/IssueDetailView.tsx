@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AnalyticsDetailLayout,
   AnalyticsMetricRow,
@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 type TabId = "stack" | "occurrences";
 
 export function IssueDetailView({
+  issueId,
   title,
   resolved,
   badges,
@@ -24,6 +25,7 @@ export function IssueDetailView({
   occurrences,
   defaultTab = "stack",
 }: {
+  issueId: string;
   title: string;
   resolved: boolean;
   badges: ReactNode;
@@ -36,6 +38,10 @@ export function IssueDetailView({
   defaultTab?: TabId;
 }) {
   const [tab, setTab] = useState<TabId>(defaultTab);
+
+  useEffect(() => {
+    setTab(defaultTab);
+  }, [issueId, defaultTab]);
 
   return (
     <div className="space-y-4">
