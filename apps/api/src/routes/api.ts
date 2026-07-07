@@ -31,6 +31,11 @@ import {
   resolveEventsSummaryWindow,
 } from "../lib/events-page-summary.js";
 import {
+  fetchSessionsPageSummary,
+  parseSessionsMetricsAnchor,
+  resolveSessionsSummaryWindow,
+} from "../lib/sessions-page-summary.js";
+import {
   attachLatestEventIds,
   fetchSparklinesForEventNames,
   listEventNamesGrouped,
@@ -930,6 +935,28 @@ export async function apiRoutes(
     });
     if (!event) return reply.status(404).send({ error: "Not found" });
     return reply.send(event);
+  });
+
+  app.get("/sessions/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      metricsUntil?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
+
+    const filter = { appId, platform, range };
+    const window = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const summary = await fetchSessionsPageSummary(prisma, filter, projectId, window);
+    return reply.send(summary);
   });
 
   app.get("/sessions", async (request, reply) => {
