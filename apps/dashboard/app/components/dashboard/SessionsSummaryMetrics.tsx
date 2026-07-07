@@ -123,8 +123,8 @@ function MetricCell({
   sparklineLabel: string;
 }) {
   return (
-    <div className="flex flex-col gap-2 px-4 py-3 sm:px-5 sm:py-4">
-      <div>
+    <div className="flex items-end justify-between gap-3 px-4 py-3 sm:px-5 sm:py-4">
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
         <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight sm:text-xl">{value}</p>
         {deltaMode === "pp" ? (
@@ -136,7 +136,7 @@ function MetricCell({
       <MiniSparkline
         data={sparkline}
         color="var(--chart-session, var(--chart-event))"
-        className="h-8 w-full max-w-[140px]"
+        className="h-8 w-[120px] shrink-0 sm:w-[140px]"
         ariaLabel={sparklineLabel}
       />
     </div>
