@@ -152,6 +152,26 @@ async function queryEventBuckets(
   `);
 }
 
+/** @internal Exported for unit tests. */
+export function overviewSessionBucketEnvironmentExistsSql(
+  projectId: string,
+  environment: string,
+  since: Date,
+  until: Date,
+  sessionAlias = "s"
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`EXISTS (
+    SELECT 1 FROM "Event" e
+    WHERE e."project_id" = ${projectId}
+      AND e."session_id" = ${s}."session_id"
+      AND e."app" = ${s}."app"
+      AND e."environment" = ${environment}
+      AND e."created_at" >= ${since}
+      AND e."created_at" <= ${until}
+  )`;
+}
+
 async function querySessionBuckets(
   prisma: PrismaClient,
   bucket: OverviewSeriesBucket,
@@ -162,17 +182,13 @@ async function querySessionBuckets(
   environmentFilter: string | undefined
 ): Promise<{ bucket: Date; c: bigint }[]> {
   const appClause = appFilter ? Prisma.sql`AND s."app" = ${appFilter}` : Prisma.empty;
-  const sessionUntilClause = environmentFilter
-    ? Prisma.empty
-    : Prisma.sql`AND s."started_at" <= ${until}`;
   const envClause = environmentFilter
-    ? Prisma.sql`AND EXISTS (
-        SELECT 1 FROM "Event" e
-        WHERE e."project_id" = s."project_id"
-          AND e."session_id" = s."session_id"
-          AND e."environment" = ${environmentFilter}
-          AND e."created_at" >= ${since}
-      )`
+    ? Prisma.sql`AND ${overviewSessionBucketEnvironmentExistsSql(
+        projectId,
+        environmentFilter,
+        since,
+        until
+      )}`
     : Prisma.empty;
   const trunc = bucket === "week" ? "week" : bucket;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
@@ -182,7 +198,7 @@ async function querySessionBuckets(
     FROM "Session" s
     WHERE s."project_id" = ${projectId}
       AND s."started_at" >= ${since}
-      ${sessionUntilClause}
+      AND s."started_at" <= ${until}
       ${appClause}
       ${envClause}
     GROUP BY 1
