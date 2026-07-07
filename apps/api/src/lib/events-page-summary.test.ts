@@ -83,9 +83,20 @@ describe("enrichEventListFilterForMetrics", () => {
     expect(enriched.eventCountRange?.lte).toEqual(anchor);
   });
 
-  it("leaves filter unchanged when list range has a lower bound", () => {
+  it("leaves filter unchanged when list range has explicit start and end", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const filter = { range: { gte: since, lte: until } };
+    expect(enrichEventListFilterForMetrics(filter, filter.range, anchor)).toEqual(filter);
+  });
+
+  it("adds upper bound when list range has only a start date", () => {
     const since = new Date("2026-06-01T00:00:00.000Z");
     const filter = { range: { gte: since } };
-    expect(enrichEventListFilterForMetrics(filter, filter.range, anchor)).toEqual(filter);
+    const window = resolveEventsSummaryWindow(filter.range, anchor);
+    const enriched = enrichEventListFilterForMetrics(filter, filter.range, anchor);
+    expect(enriched.eventCountRange?.gte).toEqual(window.since);
+    expect(enriched.eventCountRange?.lte).toEqual(window.until);
+    expect(enriched.eventCountRange?.lte).toEqual(anchor);
   });
 });

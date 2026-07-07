@@ -77,7 +77,8 @@ export function enrichEventListFilterForMetrics(
   range: { gte?: Date; lte?: Date },
   anchor: Date = new Date()
 ): EventListFilterInput {
-  if (range.gte || filter.eventCountRange) return filter;
+  if (filter.eventCountRange) return filter;
+  if (range.gte && range.lte) return filter;
   const w = resolveEventsSummaryWindow(range, anchor);
   return {
     ...filter,
