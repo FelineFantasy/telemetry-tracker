@@ -36,6 +36,7 @@ type EventNameRow = {
   users_affected?: number;
   last_seen: string;
   latest_event_id?: string | null;
+  sparkline?: { t: string; count: number }[];
 };
 
 async function getEvents(search: URLSearchParams) {
