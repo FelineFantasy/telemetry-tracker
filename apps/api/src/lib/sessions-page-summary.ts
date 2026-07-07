@@ -212,19 +212,15 @@ export function sessionFilterSql(
   if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
   if (f.platform) parts.push(Prisma.sql`s."platform" = ${f.platform}`);
   if (f.country) parts.push(Prisma.sql`s."country" = ${f.country}`);
+  const eventClauses: Prisma.Sql[] = [];
   if (f.environment) {
-    parts.push(
-      sessionEventExistsSql(projectId, "s", [
-        Prisma.sql`e."environment" = ${f.environment}`,
-      ])
-    );
+    eventClauses.push(Prisma.sql`e."environment" = ${f.environment}`);
   }
   if (f.release) {
-    parts.push(
-      sessionEventExistsSql(projectId, "s", [
-        Prisma.sql`e."release" = ${f.release}`,
-      ])
-    );
+    eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
+  }
+  if (eventClauses.length > 0) {
+    parts.push(sessionEventExistsSql(projectId, "s", eventClauses));
   }
   if (f.q?.trim()) parts.push(sessionSearchSql(f.q));
   return Prisma.join(parts, " AND ");

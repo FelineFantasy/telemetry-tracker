@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   BOUNCE_MAX_DURATION_SECONDS,
@@ -5,7 +6,13 @@ import {
   parseSessionsMetricsAnchor,
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
+  sessionFilterSql,
 } from "./sessions-page-summary.js";
+
+function prismaSqlText(fragment: Prisma.Sql): string {
+  const parts = fragment as unknown as { strings: string[] };
+  return parts.strings.join("?");
+}
 
 describe("parseSessionsMetricsAnchor", () => {
   it("parses ISO metricsUntil", () => {
@@ -133,5 +140,20 @@ describe("buildSessionListFilter", () => {
   it("omits empty search and unset filters", () => {
     const filter = buildSessionListFilter({ range, q: "   " });
     expect(filter).toEqual({ range });
+  });
+});
+
+describe("sessionFilterSql", () => {
+  it("requires one event row when both environment and release are set", () => {
+    const sql = sessionFilterSql("proj-1", {
+      range: {},
+      environment: "production",
+      release: "1.2.0",
+    });
+    const text = prismaSqlText(sql);
+    const existsCount = (text.match(/EXISTS/g) ?? []).length;
+    expect(existsCount).toBe(1);
+    expect(text).toContain('"environment"');
+    expect(text).toContain('"release"');
   });
 });
