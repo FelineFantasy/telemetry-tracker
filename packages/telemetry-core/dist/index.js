@@ -1,6 +1,7 @@
-const REPORTED = Symbol.for("telemetry.reported");
+import { readDeviceContext } from "./device-context.js";
 import { SDK_VERSION } from "./version.js";
 export { SDK_VERSION };
+const REPORTED = Symbol.for("telemetry.reported");
 const ANON_STORAGE_KEY = "tacko_telemetry_anon_id";
 let anonymousId = null;
 function generateUUID() {
@@ -37,6 +38,7 @@ export function getAnonymousId() {
 }
 let config = null;
 let userId = null;
+let userEmail = null;
 let browserHandlersInstalled = false;
 let sessionLifecycleInstalled = false;
 let sessionId = null;
@@ -50,14 +52,19 @@ function ensureUrlFromCfg(cfg, path) {
     return `${base}${path}`;
 }
 function buildSessionPayload(cfg, endedAt) {
+    const device = readDeviceContext();
     return {
         session_id: sessionId,
         app: cfg.app,
         platform: cfg.platform ?? undefined,
         environment: cfg.environment ?? undefined,
         user_id: userId ?? undefined,
+        user_email: userEmail ?? undefined,
         anonymous_id: getAnonymousId(),
         sdk_version: SDK_VERSION,
+        country: device.country ?? undefined,
+        device_browser: device.device_browser ?? undefined,
+        device_os: device.device_os ?? undefined,
         started_at: sessionStartedAt?.toISOString(),
         ended_at: endedAt?.toISOString(),
     };
@@ -193,8 +200,15 @@ export function init(c) {
     startSession();
     installBrowserSessionLifecycle();
 }
-export function identify(id) {
+export function identify(id, traits) {
     userId = id;
+    if (traits && "email" in traits) {
+        userEmail = traits.email ?? null;
+    }
+    const cfg = getConfigOrNull();
+    if (cfg && sessionId) {
+        void postSession(cfg);
+    }
 }
 function getConfig() {
     if (!config)

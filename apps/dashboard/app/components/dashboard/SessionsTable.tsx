@@ -8,12 +8,17 @@ import {
   tableDateColumnClass,
 } from "@/app/components/ui/Table";
 import { formatDurationSec } from "@/lib/format-duration";
+import { countryFlagEmoji, formatSessionDevice } from "@/lib/session-display";
 
 export type SessionsTableRow = {
   id: string;
   session_id: string;
   user_id?: string | null;
   anonymous_id?: string | null;
+  user_email?: string | null;
+  country?: string | null;
+  device_browser?: string | null;
+  device_os?: string | null;
   started_at: string;
   duration_sec: number;
   event_count: number;
@@ -28,10 +33,47 @@ function truncate(s: string, len: number) {
 
 function SessionIdentity({ row }: { row: SessionsTableRow }) {
   const identity = row.user_id ?? row.anonymous_id;
-  if (!identity) return <span className="text-muted-foreground">—</span>;
+  const email = row.user_email?.trim();
+  if (!identity && !email) return <span className="text-muted-foreground">—</span>;
   return (
-    <span title={identity} className="font-mono text-[13px]">
-      {truncate(identity, 24)}
+    <div className="space-y-0.5">
+      {email ? (
+        <span title={email} className="block text-[13px]">
+          {truncate(email, 28)}
+        </span>
+      ) : null}
+      {identity ? (
+        <span title={identity} className="block font-mono text-[13px] text-muted-foreground">
+          {truncate(identity, 24)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function CountryCell({ country }: { country?: string | null }) {
+  if (!country?.trim()) return <span className="text-muted-foreground">—</span>;
+  const flag = countryFlagEmoji(country);
+  return (
+    <span title={country} className="tabular-nums text-[13px]">
+      {flag ? <span className="mr-1.5">{flag}</span> : null}
+      {country.toUpperCase()}
+    </span>
+  );
+}
+
+function DeviceCell({
+  browser,
+  os,
+}: {
+  browser?: string | null;
+  os?: string | null;
+}) {
+  const label = formatSessionDevice(browser, os);
+  if (!label) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span title={label} className="text-[13px]">
+      {truncate(label, 28)}
     </span>
   );
 }
@@ -89,6 +131,8 @@ export function SessionsTable({
         <thead>
           <tr>
             <th>User</th>
+            <th className="hidden md:table-cell">Country</th>
+            <th className="hidden lg:table-cell">Device</th>
             <th>Duration</th>
             <th className="hidden sm:table-cell text-right">Pages / Events</th>
             <th className={tableDateColumnClass}>Started</th>
@@ -112,6 +156,12 @@ export function SessionsTable({
                     {truncate(row.session_id, 18)}
                   </TableListLink>
                 </div>
+              </td>
+              <td className="hidden md:table-cell">
+                <CountryCell country={row.country} />
+              </td>
+              <td className="hidden lg:table-cell max-w-[9rem]">
+                <DeviceCell browser={row.device_browser} os={row.device_os} />
               </td>
               <td>
                 <DurationCell durationSec={row.duration_sec} maxDurationSec={pageMax} />

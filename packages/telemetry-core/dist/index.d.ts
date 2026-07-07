@@ -18,7 +18,10 @@ export declare function getSessionId(): string | null;
 /** End the current session and clear the in-memory session id. */
 export declare function endSession(): void;
 export declare function init(c: TelemetryConfig): void;
-export declare function identify(id: string | null): void;
+export type IdentifyTraits = {
+    email?: string | null;
+};
+export declare function identify(id: string | null, traits?: IdentifyTraits): void;
 /** Headers for ingest POST requests (Authorization + Content-Type). */
 export declare function buildIngestHeaders(cfg: Pick<TelemetryConfig, "apiKey">): Record<string, string>;
 export declare function trackEvent(name: string, properties?: Record<string, unknown>): void;
