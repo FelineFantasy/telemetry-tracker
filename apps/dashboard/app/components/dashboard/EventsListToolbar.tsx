@@ -22,12 +22,12 @@ import {
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
 
 const SORT_OPTIONS: DashboardSelectOption[] = [
-  { value: "created_at", label: "Created" },
+  { value: "last_seen", label: "Last seen" },
+  { value: "first_seen", label: "First seen" },
+  { value: "count", label: "Count" },
   { value: "name", label: "Name" },
-  { value: "app", label: "App" },
-  { value: "environment", label: "Environment" },
-  { value: "platform", label: "Platform" },
-  { value: "release", label: "Release" },
+  { value: "users", label: "Users" },
+  { value: "sessions", label: "Sessions" },
 ];
 
 type Props = {
@@ -185,7 +185,7 @@ export function EventsListToolbar({
             <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
             <DashboardCustomSelect
               name="sort"
-              value={sort || "created_at"}
+              value={sort || "last_seen"}
               options={SORT_OPTIONS}
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}

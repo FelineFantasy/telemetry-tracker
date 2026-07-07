@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { buildEventWhereSql } from "./list-query-helpers.js";
 
 export type LatestEventByNameRow = {
+  id: string;
   name: string;
   app: string;
   platform: string | null;
@@ -16,10 +17,13 @@ export async function fetchLatestEventsByName(
   prisma: PrismaClient,
   params: {
     projectId: string;
-    since: Date;
-    until: Date;
+    since?: Date;
+    until?: Date;
     app?: string;
     environment?: string;
+    platform?: string;
+    release?: string;
+    propertiesContains?: string;
     names: string[];
   }
 ): Promise<Map<string, LatestEventByNameRow>> {
@@ -30,6 +34,9 @@ export async function fetchLatestEventsByName(
     projectId: params.projectId,
     appId: params.app,
     environment: params.environment,
+    platform: params.platform,
+    release: params.release,
+    propertiesContains: params.propertiesContains,
     gte: params.since,
     lte: params.until,
   });
@@ -37,6 +44,7 @@ export async function fetchLatestEventsByName(
 
   const rows = await prisma.$queryRaw<LatestEventByNameRow[]>(Prisma.sql`
     SELECT DISTINCT ON (e."name")
+      e."id",
       e."name",
       e."app",
       e."platform",
