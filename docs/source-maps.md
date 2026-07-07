@@ -145,3 +145,27 @@ Symbolication is display-only; grouping fingerprints stay on raw minified stacks
 - [sdk-core.md](./sdk-core.md) — `trackError`, `release` in payloads
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — ingest pipeline
 - [ENTITLEMENTS.md](./ENTITLEMENTS.md) — retention by plan tier
+
+## GitHub Action Workflow Example
+
+You can automatically upload source maps on every release using our GitHub Action:
+
+```yaml
+name: Release Configuration
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload-maps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload Source Maps
+        uses: ./
+        with:
+          api_key: ${{ secrets.TT_API_KEY }}
+          release: ${{ github.event.release.tag_name }}
+          app: "my-telemetry-app"
+          artifact_path: "./build"
+```
