@@ -135,15 +135,10 @@ function countInRangeWhereSql(f: EventListFilterInput, alias = "e"): Prisma.Sql 
 }
 
 function buildGroupedVisibilityHavingSql(f: EventListFilterInput): Prisma.Sql {
-  const parts: Prisma.Sql[] = [];
-  if (f.range.gte) {
-    parts.push(Prisma.sql`MAX(e."created_at") >= ${f.range.gte}`);
+  if (!hasCountRangeBounds(f)) {
+    return Prisma.empty;
   }
-  if (f.range.lte) {
-    parts.push(Prisma.sql`MAX(e."created_at") <= ${f.range.lte}`);
-  }
-  if (parts.length === 0) return Prisma.empty;
-  return Prisma.sql`HAVING ${Prisma.join(parts, " AND ")}`;
+  return Prisma.sql`HAVING ${countInRangeExpr(f, "e")} > 0`;
 }
 
 function buildGroupedBaseWhereSql(

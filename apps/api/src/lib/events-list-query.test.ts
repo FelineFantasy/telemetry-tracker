@@ -58,6 +58,17 @@ describe("resolveEventCountRangeBounds", () => {
       })
     ).toEqual({ gte: since, lte: until });
   });
+
+  it("applies enriched eventCountRange when list range is all-time", () => {
+    const since = new Date("2026-06-21T12:00:00.000Z");
+    const until = new Date("2026-06-28T12:00:00.000Z");
+    expect(
+      resolveEventCountRangeBounds({
+        range: {},
+        eventCountRange: { gte: since, lte: until },
+      })
+    ).toEqual({ gte: since, lte: until });
+  });
 });
 
 describe("serializeEventNameListItem", () => {

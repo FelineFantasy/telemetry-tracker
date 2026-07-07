@@ -22,7 +22,7 @@ export function buildEventWhereSql(params: {
   if (params.lte) parts.push(Prisma.sql`created_at <= ${params.lte}`);
   if (params.propertiesContains?.trim()) {
     const pat = `%${escapeLikePattern(params.propertiesContains.trim())}%`;
-    parts.push(Prisma.sql`properties::text ILIKE ${pat}`);
+    parts.push(Prisma.sql`properties::text ILIKE ${pat} ESCAPE '\\'`);
   }
   return Prisma.join(parts, " AND ");
 }
