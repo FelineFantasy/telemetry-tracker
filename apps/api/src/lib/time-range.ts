@@ -83,6 +83,22 @@ function formatCustomShort(ms: number): string {
   return `${Math.round(days)}D`;
 }
 
+export function parseChartBucketParam(
+  value: string | undefined
+): TimeRangeBucket | undefined {
+  const raw = value?.trim().toLowerCase();
+  if (raw === "hour" || raw === "day" || raw === "week") return raw;
+  return undefined;
+}
+
+/** Chart bucket from optional URL override, else auto-selected from window duration. */
+export function resolveChartBucket(
+  durationMs: number,
+  override?: TimeRangeBucket
+): TimeRangeBucket {
+  return override ?? chooseTimeRangeBucket(durationMs).bucket;
+}
+
 export function chooseTimeRangeBucket(durationMs: number): {
   bucket: TimeRangeBucket;
   bucketSeconds: number;
