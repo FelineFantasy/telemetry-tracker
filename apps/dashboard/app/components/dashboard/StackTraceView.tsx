@@ -1,11 +1,11 @@
 /** Readable stack trace: line numbers + monospace, wrapped lines. */
+import { AnalyticsPanel, AnalyticsPanelHeader } from "@/app/components/dashboard/analytics-ui";
+
 export function StackTraceView({ source, title }: { source: string; title: string }) {
   const lines = source.split(/\r?\n/);
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-background">
-      <div className="border-b border-border px-4 py-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-        {title}
-      </div>
+    <AnalyticsPanel>
+      <AnalyticsPanelHeader title={title} />
       <ol className="max-h-96 list-none overflow-auto p-0 font-mono text-[11px] leading-relaxed">
         {lines.map((line, i) => (
           <li key={i} className="flex gap-3 border-b border-border/50 px-3 py-1 last:border-0">
@@ -18,6 +18,6 @@ export function StackTraceView({ source, title }: { source: string; title: strin
           </li>
         ))}
       </ol>
-    </div>
+    </AnalyticsPanel>
   );
 }

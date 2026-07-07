@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AnalyticsPanel } from "@/app/components/dashboard/analytics-ui";
 
 export function DetailMetaPanel({
   title,
@@ -10,10 +11,10 @@ export function DetailMetaPanel({
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border border-border bg-surface/40 p-5 ${className}`}>
+    <AnalyticsPanel className={`p-5 ${className}`}>
       <h2 className="mb-4 text-sm font-medium">{title}</h2>
       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</dl>
-    </div>
+    </AnalyticsPanel>
   );
 }
 
@@ -45,12 +46,12 @@ export function DetailSummaryPanel({
   children?: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface/40 p-5" aria-label={title}>
+    <AnalyticsPanel className="p-5" aria-label={title}>
       <h2 className="break-words text-[15px] font-medium leading-snug text-destructive">{title}</h2>
       {badges ? <div className="mt-3 flex flex-wrap gap-2">{badges}</div> : null}
       {meta ? <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{meta}</div> : null}
       {children}
-    </section>
+    </AnalyticsPanel>
   );
 }
 
@@ -65,6 +66,6 @@ export function DetailMetaChip({ label, children }: { label: string; children: R
 
 export function OccurrencePanel({ children }: { children: ReactNode }) {
   return (
-    <li className="rounded-xl border border-border bg-surface/40 p-4">{children}</li>
+    <li className="rounded-lg border border-border bg-background/40 p-4">{children}</li>
   );
 }

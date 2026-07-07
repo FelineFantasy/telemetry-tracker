@@ -3,6 +3,7 @@ import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListTool
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
+import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { EmptyState } from "@/app/components/EmptyState";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
@@ -148,7 +149,8 @@ export default async function SessionsPage({
         }
       />
 
-      <SessionsListToolbar
+      <AnalyticsListShell>
+        <SessionsListToolbar
         path={SESSIONS_PATH}
         currentParams={currentParams}
         timeRange={timeRange}
@@ -161,12 +163,12 @@ export default async function SessionsPage({
         sort={sort ?? "started_at"}
         order={order ?? "desc"}
         platforms={platforms}
-      />
+        />
 
-      <ListResultCount total={total} noun={total === 1 ? "session" : "sessions"} />
+        <ListResultCount total={total} noun={total === 1 ? "session" : "sessions"} />
 
-      {items.length ? (
-        <TableWrap>
+        {items.length ? (
+          <TableWrap>
           <Table>
             <thead>
               <tr>
@@ -227,8 +229,9 @@ export default async function SessionsPage({
               : `No sessions match ${rangeLabel}. Try another range or clear filters.`
           }
         />
-      )}
-      <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
+        )}
+        <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
+      </AnalyticsListShell>
     </>
   );
 }

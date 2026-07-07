@@ -6,6 +6,11 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { saveProjectAlertSettingsAction } from "@/app/dashboard/actions";
 import {
+  AnalyticsPanel,
+  AnalyticsPanelHeader,
+  AnalyticsPanelList,
+} from "@/app/components/dashboard/analytics-ui";
+import {
   SettingsPageBody,
   SettingsPageHeader,
 } from "@/app/components/dashboard/settings/SettingsPageHeader";
@@ -190,29 +195,32 @@ export function AlertsClient({
           {initialEvents.length === 0 ? (
             <p className="text-[13px] text-muted-foreground">No alerts fired yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border">
-              {initialEvents.map((event) => (
-                <li key={event.id} className="px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium">{event.title}</p>
-                      <p className="mt-0.5 text-[12px] text-muted-foreground">{event.body}</p>
+            <AnalyticsPanel>
+              <AnalyticsPanelHeader title="Recent alerts" description="Newest first" />
+              <AnalyticsPanelList>
+                {initialEvents.map((event) => (
+                  <li key={event.id} className="px-4 py-3 sm:px-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium">{event.title}</p>
+                        <p className="mt-0.5 text-[12px] text-muted-foreground">{event.body}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                          {ruleLabel(event.rule)}
+                        </span>
+                        <p
+                          className="mt-1 font-mono text-[10px] text-muted-foreground"
+                          title={event.firedAt}
+                        >
+                          {formatRelativeTime(event.firedAt)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                        {ruleLabel(event.rule)}
-                      </span>
-                      <p
-                        className="mt-1 font-mono text-[10px] text-muted-foreground"
-                        title={event.firedAt}
-                      >
-                        {formatRelativeTime(event.firedAt)}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </AnalyticsPanelList>
+            </AnalyticsPanel>
           )}
         </Section>
       </SettingsPageBody>

@@ -360,6 +360,32 @@ export async function fetchMetricsForGroupIds(
   return out;
 }
 
+/** Distinct users/sessions impacted by all occurrences in one error group. */
+export async function fetchImpactMetricsForGroupId(
+  prisma: PrismaClient,
+  errorGroupId: string
+): Promise<{ users_affected: number; sessions_affected: number }> {
+  const rows = await prisma.$queryRaw<
+    [{ users_affected: number | bigint | null; sessions_affected: number | bigint | null }]
+  >(Prisma.sql`
+    SELECT
+      COUNT(DISTINCT COALESCE(
+        NULLIF(TRIM(COALESCE(o.user_id, '')), ''),
+        NULLIF(TRIM(COALESCE(o.anonymous_id, '')), ''),
+        NULLIF(TRIM(COALESCE(o.session_id, '')), '')
+      ))::int AS users_affected,
+      COUNT(DISTINCT o.session_id) FILTER (
+        WHERE o.session_id IS NOT NULL AND TRIM(o.session_id) <> ''
+      )::int AS sessions_affected
+    FROM "ErrorOccurrence" o
+    WHERE o.error_group_id = ${errorGroupId}
+  `);
+  return {
+    users_affected: Number(rows[0]?.users_affected ?? 0),
+    sessions_affected: Number(rows[0]?.sessions_affected ?? 0),
+  };
+}
+
 export async function listErrorGroupsPrisma(
   prisma: PrismaClient,
   f: ErrorListFilterInput,

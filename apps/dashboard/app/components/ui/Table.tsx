@@ -1,5 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import Link from "next/link";
+import { analyticsPanelClass } from "@/app/components/dashboard/analytics-ui";
 import { cn } from "@/lib/cn";
 
 const tableClass = cn(
@@ -19,7 +20,7 @@ export function TableWrap({
   className?: string;
 }) {
   return (
-    <div className={cn("overflow-x-auto rounded-xl border border-border bg-surface/40", className)}>
+    <div className={cn("overflow-x-auto", analyticsPanelClass, className)}>
       {children}
     </div>
   );
