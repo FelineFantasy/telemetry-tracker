@@ -124,7 +124,7 @@ function MetricCell({
   label: string;
   value: string;
   current: number;
-  previous: number;
+  previous: number | null;
   invertDelta?: boolean;
   deltaMode?: "relative" | "pp";
   sparkline?: SparklinePoint[];
@@ -137,7 +137,9 @@ function MetricCell({
       <div>
         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
         <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight sm:text-xl">{value}</p>
-        {deltaMode === "pp" ? (
+        {previous == null ? (
+          <p className="mt-1 text-[11px] text-muted-foreground">— {compareText}</p>
+        ) : deltaMode === "pp" ? (
           <PpDelta deltaPp={current - previous} invert={invertDelta} />
         ) : (
           <Delta
@@ -281,7 +283,11 @@ export function OverviewKeyMetrics({
                 label="Apdex"
                 value={formatApdex(latencyMetrics.apdex)}
                 current={latencyMetrics.apdex * 100}
-                previous={latencyMetrics.apdexPrevious * 100}
+                previous={
+                  latencyMetrics.apdexPrevious == null
+                    ? null
+                    : latencyMetrics.apdexPrevious * 100
+                }
                 deltaMode="pp"
                 sparkline={latencyMetrics.sparklines.apdexPct}
                 sparklineLabel="Apdex score over time"

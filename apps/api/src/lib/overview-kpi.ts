@@ -37,9 +37,9 @@ export type OverviewRequestMetrics = {
 } | {
   available: true;
   avgResponseMs: number;
-  avgResponseMsPrevious: number;
+  avgResponseMsPrevious: number | null;
   apdex: number;
-  apdexPrevious: number;
+  apdexPrevious: number | null;
   requestCount: number;
   sparklines: {
     avgResponseMs: OverviewSparklinePoint[];
@@ -114,6 +114,23 @@ export function apdexPctForBucket(
 ): number | null {
   if (total <= 0) return null;
   return apdexPctFromScore(apdexScore(satisfied, tolerating, total));
+}
+
+/** Bucket sparkline value — null when the bucket has no timed `$request` samples. */
+export function avgResponseMsForBucket(
+  avgMs: number | null | undefined,
+  sampleCount: number
+): number | null {
+  if (sampleCount <= 0 || avgMs == null) return null;
+  return Math.round(avgMs);
+}
+
+/** Scalar compare value — null when the window has no timed `$request` samples. */
+export function avgResponseMsForWindow(
+  avgMs: number | null | undefined,
+  sampleCount: number
+): number | null {
+  return avgResponseMsForBucket(avgMs, sampleCount);
 }
 
 function apdexBucketComponentsExpr(
@@ -254,17 +271,24 @@ export async function fetchOverviewRequestMetrics(
   const buckets = generateOverviewChartBuckets(chartSince, until, bucket);
 
   const avgResponseMs = Math.round(Number(row?.avg_response_ms ?? 0));
-  const avgResponseMsPrevious = Math.round(Number(row?.avg_response_ms_previous ?? 0));
+  const previousRequestCount = Number(row?.total_previous ?? 0);
+  const avgResponseMsPrevious = avgResponseMsForWindow(
+    row?.avg_response_ms_previous,
+    previousRequestCount
+  );
   const apdex = apdexScore(
     Number(row?.satisfied ?? 0),
     Number(row?.tolerating ?? 0),
     requestCount
   );
-  const apdexPrevious = apdexScore(
-    Number(row?.satisfied_previous ?? 0),
-    Number(row?.tolerating_previous ?? 0),
-    Number(row?.total_previous ?? 0)
-  );
+  const apdexPrevious =
+    previousRequestCount === 0
+      ? null
+      : apdexScore(
+          Number(row?.satisfied_previous ?? 0),
+          Number(row?.tolerating_previous ?? 0),
+          previousRequestCount
+        );
 
   return {
     available: true,
@@ -279,7 +303,10 @@ export async function fetchOverviewRequestMetrics(
         const bucketRow = byBucket.get(t);
         return {
           t,
-          count: Math.round(Number(bucketRow?.avg_response_ms ?? 0)),
+          count: avgResponseMsForBucket(
+            bucketRow?.avg_response_ms,
+            Number(bucketRow?.total ?? 0)
+          ),
         };
       }),
       apdexPct: buckets.map((bucketDate) => {

@@ -4,6 +4,8 @@ import {
   apdexPctForBucket,
   apdexPctFromScore,
   apdexScore,
+  avgResponseMsForBucket,
+  avgResponseMsForWindow,
   overviewTopErrorGroupsInWindowSql,
   REQUEST_APDEX_THRESHOLD_MS,
   sparklinesFromTimeSeries,
@@ -43,6 +45,23 @@ describe("apdexPctForBucket", () => {
 
   it("returns apdex percentage when samples exist", () => {
     expect(apdexPctForBucket(8, 2, 10)).toBe(90);
+  });
+});
+
+describe("avgResponseMsForBucket", () => {
+  it("returns null when the bucket has no timed request samples", () => {
+    expect(avgResponseMsForBucket(null, 0)).toBeNull();
+    expect(avgResponseMsForBucket(120, 0)).toBeNull();
+  });
+
+  it("rounds the average when samples exist", () => {
+    expect(avgResponseMsForBucket(118.6, 3)).toBe(119);
+  });
+});
+
+describe("avgResponseMsForWindow", () => {
+  it("returns null when the compare window has no timed request samples", () => {
+    expect(avgResponseMsForWindow(null, 0)).toBeNull();
   });
 });
 

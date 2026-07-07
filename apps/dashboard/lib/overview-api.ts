@@ -23,12 +23,12 @@ export type OverviewRequestMetrics =
   | {
       available: true;
       avgResponseMs: number;
-      avgResponseMsPrevious: number;
+      avgResponseMsPrevious: number | null;
       apdex: number;
-      apdexPrevious: number;
+      apdexPrevious: number | null;
       requestCount: number;
       sparklines: {
-        avgResponseMs: OverviewTimeSeriesPoint[];
+        avgResponseMs: Array<{ t: string; count: number | null }>;
         apdexPct: Array<{ t: string; count: number | null }>;
       };
     };
