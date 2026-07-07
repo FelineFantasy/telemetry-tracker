@@ -68,6 +68,35 @@ export function resolveErrorsSummaryWindow(
   };
 }
 
+export function buildErrorGroupScopeSql(
+  f: ErrorListFilterInput,
+  projectId: string,
+  egAlias = "eg"
+): Prisma.Sql {
+  const eg = Prisma.raw(`"${egAlias}"`);
+  const parts: Prisma.Sql[] = [Prisma.sql`${eg}."project_id" = ${projectId}`];
+  if (f.appId) parts.push(Prisma.sql`${eg}."app" = ${f.appId}`);
+  if (f.environment) parts.push(Prisma.sql`${eg}."environment" = ${f.environment}`);
+  if (f.q) {
+    const pat = `%${escapeLikePattern(f.q)}%`;
+    parts.push(Prisma.sql`${eg}."message" ILIKE ${pat} ESCAPE '\\'`);
+  }
+  if (f.range.gte) parts.push(Prisma.sql`${eg}."last_seen" >= ${f.range.gte}`);
+  if (f.range.lte) parts.push(Prisma.sql`${eg}."last_seen" <= ${f.range.lte}`);
+  if (f.status === "unresolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NULL`);
+  if (f.status === "resolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NOT NULL`);
+  if (f.release) {
+    parts.push(
+      Prisma.sql`EXISTS (
+        SELECT 1 FROM "ErrorOccurrence" rel
+        WHERE rel."error_group_id" = ${eg}."id"
+          AND rel."release" = ${f.release}
+      )`
+    );
+  }
+  return Prisma.join(parts, " AND ");
+}
+
 export function buildErrorOccurrenceFilterSql(
   f: ErrorListFilterInput,
   projectId: string,
@@ -76,26 +105,7 @@ export function buildErrorOccurrenceFilterSql(
 ): Prisma.Sql {
   const t = alias;
   const applyOccurrenceRange = opts?.applyOccurrenceRange !== false;
-  const parts: Prisma.Sql[] = [
-    Prisma.sql`eg."project_id" = ${projectId}`,
-  ];
-  if (f.appId) parts.push(Prisma.sql`eg."app" = ${f.appId}`);
-  if (f.environment) parts.push(Prisma.sql`eg."environment" = ${f.environment}`);
-  if (f.q) {
-    const pat = `%${escapeLikePattern(f.q)}%`;
-    parts.push(Prisma.sql`eg."message" ILIKE ${pat} ESCAPE '\\'`);
-  }
-  if (f.status === "unresolved") parts.push(Prisma.sql`eg."resolved_at" IS NULL`);
-  if (f.status === "resolved") parts.push(Prisma.sql`eg."resolved_at" IS NOT NULL`);
-  if (f.release) {
-    parts.push(
-      Prisma.sql`EXISTS (
-        SELECT 1 FROM "ErrorOccurrence" rel
-        WHERE rel."error_group_id" = eg."id"
-          AND rel."release" = ${f.release}
-      )`
-    );
-  }
+  const parts: Prisma.Sql[] = [buildErrorGroupScopeSql(f, projectId, "eg")];
   if (applyOccurrenceRange && f.range.gte) {
     parts.push(Prisma.sql`${Prisma.raw(`"${t}"."created_at"`)} >= ${f.range.gte}`);
   }
@@ -125,9 +135,6 @@ export async function fetchErrorsPageSummary(
   window: ResolvedSummaryWindow
 ): Promise<ErrorsPageSummary> {
   const { since, until, previousSince, previousUntil } = window;
-  const baseFilter = buildErrorOccurrenceFilterSql(f, projectId, "eo", {
-    applyOccurrenceRange: false,
-  });
 
   const eventParts: Prisma.Sql[] = [Prisma.sql`e."project_id" = ${projectId}`];
   if (f.appId) eventParts.push(Prisma.sql`e."app" = ${f.appId}`);
@@ -137,6 +144,36 @@ export async function fetchErrorsPageSummary(
   const occurrenceReleaseClause = f.release
     ? Prisma.sql`AND eo."release" = ${f.release}`
     : Prisma.empty;
+  const groupScopeSql = buildErrorGroupScopeSql(f, projectId, "eg");
+  const eventSessionScope =
+    f.q != null && f.q.trim() !== ""
+      ? Prisma.sql`AND EXISTS (
+          SELECT 1
+          FROM "ErrorOccurrence" seo
+          INNER JOIN "ErrorGroup" seg ON seg."id" = seo."error_group_id"
+          WHERE ${buildErrorGroupScopeSql(f, projectId, "seg")}
+            ${f.release ? Prisma.sql`AND seo."release" = ${f.release}` : Prisma.empty}
+            AND seo."created_at" >= ${previousSince}
+            AND seo."created_at" <= ${until}
+            AND (
+              (
+                e."session_id" IS NOT NULL
+                AND TRIM(e."session_id") <> ''
+                AND seo."session_id" = e."session_id"
+              )
+              OR (
+                e."user_id" IS NOT NULL
+                AND TRIM(e."user_id") <> ''
+                AND seo."user_id" = e."user_id"
+              )
+              OR (
+                e."anonymous_id" IS NOT NULL
+                AND TRIM(e."anonymous_id") <> ''
+                AND seo."anonymous_id" = e."anonymous_id"
+              )
+            )
+        )`
+      : Prisma.empty;
 
   const rows = await prisma.$queryRaw<
     [
@@ -165,7 +202,7 @@ export async function fetchErrorsPageSummary(
         eg."resolved_at"
       FROM "ErrorOccurrence" eo
       INNER JOIN "ErrorGroup" eg ON eg."id" = eo."error_group_id"
-      WHERE ${baseFilter}
+      WHERE ${groupScopeSql}
         ${occurrenceReleaseClause}
         AND eo."created_at" >= ${previousSince}
         AND eo."created_at" <= ${until}
@@ -174,6 +211,7 @@ export async function fetchErrorsPageSummary(
       SELECT e."created_at"
       FROM "Event" e
       WHERE ${eventFilter}
+        ${eventSessionScope}
         AND e."created_at" >= ${previousSince}
         AND e."created_at" <= ${until}
     )

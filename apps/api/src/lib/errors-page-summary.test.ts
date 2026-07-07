@@ -1,5 +1,38 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { resolveErrorsSummaryWindow, enrichErrorListFilterForMetrics } from "./errors-page-summary.js";
+import {
+  buildErrorGroupScopeSql,
+  enrichErrorListFilterForMetrics,
+  resolveErrorsSummaryWindow,
+} from "./errors-page-summary.js";
+
+function prismaSqlText(fragment: Prisma.Sql): string {
+  const parts = fragment as unknown as { strings: string[] };
+  return parts.strings.join("?");
+}
+
+describe("buildErrorGroupScopeSql", () => {
+  it("applies last_seen bounds so summary matches the issues list date filter", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const sql = buildErrorGroupScopeSql(
+      { range: { gte: since, lte: until }, status: "all" },
+      "proj-1"
+    );
+    const text = prismaSqlText(sql);
+    expect(text).toContain('"last_seen" >= ?');
+    expect(text).toContain('"last_seen" <= ?');
+  });
+
+  it("applies message search on error groups", () => {
+    const sql = buildErrorGroupScopeSql(
+      { range: {}, q: "timeout", status: "all" },
+      "proj-1"
+    );
+    const text = prismaSqlText(sql);
+    expect(text).toContain('"message" ILIKE ?');
+  });
+});
 
 describe("resolveErrorsSummaryWindow", () => {
   const anchor = new Date("2026-06-28T12:00:00.000Z");
