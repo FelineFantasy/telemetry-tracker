@@ -23,6 +23,20 @@ import {
   parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
 } from "../lib/errors-page-summary.js";
+import {
+  enrichEventListFilterForMetrics,
+  fetchEventsPageSummary,
+  parseEventsMetricsAnchor,
+  resolveEventsSummaryWindow,
+} from "../lib/events-page-summary.js";
+import {
+  attachLatestEventIds,
+  listEventNamesGrouped,
+  parseEventListOrderParam,
+  parseEventListSortParam,
+  serializeEventNameListItem,
+  type EventListFilterInput,
+} from "../lib/events-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
 import { fetchLatestEventsByName } from "../lib/latest-events-by-name.js";
@@ -66,7 +80,7 @@ import {
   EVENT_SORT_SQL,
   eventListOrderBy,
   overviewErrorOrderBy,
-  parseEventListSortParam,
+  parseEventListSortParam as parseRawEventListSortParam,
   parseListOrderParam,
   parseOverviewErrorSortParam,
   parseOverviewTopEventsSortParam,
@@ -684,6 +698,45 @@ export async function apiRoutes(
     return reply.send({ ...enriched, ...impact });
   });
 
+  app.get("/events/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      name?: string;
+      environment?: string;
+      platform?: string;
+      release?: string;
+      propertiesContains?: string;
+      metricsUntil?: string;
+    };
+    const appId = queryApp(query.app);
+    const name = queryString(query.name);
+    const environment = queryString(query.environment);
+    const platform = queryString(query.platform);
+    const release = queryString(query.release);
+    const propertiesContains = queryString(query.propertiesContains);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
+
+    const filter: EventListFilterInput = {
+      appId,
+      name,
+      environment,
+      platform,
+      release,
+      propertiesContains,
+      range,
+    };
+
+    const window = resolveEventsSummaryWindow(range, metricsAnchor);
+    const summary = await fetchEventsPageSummary(prisma, filter, projectId, window);
+    return reply.send(summary);
+  });
+
   app.get("/events", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
@@ -702,6 +755,8 @@ export async function apiRoutes(
       propertiesContains?: string;
       sort?: string;
       order?: string;
+      view?: string;
+      metricsUntil?: string;
     };
     const pageSize = parseListPageSize(query.pageSize, query.limit);
     const page = parsePositivePage(query.page, 1);
@@ -713,7 +768,45 @@ export async function apiRoutes(
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
     const range = parseCreatedRange(query, "all");
-    const sortParsed = parseEventListSortParam(queryString(query.sort));
+    const view = queryString(query.view) ?? "grouped";
+    const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
+
+    if (view === "grouped") {
+      const sortParsed = parseEventListSortParam(queryString(query.sort));
+      if (!sortParsed.ok) {
+        return reply.status(400).send({ error: "Invalid sort" });
+      }
+      const orderParsed = parseEventListOrderParam(queryString(query.order));
+      if (!orderParsed.ok) {
+        return reply.status(400).send({ error: "Invalid order" });
+      }
+
+      const filter: EventListFilterInput = {
+        appId,
+        name,
+        environment,
+        platform,
+        release,
+        propertiesContains,
+        range,
+      };
+      const metricsFilter = enrichEventListFilterForMetrics(filter, range, metricsAnchor);
+
+      const { total, rows } = await listEventNamesGrouped(
+        prisma,
+        metricsFilter,
+        projectId,
+        sortParsed.sort,
+        orderParsed.order,
+        skip,
+        pageSize
+      );
+      const withIds = await attachLatestEventIds(prisma, rows, metricsFilter, projectId);
+      const items = withIds.map((r) => serializeEventNameListItem(r));
+      return reply.send({ items, total, page, pageSize, view: "grouped" });
+    }
+
+    const sortParsed = parseRawEventListSortParam(queryString(query.sort));
     if (!sortParsed.ok) {
       return reply.status(400).send({ error: "Invalid sort" });
     }
@@ -748,7 +841,7 @@ export async function apiRoutes(
         ),
       ]);
       const total = Number(countRow[0]?.c ?? 0);
-      return reply.send({ items: rows, total, page, pageSize });
+      return reply.send({ items: rows, total, page, pageSize, view: "raw" });
     }
 
     const where: Prisma.EventWhereInput = whereEventProject(projectId);
@@ -771,7 +864,7 @@ export async function apiRoutes(
         orderBy: eventOrderBy,
       }),
     ]);
-    return reply.send({ items: list, total, page, pageSize });
+    return reply.send({ items: list, total, page, pageSize, view: "raw" });
   });
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {

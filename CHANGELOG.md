@@ -13,6 +13,22 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.5.2] - 2026-07-07
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#185](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/185)).
+
+### Added
+
+- **Events page summary KPIs** — headline metrics row (total events, distinct users, unique event names, distinct sessions) with prior-period comparison ([#245](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/245), [#185](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/185))
+- **`GET /api/events/summary`** — filtered-window KPIs for the events list ([#245](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/245))
+- **Events grouped table** — paginated, sortable event-name catalog with in-range counts, user totals, and share % ([#245](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/245))
+
+### Changed
+
+- **Events list** — primary view groups occurrences by event name (`view=grouped` default); raw occurrence log available via `view=raw` ([#245](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/245))
+
+---
+
 ## [1.5.1] - 2026-07-07
 
 Continues the **v1.5.0 — Analytics dashboard** milestone ([#182](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/182), [#241](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/241)).
