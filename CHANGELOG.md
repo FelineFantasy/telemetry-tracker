@@ -13,7 +13,23 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
-## [1.5.0] - 2026-07-07
+## [1.5.1] - 2026-07-07
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#182](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/182), [#241](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/241)).
+
+### Added
+
+- **Errors analytics panels** — stacked errors-over-time by type and top error types with share % and sparklines ([#242](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/242), [#182](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/182))
+- **`GET /api/errors/analytics`** — filtered stacked series and top-type rankings aligned with errors summary filters ([#242](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/242))
+- **Errors list type badges and trend sparklines** — per-row error type from message prefix and occurrence trend mini-charts ([#242](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/242))
+
+### Fixed
+
+- **Errors summary KPIs** — scope `events_count` and error rate when status or search filters are active ([#241](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/241))
+- **Errors list sort** — sort by Occurrences uses in-range counts via aggregate SQL path ([#241](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/241))
+- **Errors analytics totals** — top-type counts use the full KPI window when the stacked chart is bucket-capped ([#242](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/242))
+
+---
 
 First release of the **v1.5.0 — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
 
