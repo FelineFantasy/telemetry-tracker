@@ -1,8 +1,10 @@
-const REPORTED = Symbol.for("telemetry.reported");
+import { readDeviceContext } from "./device-context.js";
 
 import { SDK_VERSION } from "./version.js";
 
 export { SDK_VERSION };
+
+const REPORTED = Symbol.for("telemetry.reported");
 
 const ANON_STORAGE_KEY = "tacko_telemetry_anon_id";
 
@@ -55,6 +57,7 @@ export type TelemetryConfig = {
 
 let config: TelemetryConfig | null = null;
 let userId: string | null = null;
+let userEmail: string | null = null;
 let browserHandlersInstalled = false;
 let sessionLifecycleInstalled = false;
 let sessionId: string | null = null;
@@ -78,14 +81,19 @@ function ensureUrlFromCfg(cfg: TelemetryConfig, path: string): string {
 }
 
 function buildSessionPayload(cfg: TelemetryConfig, endedAt?: Date): Record<string, unknown> {
+  const device = readDeviceContext();
   return {
     session_id: sessionId,
     app: cfg.app,
     platform: cfg.platform ?? undefined,
     environment: cfg.environment ?? undefined,
     user_id: userId ?? undefined,
+    user_email: userEmail ?? undefined,
     anonymous_id: getAnonymousId(),
     sdk_version: SDK_VERSION,
+    country: device.country ?? undefined,
+    device_browser: device.device_browser ?? undefined,
+    device_os: device.device_os ?? undefined,
     started_at: sessionStartedAt?.toISOString(),
     ended_at: endedAt?.toISOString(),
   };
@@ -234,8 +242,19 @@ export function init(c: TelemetryConfig): void {
   installBrowserSessionLifecycle();
 }
 
-export function identify(id: string | null): void {
+export type IdentifyTraits = {
+  email?: string | null;
+};
+
+export function identify(id: string | null, traits?: IdentifyTraits): void {
   userId = id;
+  if (traits && "email" in traits) {
+    userEmail = traits.email ?? null;
+  }
+  const cfg = getConfigOrNull();
+  if (cfg && sessionId) {
+    void postSession(cfg);
+  }
 }
 
 function getConfig(): TelemetryConfig {

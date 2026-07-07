@@ -14,6 +14,7 @@ import {
   type OverviewSeriesBucket,
 } from "./overview-timeseries.js";
 import type { ResolvedSummaryWindow, SessionListFilterInput } from "./sessions-page-summary.js";
+import { sessionFilterSql } from "./sessions-page-summary.js";
 import { parseChartBucketParam, resolveChartBucket, type TimeRangeBucket } from "./time-range.js";
 
 export type SessionsVolumePoint = {
@@ -52,10 +53,7 @@ function buildSessionAnalyticsFilterSql(
   f: SessionListFilterInput,
   projectId: string
 ): Prisma.Sql {
-  const parts: Prisma.Sql[] = [Prisma.sql`s."project_id" = ${projectId}`];
-  if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
-  if (f.platform) parts.push(Prisma.sql`s."platform" = ${f.platform}`);
-  return Prisma.join(parts, " AND ");
+  return sessionFilterSql(projectId, f);
 }
 
 /** Zero-fill bucket rows into a continuous volume series. */
