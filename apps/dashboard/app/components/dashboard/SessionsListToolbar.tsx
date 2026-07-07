@@ -7,6 +7,7 @@ import { FiltersSortPanel } from "@/app/components/dashboard/FiltersSortPanel";
 import {
   FilterField,
   FilterForm,
+  FilterInput,
   FilterLabel,
   FilterRow,
   FilterSegment,
@@ -42,9 +43,16 @@ type Props = {
   appFilter: string;
   pageSize: string;
   defaultPageSize: number;
+  q: string;
+  environment: string;
+  release: string;
+  country: string;
   platform: string;
   sort: string;
   order: string;
+  environments: string[];
+  releases: string[];
+  countries: string[];
   platforms: string[];
 };
 
@@ -57,9 +65,16 @@ export function SessionsListToolbar({
   appFilter,
   pageSize,
   defaultPageSize,
+  q,
+  environment,
+  release,
+  country,
   platform,
   sort,
   order,
+  environments,
+  releases,
+  countries,
   platforms,
 }: Props) {
   const fieldIds = useId();
@@ -73,6 +88,27 @@ export function SessionsListToolbar({
     lte: toParam || timeRange.lte.toISOString(),
   };
 
+  const environmentOptions: DashboardSelectOption[] = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      ...environments.map((e) => ({ value: e, label: e })),
+    ],
+    [environments]
+  );
+  const releaseOptions: DashboardSelectOption[] = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      ...releases.map((e) => ({ value: e, label: e })),
+    ],
+    [releases]
+  );
+  const countryOptions: DashboardSelectOption[] = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      ...countries.map((e) => ({ value: e, label: e })),
+    ],
+    [countries]
+  );
   const platformOptions: DashboardSelectOption[] = useMemo(
     () => [
       { value: "", label: "Any" },
@@ -106,6 +142,49 @@ export function SessionsListToolbar({
 
         <FilterRow>
           <FilterField grow>
+            <FilterLabel>Search</FilterLabel>
+            <FilterInput
+              type="search"
+              name="q"
+              defaultValue={q}
+              placeholder="User id, email, country, device…"
+              autoComplete="off"
+            />
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("env-l")}>Environment</FilterLabel>
+            <DashboardCustomSelect
+              name="environment"
+              value={environment}
+              options={environmentOptions}
+              triggerId={id("env-t")}
+              listLabelledBy={id("env-l")}
+            />
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("rel-l")}>Release</FilterLabel>
+            <DashboardCustomSelect
+              name="release"
+              value={release}
+              options={releaseOptions}
+              triggerId={id("rel-t")}
+              listLabelledBy={id("rel-l")}
+            />
+          </FilterField>
+        </FilterRow>
+
+        <FilterRow>
+          <FilterField>
+            <FilterLabel id={id("country-l")}>Country</FilterLabel>
+            <DashboardCustomSelect
+              name="country"
+              value={country}
+              options={countryOptions}
+              triggerId={id("country-t")}
+              listLabelledBy={id("country-l")}
+            />
+          </FilterField>
+          <FilterField>
             <FilterLabel id={id("plat-l")}>Platform</FilterLabel>
             <DashboardCustomSelect
               name="platform"

@@ -11,6 +11,12 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Sessions filters and context** — search by user id/email/country/device; Environment, Release, and Country filters; country flag and browser/OS columns; optional user email from `identify()` ([#192](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/192))
+- **Session ingest** — `country`, `device_browser`, `device_os`, and `user_email` on `POST /ingest/session`; SDK sends device/country context and patches identity on `identify()`
+- **`GET /api/sessions`** — list/detail rows include geo/device/email context; summary and analytics honor the expanded filter set
+
 ---
 
 ## [1.5.9] - 2026-07-07

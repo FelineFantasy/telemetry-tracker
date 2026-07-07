@@ -65,6 +65,10 @@ describe("serializeSessionListItem", () => {
     platform: "web",
     user_id: "user_1",
     anonymous_id: null,
+    user_email: "user@example.com",
+    country: "US",
+    device_browser: "Chrome",
+    device_os: "macOS",
     sdk_version: "1.0.0",
     started_at: new Date("2026-06-01T10:00:00.000Z"),
     ended_at: new Date("2026-06-01T10:05:30.000Z"),
@@ -81,6 +85,10 @@ describe("serializeSessionListItem", () => {
     expect(item.event_count).toBe(12);
     expect(item.page_count).toBe(3);
     expect(item.status).toBe("healthy");
+    expect(item.user_email).toBe("user@example.com");
+    expect(item.country).toBe("US");
+    expect(item.device_browser).toBe("Chrome");
+    expect(item.device_os).toBe("macOS");
     expect(item.started_at).toBe("2026-06-01T10:00:00.000Z");
     expect(item.ended_at).toBe("2026-06-01T10:05:30.000Z");
     expect(item.max_duration_sec).toBe(600);

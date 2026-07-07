@@ -1,10 +1,18 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   BOUNCE_MAX_DURATION_SECONDS,
+  buildSessionListFilter,
   parseSessionsMetricsAnchor,
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
+  sessionFilterSql,
 } from "./sessions-page-summary.js";
+
+function prismaSqlText(fragment: Prisma.Sql): string {
+  const parts = fragment as unknown as { strings: string[] };
+  return parts.strings.join("?");
+}
 
 describe("parseSessionsMetricsAnchor", () => {
   it("parses ISO metricsUntil", () => {
@@ -99,5 +107,53 @@ describe("resolveSessionListStartedAtBounds", () => {
 describe("BOUNCE_MAX_DURATION_SECONDS", () => {
   it("is 10 seconds", () => {
     expect(BOUNCE_MAX_DURATION_SECONDS).toBe(10);
+  });
+});
+
+describe("buildSessionListFilter", () => {
+  const range = {
+    gte: new Date("2026-06-01T00:00:00.000Z"),
+    lte: new Date("2026-06-08T00:00:00.000Z"),
+  };
+
+  it("includes optional scope fields when provided", () => {
+    const filter = buildSessionListFilter({
+      appId: "web",
+      platform: "web",
+      environment: "production",
+      release: "1.2.0",
+      country: "US",
+      q: "  user-1 ",
+      range,
+    });
+    expect(filter).toEqual({
+      appId: "web",
+      platform: "web",
+      environment: "production",
+      release: "1.2.0",
+      country: "US",
+      q: "user-1",
+      range,
+    });
+  });
+
+  it("omits empty search and unset filters", () => {
+    const filter = buildSessionListFilter({ range, q: "   " });
+    expect(filter).toEqual({ range });
+  });
+});
+
+describe("sessionFilterSql", () => {
+  it("requires one event row when both environment and release are set", () => {
+    const sql = sessionFilterSql("proj-1", {
+      range: {},
+      environment: "production",
+      release: "1.2.0",
+    });
+    const text = prismaSqlText(sql);
+    const existsCount = (text.match(/EXISTS/g) ?? []).length;
+    expect(existsCount).toBe(1);
+    expect(text).toContain('"environment"');
+    expect(text).toContain('"release"');
   });
 });
