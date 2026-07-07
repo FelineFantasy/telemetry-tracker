@@ -35,6 +35,15 @@ describe("serializeErrorGroupListItem", () => {
     });
     expect(item.occurrences_in_range).toBe(0);
   });
+
+  it("includes error type and sparkline defaults", () => {
+    const item = serializeErrorGroupListItem({
+      ...baseRow,
+      message: "TypeError: boom",
+    });
+    expect(item.error_type).toBe("TypeError");
+    expect(item.sparkline).toEqual([]);
+  });
 });
 
 describe("parseTrendWindowParam", () => {

@@ -2,6 +2,10 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
+import {
+  ErrorsAnalyticsPanels,
+  type ErrorsAnalyticsData,
+} from "@/app/components/dashboard/ErrorsAnalyticsPanels";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
@@ -38,6 +42,8 @@ type ErrorGroupRow = {
   occurrences_recent?: number;
   occurrences_previous?: number;
   trend_ratio?: number;
+  error_type?: string;
+  sparkline?: { t: string; count: number }[];
 };
 
 async function getErrors(
@@ -58,6 +64,12 @@ async function getErrors(
 
 async function getErrorsSummary(search: URLSearchParams): Promise<ErrorsPageSummary | null> {
   const res = await dashboardApiFetch(`/api/errors/summary?${search.toString()}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function getErrorsAnalytics(search: URLSearchParams): Promise<ErrorsAnalyticsData | null> {
+  const res = await dashboardApiFetch(`/api/errors/analytics?${search.toString()}`);
   if (!res.ok) return null;
   return res.json();
 }
@@ -205,18 +217,21 @@ export default async function ErrorsListPage({
   let items: ErrorGroupRow[] = [];
   let total = 0;
   let summary: ErrorsPageSummary | null = null;
+  let analytics: ErrorsAnalyticsData | null = null;
   let filterOptions = { environments: [] as string[], releases: [] as string[] };
 
   try {
-    const [opts, data, summaryData] = await Promise.all([
+    const [opts, data, summaryData, analyticsData] = await Promise.all([
       getFilterOptions(appFilter || undefined),
       getErrors(apiQuery),
       getErrorsSummary(summaryQuery),
+      getErrorsAnalytics(summaryQuery),
     ]);
     filterOptions = opts;
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
     summary = summaryData;
+    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -252,6 +267,8 @@ export default async function ErrorsListPage({
 
       <AnalyticsListShell>
         {summary ? <ErrorsSummaryMetrics summary={summary} /> : null}
+
+        {analytics ? <ErrorsAnalyticsPanels analytics={analytics} /> : null}
 
         <ErrorsListToolbar
           path={ERRORS_PATH}

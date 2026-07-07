@@ -4,6 +4,7 @@ import { prisma } from "../lib/db.js";
 import {
   fetchImpactMetricsForGroupId,
   fetchMetricsForGroupIds,
+  fetchSparklinesForGroupIds,
   isAggregateSort,
   listErrorGroupsAggregated,
   listErrorGroupsPrisma,
@@ -15,6 +16,7 @@ import {
   type ErrorListFilterInput,
   type ScalarErrorListSort,
 } from "../lib/errors-list-query.js";
+import { fetchErrorsAnalytics } from "../lib/errors-analytics.js";
 import {
   enrichErrorListFilterForMetrics,
   fetchErrorsPageSummary,
@@ -439,6 +441,47 @@ export async function apiRoutes(
     return reply.send(summary);
   });
 
+  app.get("/errors/analytics", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      environment?: string;
+      release?: string;
+      q?: string;
+      status?: string;
+      metricsUntil?: string;
+    };
+    const appId = queryApp(query.app);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const q = queryString(query.q);
+    const status = queryString(query.status) ?? "all";
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
+
+    const filter: ErrorListFilterInput = {
+      appId,
+      environment,
+      release,
+      q,
+      range,
+      status:
+        status === "unresolved"
+          ? "unresolved"
+          : status === "resolved"
+            ? "resolved"
+            : "all",
+    };
+
+    const window = resolveErrorsSummaryWindow(range, metricsAnchor);
+    const analytics = await fetchErrorsAnalytics(prisma, filter, projectId, window);
+    return reply.send(analytics);
+  });
+
   app.get("/errors", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
@@ -521,7 +564,19 @@ export async function apiRoutes(
         skip,
         pageSize
       );
-      const items = rows.map((r) => serializeErrorGroupListItem(r));
+      const sparklines = await fetchSparklinesForGroupIds(
+        prisma,
+        rows.map((r) => r.id),
+        trend.durationMs,
+        trend.end,
+        metricsFilter.release
+      );
+      const items = rows.map((r) =>
+        serializeErrorGroupListItem({
+          ...r,
+          sparkline: sparklines.get(r.id) ?? [],
+        })
+      );
       return reply.send({ items, total, page, pageSize });
     }
 
@@ -546,6 +601,13 @@ export async function apiRoutes(
         occurrenceCountRange: metricsFilter.occurrenceCountRange,
       }
     );
+    const sparklines = await fetchSparklinesForGroupIds(
+      prisma,
+      groups.map((g) => g.id),
+      trend.durationMs,
+      trend.end,
+      metricsFilter.release
+    );
     const items = groups.map((g) => {
       const m = metrics.get(g.id);
       const row: ErrorGroupListRow = {
@@ -565,6 +627,7 @@ export async function apiRoutes(
         occurrences_previous: m?.occurrences_previous ?? 0,
         trend_ratio: m?.trend_ratio ?? 0,
         occurrences_in_range: m?.occurrences_in_range ?? 0,
+        sparkline: sparklines.get(g.id) ?? [],
       };
       return serializeErrorGroupListItem(row);
     });
