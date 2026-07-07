@@ -5,6 +5,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { buildEventWhereSql } from "./list-query-helpers.js";
 import { fetchLatestEventsByName } from "./latest-events-by-name.js";
+import { parseEventCaptureKind } from "./event-taxonomy.js";
 import { generateOverviewChartBuckets } from "./overview-timeseries.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 
@@ -401,6 +402,7 @@ export function serializeEventNameListItem(
     sessions_affected: row.sessions_affected,
     share_pct: row.share_pct,
     latest_event_id: row.latest_event_id ?? null,
+    capture_kind: parseEventCaptureKind(row.name),
     sparkline: row.sparkline ?? [],
   };
 }

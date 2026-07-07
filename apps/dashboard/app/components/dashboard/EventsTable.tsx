@@ -20,8 +20,20 @@ export type EventsTableRow = {
   users_affected?: number;
   last_seen: string;
   latest_event_id?: string | null;
+  capture_kind?: "auto" | "custom";
   sparkline?: SparklinePoint[];
 };
+
+function EventCaptureKindBadge({ kind }: { kind: "auto" | "custom" }) {
+  const label = kind === "auto" ? "Auto-captured" : "Custom";
+  return (
+    <span title={label}>
+      <Badge variant={kind === "auto" ? "secondary" : "outline"}>
+        {kind === "auto" ? "Auto" : "Custom"}
+      </Badge>
+    </span>
+  );
+}
 
 export function EventsTable({
   rows,
@@ -38,6 +50,7 @@ export function EventsTable({
         <thead>
           <tr>
             <th>Event name</th>
+            <th className="hidden md:table-cell">Kind</th>
             <th className="hidden md:table-cell">App</th>
             <th className="hidden lg:table-cell">Environment</th>
             <th className="hidden lg:table-cell">Platform</th>
@@ -57,9 +70,19 @@ export function EventsTable({
             return (
               <tr key={row.name}>
                 <td className="max-w-xs sm:max-w-md">
-                  <TableListLink href={hrefForName(row)} className="line-clamp-2">
-                    {row.name}
-                  </TableListLink>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <TableListLink href={hrefForName(row)} className="line-clamp-2">
+                      {row.name}
+                    </TableListLink>
+                    {row.capture_kind ? (
+                      <span className="md:hidden">
+                        <EventCaptureKindBadge kind={row.capture_kind} />
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
+                <td className="hidden md:table-cell">
+                  {row.capture_kind ? <EventCaptureKindBadge kind={row.capture_kind} /> : "—"}
                 </td>
                 <td className="hidden md:table-cell">
                   <Badge>{row.app}</Badge>
