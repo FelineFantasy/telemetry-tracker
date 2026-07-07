@@ -1,11 +1,19 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   apdexPctFromScore,
   apdexScore,
-  overviewTopErrorGroupWhere,
+  overviewTopErrorGroupsInWindowSql,
   REQUEST_APDEX_THRESHOLD_MS,
   sparklinesFromTimeSeries,
 } from "./overview-kpi.js";
+
+function prismaSqlText(fragment: Prisma.Sql): string {
+  return fragment.strings.reduce(
+    (acc, part, i) => acc + part + (fragment.values[i] ?? ""),
+    ""
+  );
+}
 
 describe("apdexScore", () => {
   it("returns 1 when there are no samples", () => {
@@ -50,21 +58,22 @@ describe("REQUEST_APDEX_THRESHOLD_MS", () => {
   });
 });
 
-describe("overviewTopErrorGroupWhere", () => {
-  it("scopes top error groups to the metrics window", () => {
+describe("overviewTopErrorGroupsInWindowSql", () => {
+  it("ranks and counts occurrences inside the metrics window", () => {
     const since = new Date("2026-03-01T00:00:00.000Z");
     const until = new Date("2026-03-15T00:00:00.000Z");
-    const where = overviewTopErrorGroupWhere(
-      "proj_1",
-      { app: "web", environment: "production" },
-      { gte: since, lte: until }
+    const text = prismaSqlText(
+      overviewTopErrorGroupsInWindowSql(
+        "proj_1",
+        { app: "web", environment: "production" },
+        { gte: since, lte: until },
+        8
+      )
     );
 
-    expect(where).toMatchObject({
-      project_id: "proj_1",
-      app: "web",
-      environment: "production",
-      last_seen: { gte: since, lte: until },
-    });
+    expect(text).toContain('eo."created_at" >=');
+    expect(text).toContain('eo."created_at" <=');
+    expect(text).toContain("COUNT(eo.id)");
+    expect(text).toContain("ORDER BY occurrences DESC");
   });
 });
