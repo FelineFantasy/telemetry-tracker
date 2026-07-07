@@ -32,6 +32,7 @@ import {
 } from "../lib/events-page-summary.js";
 import {
   attachLatestEventIds,
+  fetchSparklinesForEventNames,
   listEventNamesGrouped,
   parseEventListOrderParam,
   parseEventListSortParam,
@@ -841,8 +842,21 @@ export async function apiRoutes(
         skip,
         pageSize
       );
-      const withIds = await attachLatestEventIds(prisma, rows, metricsFilter, projectId);
-      const items = withIds.map((r) => serializeEventNameListItem(r));
+      const [withIds, sparklines] = await Promise.all([
+        attachLatestEventIds(prisma, rows, metricsFilter, projectId),
+        fetchSparklinesForEventNames(
+          prisma,
+          rows.map((r) => r.name),
+          metricsFilter,
+          projectId
+        ),
+      ]);
+      const items = withIds.map((r) =>
+        serializeEventNameListItem({
+          ...r,
+          sparkline: sparklines.get(r.name) ?? [],
+        })
+      );
       return reply.send({ items, total, page, pageSize, view: "grouped" });
     }
 
