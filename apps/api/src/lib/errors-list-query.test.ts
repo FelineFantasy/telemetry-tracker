@@ -1,5 +1,34 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { parseTrendWindowParam } from "./errors-list-query.js";
+import { parseTrendWindowParam, serializeErrorGroupListItem } from "./errors-list-query.js";
+
+describe("serializeErrorGroupListItem", () => {
+  const baseRow = {
+    id: "eg_1",
+    fingerprint: "fp",
+    message: "boom",
+    top_stack: null,
+    app: "web",
+    environment: "production",
+    occurrences: 42,
+    first_seen: new Date("2026-06-01T00:00:00.000Z"),
+    last_seen: new Date("2026-06-08T00:00:00.000Z"),
+    resolved_at: null,
+  };
+
+  it("defaults occurrences_in_range to zero when no in-range aggregate exists", () => {
+    const item = serializeErrorGroupListItem(baseRow);
+    expect(item.occurrences).toBe(42);
+    expect(item.occurrences_in_range).toBe(0);
+  });
+
+  it("preserves explicit zero in-range counts", () => {
+    const item = serializeErrorGroupListItem({
+      ...baseRow,
+      occurrences_in_range: 0,
+    });
+    expect(item.occurrences_in_range).toBe(0);
+  });
+});
 
 describe("parseTrendWindowParam", () => {
   const anchor = new Date("2026-06-28T12:00:00.000Z");

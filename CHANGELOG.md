@@ -13,6 +13,20 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.4.14] - 2026-07-07
+
+### Added
+
+- **Errors page summary KPIs** — headline metrics row (total errors, affected users, error rate, unique groups, resolved groups) with prior-period comparison ([#235](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/235), [#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181))
+- **`GET /api/errors/summary`** — filtered-window KPIs for the errors list ([#235](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/235))
+
+### Changed
+
+- **Errors list Count column** — shows in-range occurrence counts instead of lifetime totals ([#235](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/235))
+- **Errors list release filter** — filter by release in the toolbar; filter options union event and error-occurrence releases ([#235](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/235))
+
+---
+
 ## [1.4.13] - 2026-07-07
 
 ### Changed

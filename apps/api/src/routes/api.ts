@@ -11,9 +11,16 @@ import {
   parseErrorListSortParam,
   parseTrendWindowParam,
   serializeErrorGroupListItem,
+  type ErrorGroupListRow,
   type ErrorListFilterInput,
   type ScalarErrorListSort,
 } from "../lib/errors-list-query.js";
+import {
+  enrichErrorListFilterForMetrics,
+  fetchErrorsPageSummary,
+  parseErrorsMetricsAnchor,
+  resolveErrorsSummaryWindow,
+} from "../lib/errors-page-summary.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
 import { fetchLatestEventsByName } from "../lib/latest-events-by-name.js";
@@ -391,6 +398,47 @@ export async function apiRoutes(
     });
   });
 
+  app.get("/errors/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      environment?: string;
+      release?: string;
+      q?: string;
+      status?: string;
+      metricsUntil?: string;
+    };
+    const appId = queryApp(query.app);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const q = queryString(query.q);
+    const status = queryString(query.status) ?? "all";
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
+
+    const filter: ErrorListFilterInput = {
+      appId,
+      environment,
+      release,
+      q,
+      range,
+      status:
+        status === "unresolved"
+          ? "unresolved"
+          : status === "resolved"
+            ? "resolved"
+            : "all",
+    };
+
+    const window = resolveErrorsSummaryWindow(range, metricsAnchor);
+    const summary = await fetchErrorsPageSummary(prisma, filter, projectId, window);
+    return reply.send(summary);
+  });
+
   app.get("/errors", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
@@ -403,6 +451,7 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       environment?: string;
+      release?: string;
       q?: string;
       status?: string;
       sort?: string;
@@ -410,15 +459,18 @@ export async function apiRoutes(
       trendWindow?: string;
       trendFrom?: string;
       trendTo?: string;
+      metricsUntil?: string;
     };
     const pageSize = parseListPageSize(query.pageSize, query.limit);
     const page = parsePositivePage(query.page, 1);
     const skip = (page - 1) * pageSize;
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
+    const release = queryString(query.release);
     const q = queryString(query.q);
     const status = queryString(query.status) ?? "all";
     const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
 
     const sortParsed = parseErrorListSortParam(queryString(query.sort));
     if (!sortParsed.ok) {
@@ -445,6 +497,7 @@ export async function apiRoutes(
     const filter: ErrorListFilterInput = {
       appId,
       environment,
+      release,
       q,
       range,
       status:
@@ -454,11 +507,12 @@ export async function apiRoutes(
             ? "resolved"
             : "all",
     };
+    const metricsFilter = enrichErrorListFilterForMetrics(filter, range, metricsAnchor);
 
     if (isAggregateSort(sortParsed.sort)) {
       const { total, rows } = await listErrorGroupsAggregated(
         prisma,
-        filter,
+        metricsFilter,
         projectId,
         sortParsed.sort,
         orderParsed.order,
@@ -485,18 +539,34 @@ export async function apiRoutes(
       prisma,
       groups.map((g) => g.id),
       trend.durationMs,
-      trend.end
+      trend.end,
+      {
+        range: metricsFilter.range,
+        release: metricsFilter.release,
+        occurrenceCountRange: metricsFilter.occurrenceCountRange,
+      }
     );
     const items = groups.map((g) => {
       const m = metrics.get(g.id);
-      return {
-        ...g,
+      const row: ErrorGroupListRow = {
+        id: g.id,
+        fingerprint: g.fingerprint,
+        message: g.message,
+        top_stack: g.top_stack,
+        app: g.app,
+        environment: g.environment,
+        occurrences: g.occurrences,
+        first_seen: g.first_seen,
+        last_seen: g.last_seen,
+        resolved_at: g.resolved_at,
         users_affected: m?.users_affected ?? 0,
         sessions_affected: m?.sessions_affected ?? 0,
         occurrences_recent: m?.occurrences_recent ?? 0,
         occurrences_previous: m?.occurrences_previous ?? 0,
         trend_ratio: m?.trend_ratio ?? 0,
+        occurrences_in_range: m?.occurrences_in_range ?? 0,
       };
+      return serializeErrorGroupListItem(row);
     });
     return reply.send({ items, total, page, pageSize });
   });
@@ -725,7 +795,7 @@ export async function apiRoutes(
       ? { ...whereSessionProject(projectId), app: appFilter }
       : whereSessionProject(projectId);
 
-    const [environments, platEvents, platSessions, relEvents] = await Promise.all([
+    const [environments, platEvents, platSessions, relEvents, relErrors] = await Promise.all([
       distinctEnvironmentsForProject(prisma, projectId, appFilter),
       prisma.event.groupBy({
         by: ["platform"],
@@ -739,6 +809,15 @@ export async function apiRoutes(
         by: ["release"],
         where: { ...baseEvent, release: { not: null } },
       }),
+      prisma.errorOccurrence.groupBy({
+        by: ["release"],
+        where: {
+          release: { not: null },
+          error_group: appFilter
+            ? { project_id: projectId, app: appFilter }
+            : { project_id: projectId },
+        },
+      }),
     ]);
 
     const platforms = [
@@ -747,10 +826,12 @@ export async function apiRoutes(
         ...platSessions.map((r) => r.platform).filter(Boolean) as string[],
       ]),
     ].sort();
-    const releases = relEvents
-      .map((r) => r.release)
-      .filter((x): x is string => x != null && x !== "")
-      .sort();
+    const releases = [
+      ...new Set([
+        ...relEvents.map((r) => r.release).filter(Boolean) as string[],
+        ...relErrors.map((r) => r.release).filter(Boolean) as string[],
+      ]),
+    ].sort();
 
     return reply.send({ environments, platforms, releases });
   });
