@@ -11,6 +11,11 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Sessions analytics panels** — sessions-over-time area chart with Hour/Day/Week bucket control and platform donut, scoped to sessions list filters ([#190](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/190))
+- **`GET /api/sessions/analytics`** — filtered session volume series and platform groupBy aligned with the sessions list
+
 ---
 
 ## [1.5.7] - 2026-07-07
