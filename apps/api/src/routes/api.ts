@@ -74,6 +74,13 @@ import {
   resolveCompareWindow,
   type OverviewCompareMode,
 } from "../lib/overview-stats.js";
+import {
+  buildOverviewSessionFilter,
+  fetchOverviewRequestMetrics,
+  listOverviewRecentSessions,
+  listOverviewTopErrorGroups,
+  sparklinesFromTimeSeries,
+} from "../lib/overview-kpi.js";
 import { getAppNavSummariesForProject } from "../lib/app-nav-summary.js";
 import {
   distinctAppsForProject,
@@ -298,6 +305,9 @@ export async function apiRoutes(
       environments,
       sessionDurationSeries,
       activeIssues,
+      requestMetrics,
+      recentSessions,
+      metricsTopErrorGroups,
     ] = await Promise.all([
       getOverviewErrorCountsPair(prisma, windowParams),
       getOverviewEventWindowStats(prisma, windowParams),
@@ -349,6 +359,24 @@ export async function apiRoutes(
         environment
       ),
       listActiveIssues(prisma, listScope),
+      fetchOverviewRequestMetrics(
+        prisma,
+        metricsScope,
+        compareWindow.previousSince,
+        previousUntil,
+        chartBucket
+      ),
+      listOverviewRecentSessions(
+        prisma,
+        buildOverviewSessionFilter(metricsScope, {
+          gte: metricsWindow.gte,
+          lte: metricsWindow.lte,
+        }),
+        projectId,
+        { gte: metricsWindow.gte, lte: metricsWindow.lte },
+        8
+      ),
+      listOverviewTopErrorGroups(prisma, metricsScope, 8),
     ]);
 
     const errorsCount = errorCounts.current;
@@ -429,6 +457,10 @@ export async function apiRoutes(
       listPageSize,
       series,
       sessionDurationSeries,
+      kpiSparklines: sparklinesFromTimeSeries(series),
+      requestMetrics,
+      recentSessions,
+      metricsTopErrorGroups,
     });
   });
 

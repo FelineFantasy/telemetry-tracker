@@ -51,9 +51,10 @@ type BucketRow = {
 
 function buildSessionAnalyticsFilterSql(
   f: SessionListFilterInput,
-  projectId: string
+  projectId: string,
+  eventWindow: { gte: Date; lte: Date }
 ): Prisma.Sql {
-  return sessionFilterSql(projectId, f);
+  return sessionFilterSql(projectId, f, eventWindow);
 }
 
 /** Zero-fill bucket rows into a continuous volume series. */
@@ -87,7 +88,14 @@ export async function fetchSessionsAnalytics(
   const chartSince = expectedBuckets[0] ?? since;
   const querySince = overviewChartQuerySince(since, until, bucket);
 
-  const sessionFilter = buildSessionAnalyticsFilterSql(f, projectId);
+  const sessionFilterVolume = buildSessionAnalyticsFilterSql(f, projectId, {
+    gte: querySince,
+    lte: until,
+  });
+  const sessionFilterPlatforms = buildSessionAnalyticsFilterSql(f, projectId, {
+    gte: since,
+    lte: until,
+  });
   const platformExpr = eventPlatformCategorySql("s");
   const trunc = bucket === "week" ? "week" : bucket;
 
@@ -97,7 +105,7 @@ export async function fetchSessionsAnalytics(
         (date_trunc(${trunc}, s."started_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
         COUNT(*)::bigint AS c
       FROM "Session" s
-      WHERE ${sessionFilter}
+      WHERE ${sessionFilterVolume}
         AND s."started_at" >= ${querySince}
         AND s."started_at" <= ${until}
       GROUP BY 1
@@ -108,7 +116,7 @@ export async function fetchSessionsAnalytics(
         ${platformExpr} AS platform,
         COUNT(*)::bigint AS c
       FROM "Session" s
-      WHERE ${sessionFilter}
+      WHERE ${sessionFilterPlatforms}
         AND s."started_at" >= ${since}
         AND s."started_at" <= ${until}
       GROUP BY 1

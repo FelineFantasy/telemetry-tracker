@@ -7,6 +7,7 @@ import {
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
   sessionFilterSql,
+  sessionWindowWithEventScope,
 } from "./sessions-page-summary.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
@@ -155,5 +156,60 @@ describe("sessionFilterSql", () => {
     expect(existsCount).toBe(1);
     expect(text).toContain('"environment"');
     expect(text).toContain('"release"');
+  });
+
+  it("bounds matching events to the metrics window when provided", () => {
+    const since = new Date("2026-03-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const text = prismaSqlText(
+      sessionFilterSql(
+        "proj-1",
+        { range: { gte: since, lte: until }, environment: "production" },
+        { gte: since, lte: until }
+      )
+    );
+
+    expect(text).toContain('e."created_at" >=');
+    expect(text).toContain('e."created_at" <=');
+  });
+});
+
+describe("sessionWindowWithEventScope", () => {
+  it("requires matching events inside the current metrics window", () => {
+    const since = new Date("2026-03-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const text = prismaSqlText(
+      sessionWindowWithEventScope(
+        "proj-1",
+        { range: {}, environment: "production" },
+        "s",
+        since,
+        until
+      )
+    );
+
+    expect(text).toContain('"started_at" >=');
+    expect(text).toContain('"started_at" <=');
+    expect(text).toContain('e."created_at" >=');
+    expect(text).toContain('e."created_at" <=');
+  });
+
+  it("uses an exclusive upper bound for the previous compare window", () => {
+    const previousSince = new Date("2026-02-22T00:00:00.000Z");
+    const previousUntil = new Date("2026-03-01T00:00:00.000Z");
+    const text = prismaSqlText(
+      sessionWindowWithEventScope(
+        "proj-1",
+        { range: {}, environment: "production" },
+        "s",
+        previousSince,
+        previousUntil,
+        true
+      )
+    );
+
+    expect(text).toContain('"started_at" <');
+    expect(text).toContain('e."created_at" <');
+    expect(text).not.toContain('e."created_at" <=');
   });
 });
