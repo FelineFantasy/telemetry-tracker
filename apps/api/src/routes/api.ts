@@ -17,6 +17,7 @@ import {
   type ScalarErrorListSort,
 } from "../lib/errors-list-query.js";
 import { fetchErrorsAnalytics } from "../lib/errors-analytics.js";
+import { fetchEventsAnalytics } from "../lib/events-analytics.js";
 import {
   enrichErrorListFilterForMetrics,
   fetchErrorsPageSummary,
@@ -735,6 +736,45 @@ export async function apiRoutes(
     const window = resolveEventsSummaryWindow(range, metricsAnchor);
     const summary = await fetchEventsPageSummary(prisma, filter, projectId, window);
     return reply.send(summary);
+  });
+
+  app.get("/events/analytics", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      name?: string;
+      environment?: string;
+      platform?: string;
+      release?: string;
+      propertiesContains?: string;
+      metricsUntil?: string;
+    };
+    const appId = queryApp(query.app);
+    const name = queryString(query.name);
+    const environment = queryString(query.environment);
+    const platform = queryString(query.platform);
+    const release = queryString(query.release);
+    const propertiesContains = queryString(query.propertiesContains);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
+
+    const filter: EventListFilterInput = {
+      appId,
+      name,
+      environment,
+      platform,
+      release,
+      propertiesContains,
+      range,
+    };
+
+    const window = resolveEventsSummaryWindow(range, metricsAnchor);
+    const analytics = await fetchEventsAnalytics(prisma, filter, projectId, window);
+    return reply.send(analytics);
   });
 
   app.get("/events", async (request, reply) => {
