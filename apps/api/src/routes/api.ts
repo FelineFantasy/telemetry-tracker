@@ -31,6 +31,12 @@ import {
   resolveEventsSummaryWindow,
 } from "../lib/events-page-summary.js";
 import {
+  fetchSessionsPageSummary,
+  parseSessionsMetricsAnchor,
+  resolveSessionListStartedAtBounds,
+  resolveSessionsSummaryWindow,
+} from "../lib/sessions-page-summary.js";
+import {
   attachLatestEventIds,
   fetchSparklinesForEventNames,
   listEventNamesGrouped,
@@ -932,6 +938,28 @@ export async function apiRoutes(
     return reply.send(event);
   });
 
+  app.get("/sessions/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      metricsUntil?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
+
+    const filter = { appId, platform, range };
+    const window = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const summary = await fetchSessionsPageSummary(prisma, filter, projectId, window);
+    return reply.send(summary);
+  });
+
   app.get("/sessions", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
@@ -946,6 +974,7 @@ export async function apiRoutes(
       platform?: string;
       sort?: string;
       order?: string;
+      metricsUntil?: string;
     };
     const pageSize = parseListPageSize(query.pageSize, query.limit);
     const page = parsePositivePage(query.page, 1);
@@ -953,6 +982,7 @@ export async function apiRoutes(
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
     const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
     const sortParsed = parseSessionListSortParam(queryString(query.sort));
     if (!sortParsed.ok) {
       return reply.status(400).send({ error: "Invalid sort" });
@@ -966,11 +996,8 @@ export async function apiRoutes(
     const where: Prisma.SessionWhereInput = whereSessionProject(projectId);
     if (appId) where.app = appId;
     if (platform) where.platform = platform;
-    if (range.gte || range.lte) {
-      where.started_at = {};
-      if (range.gte) where.started_at.gte = range.gte;
-      if (range.lte) where.started_at.lte = range.lte;
-    }
+    const startedAt = resolveSessionListStartedAtBounds(range, metricsAnchor);
+    where.started_at = { gte: startedAt.gte, lte: startedAt.lte };
     const [total, list] = await Promise.all([
       prisma.session.count({ where }),
       prisma.session.findMany({
