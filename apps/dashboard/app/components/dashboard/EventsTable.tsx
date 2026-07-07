@@ -1,5 +1,6 @@
 import { Badge } from "@/app/components/Badge";
 import { TimeAgo } from "@/app/components/TimeAgo";
+import { MiniSparkline, type SparklinePoint } from "@/app/components/dashboard/MiniSparkline";
 import {
   Table,
   TableListLink,
@@ -19,6 +20,7 @@ export type EventsTableRow = {
   users_affected?: number;
   last_seen: string;
   latest_event_id?: string | null;
+  sparkline?: SparklinePoint[];
 };
 
 export function EventsTable({
@@ -40,6 +42,7 @@ export function EventsTable({
             <th className="hidden lg:table-cell">Environment</th>
             <th className="hidden lg:table-cell">Platform</th>
             <th className="hidden md:table-cell text-right">Users</th>
+            <th className="hidden lg:table-cell text-right">Trend</th>
             <th className="text-right">Count</th>
             <th className="hidden sm:table-cell text-right">Share</th>
             <th className={tableDateColumnClass}>Last seen</th>
@@ -69,6 +72,16 @@ export function EventsTable({
                 </td>
                 <td className="hidden md:table-cell text-right tabular-nums">
                   {(row.users_affected ?? 0).toLocaleString()}
+                </td>
+                <td className="hidden lg:table-cell text-right">
+                  <div className="flex justify-end">
+                    <MiniSparkline
+                      data={row.sparkline ?? []}
+                      color="var(--chart-event)"
+                      className="h-8 w-24"
+                      ariaLabel={`Trend for ${row.name}`}
+                    />
+                  </div>
                 </td>
                 <td className="text-right tabular-nums">
                   {(row.count_in_range ?? 0).toLocaleString()}

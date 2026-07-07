@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Events list trend sparklines** — per-event-name occurrence mini-charts in the grouped table, scoped to the active filters and metrics window ([#187](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/187))
+
 ---
 
 ## [1.5.3] - 2026-07-07
