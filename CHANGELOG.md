@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.5.12] - 2026-07-08
+
+### Fixed
+
+- **Overview page crash** — precompute error detail links on the server instead of passing a function into the top-errors client panel (fixes RSC boundary error on `/dashboard/overview`)
+
+---
+
 ## [1.5.11] - 2026-07-08
 
 Continues the **v1.5.0 — Analytics dashboard** milestone ([#183](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/183)).
