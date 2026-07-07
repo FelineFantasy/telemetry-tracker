@@ -11,10 +11,16 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.3] - 2026-07-07
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#186](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/186)).
+
 ### Added
 
-- **Events analytics panels** — events-over-time line chart, top events with share % and horizontal bars, and platform breakdown donut scoped to Events page filters ([#186](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/186))
-- **`GET /api/events/analytics`** — filtered volume series, top event names, and platform groupBy for the events list ([#186](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/186))
+- **Events analytics panels** — events-over-time line chart, top events with share % and horizontal bars, and platform breakdown donut scoped to Events page filters ([#249](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/249), [#186](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/186))
+- **`GET /api/events/analytics`** — filtered volume series, top event names, and platform groupBy for the events list ([#249](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/249))
 
 ---
 
