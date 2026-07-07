@@ -11,6 +11,12 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.5] - 2026-07-07
+
+Docs-only PATCH — contributor workflow ([#256](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/256)).
+
 ### Changed
 
 - **Contributing** — GitHub default branch is now **`develop`**; README, PR template, and release docs updated so fork PRs target integration instead of **`main`**
