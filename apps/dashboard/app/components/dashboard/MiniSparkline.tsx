@@ -20,7 +20,7 @@ export function MiniSparkline({ data, color, className, ariaLabel }: Props) {
   const gradientId = useId().replace(/:/g, "");
   const colors = useChartColors();
   const stroke = color ?? colors.error;
-  const chartData = data.map((p) => ({ value: p.count }));
+  const chartData = data.map((p) => ({ value: p.count ?? null }));
   const hasData = chartData.some((p) => p.value != null && p.value > 0);
 
   if (!hasData) {
@@ -55,6 +55,7 @@ export function MiniSparkline({ data, color, className, ariaLabel }: Props) {
             strokeWidth={1.5}
             dot={false}
             isAnimationActive={false}
+            connectNulls={false}
           />
         </AreaChart>
       </ResponsiveContainer>

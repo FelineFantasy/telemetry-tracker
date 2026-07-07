@@ -13,6 +13,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.5.13] - 2026-07-08
+
+### Fixed
+
+- **Sessions KPI sparklines** — use null gaps for empty rate/duration buckets; horizontal mobile layout with fixed-width charts
+- **Sessions table on mobile** — truncate user/session IDs, fix duration bar overflow, and restore horizontal scroll for clipped timestamps
+
+---
+
 ## [1.5.12] - 2026-07-08
 
 ### Fixed
