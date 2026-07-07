@@ -13,7 +13,9 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
-## [1.4.14] - 2026-07-07
+## [1.5.0] - 2026-07-07
+
+First release of the **v1.5.0 — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
 
 ### Added
 
