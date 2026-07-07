@@ -73,7 +73,6 @@ export function OverviewTopErrorsPanel({
   groups,
   rangeLabel,
   errorsHref,
-  buildHref,
 }: {
   groups: Array<{
     id: string;
@@ -81,10 +80,10 @@ export function OverviewTopErrorsPanel({
     app: string;
     occurrences: number;
     last_seen: string;
+    href: string;
   }>;
   rangeLabel: string;
   errorsHref: string;
-  buildHref: (id: string) => string;
 }) {
   return (
     <AnalyticsPanel aria-label="Top errors">
@@ -100,7 +99,7 @@ export function OverviewTopErrorsPanel({
           {groups.map((group) => (
             <OverviewListItem
               key={group.id}
-              href={buildHref(group.id)}
+              href={group.href}
               title={group.message}
               titleClassName="font-medium text-destructive"
               badges={<Badge>{group.app}</Badge>}
