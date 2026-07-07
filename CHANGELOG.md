@@ -11,9 +11,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.4] - 2026-07-07
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#187](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/187)).
+
 ### Added
 
-- **Events list trend sparklines** — per-event-name occurrence mini-charts in the grouped table, scoped to the active filters and metrics window ([#187](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/187))
+- **Events list trend sparklines** — per-event-name occurrence mini-charts in the grouped table, scoped to the active filters and metrics window ([#252](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/252), [#187](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/187))
 
 ---
 
