@@ -132,7 +132,7 @@ export function buildErrorGroupWhereInput(
 
 export type ScalarErrorListSort = Exclude<
   ErrorListSort,
-  "users" | "sessions" | "trend"
+  "users" | "sessions" | "trend" | "occurrences"
 >;
 
 function prismaOrderBy(
@@ -143,8 +143,6 @@ function prismaOrderBy(
   switch (sort) {
     case "first_seen":
       return { first_seen: o };
-    case "occurrences":
-      return { occurrences: o };
     case "message":
       return { message: o };
     case "app":
@@ -157,9 +155,14 @@ function prismaOrderBy(
   }
 }
 
-/** Scalar sorts only — users/sessions/trend use raw SQL. */
+/** Scalar sorts only — users/sessions/trend/occurrences use raw SQL aggregates. */
 export function isAggregateSort(sort: ErrorListSort): boolean {
-  return sort === "users" || sort === "sessions" || sort === "trend";
+  return (
+    sort === "users" ||
+    sort === "sessions" ||
+    sort === "trend" ||
+    sort === "occurrences"
+  );
 }
 
 export type ErrorGroupListRow = {
@@ -283,6 +286,9 @@ function orderByAggregateSql(
   }
   if (sort === "sessions") {
     return Prisma.sql`ORDER BY COALESCE(agg.sessions_affected, 0) ${dir} ${nulls}`;
+  }
+  if (sort === "occurrences") {
+    return Prisma.sql`ORDER BY COALESCE(agg.occurrences_in_range, 0) ${dir} ${nulls}, eg.last_seen DESC`;
   }
   const trendExpr = Prisma.sql`(COALESCE(agg.occurrences_recent, 0)::float / GREATEST(COALESCE(agg.occurrences_previous, 0), 1))`;
   return Prisma.sql`ORDER BY ${trendExpr} ${dir} ${nulls}, eg.last_seen DESC`;

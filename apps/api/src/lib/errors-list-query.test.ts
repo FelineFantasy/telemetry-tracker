@@ -1,5 +1,12 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { parseTrendWindowParam, serializeErrorGroupListItem } from "./errors-list-query.js";
+import { parseTrendWindowParam, serializeErrorGroupListItem, isAggregateSort } from "./errors-list-query.js";
+
+describe("isAggregateSort", () => {
+  it("routes occurrences sort through the in-range aggregate path", () => {
+    expect(isAggregateSort("occurrences")).toBe(true);
+    expect(isAggregateSort("last_seen")).toBe(false);
+  });
+});
 
 describe("serializeErrorGroupListItem", () => {
   const baseRow = {

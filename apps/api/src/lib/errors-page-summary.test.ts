@@ -2,15 +2,55 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   buildErrorGroupScopeSql,
+  buildEventSessionScopeSql,
   enrichErrorListFilterForMetrics,
   parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
+  shouldScopeEventsToFilteredErrors,
 } from "./errors-page-summary.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   const parts = fragment as unknown as { strings: string[] };
   return parts.strings.join("?");
 }
+
+describe("shouldScopeEventsToFilteredErrors", () => {
+  it("scopes events when status or message search narrows error groups", () => {
+    expect(shouldScopeEventsToFilteredErrors({ range: {}, status: "all" })).toBe(false);
+    expect(shouldScopeEventsToFilteredErrors({ range: {}, status: "unresolved" })).toBe(
+      true
+    );
+    expect(shouldScopeEventsToFilteredErrors({ range: {}, q: "timeout", status: "all" })).toBe(
+      true
+    );
+  });
+});
+
+describe("buildEventSessionScopeSql", () => {
+  it("includes status filters when scoping events to matching error sessions", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const sql = buildEventSessionScopeSql(
+      { range: {}, status: "unresolved" },
+      "proj-1",
+      since,
+      until
+    );
+    const text = prismaSqlText(sql);
+    expect(text).toContain("EXISTS");
+    expect(text).toContain('"resolved_at" IS NULL');
+  });
+
+  it("returns empty SQL when no narrowing filters apply", () => {
+    const sql = buildEventSessionScopeSql(
+      { range: {}, status: "all" },
+      "proj-1",
+      new Date("2026-06-01T00:00:00.000Z"),
+      new Date("2026-06-08T00:00:00.000Z")
+    );
+    expect(prismaSqlText(sql)).toBe("");
+  });
+});
 
 describe("parseErrorsMetricsAnchor", () => {
   it("parses ISO metricsUntil", () => {
