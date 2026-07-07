@@ -23,7 +23,7 @@ export const REQUEST_APDEX_THRESHOLD_MS = 300;
 
 export type OverviewSparklinePoint = {
   t: string;
-  count: number;
+  count: number | null;
 };
 
 export type OverviewKpiSparklines = {
@@ -104,6 +104,16 @@ export function apdexScore(
 
 export function apdexPctFromScore(score: number): number {
   return Math.round(score * 1000) / 10;
+}
+
+/** Bucket sparkline value — null when the bucket has no `$request` samples. */
+export function apdexPctForBucket(
+  satisfied: number,
+  tolerating: number,
+  total: number
+): number | null {
+  if (total <= 0) return null;
+  return apdexPctFromScore(apdexScore(satisfied, tolerating, total));
 }
 
 function apdexBucketComponentsExpr(
@@ -275,12 +285,12 @@ export async function fetchOverviewRequestMetrics(
       apdexPct: buckets.map((bucketDate) => {
         const t = bucketDate.toISOString();
         const bucketRow = byBucket.get(t);
-        const score = apdexScore(
+        const pct = apdexPctForBucket(
           Number(bucketRow?.satisfied ?? 0),
           Number(bucketRow?.tolerating ?? 0),
           Number(bucketRow?.total ?? 0)
         );
-        return { t, count: apdexPctFromScore(score) };
+        return { t, count: pct };
       }),
     },
   };

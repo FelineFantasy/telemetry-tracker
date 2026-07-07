@@ -156,4 +156,19 @@ describe("sessionFilterSql", () => {
     expect(text).toContain('"environment"');
     expect(text).toContain('"release"');
   });
+
+  it("bounds matching events to the metrics window when provided", () => {
+    const since = new Date("2026-03-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const text = prismaSqlText(
+      sessionFilterSql(
+        "proj-1",
+        { range: { gte: since, lte: until }, environment: "production" },
+        { gte: since, lte: until }
+      )
+    );
+
+    expect(text).toContain('e."created_at" >=');
+    expect(text).toContain('e."created_at" <=');
+  });
 });

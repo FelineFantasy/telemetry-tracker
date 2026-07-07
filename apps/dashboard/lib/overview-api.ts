@@ -29,7 +29,7 @@ export type OverviewRequestMetrics =
       requestCount: number;
       sparklines: {
         avgResponseMs: OverviewTimeSeriesPoint[];
-        apdexPct: OverviewTimeSeriesPoint[];
+        apdexPct: Array<{ t: string; count: number | null }>;
       };
     };
 

@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
+  apdexPctForBucket,
   apdexPctFromScore,
   apdexScore,
   overviewTopErrorGroupsInWindowSql,
@@ -32,6 +33,16 @@ describe("apdexScore", () => {
 describe("apdexPctFromScore", () => {
   it("rounds to one decimal place as a percentage", () => {
     expect(apdexPctFromScore(0.91234)).toBe(91.2);
+  });
+});
+
+describe("apdexPctForBucket", () => {
+  it("returns null when the bucket has no request samples", () => {
+    expect(apdexPctForBucket(0, 0, 0)).toBeNull();
+  });
+
+  it("returns apdex percentage when samples exist", () => {
+    expect(apdexPctForBucket(8, 2, 10)).toBe(90);
   });
 });
 

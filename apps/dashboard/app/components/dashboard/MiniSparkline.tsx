@@ -6,7 +6,7 @@ import { useChartColors } from "@/lib/use-chart-colors";
 
 export type SparklinePoint = {
   t: string;
-  count: number;
+  count: number | null;
 };
 
 type Props = {
@@ -21,7 +21,7 @@ export function MiniSparkline({ data, color, className, ariaLabel }: Props) {
   const colors = useChartColors();
   const stroke = color ?? colors.error;
   const chartData = data.map((p) => ({ value: p.count }));
-  const hasData = chartData.some((p) => p.value > 0);
+  const hasData = chartData.some((p) => p.value != null && p.value > 0);
 
   if (!hasData) {
     return (

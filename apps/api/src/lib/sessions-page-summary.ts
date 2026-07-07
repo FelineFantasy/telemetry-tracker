@@ -176,12 +176,24 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
 function sessionEventExistsSql(
   projectId: string,
   sessionAlias: string,
-  extra: Prisma.Sql[] = []
+  extra: Prisma.Sql[] = [],
+  eventWindow?: { gte?: Date; lte?: Date }
 ): Prisma.Sql {
   const s = Prisma.raw(`"${sessionAlias}"`);
   const clauses =
     extra.length > 0
       ? Prisma.sql` AND ${Prisma.join(extra, " AND ")}`
+      : Prisma.empty;
+  const windowParts: Prisma.Sql[] = [];
+  if (eventWindow?.gte) {
+    windowParts.push(Prisma.sql`e."created_at" >= ${eventWindow.gte}`);
+  }
+  if (eventWindow?.lte) {
+    windowParts.push(Prisma.sql`e."created_at" <= ${eventWindow.lte}`);
+  }
+  const windowClause =
+    windowParts.length > 0
+      ? Prisma.sql` AND ${Prisma.join(windowParts, " AND ")}`
       : Prisma.empty;
   return Prisma.sql`EXISTS (
     SELECT 1 FROM "Event" e
@@ -189,7 +201,17 @@ function sessionEventExistsSql(
       AND e."session_id" = ${s}."session_id"
       AND e."app" = ${s}."app"
       ${clauses}
+      ${windowClause}
   )`;
+}
+
+function resolveSessionEventWindow(
+  f: SessionListFilterInput,
+  eventWindow?: { gte?: Date; lte?: Date }
+): { gte?: Date; lte?: Date } | undefined {
+  if (eventWindow?.gte || eventWindow?.lte) return eventWindow;
+  if (f.range.gte || f.range.lte) return { gte: f.range.gte, lte: f.range.lte };
+  return undefined;
 }
 
 function sessionSearchSql(q: string): Prisma.Sql {
@@ -206,7 +228,8 @@ function sessionSearchSql(q: string): Prisma.Sql {
 
 export function sessionFilterSql(
   projectId: string,
-  f: SessionListFilterInput
+  f: SessionListFilterInput,
+  eventWindow?: { gte?: Date; lte?: Date }
 ): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`s."project_id" = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
@@ -220,7 +243,14 @@ export function sessionFilterSql(
     eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
   }
   if (eventClauses.length > 0) {
-    parts.push(sessionEventExistsSql(projectId, "s", eventClauses));
+    parts.push(
+      sessionEventExistsSql(
+        projectId,
+        "s",
+        eventClauses,
+        resolveSessionEventWindow(f, eventWindow)
+      )
+    );
   }
   if (f.q?.trim()) parts.push(sessionSearchSql(f.q));
   return Prisma.join(parts, " AND ");
