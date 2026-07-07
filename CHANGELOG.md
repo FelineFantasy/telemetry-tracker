@@ -11,9 +11,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.9] - 2026-07-07
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#191](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/191)).
+
 ### Added
 
-- **Sessions enriched table** — duration with relative bar, pages/events counts, crash-free status badge, default sort by duration, and matching detail fields ([#191](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/191))
+- **Sessions enriched table** — duration with relative bar, pages/events counts, crash-free status badge, default sort by duration, and matching detail fields ([#266](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/266), [#191](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/191))
 - **`GET /api/sessions`** — enriched list rows with duration, event/page aggregates, and healthy/warning status aligned with sessions summary rules
 
 ---
