@@ -21,8 +21,12 @@ import {
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
 
 const SORT_OPTIONS: DashboardSelectOption[] = [
+  { value: "duration", label: "Duration" },
+  { value: "events", label: "Events" },
+  { value: "pages", label: "Pages" },
   { value: "started_at", label: "Started" },
   { value: "ended_at", label: "Ended" },
+  { value: "status", label: "Status" },
   { value: "session_id", label: "Session ID" },
   { value: "app", label: "App" },
   { value: "platform", label: "Platform" },
@@ -118,7 +122,7 @@ export function SessionsListToolbar({
             <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
             <DashboardCustomSelect
               name="sort"
-              value={sort || "started_at"}
+              value={sort || "duration"}
               options={SORT_OPTIONS}
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}

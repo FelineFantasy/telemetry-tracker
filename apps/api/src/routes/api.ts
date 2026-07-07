@@ -39,6 +39,7 @@ import {
   parseSessionsMetricsAnchor,
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
+  type SessionListFilterInput,
 } from "../lib/sessions-page-summary.js";
 import {
   attachLatestEventIds,
@@ -49,6 +50,13 @@ import {
   serializeEventNameListItem,
   type EventListFilterInput,
 } from "../lib/events-list-query.js";
+import {
+  fetchSessionEnrichedById,
+  listSessionsEnriched,
+  parseSessionListOrderParam,
+  parseSessionListSortParam,
+  serializeSessionListItem,
+} from "../lib/sessions-list-query.js";
 import { parseCreatedRange } from "../lib/list-query.js";
 import { buildEventWhereSql } from "../lib/list-query-helpers.js";
 import { fetchLatestEventsByName } from "../lib/latest-events-by-name.js";
@@ -96,8 +104,6 @@ import {
   parseListOrderParam,
   parseOverviewErrorSortParam,
   parseOverviewTopEventsSortParam,
-  parseSessionListSortParam,
-  sessionListOrderBy,
 } from "../lib/list-sort-params.js";
 
 const DEFAULT_LIST_PAGE_SIZE = 20;
@@ -1021,27 +1027,30 @@ export async function apiRoutes(
     if (!sortParsed.ok) {
       return reply.status(400).send({ error: "Invalid sort" });
     }
-    const orderParsed = parseListOrderParam(queryString(query.order));
+    const orderParsed = parseSessionListOrderParam(queryString(query.order));
     if (!orderParsed.ok) {
       return reply.status(400).send({ error: "Invalid order" });
     }
-    const sessionOrderBy = sessionListOrderBy(sortParsed.sort, orderParsed.order);
 
-    const where: Prisma.SessionWhereInput = whereSessionProject(projectId);
-    if (appId) where.app = appId;
-    if (platform) where.platform = platform;
+    const filter: SessionListFilterInput = { appId, platform, range };
     const startedAt = resolveSessionListStartedAtBounds(range, metricsAnchor);
-    where.started_at = { gte: startedAt.gte, lte: startedAt.lte };
-    const [total, list] = await Promise.all([
-      prisma.session.count({ where }),
-      prisma.session.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: sessionOrderBy,
-      }),
-    ]);
-    return reply.send({ items: list, total, page, pageSize });
+    const { total, rows, maxDurationSec } = await listSessionsEnriched(
+      prisma,
+      filter,
+      projectId,
+      startedAt,
+      sortParsed.sort,
+      orderParsed.order,
+      skip,
+      pageSize
+    );
+    return reply.send({
+      items: rows.map((row) => serializeSessionListItem(row, maxDurationSec)),
+      total,
+      page,
+      pageSize,
+      max_duration_sec: maxDurationSec,
+    });
   });
 
   app.get<{ Params: { id: string } }>("/sessions/:id", async (request, reply) => {
@@ -1052,7 +1061,9 @@ export async function apiRoutes(
       where: whereSessionById(id, projectId),
     });
     if (!session) return reply.status(404).send({ error: "Not found" });
-    return reply.send(session);
+    const enriched = await fetchSessionEnrichedById(prisma, projectId, session.id);
+    if (!enriched) return reply.status(404).send({ error: "Not found" });
+    return reply.send(serializeSessionListItem(enriched));
   });
 
   app.get("/filter-options", async (request, reply) => {

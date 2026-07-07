@@ -8,15 +8,17 @@ import {
   SessionsAnalyticsPanels,
   type SessionsAnalyticsData,
 } from "@/app/components/dashboard/SessionsAnalyticsPanels";
+import {
+  SessionsTable,
+  type SessionsTableRow,
+} from "@/app/components/dashboard/SessionsTable";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { EmptyState } from "@/app/components/EmptyState";
-import { TimeAgo } from "@/app/components/TimeAgo";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import { Table, TableListLink, TableViewLink, TableWrap, tableDateColumnClass } from "@/app/components/ui/Table";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -28,19 +30,6 @@ import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const SESSIONS_PATH = "/dashboard/sessions";
 
-type SessionRow = {
-  id: string;
-  session_id: string;
-  user_id?: string | null;
-  anonymous_id?: string | null;
-  started_at: string;
-  ended_at?: string | null;
-};
-
-function truncate(s: string, len: number) {
-  return s.length <= len ? s : s.slice(0, len) + "\u2026";
-}
-
 async function getSessions(search: URLSearchParams) {
   const res = await dashboardApiFetch(`/api/sessions?${search.toString()}`);
   if (!res.ok) {
@@ -48,10 +37,11 @@ async function getSessions(search: URLSearchParams) {
     throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
   }
   return res.json() as Promise<{
-    items: SessionRow[];
+    items: SessionsTableRow[];
     total: number;
     page: number;
     pageSize: number;
+    max_duration_sec?: number;
   }>;
 }
 
@@ -146,8 +136,9 @@ export default async function SessionsPage({
   summaryQuery.delete("sort");
   summaryQuery.delete("order");
 
-  let items: SessionRow[] = [];
+  let items: SessionsTableRow[] = [];
   let total = 0;
+  let maxDurationSec = 0;
   let summary: SessionsPageSummary | null = null;
   let analytics: SessionsAnalyticsData | null = null;
   let platforms: string[] = [];
@@ -160,6 +151,7 @@ export default async function SessionsPage({
     ]);
     items = data.items ?? [];
     total = resolveApiListTotal(data.total, items.length);
+    maxDurationSec = data.max_duration_sec ?? 0;
     platforms = opts.platforms;
     summary = summaryData;
     analytics = analyticsData;
@@ -175,6 +167,18 @@ export default async function SessionsPage({
   const currentParams = buildSessionsParamsRecord(sp);
   const hrefForPage = (p: number) =>
     mergeListQuery(SESSIONS_PATH, currentParams, { page: String(p) });
+
+  const effectiveSort = sort ?? "duration";
+  const effectiveOrder = order ?? "desc";
+  const listSubtitle =
+    page === 1 && effectiveSort === "duration" && effectiveOrder === "desc"
+      ? "Showing top sessions by duration"
+      : undefined;
+
+  const sessionHref = (row: SessionsTableRow) =>
+    appFilter
+      ? `/dashboard/sessions/${row.id}?app=${encodeURIComponent(appFilter)}`
+      : `/dashboard/sessions/${row.id}`;
 
   const rangeLabel = timeRange.label;
 
@@ -210,66 +214,24 @@ export default async function SessionsPage({
         pageSize={String(pageSize)}
         defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
         platform={platform ?? ""}
-        sort={sort ?? "started_at"}
-        order={order ?? "desc"}
+        sort={effectiveSort}
+        order={effectiveOrder}
         platforms={platforms}
         />
 
-        <ListResultCount total={total} noun={total === 1 ? "session" : "sessions"} />
+        <ListResultCount
+          total={total}
+          noun={total === 1 ? "session" : "sessions"}
+          subtitle={listSubtitle}
+        />
 
         {items.length ? (
-          <TableWrap>
-          <Table>
-            <thead>
-              <tr>
-                <th>Session ID</th>
-                <th className="hidden sm:table-cell">Identity</th>
-                <th className={tableDateColumnClass}>Started</th>
-                <th className={`hidden sm:table-cell ${tableDateColumnClass}`}>Ended</th>
-                <th className="hidden sm:table-cell" aria-hidden>
-                  View
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((s) => (
-                <tr key={s.id}>
-                  <td title={s.session_id}>
-                    <TableListLink
-                      href={
-                        appFilter
-                          ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}`
-                          : `/dashboard/sessions/${s.id}`
-                      }
-                    >
-                      {truncate(s.session_id, 24)}
-                    </TableListLink>
-                  </td>
-                  <td title={s.user_id ?? s.anonymous_id ?? undefined} className="hidden sm:table-cell">
-                    {(s.user_id ?? s.anonymous_id)
-                      ? truncate(s.user_id ?? s.anonymous_id ?? "", 20)
-                      : "—"}
-                  </td>
-                  <td className={tableDateColumnClass}>
-                    <TimeAgo iso={s.started_at} />
-                  </td>
-                  <td className={`hidden sm:table-cell ${tableDateColumnClass}`}>
-                    {s.ended_at ? <TimeAgo iso={s.ended_at} /> : "—"}
-                  </td>
-                  <td className="hidden sm:table-cell">
-                    <TableViewLink
-                      href={
-                        appFilter
-                          ? `/dashboard/sessions/${s.id}?app=${encodeURIComponent(appFilter)}`
-                          : `/dashboard/sessions/${s.id}`
-                      }
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </TableWrap>
+          <SessionsTable
+            rows={items}
+            hrefForSession={sessionHref}
+            hrefForView={sessionHref}
+            maxDurationSec={maxDurationSec}
+          />
       ) : (
         <EmptyState
           title="No sessions recorded"
