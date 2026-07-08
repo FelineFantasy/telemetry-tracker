@@ -8,6 +8,7 @@ import {
 } from "../src/lib/marketing-subscriber.js";
 import { sendTransactionalEmail, isTransactionalEmailConfigured } from "../src/lib/email.js";
 import { isMinorOrMajorBump } from "../src/lib/release-email-semver.js";
+import { isReleaseEmailBroadcastComplete } from "../src/lib/release-email-send.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const FORCE = process.argv.includes("--force");
@@ -174,6 +175,12 @@ async function main() {
   }
 
   console.log(`Sent ${sent}/${subscribers.length} release email(s).`);
+  if (!isReleaseEmailBroadcastComplete(sent, subscribers.length)) {
+    console.error(
+      `Release email incomplete: ${sent}/${subscribers.length} delivered. Re-run after fixing the failure; Actions cache is not updated on partial sends.`
+    );
+    process.exit(1);
+  }
 }
 
 main()
