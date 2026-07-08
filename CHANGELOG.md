@@ -11,9 +11,20 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.15] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#193](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/193)).
+
 ### Added
 
 - **SDK Web Vitals ingest** — browser/Next SDK captures LCP, INP, CLS, and TTFB as `$web_vital` events ([#193](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/193))
+
+### Fixed
+
+- **SDK Web Vitals opt-out** — re-init with `webVitals: false` stops `$web_vital` events (including async import race)
+- **SDK Web Vitals unload flush** — batched vitals flush with keepalive on page hide and tab hidden so CLS/LCP on short visits are not lost
 
 ---
 
