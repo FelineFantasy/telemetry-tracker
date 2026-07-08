@@ -39,7 +39,7 @@ Both routes use the public rate limit surface (`RATE_LIMIT_PUBLIC_MAX`).
 
 Align semver bumps with [RELEASE.md](./RELEASE.md#semver-guidance). If a release has no subscriber-relevant bullets (migrations-only, internal ops), skip the email with workflow dispatch disabled — cancel the **Release product email** run before the send step, or use a manual override only when needed.
 
-**There is no send audit log in the database.** The GitHub Actions log (`Sent N/M release email(s)`) and a note in the GitHub Release are the records.
+**There is no send audit log in the database.** Delivery is recorded in `MarketingReleaseEmailSend` (one row per subscriber per release version) so workflow retries skip already-sent recipients and do not rotate their unsubscribe tokens again. GitHub Actions logs and a note in the GitHub Release are the operator-facing records.
 
 ### Automated send (MINOR / MAJOR tags)
 
@@ -100,6 +100,7 @@ pnpm exec tsx scripts/send-release-email.ts --version=1.4.2
 - `--previous-version=X.Y.Z` skips patch-only releases unless `--force` is set (same rule as CI).
 - `--dry-run` prints subject, recipient count, and a short CHANGELOG preview without sending.
 - Before each send, the script rotates the one-click unsubscribe token **for that recipient only**, immediately before attempting delivery.
+- After a successful Resend delivery, a `MarketingReleaseEmailSend` row is written so retries send only to remaining subscribers (requires migration `20260708140000_marketing_release_email_send`).
 
 ### First production send checklist
 

@@ -8,7 +8,12 @@ import {
 } from "../src/lib/marketing-subscriber.js";
 import { sendTransactionalEmail, isTransactionalEmailConfigured } from "../src/lib/email.js";
 import { isMinorOrMajorBump } from "../src/lib/release-email-semver.js";
-import { isReleaseEmailBroadcastComplete } from "../src/lib/release-email-send.js";
+import {
+  isReleaseEmailBroadcastComplete,
+  loadReleaseEmailSentSubscriberIds,
+  pendingReleaseEmailRecipients,
+  recordReleaseEmailDelivery,
+} from "../src/lib/release-email-send.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const FORCE = process.argv.includes("--force");
@@ -148,17 +153,32 @@ async function main() {
   console.log(`Subject: ${subject}`);
   console.log(`CHANGELOG [${version}] preview:\n${changelogPreview(section)}`);
   if (DRY_RUN) {
-    console.log("--dry-run: not sending.");
+    const alreadySentIds = await loadReleaseEmailSentSubscriberIds(
+      prisma,
+      version,
+      subscribers.map((sub) => sub.id)
+    );
+    const pending = pendingReleaseEmailRecipients(subscribers, alreadySentIds);
+    console.log(
+      `--dry-run: would send to ${pending.length}/${subscribers.length} subscriber(s)` +
+        (alreadySentIds.size > 0 ? ` (${alreadySentIds.size} already recorded for ${version}).` : ".")
+    );
     return;
   }
 
-  let sent = 0;
-  for (const sub of subscribers) {
+  const alreadySentIds = await loadReleaseEmailSentSubscriberIds(
+    prisma,
+    version,
+    subscribers.map((sub) => sub.id)
+  );
+  const pendingSubscribers = pendingReleaseEmailRecipients(subscribers, alreadySentIds);
+  if (alreadySentIds.size > 0) {
+    console.log(`Resuming ${version}: ${alreadySentIds.size} already sent, ${pendingSubscribers.length} remaining.`);
+  }
+
+  let sentThisRun = 0;
+  for (const sub of pendingSubscribers) {
     const rawToken = generateMarketingUnsubscribeToken();
-    await prisma.marketingSubscriber.update({
-      where: { id: sub.id },
-      data: { unsubscribe_token: hashMarketingUnsubscribeToken(rawToken) },
-    });
     const unsubscribeUrl = buildMarketingUnsubscribeUrl(dashboardOrigin, rawToken);
     const html = [
       bodyHtml,
@@ -170,14 +190,26 @@ async function main() {
     ].join("\n");
 
     const result = await sendTransactionalEmail({ to: sub.email, subject, html });
-    if (result.sent) sent += 1;
-    else console.warn(`Failed to send to ${sub.email}:`, result.error ?? result.status);
+    if (!result.sent) {
+      console.warn(`Failed to send to ${sub.email}:`, result.error ?? result.status);
+      continue;
+    }
+
+    await recordReleaseEmailDelivery(prisma, {
+      subscriberId: sub.id,
+      releaseVersion: version,
+      unsubscribeTokenHash: hashMarketingUnsubscribeToken(rawToken),
+    });
+    sentThisRun += 1;
   }
 
-  console.log(`Sent ${sent}/${subscribers.length} release email(s).`);
-  if (!isReleaseEmailBroadcastComplete(sent, subscribers.length)) {
+  const deliveredTotal = alreadySentIds.size + sentThisRun;
+  console.log(
+    `Sent ${sentThisRun} release email(s) this run (${deliveredTotal}/${subscribers.length} total for ${version}).`
+  );
+  if (!isReleaseEmailBroadcastComplete(deliveredTotal, subscribers.length)) {
     console.error(
-      `Release email incomplete: ${sent}/${subscribers.length} delivered. Re-run after fixing the failure; Actions cache is not updated on partial sends.`
+      `Release email incomplete: ${deliveredTotal}/${subscribers.length} delivered. Re-run after fixing the failure; already-sent subscribers are skipped and unsubscribe tokens are unchanged on failed attempts.`
     );
     process.exit(1);
   }
