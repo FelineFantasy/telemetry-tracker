@@ -119,7 +119,7 @@ export function OverviewExtraCharts({
                 </p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={c.data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <AreaChart data={c.data} margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
                     <defs>
                       <linearGradient id={`grad-${c.id}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={c.color} stopOpacity={0.35} />
@@ -128,7 +128,12 @@ export function OverviewExtraCharts({
                     </defs>
                     <CartesianGrid stroke={colors.grid} vertical={false} />
                     <XAxis dataKey="t" tick={{ fill: colors.tick, fontSize: 10 }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fill: colors.tick, fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
+                    <YAxis
+                      tick={{ fill: colors.tick, fontSize: 10 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={40}
+                    />
                     <Tooltip
                       contentStyle={tooltipStyle}
                       formatter={(v: number) => [`${v} ${c.unit}`, c.title]}

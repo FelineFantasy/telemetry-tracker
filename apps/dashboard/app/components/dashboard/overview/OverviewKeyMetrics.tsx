@@ -154,7 +154,7 @@ function MetricCell({
         <MiniSparkline
           data={sparkline}
           color={sparklineColor}
-          className="h-10 w-full sm:h-8 lg:max-w-[140px]"
+          className="h-10 w-full sm:h-8"
           ariaLabel={sparklineLabel}
         />
       ) : null}
