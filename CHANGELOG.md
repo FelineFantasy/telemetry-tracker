@@ -11,9 +11,19 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.5.17] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#195](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/195)).
+
 ### Added
 
 - **Performance dashboard page** — KPI row (LCP, INP/FID, CLS, TTFB with prior-period compare and sparklines), vitals-over-time charts with bucket control, Good/Needs improvement/Poor rating bars, env/platform/release filters, and optional avg response + Apdex when `$request` data exists ([#195](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/195))
+
+### Fixed
+
+- **Performance page labels** — page subtitle and rating distribution caption use the API metrics window label (e.g. “Last 7 days”) instead of “Recent data” when no time filter is selected
 
 ---
 
