@@ -42,6 +42,12 @@ import {
   resolveSessionsSummaryWindow,
 } from "../lib/sessions-page-summary.js";
 import {
+  buildPerformanceFilter,
+  fetchPerformancePageSummary,
+  parsePerformanceMetricsAnchor,
+  resolvePerformanceSummaryWindow,
+} from "../lib/performance-page-summary.js";
+import {
   attachLatestEventIds,
   fetchSparklinesForEventNames,
   listEventNamesGrouped,
@@ -978,6 +984,46 @@ export async function apiRoutes(
     });
     if (!event) return reply.status(404).send({ error: "Not found" });
     return reply.send(event);
+  });
+
+  app.get("/performance/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+      metricsUntil?: string;
+      chartBucket?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parsePerformanceMetricsAnchor(queryString(query.metricsUntil));
+    const chartBucket = parseChartBucketParam(queryString(query.chartBucket));
+
+    const filter = buildPerformanceFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      range,
+    });
+    const window = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const summary = await fetchPerformancePageSummary(
+      prisma,
+      filter,
+      projectId,
+      window,
+      chartBucket
+    );
+    return reply.send(summary);
   });
 
   app.get("/sessions/summary", async (request, reply) => {
