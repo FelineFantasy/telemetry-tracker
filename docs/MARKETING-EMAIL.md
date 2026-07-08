@@ -46,7 +46,8 @@ Align semver bumps with [RELEASE.md](./RELEASE.md#semver-guidance). If a release
 Pushing a semver tag `vX.Y.Z` to GitHub triggers **Release product email**:
 
 1. Resolves the previous semver tag and compares X/Y (patch-only → skip).
-2. Runs `send-release-email.ts --version=X.Y.Z --previous-version=…` with repository secrets.
+2. Runs `prisma migrate deploy` against production (applies pending migrations from the tagged commit, including `MarketingReleaseEmailSend`).
+3. Runs `send-release-email.ts --version=X.Y.Z --previous-version=…` with repository secrets.
 
 Required GitHub repository secrets (production):
 

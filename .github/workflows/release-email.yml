@@ -68,6 +68,12 @@ jobs:
           path: .release-email-sent
           key: release-email-sent-${{ github.ref_name }}
 
+      - name: Apply database migrations
+        if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter api exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Send product update email
         if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit != 'true'
         working-directory: apps/api
