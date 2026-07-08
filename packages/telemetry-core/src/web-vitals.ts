@@ -60,6 +60,16 @@ export function buildWebVitalProperties(metric: Metric): WebVitalEventProperties
 }
 
 let webVitalsInstalled = false;
+let webVitalsCaptureEnabled = false;
+
+/** Toggle capture without unregistering library listeners (checked on every report). */
+export function setWebVitalsCaptureEnabled(enabled: boolean): void {
+  webVitalsCaptureEnabled = enabled;
+}
+
+export function isWebVitalsCaptureEnabled(): boolean {
+  return webVitalsCaptureEnabled;
+}
 
 /** Register Core Web Vitals listeners; calls `report` once per finalized metric sample. */
 export function installWebVitals(
@@ -77,7 +87,12 @@ export function installWebVitals(
 
   void import("web-vitals")
     .then(({ onCLS, onINP, onLCP, onTTFB }) => {
+      if (!webVitalsCaptureEnabled) {
+        webVitalsInstalled = false;
+        return;
+      }
       const handle = (metric: Metric) => {
+        if (!webVitalsCaptureEnabled) return;
         report(buildWebVitalProperties(metric));
       };
       onCLS(handle);
@@ -94,4 +109,5 @@ export function installWebVitals(
 /** @internal Test helper — reset install guard. */
 export function resetWebVitalsInstallState(): void {
   webVitalsInstalled = false;
+  webVitalsCaptureEnabled = false;
 }

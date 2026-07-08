@@ -14,6 +14,9 @@ export type WebVitalEventProperties = {
 };
 export declare function rateWebVital(metric: WebVitalMetricName, value: number): WebVitalRating;
 export declare function buildWebVitalProperties(metric: Metric): WebVitalEventProperties;
+/** Toggle capture without unregistering library listeners (checked on every report). */
+export declare function setWebVitalsCaptureEnabled(enabled: boolean): void;
+export declare function isWebVitalsCaptureEnabled(): boolean;
 /** Register Core Web Vitals listeners; calls `report` once per finalized metric sample. */
 export declare function installWebVitals(report: (properties: WebVitalEventProperties) => void): void;
 /** @internal Test helper — reset install guard. */

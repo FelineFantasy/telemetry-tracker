@@ -1,6 +1,6 @@
 import { SDK_VERSION } from "./version.js";
 export { SDK_VERSION };
-export { WEB_VITAL_EVENT_NAME, installWebVitals, rateWebVital, buildWebVitalProperties, type WebVitalEventProperties, type WebVitalMetricName, type WebVitalRating, } from "./web-vitals.js";
+export { WEB_VITAL_EVENT_NAME, installWebVitals, rateWebVital, buildWebVitalProperties, setWebVitalsCaptureEnabled, isWebVitalsCaptureEnabled, type WebVitalEventProperties, type WebVitalMetricName, type WebVitalRating, } from "./web-vitals.js";
 export declare function getAnonymousId(): string;
 export type TelemetryConfig = {
     ingestUrl: string;
