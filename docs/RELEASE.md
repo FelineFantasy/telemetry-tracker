@@ -128,18 +128,21 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
 - [ ] [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` section complete
 - [ ] CI green on `develop` (`pnpm lint`, `pnpm test`, `pnpm -r run build`)
 - [ ] Self-host upgrade notes ready (migrations, env vars)
-- [ ] If this is a **MINOR** or **MAJOR** release: plan the [product update email](./MARKETING-EMAIL.md#maintainer-workflow-each-qualifying-release) for after deploy (manual; not CI)
+- [ ] If this is a **MINOR** or **MAJOR** release: confirm `CHANGELOG.md` is ready and plan to run [production migrations](#3-database-migrations-production) **before** pushing the tag — [product update email](./MARKETING-EMAIL.md#automated-send-minor--major-tags) sends automatically when the tag is pushed
 
 ### On `main` after promotion
 
 1. **Finalize CHANGELOG** — rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`. Prefer doing this in the **`develop` → `main`** release PR so `develop` and `main` stay aligned; if you commit on `main` after promotion, you **must** sync `develop` in step 9.
-2. **Tag:**
+2. **Deploy** — Railway rebuilds `main` automatically when the release PR merges; see [Deploy runbook](#deploy-runbook-railway).
+3. **Production DB** — run [migrations](#3-database-migrations-production) **before tagging** on MINOR/MAJOR releases (the [Release product email](../.github/workflows/release-email.yml) workflow also runs `prisma migrate deploy` immediately before send, but apply migrations here as part of the normal release gate).
+4. **Post-deploy** — [verification](#post-deploy-verification).
+5. **Tag** — after deploy and migrations are green (tag push triggers the product update email workflow for MINOR/MAJOR):
    ```bash
    git checkout main && git pull origin main
    git tag -a v1.1.0 -m "Telemetry Tracker v1.1.0"
    git push origin v1.1.0
    ```
-3. **GitHub Release** — publish notes from [RELEASE_NOTES_TEMPLATE.md](./RELEASE_NOTES_TEMPLATE.md) (highlights + upgrade steps; link to CHANGELOG for detail):
+6. **GitHub Release** — publish notes from [RELEASE_NOTES_TEMPLATE.md](./RELEASE_NOTES_TEMPLATE.md) (highlights + upgrade steps; link to CHANGELOG for detail):
    ```bash
    VERSION=1.2.0
    PREVIOUS=1.1.0
@@ -150,17 +153,8 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
      --notes-file "/tmp/release-notes-v${VERSION}.md"
    ```
    See the template for section guidance and a filled v1.1.0 example. Do not duplicate the entire CHANGELOG — keep the release body scannable for deployers.
-4. **Deploy** — Railway rebuilds `main` automatically; see [Deploy runbook](#deploy-runbook-railway).
-5. **Production DB** — run [migrations](#3-database-migrations-production) (CI does not touch prod).
-6. **Post-deploy** — [verification](#post-deploy-verification).
 7. **SDK** — if ingest/SDK contract changed, bump `packages/*/package.json` and `pnpm publish:packages`.
-8. **Product update email** — for **MINOR** and **MAJOR** releases (and notable PATCH releases), send the subscriber broadcast manually after deploy is verified. See [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#when-to-send-maintainer-policy):
-   ```bash
-   cd apps/api
-   pnpm exec tsx scripts/send-release-email.ts --dry-run --version=${VERSION}
-   pnpm exec tsx scripts/send-release-email.ts --version=${VERSION}
-   ```
-   Requires production `DATABASE_URL`, `RESEND_API_KEY`, `TELEMETRY_EMAIL_FROM`, and `TELEMETRY_DASHBOARD_ORIGIN` on the operator machine. Note send date and recipient count in the GitHub Release when done. **Not automated** — CI does not send marketing email.
+8. **Product update email** — **MINOR** and **MAJOR** tags trigger the [Release product email](../.github/workflows/release-email.yml) workflow automatically (patch tags skipped). Ensure repository secrets are set ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md#automated-send-minor--major-tags)). After the workflow completes, note send date and recipient count in the GitHub Release. For notable PATCH releases or backfill, send manually with `--force` — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#manual-send-override--backfill).
 9. **Sync `develop`** — merge **`main` into `develop`** and push after every release (milestone promotion or hotfix). Required whenever `main` has commits not on `develop` — including squash merges, merge commits from the release PR, and any post-promotion edits on `main`:
    ```bash
    git checkout develop && git pull origin develop
@@ -200,7 +194,7 @@ On push and pull requests to **`develop`** and **`main`**, CI runs ([`.github/wo
 
 ### 3. Database migrations (production)
 
-CI does **not** migrate your production database. After API deploy (or before, from your machine):
+CI does **not** migrate your production database during normal builds. Apply migrations after API deploy and **before pushing a MINOR/MAJOR tag** (see [On `main` after promotion](#on-main-after-promotion)). The [Release product email](../.github/workflows/release-email.yml) workflow also runs `prisma migrate deploy` immediately before sending so delivery records can be written.
 
 ```bash
 DATABASE_URL="postgresql://..." pnpm --filter api exec prisma migrate deploy

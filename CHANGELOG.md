@@ -13,6 +13,26 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.6.0] - 2026-07-08
+
+Continues **v1.6.0 — Launch hardening** ([#3](https://github.com/Telemetry-Tracker/telemetry-tracker/milestone/3)).
+
+### Added
+
+- **Automated product update email** — MINOR/MAJOR `vX.Y.Z` tag push triggers [Release product email](.github/workflows/release-email.yml); patch-only tags skipped ([#291](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/291))
+- **`MarketingReleaseEmailSend`** — per-subscriber delivery ledger so workflow retries skip already-sent recipients and do not rotate unsubscribe tokens again
+- **Release email scripts** — semver bump check, idempotent send with `--previous-version` / `--force` for manual override
+
+### Changed
+
+- **Marketing & release docs** — automation secrets, migrate-before-tag runbook order, and backfill guidance ([MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md), [RELEASE.md](docs/RELEASE.md))
+
+### Database
+
+- Migration `20260708140000_marketing_release_email_send` — `MarketingReleaseEmailSend` table
+
+---
+
 ## [1.5.18] - 2026-07-08
 
 ### Fixed
