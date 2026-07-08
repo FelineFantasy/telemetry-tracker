@@ -13,6 +13,16 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.5.18] - 2026-07-08
+
+### Fixed
+
+- **Overview Signals charts** — restore visible Y-axis labels (remove negative left margin)
+- **Overview key metrics** — full-width KPI sparklines on all breakpoints
+- **Dashboard top nav** — align scope picker row with page content column
+
+---
+
 ## [1.5.17] - 2026-07-08
 
 Continues the **v1.5.0 — Analytics dashboard** milestone ([#195](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/195)).
