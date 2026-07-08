@@ -31,10 +31,20 @@ Both routes use the public rate limit surface (`RATE_LIMIT_PUBLIC_MAX`).
 
 ## When to send (maintainer policy)
 
+Versions use **`vX.Y.Z`** semver:
+
+| Component | Name | Product update email |
+|-----------|------|----------------------|
+| **X** | Major | **Send** |
+| **Y** | Minor | **Send** |
+| **Z** | Patch / hotfix | **Skip** (use `--force` for exceptional user-visible hotfixes) |
+
+Examples: `v1.5.18` → `v1.6.0` is a **minor** release (Y: 5→6). `v1.6.0` → `v1.6.1` is a **patch** hotfix (Z only).
+
 | Release type | Send? | Notes |
 |--------------|-------|-------|
-| **MINOR** or **MAJOR** on `main` | **Yes** | Automated on `v*.*.*` tag push via [release-email workflow](../.github/workflows/release-email.yml) |
-| **PATCH** (hotfix) | **No** | Workflow skips patch-only bumps; use `--force` for exceptional user-visible hotfixes |
+| **MINOR** (Y) or **MAJOR** (X) on `main` | **Yes** | Automated on `v*.*.*` tag push via [release-email workflow](../.github/workflows/release-email.yml) |
+| **PATCH** / hotfix (Z only) | **No** | Workflow skips Z-only bumps; use `--force` for exceptional user-visible hotfixes |
 | Pre-release / draft | **No** | Use `--dry-run` and `--version=Unreleased` to preview copy only |
 
 Align semver bumps with [RELEASE.md](./RELEASE.md#semver-guidance). If a release has no subscriber-relevant bullets (migrations-only, internal ops), skip the email with workflow dispatch disabled — cancel the **Release product email** run before the send step, or use a manual override only when needed.
@@ -43,9 +53,9 @@ Delivery is recorded in `MarketingReleaseEmailSend` (one row per subscriber per 
 
 ### Automated send (MINOR / MAJOR tags)
 
-Pushing a semver tag `vX.Y.Z` to GitHub triggers **Release product email**:
+Pushing a semver tag `vX.Y.Z` to GitHub triggers **Release product email** when **X** (major) or **Y** (minor) increases vs the previous tag; **Z**-only (patch/hotfix) tags are skipped:
 
-1. Resolves the previous semver tag and compares X/Y (patch-only → skip).
+1. Resolves the previous semver tag and compares **X** and **Y** (Z-only → skip).
 2. Runs `prisma migrate deploy` against production (applies pending migrations from the tagged commit, including `MarketingReleaseEmailSend`).
 3. Runs `send-release-email.ts --version=X.Y.Z --previous-version=…` with repository secrets.
 
@@ -98,7 +108,7 @@ pnpm exec tsx scripts/send-release-email.ts --version=1.4.2
 ```
 
 - `--version=X.Y.Z` reads that section from `CHANGELOG.md` (repo root). Required for a live send; omit only with `--dry-run` to preview `[Unreleased]`.
-- `--previous-version=X.Y.Z` skips patch-only releases unless `--force` is set (same rule as CI).
+- `--previous-version=X.Y.Z` skips Z-only (patch/hotfix) releases unless `--force` is set (same rule as CI).
 - `--dry-run` prints subject, recipient count, and a short CHANGELOG preview without sending.
 - Before each successful send, the script rotates the one-click unsubscribe token for that recipient: the hash is written **before** Resend sends so the link in the message always matches the database; failed sends restore the prior token.
 - After a successful Resend delivery, a `MarketingReleaseEmailSend` row is written so retries send only to remaining subscribers (requires migration `20260708140000_marketing_release_email_send`).
@@ -116,7 +126,7 @@ pnpm exec tsx scripts/send-release-email.ts --version=1.4.2
 
 ### Automation
 
-**MINOR** and **MAJOR** tags trigger [Release product email](../.github/workflows/release-email.yml) automatically. Patch tags are skipped. See [When to send](#when-to-send-maintainer-policy) for secrets and manual override.
+**MINOR** (Y) and **MAJOR** (X) tags trigger [Release product email](../.github/workflows/release-email.yml) automatically. Patch/hotfix tags (Z only) are skipped. See [When to send](#when-to-send-maintainer-policy) for secrets and manual override.
 
 ## Privacy
 
