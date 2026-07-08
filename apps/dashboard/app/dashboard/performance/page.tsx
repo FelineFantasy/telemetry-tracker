@@ -123,7 +123,7 @@ export default async function PerformancePage({
   }
 
   const currentParams = buildPerformanceParamsRecord(sp);
-  const rangeLabel = timeRange.label;
+  const metricsRangeLabel = summary?.window.label ?? timeRange.label;
   const hasVitals = summary?.webVitals.available === true;
   const hasRequestLatency = summary?.requestLatency.available === true;
 
@@ -133,8 +133,8 @@ export default async function PerformancePage({
         title="Performance"
         context={
           appFilter
-            ? `${rangeLabel} · App: ${appFilter}`
-            : `${rangeLabel} · Web vitals and request latency for your apps.`
+            ? `${metricsRangeLabel} · App: ${appFilter}`
+            : `${metricsRangeLabel} · Web vitals and request latency for your apps.`
         }
       />
 
@@ -168,7 +168,10 @@ export default async function PerformancePage({
                   path={PERFORMANCE_PATH}
                   currentParams={currentParams}
                 />
-                <PerformanceRatingDistribution summary={summary} rangeLabel={rangeLabel} />
+                <PerformanceRatingDistribution
+                  summary={summary}
+                  rangeLabel={summary.window.label}
+                />
               </section>
             ) : (
               <EmptyState
