@@ -164,9 +164,9 @@ jobs:
       - name: Upload Source Maps
         uses: ./.github/actions/upload-source-maps
         with:
-          session_cookie: \${{ secrets.TT_SESSION_COOKIE }}
+          session_cookie: ${{ secrets.TT_SESSION_COOKIE }}
           project_id: "your-project-uuid-here"
-          release: \${{ github.event.release.tag_name }}
+          release: ${{ github.event.release.tag_name }}
           app: "my-telemetry-app"
           artifact_path: "./dist"
           base_url: "https://example.com"
