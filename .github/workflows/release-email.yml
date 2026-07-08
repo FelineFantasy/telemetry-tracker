@@ -31,10 +31,10 @@ jobs:
         id: tags
         run: |
           CURRENT="${GITHUB_REF_NAME#v}"
-          PREVIOUS=$(git tag -l "v*.*.*" --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1 | sed 's/^v//')
+          PREVIOUS=$(git tag -l "v*.*.*" --merged HEAD --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1 | sed 's/^v//')
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
-          echo "Tag ${GITHUB_REF_NAME} (previous: ${PREVIOUS:-none})"
+          echo "Tag ${GITHUB_REF_NAME} (previous on this line: ${PREVIOUS:-none})"
 
       - name: Check minor/major bump
         id: bump
@@ -49,14 +49,16 @@ jobs:
           echo "reason=$(node -e "console.log(JSON.parse(process.argv[1]).reason)" "$BUMP")" >> "$GITHUB_OUTPUT"
           echo "Bump decision: $BUMP"
 
-      - name: Prisma migrate deploy
+      - name: Check prior successful send
+        id: send-cache
         if: steps.bump.outputs.should_send == 'true'
-        run: pnpm --filter api exec prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        uses: actions/cache@v4
+        with:
+          path: .release-email-sent
+          key: release-email-sent-${{ github.ref_name }}
 
       - name: Send product update email
-        if: steps.bump.outputs.should_send == 'true'
+        if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit != 'true'
         working-directory: apps/api
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -69,6 +71,14 @@ jobs:
             ARGS="$ARGS --previous-version=${{ steps.tags.outputs.previous }}"
           fi
           pnpm exec tsx scripts/send-release-email.ts $ARGS
+
+      - name: Record successful send
+        if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit != 'true'
+        run: mkdir -p .release-email-sent && date -u +%Y-%m-%dT%H:%M:%SZ > .release-email-sent/sent-at
+
+      - name: Skip duplicate send
+        if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit == 'true'
+        run: echo "Skipped product update email — already sent for ${{ github.ref_name }} (Actions cache)"
 
       - name: Skip patch-only release
         if: steps.bump.outputs.should_send != 'true'
