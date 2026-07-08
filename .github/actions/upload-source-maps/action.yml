@@ -48,9 +48,13 @@ runs:
         function uploadFile(filePath) {
           return new Promise((resolve, reject) => {
             const content = fs.readFileSync(filePath, 'utf8');
-            const fileName = path.basename(filePath);
-            const jsName = fileName.replace('.map', '');
-            const bundleUrl = \`\${'${{ inputs.base_url }}'}/\${jsName}\`;
+            const artifactPath = '${{ inputs.artifact_path }}';
+            // 1. Получаем путь, относительный к artifact_path
+            const relativePath = filePath.replace(artifactPath, '').replace(/^\/+/, '');
+            // 2. Убираем .map, чтобы получить путь к исходному JS
+            const jsPath = relativePath.replace(/\.map$/, '');
+            // 3. Собираем полный URL
+            const bundleUrl = \`\${{ inputs.base_url }}/\${jsPath}\`;
 
             const payload = JSON.stringify({
               app: '${{ inputs.app }}',
@@ -76,9 +80,9 @@ runs:
               res.on('data', chunk => body += chunk);
               res.on('end', () => {
                 if (res.statusCode >= 400) {
-                  reject(new Error(\`Failed to upload \${fileName}: \${res.statusCode} - \${body}\`));
+                  reject(new Error(\`Failed to upload \${path.basename(filePath)}: \${res.statusCode} - \${body}\`));
                 } else {
-                  console.log(\`Successfully uploaded \${fileName}\`);
+                  console.log(\`Successfully uploaded \${path.basename(filePath)}\`);
                   resolve();
                 }
               });
