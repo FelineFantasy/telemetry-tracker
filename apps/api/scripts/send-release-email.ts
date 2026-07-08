@@ -12,7 +12,7 @@ import {
   isReleaseEmailBroadcastComplete,
   loadReleaseEmailSentSubscriberIds,
   pendingReleaseEmailRecipients,
-  recordReleaseEmailSend,
+  recordReleaseEmailSendReliable,
   revertReleaseEmailUnsubscribeToken,
   stageReleaseEmailUnsubscribeToken,
 } from "../src/lib/release-email-send.js";
@@ -215,7 +215,7 @@ async function main() {
       continue;
     }
 
-    await recordReleaseEmailSend(prisma, {
+    await recordReleaseEmailSendReliable(prisma, {
       subscriberId: sub.id,
       releaseVersion: version,
     });

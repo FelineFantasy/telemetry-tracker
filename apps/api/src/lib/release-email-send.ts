@@ -1,5 +1,7 @@
-import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
+
+const RECORD_SEND_MAX_ATTEMPTS = 3;
+const RECORD_SEND_RETRY_MS = 250;
 
 /** Whether every targeted subscriber received the release email. */
 export function isReleaseEmailBroadcastComplete(deliveredCount: number, subscriberCount: number): boolean {
@@ -59,7 +61,11 @@ export async function revertReleaseEmailUnsubscribeToken(
   });
 }
 
-/** Record a successful delivery after Resend accepts the message. Idempotent on duplicate rows. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Record a successful delivery after Resend accepts the message. Idempotent via upsert. */
 export async function recordReleaseEmailSend(
   db: PrismaTypes.DefaultPrismaClient,
   input: {
@@ -67,17 +73,47 @@ export async function recordReleaseEmailSend(
     releaseVersion: string;
   }
 ): Promise<void> {
-  try {
-    await db.marketingReleaseEmailSend.create({
-      data: {
+  await db.marketingReleaseEmailSend.upsert({
+    where: {
+      subscriber_id_release_version: {
         subscriber_id: input.subscriberId,
         release_version: input.releaseVersion,
       },
-    });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return;
-    }
-    throw err;
+    },
+    create: {
+      subscriber_id: input.subscriberId,
+      release_version: input.releaseVersion,
+    },
+    update: {},
+  });
+}
+
+/** Retry transient ledger write failures so accepted emails are not retried as pending. */
+export async function recordReleaseEmailSendReliable(
+  db: PrismaTypes.DefaultPrismaClient,
+  input: {
+    subscriberId: string;
+    releaseVersion: string;
   }
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= RECORD_SEND_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await recordReleaseEmailSend(db, input);
+      return;
+    } catch (err) {
+      lastError = err;
+      if (attempt === RECORD_SEND_MAX_ATTEMPTS) break;
+      await sleep(RECORD_SEND_RETRY_MS * attempt);
+    }
+  }
+
+  const recorded = await loadReleaseEmailSentSubscriberIds(db, input.releaseVersion, [input.subscriberId]);
+  if (recorded.has(input.subscriberId)) {
+    return;
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Failed to record release email delivery after Resend accepted the message.");
 }
