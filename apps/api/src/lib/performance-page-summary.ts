@@ -55,7 +55,9 @@ export type WebVitalMetricSummary = {
   metric: PerformanceVitalKey;
   sampleCount: number;
   p75: number | null;
+  p75Previous: number | null;
   p95: number | null;
+  goodPctPrevious: number | null;
   rating: WebVitalRatingDistribution;
   series: PerformanceSparklinePoint[];
 };
@@ -238,6 +240,23 @@ export function pctOfTotal(part: number, total: number): number {
   return (part / total) * 100;
 }
 
+/** Prior-period p75 and good-% for KPI compare (null when no prior samples). */
+export function resolveVitalPreviousCompare(
+  metric: PerformanceVitalKey,
+  p75Previous: number | null | undefined,
+  previousSampleCount: number,
+  goodCountPrevious: number
+): { p75Previous: number | null; goodPctPrevious: number | null } {
+  if (previousSampleCount <= 0) {
+    return { p75Previous: null, goodPctPrevious: null };
+  }
+  return {
+    p75Previous:
+      p75Previous == null ? null : roundWebVitalValue(metric, p75Previous),
+    goodPctPrevious: pctOfTotal(goodCountPrevious, previousSampleCount),
+  };
+}
+
 /** Build rating distribution counts and percentages from raw counts. */
 export function buildWebVitalRatingDistribution(
   good: number,
@@ -293,7 +312,9 @@ function emptyVitalSummary(metric: PerformanceVitalKey): WebVitalMetricSummary {
     metric,
     sampleCount: 0,
     p75: null,
+    p75Previous: null,
     p95: null,
+    goodPctPrevious: null,
     rating: buildWebVitalRatingDistribution(0, 0, 0),
     series: [],
   };
@@ -302,9 +323,12 @@ function emptyVitalSummary(metric: PerformanceVitalKey): WebVitalMetricSummary {
 type VitalScalarRow = {
   metric: string;
   sample_count: bigint;
+  sample_count_previous: bigint;
   p75: number | null;
+  p75_previous: number | null;
   p95: number | null;
   good_count: bigint;
+  good_count_previous: bigint;
   needs_improvement_count: bigint;
   poor_count: bigint;
 };
@@ -320,29 +344,38 @@ async function fetchWebVitalScalars(
   prisma: PrismaClient,
   f: PerformanceFilterInput,
   projectId: string,
-  since: Date,
-  until: Date
+  window: ResolvedSummaryWindow
 ): Promise<VitalScalarRow[]> {
+  const { since, until, previousSince, previousUntil } = window;
   const filters = performanceEventFilterSql(f, projectId);
   const value = webVitalValueExpr("e");
   const metricKey = webVitalMetricKeySql("e");
   const rating = webVitalComputedRatingSql(metricKey, value);
+  const currentWindow = Prisma.sql`e."created_at" >= ${since} AND e."created_at" <= ${until}`;
+  const previousWindow = Prisma.sql`e."created_at" >= ${previousSince} AND e."created_at" < ${previousUntil}`;
+  const queryLowerBound = previousSince;
 
   return prisma.$queryRaw<VitalScalarRow[]>(Prisma.sql`
     SELECT
       ${metricKey} AS metric,
-      COUNT(*)::bigint AS sample_count,
-      PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${value}) AS p75,
-      PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${value}) AS p95,
-      COUNT(*) FILTER (WHERE ${rating} = 'good')::bigint AS good_count,
-      COUNT(*) FILTER (WHERE ${rating} = 'needs-improvement')::bigint AS needs_improvement_count,
-      COUNT(*) FILTER (WHERE ${rating} = 'poor')::bigint AS poor_count
+      COUNT(*) FILTER (WHERE ${currentWindow})::bigint AS sample_count,
+      COUNT(*) FILTER (WHERE ${previousWindow})::bigint AS sample_count_previous,
+      PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${value})
+        FILTER (WHERE ${currentWindow}) AS p75,
+      PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${value})
+        FILTER (WHERE ${previousWindow}) AS p75_previous,
+      PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${value})
+        FILTER (WHERE ${currentWindow}) AS p95,
+      COUNT(*) FILTER (WHERE ${currentWindow} AND ${rating} = 'good')::bigint AS good_count,
+      COUNT(*) FILTER (WHERE ${previousWindow} AND ${rating} = 'good')::bigint AS good_count_previous,
+      COUNT(*) FILTER (WHERE ${currentWindow} AND ${rating} = 'needs-improvement')::bigint AS needs_improvement_count,
+      COUNT(*) FILTER (WHERE ${currentWindow} AND ${rating} = 'poor')::bigint AS poor_count
     FROM "Event" e
     WHERE ${filters}
       AND e."name" = ${WEB_VITAL_EVENT_NAME}
       AND ${metricKey} IS NOT NULL
       AND ${value} IS NOT NULL
-      AND e."created_at" >= ${since}
+      AND e."created_at" >= ${queryLowerBound}
       AND e."created_at" <= ${until}
     GROUP BY 1
   `);
@@ -407,9 +440,16 @@ function buildVitalSummaries(
     scalarByMetric.set(key, {
       metric: key,
       sample_count: BigInt(Number(existing.sample_count) + Number(row.sample_count)),
+      sample_count_previous: BigInt(
+        Number(existing.sample_count_previous) + Number(row.sample_count_previous)
+      ),
       p75: existing.p75,
+      p75_previous: existing.p75_previous,
       p95: existing.p95,
       good_count: BigInt(Number(existing.good_count) + Number(row.good_count)),
+      good_count_previous: BigInt(
+        Number(existing.good_count_previous) + Number(row.good_count_previous)
+      ),
       needs_improvement_count: BigInt(
         Number(existing.needs_improvement_count) + Number(row.needs_improvement_count)
       ),
@@ -431,11 +471,19 @@ function buildVitalSummaries(
       p75: row.p75,
       sampleCount: Number(row.sample_count),
     }));
+    const previousCompare = resolveVitalPreviousCompare(
+      key,
+      scalar.p75_previous,
+      Number(scalar.sample_count_previous),
+      Number(scalar.good_count_previous)
+    );
     result[key] = {
       metric: key,
       sampleCount: Number(scalar.sample_count),
       p75: roundWebVitalValue(key, scalar.p75),
+      p75Previous: previousCompare.p75Previous,
       p95: roundWebVitalValue(key, scalar.p95),
+      goodPctPrevious: previousCompare.goodPctPrevious,
       rating: buildWebVitalRatingDistribution(
         Number(scalar.good_count),
         Number(scalar.needs_improvement_count),
@@ -637,7 +685,7 @@ export async function fetchPerformancePageSummary(
   const chartSince = overviewChartQuerySince(since, until, bucket);
 
   const [scalarRows, bucketRows, requestLatency] = await Promise.all([
-    fetchWebVitalScalars(prisma, f, projectId, since, until),
+    fetchWebVitalScalars(prisma, f, projectId, window),
     fetchWebVitalSeries(prisma, f, projectId, chartSince, until, bucket),
     fetchPerformanceRequestLatency(prisma, f, projectId, window, bucket),
   ]);

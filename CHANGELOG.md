@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Performance dashboard page** — KPI row (LCP, INP/FID, CLS, TTFB with prior-period compare and sparklines), vitals-over-time charts with bucket control, Good/Needs improvement/Poor rating bars, env/platform/release filters, and optional avg response + Apdex when `$request` data exists ([#195](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/195))
+
 ---
 
 ## [1.5.16] - 2026-07-08

@@ -19,7 +19,9 @@ export type WebVitalMetricSummary = {
   metric: "LCP" | "INP" | "CLS" | "TTFB";
   sampleCount: number;
   p75: number | null;
+  p75Previous: number | null;
   p95: number | null;
+  goodPctPrevious: number | null;
   rating: WebVitalRatingDistribution;
   series: PerformanceSparklinePoint[];
 };
