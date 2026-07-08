@@ -140,7 +140,7 @@ async function main() {
       return;
     }
     console.error(
-      "No active marketing subscribers. Re-run after subscribers exist; Actions cache is not updated."
+      "No active marketing subscribers. Re-run after subscribers exist; the workflow can be retried safely."
     );
     process.exit(1);
   }
