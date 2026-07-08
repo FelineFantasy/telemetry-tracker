@@ -25,9 +25,13 @@ import { OverviewAppHealth } from "@/app/components/dashboard/overview/OverviewA
 import { OverviewActiveIncidents } from "@/app/components/dashboard/overview/OverviewActiveIncidents";
 import { OverviewMetricsSection } from "@/app/components/dashboard/overview/OverviewMetricsSection";
 import { OverviewExtraCharts } from "@/app/components/dashboard/overview/OverviewExtraCharts";
+import {
+  OverviewRecentSessionsPanel,
+  OverviewTopErrorsPanel,
+} from "@/app/components/dashboard/overview/OverviewBreakdownGrid";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
-import type { OverviewApiResponse, OverviewHealth, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
+import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
 import {
   parseOverviewCompare,
@@ -135,6 +139,15 @@ function emptySeries(): OverviewApiResponse["series"] {
     bucket: "hour",
     errors: [],
     events: [],
+    sessions: [],
+  };
+}
+
+function emptySparklines(): OverviewKpiSparklines {
+  return {
+    errors: [],
+    events: [],
+    sessions: [],
   };
 }
 
@@ -350,6 +363,7 @@ export default async function OverviewPage({
   const overviewData: OverviewApiResponse = {
     ...overviewResult,
     series: overviewResult.series ?? emptySeries(),
+    kpiSparklines: overviewResult.kpiSparklines ?? emptySparklines(),
   };
 
   const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
@@ -432,8 +446,35 @@ export default async function OverviewPage({
           activeUsersPrevious={overviewData.activeUsersPrevious ?? 0}
           workspaceStats={workspaceStats}
           workspaceTelemetry={workspaceTelemetry}
+          sparklines={overviewData.kpiSparklines ?? emptySparklines()}
+          requestMetrics={overviewData.requestMetrics}
         />
       </Suspense>
+
+      <DashboardSection
+        kicker="Volume"
+        title="Telemetry over time"
+        description={`Errors, events, and sessions in ${displayRangeLabel.toLowerCase()}`}
+        className="mb-8"
+      >
+        <OverviewTrendsChart series={overviewData.series} rangeLabel={displayRangeLabel} />
+      </DashboardSection>
+
+      <section className="mb-8 grid gap-4 lg:grid-cols-2">
+        <OverviewTopErrorsPanel
+          groups={(overviewData.metricsTopErrorGroups ?? []).map((group) => ({
+            ...group,
+            href: buildErrorGroupDetailHref(group.id, { app, environment }),
+          }))}
+          rangeLabel={displayRangeLabel}
+          errorsHref={scopedListHref("/dashboard/errors", app, environment)}
+        />
+        <OverviewRecentSessionsPanel
+          sessions={overviewData.recentSessions ?? []}
+          rangeLabel={displayRangeLabel}
+          sessionsHref={scopedListHref("/dashboard/sessions", app, environment)}
+        />
+      </section>
 
       <OverviewExtraCharts
         series={overviewData.series}
@@ -455,8 +496,6 @@ export default async function OverviewPage({
           topEventsSort={topEventsSort}
           topEventsOrder={topEventsOrder}
         />
-
-        <OverviewTrendsChart series={overviewData.series} rangeLabel={displayRangeLabel} />
 
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <OverviewTopBars

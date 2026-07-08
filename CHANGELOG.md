@@ -13,6 +13,35 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.5.13] - 2026-07-08
+
+### Fixed
+
+- **Sessions KPI sparklines** — use null gaps for empty rate/duration buckets; horizontal mobile layout with fixed-width charts
+- **Sessions table on mobile** — truncate user/session IDs, fix duration bar overflow, and restore horizontal scroll for clipped timestamps
+
+---
+
+## [1.5.12] - 2026-07-08
+
+### Fixed
+
+- **Overview page crash** — precompute error detail links on the server instead of passing a function into the top-errors client panel (fixes RSC boundary error on `/dashboard/overview`)
+
+---
+
+## [1.5.11] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#183](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/183)).
+
+### Added
+
+- **Overview KPI row** — errors, events, and sessions cards with prior-period compare and sparklines; avg response time and Apdex when Node `$request` duration data exists ([#272](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/272), [#183](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/183))
+- **`GET /api/overview`** — `kpiSparklines`, optional `requestMetrics`, `metricsTopErrorGroups`, and `recentSessions` for the overview hero layout
+- **Overview layout** — polished telemetry volume chart and top-errors / recent-sessions grid
+
+---
+
 ## [1.5.10] - 2026-07-08
 
 Continues the **v1.5.0 — Analytics dashboard** milestone ([#192](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/192)).

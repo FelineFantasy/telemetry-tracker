@@ -1,10 +1,19 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   buildWorkspaceTelemetry,
   computeOverviewHealth,
   errorGroupDetailHref,
+  overviewEnvironmentSessionCountUpperClauses,
   resolveCompareWindow,
 } from "./overview-stats.js";
+
+function prismaSqlText(fragment: Prisma.Sql): string {
+  return fragment.strings.reduce(
+    (acc, part, i) => acc + part + (fragment.values[i] ?? ""),
+    ""
+  );
+}
 
 describe("resolveCompareWindow", () => {
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
@@ -48,6 +57,39 @@ describe("resolveCompareWindow", () => {
 
     expect(previousUntil).toEqual(currentSince);
     expect(previousSince).toEqual(new Date("2026-04-30T12:00:00.000Z"));
+  });
+});
+
+describe("overviewEnvironmentSessionCountUpperClauses", () => {
+  it("uses inclusive scope.until for the current metrics window", () => {
+    const since = new Date("2026-03-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const clauses = overviewEnvironmentSessionCountUpperClauses({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+    });
+
+    expect(prismaSqlText(clauses.session)).toContain("<=");
+    expect(prismaSqlText(clauses.event)).toContain("<=");
+  });
+
+  it("uses exclusive upper bounds for the previous compare window", () => {
+    const previousUntil = new Date("2026-03-01T00:00:00.000Z");
+    const clauses = overviewEnvironmentSessionCountUpperClauses(
+      {
+        projectId: "proj_1",
+        since: new Date("2026-02-22T00:00:00.000Z"),
+        until: new Date("2026-03-15T00:00:00.000Z"),
+        environment: "production",
+      },
+      previousUntil
+    );
+
+    expect(prismaSqlText(clauses.session)).toContain("<");
+    expect(prismaSqlText(clauses.session)).not.toContain("<=");
+    expect(prismaSqlText(clauses.event)).toContain("<");
   });
 });
 

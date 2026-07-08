@@ -9,6 +9,8 @@ import {
 } from "@/lib/overview-scope-url";
 import { OverviewKeyMetrics } from "@/app/components/dashboard/overview/OverviewKeyMetrics";
 import type {
+  OverviewKpiSparklines,
+  OverviewRequestMetrics,
   OverviewWorkspaceStats,
   OverviewWorkspaceTelemetry,
 } from "@/lib/overview-api";
@@ -71,6 +73,8 @@ export function OverviewMetricsSection({
   activeUsersPrevious,
   workspaceStats,
   workspaceTelemetry,
+  sparklines,
+  requestMetrics,
 }: {
   rangeLabel: string;
   rangeDurationMs: number;
@@ -86,6 +90,8 @@ export function OverviewMetricsSection({
   activeUsersPrevious: number;
   workspaceStats: OverviewWorkspaceStats;
   workspaceTelemetry: OverviewWorkspaceTelemetry;
+  sparklines: OverviewKpiSparklines;
+  requestMetrics?: OverviewRequestMetrics;
 }) {
   const searchParams = useSearchParams();
   const compare = parseOverviewCompare(searchParams.get("compare") ?? currentParams.compare);
@@ -112,6 +118,8 @@ export function OverviewMetricsSection({
         rangeLabel={rangeLabel}
         compareLabel={compareLabel}
         rangeDurationMs={rangeDurationMs}
+        sparklines={sparklines}
+        requestMetrics={requestMetrics}
       />
     </>
   );

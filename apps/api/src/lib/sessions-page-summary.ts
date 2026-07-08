@@ -46,7 +46,7 @@ export function buildSessionListFilter(input: {
 
 export type SessionsSummarySparklinePoint = {
   t: string;
-  count: number;
+  count: number | null;
 };
 
 export type SessionsPageSummary = {
@@ -173,15 +173,52 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
   )`;
 }
 
+function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
+  const eventClauses: Prisma.Sql[] = [];
+  if (f.environment) {
+    eventClauses.push(Prisma.sql`e."environment" = ${f.environment}`);
+  }
+  if (f.release) {
+    eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
+  }
+  return eventClauses;
+}
+
+function sessionHasEventScope(f: SessionListFilterInput): boolean {
+  return sessionEventScopeClauses(f).length > 0;
+}
+
+export type SessionEventWindow = {
+  gte?: Date;
+  lte?: Date;
+  exclusiveLte?: boolean;
+};
+
 function sessionEventExistsSql(
   projectId: string,
   sessionAlias: string,
-  extra: Prisma.Sql[] = []
+  extra: Prisma.Sql[] = [],
+  eventWindow?: SessionEventWindow
 ): Prisma.Sql {
   const s = Prisma.raw(`"${sessionAlias}"`);
   const clauses =
     extra.length > 0
       ? Prisma.sql` AND ${Prisma.join(extra, " AND ")}`
+      : Prisma.empty;
+  const windowParts: Prisma.Sql[] = [];
+  if (eventWindow?.gte) {
+    windowParts.push(Prisma.sql`e."created_at" >= ${eventWindow.gte}`);
+  }
+  if (eventWindow?.lte) {
+    windowParts.push(
+      eventWindow.exclusiveLte
+        ? Prisma.sql`e."created_at" < ${eventWindow.lte}`
+        : Prisma.sql`e."created_at" <= ${eventWindow.lte}`
+    );
+  }
+  const windowClause =
+    windowParts.length > 0
+      ? Prisma.sql` AND ${Prisma.join(windowParts, " AND ")}`
       : Prisma.empty;
   return Prisma.sql`EXISTS (
     SELECT 1 FROM "Event" e
@@ -189,7 +226,39 @@ function sessionEventExistsSql(
       AND e."session_id" = ${s}."session_id"
       AND e."app" = ${s}."app"
       ${clauses}
+      ${windowClause}
   )`;
+}
+
+function resolveSessionEventWindow(
+  f: SessionListFilterInput,
+  eventWindow?: SessionEventWindow
+): SessionEventWindow | undefined {
+  if (eventWindow?.gte || eventWindow?.lte) return eventWindow;
+  if (f.range.gte || f.range.lte) return { gte: f.range.gte, lte: f.range.lte };
+  return undefined;
+}
+
+/** @internal Exported for unit tests. */
+export function sessionWindowWithEventScope(
+  projectId: string,
+  f: SessionListFilterInput,
+  sessionAlias: string,
+  since: Date,
+  until: Date,
+  exclusiveUntil = false
+): Prisma.Sql {
+  const startedAt = exclusiveUntil
+    ? sessionStartedInPreviousWindow(sessionAlias, since, until)
+    : sessionStartedInCurrentWindow(sessionAlias, since, until);
+  const eventClauses = sessionEventScopeClauses(f);
+  if (eventClauses.length === 0) return startedAt;
+  return Prisma.sql`(${startedAt} AND ${sessionEventExistsSql(
+    projectId,
+    sessionAlias,
+    eventClauses,
+    { gte: since, lte: until, exclusiveLte: exclusiveUntil }
+  )})`;
 }
 
 function sessionSearchSql(q: string): Prisma.Sql {
@@ -206,21 +275,24 @@ function sessionSearchSql(q: string): Prisma.Sql {
 
 export function sessionFilterSql(
   projectId: string,
-  f: SessionListFilterInput
+  f: SessionListFilterInput,
+  eventWindow?: SessionEventWindow,
+  omitEventScope = false
 ): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`s."project_id" = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
   if (f.platform) parts.push(Prisma.sql`s."platform" = ${f.platform}`);
   if (f.country) parts.push(Prisma.sql`s."country" = ${f.country}`);
-  const eventClauses: Prisma.Sql[] = [];
-  if (f.environment) {
-    eventClauses.push(Prisma.sql`e."environment" = ${f.environment}`);
-  }
-  if (f.release) {
-    eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
-  }
-  if (eventClauses.length > 0) {
-    parts.push(sessionEventExistsSql(projectId, "s", eventClauses));
+  const eventClauses = sessionEventScopeClauses(f);
+  if (eventClauses.length > 0 && !omitEventScope) {
+    parts.push(
+      sessionEventExistsSql(
+        projectId,
+        "s",
+        eventClauses,
+        resolveSessionEventWindow(f, eventWindow)
+      )
+    );
   }
   if (f.q?.trim()) parts.push(sessionSearchSql(f.q));
   return Prisma.join(parts, " AND ");
@@ -251,14 +323,23 @@ async function fetchSessionSummaryScalars(
   window: ResolvedSummaryWindow
 ): Promise<SummaryRow> {
   const { since, until, previousSince, previousUntil } = window;
-  const filters = sessionFilterSql(projectId, f);
+  const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
   const identity = sessionIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
-  const currentWindow = sessionStartedInCurrentWindow("s", since, until);
-  const previousWindow = sessionStartedInPreviousWindow(
+  const currentWindow = sessionWindowWithEventScope(
+    projectId,
+    f,
+    "s",
+    since,
+    until
+  );
+  const previousWindow = sessionWindowWithEventScope(
+    projectId,
+    f,
     "s",
     previousSince,
-    previousUntil
+    previousUntil,
+    true
   );
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
   const queryLowerBound = new Date(
@@ -357,10 +438,10 @@ async function fetchSessionSummarySparklines(
   const durationMs = Math.max(until.getTime() - since.getTime(), 1);
   const { bucket } = chooseTimeRangeBucket(durationMs);
   const trunc = bucket === "week" ? "week" : bucket;
-  const filters = sessionFilterSql(projectId, f);
+  const chartSince = overviewChartQuerySince(since, until, bucket);
+  const filters = sessionFilterSql(projectId, f, { gte: chartSince, lte: until });
   const identity = sessionIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
-  const chartSince = overviewChartQuerySince(since, until, bucket);
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
 
   const rows = await prisma.$queryRaw<SparklineBucketRow[]>(Prisma.sql`
@@ -400,7 +481,7 @@ async function fetchSessionSummarySparklines(
   );
 
   const pick = (
-    mapper: (r: SparklineBucketRow | undefined, total: number) => number
+    mapper: (r: SparklineBucketRow | undefined, total: number) => number | null
   ): SessionsSummarySparklinePoint[] =>
     buckets.map((bucketDate) => {
       const t = bucketDate.toISOString();
@@ -412,12 +493,15 @@ async function fetchSessionSummarySparklines(
   return {
     totalSessions: pick((r) => Number(r?.total_sessions ?? 0)),
     distinctUsers: pick((r) => Number(r?.distinct_users ?? 0)),
-    avgDurationSec: pick((r) => Math.round(Number(r?.avg_duration_sec ?? 0))),
+    avgDurationSec: pick((r, total) => {
+      if (total <= 0 || r?.avg_duration_sec == null) return null;
+      return Math.round(Number(r.avg_duration_sec));
+    }),
     bounceRatePct: pick((r, total) =>
-      pct(Number(r?.bounce_sessions ?? 0), total)
+      total <= 0 ? null : pct(Number(r?.bounce_sessions ?? 0), total)
     ),
     crashFreeRatePct: pick((r, total) =>
-      pct(Number(r?.crash_free_sessions ?? 0), total)
+      total <= 0 ? null : pct(Number(r?.crash_free_sessions ?? 0), total)
     ),
   };
 }

@@ -20,8 +20,8 @@ export function TableWrap({
   className?: string;
 }) {
   return (
-    <div className={cn("overflow-x-auto", analyticsPanelClass, className)}>
-      {children}
+    <div className={cn(analyticsPanelClass, className)}>
+      <div className="overflow-x-auto">{children}</div>
     </div>
   );
 }
@@ -62,7 +62,7 @@ export function TablePropertiesCell({ data }: { data: unknown }) {
 }
 
 /** Apply to date/time column headers and cells to prevent word-by-word wrapping. */
-export const tableDateColumnClass = "whitespace-nowrap";
+export const tableDateColumnClass = "whitespace-nowrap shrink-0 min-w-[6.5rem]";
 
 export function TableViewLink({
   href,
