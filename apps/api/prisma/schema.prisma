@@ -323,9 +323,22 @@ model MarketingSubscriber {
   consent_metadata  Json?                     @map("consent_metadata")
   /// SHA-256 hex of opaque one-click unsubscribe token (raw secret emailed only).
   unsubscribe_token String                    @unique @map("unsubscribe_token")
+  release_email_sends MarketingReleaseEmailSend[]
 
   @@index([unsubscribed_at])
   @@index([source])
+}
+
+/// Idempotent audit of product update emails delivered per release version.
+model MarketingReleaseEmailSend {
+  id              String              @id @default(uuid())
+  subscriber_id   String              @map("subscriber_id")
+  subscriber      MarketingSubscriber @relation(fields: [subscriber_id], references: [id], onDelete: Cascade)
+  release_version String              @map("release_version")
+  sent_at         DateTime            @default(now()) @map("sent_at")
+
+  @@unique([subscriber_id, release_version])
+  @@index([release_version])
 }
 
 enum MarketingSubscriberSource {

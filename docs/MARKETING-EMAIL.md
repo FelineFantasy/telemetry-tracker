@@ -31,31 +31,48 @@ Both routes use the public rate limit surface (`RATE_LIMIT_PUBLIC_MAX`).
 
 ## When to send (maintainer policy)
 
-Product update emails are **manual** today — nothing in CI or cron sends them automatically.
-
 | Release type | Send? | Notes |
 |--------------|-------|-------|
-| **MINOR** or **MAJOR** on `main` | **Yes** | Typical milestone releases with user-facing `Added` / `Changed` in [CHANGELOG.md](../CHANGELOG.md) |
-| **PATCH** (hotfix) | **Usually no** | Skip routine bugfix-only patches; send only if the fix is user-visible and worth announcing |
+| **MINOR** or **MAJOR** on `main` | **Yes** | Automated on `v*.*.*` tag push via [release-email workflow](../.github/workflows/release-email.yml) |
+| **PATCH** (hotfix) | **No** | Workflow skips patch-only bumps; use `--force` for exceptional user-visible hotfixes |
 | Pre-release / draft | **No** | Use `--dry-run` and `--version=Unreleased` to preview copy only |
 
-Align semver bumps with [RELEASE.md](./RELEASE.md#semver-guidance). If a release has no subscriber-relevant bullets (migrations-only, internal ops), skip the email.
+Align semver bumps with [RELEASE.md](./RELEASE.md#semver-guidance). If a release has no subscriber-relevant bullets (migrations-only, internal ops), skip the email with workflow dispatch disabled — cancel the **Release product email** run before the send step, or use a manual override only when needed.
 
-**There is no send audit log in the database.** The operator console output (`Sent N/M release email(s)`) is the only record — keep a note in the GitHub Release or milestone when email went out.
+**There is no send audit log in the database.** Delivery is recorded in `MarketingReleaseEmailSend` (one row per subscriber per release version) so workflow retries skip already-sent recipients and do not rotate their unsubscribe tokens again. GitHub Actions logs and a note in the GitHub Release are the operator-facing records.
 
-### Maintainer workflow (each qualifying release)
+### Automated send (MINOR / MAJOR tags)
 
-Do this **after** the GitHub Release is published and production is verified — see step 8 in [RELEASE.md](./RELEASE.md#on-main-after-promotion).
+Pushing a semver tag `vX.Y.Z` to GitHub triggers **Release product email**:
 
-1. Confirm `CHANGELOG.md` on `main` has a finalized `## [X.Y.Z]` section for the tag you just shipped.
-2. From a secure machine with production `DATABASE_URL`, Resend, and dashboard origin configured:
-   ```bash
-   cd apps/api
-   pnpm exec tsx scripts/send-release-email.ts --dry-run --version=X.Y.Z
-   pnpm exec tsx scripts/send-release-email.ts --version=X.Y.Z
-   ```
-3. Spot-check one inbox (rendering + unsubscribe link).
-4. Note in the GitHub Release body or milestone: “Product update email sent to N subscribers on YYYY-MM-DD.”
+1. Resolves the previous semver tag and compares X/Y (patch-only → skip).
+2. Runs `prisma migrate deploy` against production (applies pending migrations from the tagged commit, including `MarketingReleaseEmailSend`).
+3. Runs `send-release-email.ts --version=X.Y.Z --previous-version=…` with repository secrets.
+
+Required GitHub repository secrets (production):
+
+| Secret | Purpose |
+|--------|---------|
+| `DATABASE_URL` | Production Postgres (`MarketingSubscriber`) |
+| `RESEND_API_KEY` | Resend API |
+| `TELEMETRY_EMAIL_FROM` | From address |
+| `TELEMETRY_DASHBOARD_ORIGIN` | Unsubscribe / docs links (e.g. `https://telemetry-tracker.com`) |
+
+The workflow runs **after** the tag is pushed — finalize `CHANGELOG.md` on `main` **before** tagging so the email body matches the release.
+
+### Manual send (override / backfill)
+
+Use when automation was skipped, for one-time backfill, or for a notable PATCH with `--force`:
+
+```bash
+cd apps/api
+pnpm exec tsx scripts/send-release-email.ts --dry-run --version=X.Y.Z
+pnpm exec tsx scripts/send-release-email.ts --version=X.Y.Z
+# Patch override (automation would skip):
+pnpm exec tsx scripts/send-release-email.ts --version=X.Y.Z --previous-version=X.Y.Z-1 --force
+```
+
+Spot-check one inbox (rendering + unsubscribe link) after manual sends. Note in the GitHub Release: “Product update email sent to N subscribers on YYYY-MM-DD.”
 
 ### v1.4.2 backfill (one-time)
 
@@ -81,8 +98,11 @@ pnpm exec tsx scripts/send-release-email.ts --version=1.4.2
 ```
 
 - `--version=X.Y.Z` reads that section from `CHANGELOG.md` (repo root). Required for a live send; omit only with `--dry-run` to preview `[Unreleased]`.
+- `--previous-version=X.Y.Z` skips patch-only releases unless `--force` is set (same rule as CI).
 - `--dry-run` prints subject, recipient count, and a short CHANGELOG preview without sending.
-- Before each send, the script rotates the one-click unsubscribe token **for that recipient only**, immediately before attempting delivery.
+- Before each successful send, the script rotates the one-click unsubscribe token for that recipient only (after Resend confirms delivery).
+- After a successful Resend delivery, a `MarketingReleaseEmailSend` row is written so retries send only to remaining subscribers (requires migration `20260708140000_marketing_release_email_send`).
+- If there are **no active subscribers**, the script exits non-zero so the workflow does **not** cache the tag; re-run after subscribers exist.
 
 ### First production send checklist
 
@@ -94,9 +114,9 @@ pnpm exec tsx scripts/send-release-email.ts --version=1.4.2
 6. Run with `--version=X.Y.Z` (no `--dry-run`) from a secure operator machine with production `DATABASE_URL`.
 7. Spot-check inbox rendering and the unsubscribe link.
 
-### Automation (future)
+### Automation
 
-Full automation on git tag is **not implemented**. A GitHub Action could call the same script with production secrets; until then, treat product update email as a required manual step in [RELEASE.md](./RELEASE.md) for MINOR+ releases.
+**MINOR** and **MAJOR** tags trigger [Release product email](../.github/workflows/release-email.yml) automatically. Patch tags are skipped. See [When to send](#when-to-send-maintainer-policy) for secrets and manual override.
 
 ## Privacy
 
