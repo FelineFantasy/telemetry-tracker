@@ -98,6 +98,8 @@ When `webVitals` is not set to `false`, the SDK registers listeners (via the [`w
 
 Set `webVitals: false` in `init()` to disable. Node and React Native skip vitals automatically.
 
+The dashboard **Performance** page aggregates ingested `$web_vital` samples via `GET /api/performance/summary` (p75/p95, rating distribution, and time series per vital).
+
 ### `identify(userId)`
 
 Set the current user id for subsequent events and errors.

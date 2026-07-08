@@ -13,6 +13,16 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.5.16] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#194](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/194)).
+
+### Added
+
+- **`GET /api/performance/summary`** — Web Vitals aggregates (p75/p95 LCP, INP/FID, CLS, TTFB), Good/Needs improvement/Poor rating distribution, per-vital time series, and Node `$request` latency (avg, p95, Apdex) with app/env/release/platform filters ([#194](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/194))
+
+---
+
 ## [1.5.15] - 2026-07-08
 
 Continues the **v1.5.0 — Analytics dashboard** milestone ([#193](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/193)).
