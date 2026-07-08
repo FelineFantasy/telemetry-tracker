@@ -1,8 +1,25 @@
 import { readDeviceContext } from "./device-context.js";
+import {
+  installWebVitals,
+  setWebVitalsCaptureEnabled,
+  WEB_VITAL_EVENT_NAME,
+  type WebVitalEventProperties,
+} from "./web-vitals.js";
 
 import { SDK_VERSION } from "./version.js";
 
 export { SDK_VERSION };
+export {
+  WEB_VITAL_EVENT_NAME,
+  installWebVitals,
+  rateWebVital,
+  buildWebVitalProperties,
+  setWebVitalsCaptureEnabled,
+  isWebVitalsCaptureEnabled,
+  type WebVitalEventProperties,
+  type WebVitalMetricName,
+  type WebVitalRating,
+} from "./web-vitals.js";
 
 const REPORTED = Symbol.for("telemetry.reported");
 
@@ -53,6 +70,8 @@ export type TelemetryConfig = {
   batchInterval?: number;
   /** Max queue size before flush. Default 10. */
   batchSize?: number;
+  /** Capture Core Web Vitals (LCP, INP, CLS, TTFB) in browser. Default true. */
+  webVitals?: boolean;
 };
 
 let config: TelemetryConfig | null = null;
@@ -157,7 +176,14 @@ function installBrowserSessionLifecycle(): void {
 
   window.addEventListener("pagehide", (event: Event) => {
     if ((event as PageTransitionEvent).persisted) return;
+    flushEventsKeepalive();
     closeSessionKeepalive(new Date());
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      flushEventsKeepalive();
+    }
   });
 
   window.addEventListener("pageshow", (event: Event) => {
@@ -240,6 +266,16 @@ export function init(c: TelemetryConfig): void {
   installBrowserErrorHandlers();
   startSession();
   installBrowserSessionLifecycle();
+  setWebVitalsCaptureEnabled(c.webVitals !== false);
+  if (c.webVitals !== false) {
+    installBrowserWebVitals();
+  }
+}
+
+function installBrowserWebVitals(): void {
+  installWebVitals((properties: WebVitalEventProperties) => {
+    trackEvent(WEB_VITAL_EVENT_NAME, properties);
+  });
 }
 
 export type IdentifyTraits = {
@@ -314,6 +350,18 @@ function flushEvents(): void {
   const cfg = getConfigOrNull();
   if (!cfg || eventQueue.length === 0) return;
   const batch = eventQueue.splice(0, eventQueue.length);
+  sendEventBatch(cfg, batch, false);
+}
+
+/** Flush queued events with keepalive for tab hide / unload (CLS and short visits). */
+function flushEventsKeepalive(): void {
+  const cfg = getConfigOrNull();
+  if (!cfg || eventQueue.length === 0) return;
+  const batch = eventQueue.splice(0, eventQueue.length);
+  sendEventBatch(cfg, batch, true);
+}
+
+function sendEventBatch(cfg: TelemetryConfig, batch: QueuedEvent[], keepalive: boolean): void {
   const base = cfg.ingestUrl.replace(/\/$/, "");
   const anonId = getAnonymousId();
   const events = batch.map((e) => ({
@@ -328,11 +376,16 @@ function flushEvents(): void {
     sdk_version: SDK_VERSION,
     properties: e.properties,
   }));
-  fetch(`${base}/ingest/batch`, {
-    method: "POST",
-    headers: buildIngestHeaders(cfg),
-    body: JSON.stringify({ events }),
-  }).catch((e) => console.warn("[telemetry] batch send error:", e));
+  try {
+    void fetch(`${base}/ingest/batch`, {
+      method: "POST",
+      headers: buildIngestHeaders(cfg),
+      body: JSON.stringify({ events }),
+      ...(keepalive ? { keepalive: true } : {}),
+    }).catch((e) => console.warn("[telemetry] batch send error:", e));
+  } catch (e) {
+    console.warn("[telemetry] batch send error:", e);
+  }
 }
 
 export function trackEvent(
