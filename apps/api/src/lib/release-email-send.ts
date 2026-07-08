@@ -32,7 +32,7 @@ export async function loadReleaseEmailSentSubscriberIds(
 }
 
 export async function recordReleaseEmailDelivery(
-  db: Prisma.TransactionClient | Prisma.DefaultPrismaClient,
+  db: Prisma.DefaultPrismaClient,
   input: {
     subscriberId: string;
     releaseVersion: string;
