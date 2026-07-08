@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **SDK Web Vitals ingest** — browser/Next SDK captures LCP, INP, CLS, and TTFB as `$web_vital` events ([#193](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/193))
+
 ---
 
 ## [1.5.14] - 2026-07-08

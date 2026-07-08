@@ -1,7 +1,7 @@
 /**
  * Event capture taxonomy: SDK auto-captured vs custom event names.
  *
- * Reserved auto-captured names use a `$` prefix (e.g. `$screen`, `$request`).
+ * Reserved auto-captured names use a `$` prefix (e.g. `$screen`, `$request`, `$web_vital`).
  */
 
 export const EVENT_CAPTURE_KINDS = ["auto", "custom"] as const;
