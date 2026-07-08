@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.5.14] - 2026-07-08
+
+### Fixed
+
+- **Overview key metrics sparklines** — full-width charts on mobile; keep compact width only in multi-column desktop grids
+
+---
+
 ## [1.5.13] - 2026-07-08
 
 ### Fixed
