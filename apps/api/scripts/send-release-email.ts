@@ -7,19 +7,27 @@ import {
   hashMarketingUnsubscribeToken,
 } from "../src/lib/marketing-subscriber.js";
 import { sendTransactionalEmail, isTransactionalEmailConfigured } from "../src/lib/email.js";
+import { isMinorOrMajorBump } from "../src/lib/release-email-semver.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
+const FORCE = process.argv.includes("--force");
 const SHOW_HELP = process.argv.includes("--help") || process.argv.includes("-h");
 const VERSION_ARG = process.argv.find((a) => a.startsWith("--version="))?.split("=")[1]?.trim();
+const PREVIOUS_VERSION_ARG = process.argv
+  .find((a) => a.startsWith("--previous-version="))
+  ?.split("=")[1]
+  ?.trim();
 
 const USAGE = `Usage: pnpm exec tsx scripts/send-release-email.ts [options]
 
 Broadcast a product update email to active marketing subscribers via Resend.
 
 Options:
-  --version=X.Y.Z   CHANGELOG section to send (required for live send)
-  --dry-run         Print subject, recipient count, and preview; do not send
-  --help, -h        Show this help
+  --version=X.Y.Z           CHANGELOG section to send (required for live send)
+  --previous-version=X.Y.Z  Compare against prior tag; skip patch-only unless --force
+  --force                   Send even when --previous-version indicates patch-only
+  --dry-run                 Print subject, recipient count, and preview; do not send
+  --help, -h                Show this help
 
 Examples:
   pnpm exec tsx scripts/send-release-email.ts --dry-run --version=1.4.2
@@ -92,6 +100,16 @@ async function main() {
   if (!section) {
     console.error(`Could not find CHANGELOG section for ${version}`);
     process.exit(1);
+  }
+
+  if (PREVIOUS_VERSION_ARG !== undefined && !FORCE) {
+    const bump = isMinorOrMajorBump(version, PREVIOUS_VERSION_ARG || null);
+    if (!bump.send) {
+      console.log(`Skipping release email: ${bump.reason}`);
+      if (DRY_RUN) console.log("--dry-run: would not send for patch-only release.");
+      return;
+    }
+    console.log(`Release email bump check: ${bump.reason}`);
   }
 
   if (!isTransactionalEmailConfigured()) {

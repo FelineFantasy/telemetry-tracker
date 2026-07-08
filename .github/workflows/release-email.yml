@@ -1,0 +1,75 @@
+name: Release product email
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+concurrency:
+  group: release-email-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve semver tags
+        id: tags
+        run: |
+          CURRENT="${GITHUB_REF_NAME#v}"
+          PREVIOUS=$(git tag -l "v*.*.*" --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1 | sed 's/^v//')
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "Tag ${GITHUB_REF_NAME} (previous: ${PREVIOUS:-none})"
+
+      - name: Check minor/major bump
+        id: bump
+        working-directory: apps/api
+        run: |
+          ARGS="--current=${{ steps.tags.outputs.current }}"
+          if [ -n "${{ steps.tags.outputs.previous }}" ]; then
+            ARGS="$ARGS --previous=${{ steps.tags.outputs.previous }}"
+          fi
+          BUMP=$(pnpm exec tsx scripts/check-release-email-bump.ts $ARGS)
+          echo "should_send=$(node -e "console.log(JSON.parse(process.argv[1]).send)" "$BUMP")" >> "$GITHUB_OUTPUT"
+          echo "reason=$(node -e "console.log(JSON.parse(process.argv[1]).reason)" "$BUMP")" >> "$GITHUB_OUTPUT"
+          echo "Bump decision: $BUMP"
+
+      - name: Prisma migrate deploy
+        if: steps.bump.outputs.should_send == 'true'
+        run: pnpm --filter api exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Send product update email
+        if: steps.bump.outputs.should_send == 'true'
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TELEMETRY_EMAIL_FROM: ${{ secrets.TELEMETRY_EMAIL_FROM }}
+          TELEMETRY_DASHBOARD_ORIGIN: ${{ secrets.TELEMETRY_DASHBOARD_ORIGIN }}
+        run: |
+          ARGS="--version=${{ steps.tags.outputs.current }}"
+          if [ -n "${{ steps.tags.outputs.previous }}" ]; then
+            ARGS="$ARGS --previous-version=${{ steps.tags.outputs.previous }}"
+          fi
+          pnpm exec tsx scripts/send-release-email.ts $ARGS
+
+      - name: Skip patch-only release
+        if: steps.bump.outputs.should_send != 'true'
+        run: echo "Skipped product update email — ${{ steps.bump.outputs.reason }}"
