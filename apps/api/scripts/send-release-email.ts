@@ -12,7 +12,9 @@ import {
   isReleaseEmailBroadcastComplete,
   loadReleaseEmailSentSubscriberIds,
   pendingReleaseEmailRecipients,
-  recordReleaseEmailDelivery,
+  recordReleaseEmailSendReliable,
+  revertReleaseEmailUnsubscribeToken,
+  stageReleaseEmailUnsubscribeToken,
 } from "../src/lib/release-email-send.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -128,7 +130,7 @@ async function main() {
 
   const subscribers = await prisma.marketingSubscriber.findMany({
     where: { unsubscribed_at: null },
-    select: { id: true, email: true },
+    select: { id: true, email: true, unsubscribe_token: true },
     orderBy: { email: "asc" },
   });
 
@@ -138,7 +140,7 @@ async function main() {
       return;
     }
     console.error(
-      "No active marketing subscribers. Re-run after subscribers exist; Actions cache is not updated."
+      "No active marketing subscribers. Re-run after subscribers exist; the workflow can be retried safely."
     );
     process.exit(1);
   }
@@ -185,6 +187,14 @@ async function main() {
   let sentThisRun = 0;
   for (const sub of pendingSubscribers) {
     const rawToken = generateMarketingUnsubscribeToken();
+    const unsubscribeTokenHash = hashMarketingUnsubscribeToken(rawToken);
+    const previousUnsubscribeTokenHash = sub.unsubscribe_token;
+
+    await stageReleaseEmailUnsubscribeToken(prisma, {
+      subscriberId: sub.id,
+      unsubscribeTokenHash,
+    });
+
     const unsubscribeUrl = buildMarketingUnsubscribeUrl(dashboardOrigin, rawToken);
     const html = [
       bodyHtml,
@@ -197,14 +207,17 @@ async function main() {
 
     const result = await sendTransactionalEmail({ to: sub.email, subject, html });
     if (!result.sent) {
+      await revertReleaseEmailUnsubscribeToken(prisma, {
+        subscriberId: sub.id,
+        previousUnsubscribeTokenHash,
+      });
       console.warn(`Failed to send to ${sub.email}:`, result.error ?? result.status);
       continue;
     }
 
-    await recordReleaseEmailDelivery(prisma, {
+    await recordReleaseEmailSendReliable(prisma, {
       subscriberId: sub.id,
       releaseVersion: version,
-      unsubscribeTokenHash: hashMarketingUnsubscribeToken(rawToken),
     });
     sentThisRun += 1;
   }
@@ -215,7 +228,7 @@ async function main() {
   );
   if (!isReleaseEmailBroadcastComplete(deliveredTotal, subscribers.length)) {
     console.error(
-      `Release email incomplete: ${deliveredTotal}/${subscribers.length} delivered. Re-run after fixing the failure; already-sent subscribers are skipped and unsubscribe tokens are unchanged on failed attempts.`
+      `Release email incomplete: ${deliveredTotal}/${subscribers.length} delivered. Re-run after fixing the failure; already-sent subscribers are skipped and failed send attempts restore the prior unsubscribe token.`
     );
     process.exit(1);
   }

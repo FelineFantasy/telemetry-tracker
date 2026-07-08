@@ -60,22 +60,14 @@ jobs:
           echo "reason=$(node -e "console.log(JSON.parse(process.argv[1]).reason)" "$BUMP")" >> "$GITHUB_OUTPUT"
           echo "Bump decision: $BUMP"
 
-      - name: Check prior successful send
-        id: send-cache
-        if: steps.bump.outputs.should_send == 'true'
-        uses: actions/cache@v4
-        with:
-          path: .release-email-sent
-          key: release-email-sent-${{ github.ref_name }}
-
       - name: Apply database migrations
-        if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit != 'true'
+        if: steps.bump.outputs.should_send == 'true'
         run: pnpm --filter api exec prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Send product update email
-        if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit != 'true'
+        if: steps.bump.outputs.should_send == 'true'
         working-directory: apps/api
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -90,16 +82,6 @@ jobs:
             ARGS+=(--previous-version="$RELEASE_PREVIOUS")
           fi
           pnpm exec tsx scripts/send-release-email.ts "${ARGS[@]}"
-
-      - name: Record successful send
-        if: success() && steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit != 'true'
-        run: mkdir -p .release-email-sent && date -u +%Y-%m-%dT%H:%M:%SZ > .release-email-sent/sent-at
-
-      - name: Skip duplicate send
-        if: steps.bump.outputs.should_send == 'true' && steps.send-cache.outputs.cache-hit == 'true'
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: echo "Skipped product update email — already sent for ${RELEASE_TAG} (Actions cache)"
 
       - name: Skip patch-only release
         if: steps.bump.outputs.should_send != 'true'
