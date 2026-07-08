@@ -8,6 +8,7 @@ import {
   parsePerformanceMetricsAnchor,
   pctOfTotal,
   resolvePerformanceSummaryWindow,
+  resolveVitalPreviousCompare,
   roundWebVitalValue,
   WEB_VITAL_EVENT_NAME,
   WEB_VITAL_THRESHOLDS,
@@ -198,6 +199,29 @@ describe("mergeVitalSeriesBuckets", () => {
       "INP"
     );
     expect(series[0]?.value).toBeNull();
+  });
+});
+
+describe("resolveVitalPreviousCompare", () => {
+  it("returns null previous fields when prior sample count is zero", () => {
+    expect(resolveVitalPreviousCompare("LCP", 2200, 0, 0)).toEqual({
+      p75Previous: null,
+      goodPctPrevious: null,
+    });
+  });
+
+  it("computes p75Previous and goodPctPrevious from prior samples", () => {
+    expect(resolveVitalPreviousCompare("LCP", 2200.4, 50, 40)).toEqual({
+      p75Previous: 2200,
+      goodPctPrevious: 80,
+    });
+  });
+
+  it("returns null p75Previous when prior percentile is missing", () => {
+    expect(resolveVitalPreviousCompare("CLS", null, 12, 8)).toEqual({
+      p75Previous: null,
+      goodPctPrevious: pctOfTotal(8, 12),
+    });
   });
 });
 
