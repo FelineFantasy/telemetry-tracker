@@ -38,10 +38,13 @@ jobs:
 
       - name: Resolve release version
         id: tags
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          DISPATCH_PREVIOUS_VERSION: ${{ inputs.previous_version }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            CURRENT="${{ inputs.version }}"
-            PREVIOUS="${{ inputs.previous_version }}"
+            CURRENT="$DISPATCH_VERSION"
+            PREVIOUS="$DISPATCH_PREVIOUS_VERSION"
           else
             CURRENT="${GITHUB_REF_NAME#v}"
             if ! [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
