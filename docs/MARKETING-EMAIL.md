@@ -99,8 +99,9 @@ pnpm exec tsx scripts/send-release-email.ts --version=1.4.2
 - `--version=X.Y.Z` reads that section from `CHANGELOG.md` (repo root). Required for a live send; omit only with `--dry-run` to preview `[Unreleased]`.
 - `--previous-version=X.Y.Z` skips patch-only releases unless `--force` is set (same rule as CI).
 - `--dry-run` prints subject, recipient count, and a short CHANGELOG preview without sending.
-- Before each send, the script rotates the one-click unsubscribe token **for that recipient only**, immediately before attempting delivery.
+- Before each successful send, the script rotates the one-click unsubscribe token for that recipient only (after Resend confirms delivery).
 - After a successful Resend delivery, a `MarketingReleaseEmailSend` row is written so retries send only to remaining subscribers (requires migration `20260708140000_marketing_release_email_send`).
+- If there are **no active subscribers**, the script exits non-zero so the workflow does **not** cache the tag; re-run after subscribers exist.
 
 ### First production send checklist
 

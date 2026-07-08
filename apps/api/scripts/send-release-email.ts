@@ -133,8 +133,14 @@ async function main() {
   });
 
   if (subscribers.length === 0) {
-    console.log("No active marketing subscribers.");
-    return;
+    if (DRY_RUN) {
+      console.log("--dry-run: would send to 0 subscriber(s).");
+      return;
+    }
+    console.error(
+      "No active marketing subscribers. Re-run after subscribers exist; Actions cache is not updated."
+    );
+    process.exit(1);
   }
 
   const subject =

@@ -5,8 +5,8 @@ import {
 } from "./release-email-send.js";
 
 describe("isReleaseEmailBroadcastComplete", () => {
-  it("is complete when there are no subscribers", () => {
-    expect(isReleaseEmailBroadcastComplete(0, 0)).toBe(true);
+  it("is incomplete when there are no subscribers", () => {
+    expect(isReleaseEmailBroadcastComplete(0, 0)).toBe(false);
   });
 
   it("is complete when every subscriber was sent", () => {

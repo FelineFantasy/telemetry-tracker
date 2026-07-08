@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 /** Whether every targeted subscriber received the release email. */
 export function isReleaseEmailBroadcastComplete(deliveredCount: number, subscriberCount: number): boolean {
-  if (subscriberCount === 0) return true;
+  if (subscriberCount === 0) return false;
   return deliveredCount === subscriberCount;
 }
 
