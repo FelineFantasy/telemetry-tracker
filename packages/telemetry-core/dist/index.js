@@ -1,6 +1,8 @@
 import { readDeviceContext } from "./device-context.js";
+import { installWebVitals, WEB_VITAL_EVENT_NAME, } from "./web-vitals.js";
 import { SDK_VERSION } from "./version.js";
 export { SDK_VERSION };
+export { WEB_VITAL_EVENT_NAME, installWebVitals, rateWebVital, buildWebVitalProperties, } from "./web-vitals.js";
 const REPORTED = Symbol.for("telemetry.reported");
 const ANON_STORAGE_KEY = "tacko_telemetry_anon_id";
 let anonymousId = null;
@@ -199,6 +201,14 @@ export function init(c) {
     installBrowserErrorHandlers();
     startSession();
     installBrowserSessionLifecycle();
+    if (c.webVitals !== false) {
+        installBrowserWebVitals();
+    }
+}
+function installBrowserWebVitals() {
+    installWebVitals((properties) => {
+        trackEvent(WEB_VITAL_EVENT_NAME, properties);
+    });
 }
 export function identify(id, traits) {
     userId = id;

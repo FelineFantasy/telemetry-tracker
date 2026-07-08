@@ -32,6 +32,7 @@ const config = {
   ingestUrl: process.env.NEXT_PUBLIC_INGEST_URL || "http://localhost:3001",
   app: "my-next-app",
   environment: process.env.NODE_ENV,
+  // webVitals: true by default — emits $web_vital events for LCP, INP, CLS, TTFB
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

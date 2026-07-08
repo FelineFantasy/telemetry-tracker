@@ -1,8 +1,22 @@
 import { readDeviceContext } from "./device-context.js";
+import {
+  installWebVitals,
+  WEB_VITAL_EVENT_NAME,
+  type WebVitalEventProperties,
+} from "./web-vitals.js";
 
 import { SDK_VERSION } from "./version.js";
 
 export { SDK_VERSION };
+export {
+  WEB_VITAL_EVENT_NAME,
+  installWebVitals,
+  rateWebVital,
+  buildWebVitalProperties,
+  type WebVitalEventProperties,
+  type WebVitalMetricName,
+  type WebVitalRating,
+} from "./web-vitals.js";
 
 const REPORTED = Symbol.for("telemetry.reported");
 
@@ -53,6 +67,8 @@ export type TelemetryConfig = {
   batchInterval?: number;
   /** Max queue size before flush. Default 10. */
   batchSize?: number;
+  /** Capture Core Web Vitals (LCP, INP, CLS, TTFB) in browser. Default true. */
+  webVitals?: boolean;
 };
 
 let config: TelemetryConfig | null = null;
@@ -240,6 +256,15 @@ export function init(c: TelemetryConfig): void {
   installBrowserErrorHandlers();
   startSession();
   installBrowserSessionLifecycle();
+  if (c.webVitals !== false) {
+    installBrowserWebVitals();
+  }
+}
+
+function installBrowserWebVitals(): void {
+  installWebVitals((properties: WebVitalEventProperties) => {
+    trackEvent(WEB_VITAL_EVENT_NAME, properties);
+  });
 }
 
 export type IdentifyTraits = {

@@ -40,6 +40,7 @@ describe("browser session lifecycle", () => {
       apiKey: "tt_live_pub_secret",
       batchInterval: 0,
       environment: "test",
+      webVitals: false,
     });
   });
 
@@ -108,6 +109,7 @@ describe("browser session lifecycle", () => {
       apiKey: "tt_live_pub_secret",
       batchInterval: 0,
       environment: "test",
+      webVitals: false,
     });
 
     const secondId = getSessionId();
