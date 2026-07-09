@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Source map CI upload auth** — `POST /api/project/source-maps` accepts project API keys (`X-API-Key` or `Authorization: Bearer`) for CI uploads; GitHub Action uses `api_key` input instead of session cookie ([#302](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/302))
+
 ---
 
 ## [1.6.0] - 2026-07-08
