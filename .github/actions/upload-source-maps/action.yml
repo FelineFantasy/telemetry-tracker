@@ -50,7 +50,9 @@ runs:
             const content = fs.readFileSync(filePath, 'utf8');
             const artifactPath = '${{ inputs.artifact_path }}';
             // 1. Получаем путь, относительный к artifact_path
-            const relativePath = filePath.replace(artifactPath, '').replace(/^\/+/, '');
+            const resolvedArtifactPath = path.resolve(artifactPath);
+            const resolvedFilePath = path.resolve(filePath);
+            const relativePath = path.relative(resolvedArtifactPath, resolvedFilePath);
             // 2. Убираем .map, чтобы получить путь к исходному JS
             const jsPath = relativePath.replace(/\.map$/, '');
             // 3. Собираем полный URL
