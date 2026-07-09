@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.7.1] - 2026-07-09
+
+### Changed
+
+- **Release email ops** — document that `TELEMETRY_EMAIL_FROM` must use a verified Resend domain (`noreply@tacko.io`, not `@telemetry-tracker.com`); fail fast with setup guidance on Resend domain verification errors ([#334](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/334))
+
+---
+
 ## [1.7.0] - 2026-07-09
 
 ### Added
