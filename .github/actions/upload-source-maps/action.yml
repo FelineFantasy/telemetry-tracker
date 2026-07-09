@@ -1,8 +1,8 @@
 name: 'Upload Source Maps'
 description: 'Uploads source maps to Telemetry-Tracker on release'
 inputs:
-  session_cookie:
-    description: 'Dashboard session cookie for authentication'
+  api_key:
+    description: 'Project API key (tt_live_...) for CI uploads'
     required: true
   project_id:
     description: 'Telemetry-Tracker Project ID (X-Project-Id)'
@@ -72,7 +72,7 @@ runs:
               headers: {
                 'Content-Type': 'application/json',
                 'X-Project-Id': '${{ inputs.project_id }}',
-                'Cookie': '${{ inputs.session_cookie }}',
+                'X-API-Key': '${{ inputs.api_key }}',
                 'Content-Length': Buffer.byteLength(payload)
               }
             };
