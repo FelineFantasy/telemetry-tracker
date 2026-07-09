@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Health endpoint metrics** — `GET /health` always includes `version` (override with `TELEMETRY_API_VERSION`); database probe reports `database_latency_ms` when `HEALTH_CHECK_DATABASE=true`; optional `HEALTH_DETAILED=true` adds `uptime_seconds` and `node_version` for self-host monitoring ([#234](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/234))
+
 ---
 
 ## [1.6.2] - 2026-07-09
