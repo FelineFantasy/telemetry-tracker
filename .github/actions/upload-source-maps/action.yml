@@ -49,13 +49,13 @@ runs:
           return new Promise((resolve, reject) => {
             const content = fs.readFileSync(filePath, 'utf8');
             const artifactPath = '${{ inputs.artifact_path }}';
-            // 1. Получаем путь, относительный к artifact_path
+            // 1. Get path relative to artifact_path
             const resolvedArtifactPath = path.resolve(artifactPath);
             const resolvedFilePath = path.resolve(filePath);
             const relativePath = path.relative(resolvedArtifactPath, resolvedFilePath);
-            // 2. Убираем .map, чтобы получить путь к исходному JS
+            // 2. Remove .map to get the original JS path
             const jsPath = relativePath.replace(/\.map$/, '');
-            // 3. Собираем полный URL
+            // 3. Build the full URL
             const bundleUrl = \`\${{ inputs.base_url }}/\${jsPath}\`;
 
             const payload = JSON.stringify({
