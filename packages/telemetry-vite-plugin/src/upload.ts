@@ -12,7 +12,7 @@ export type UploadSourceMapsOptions = {
   outDir: string;
   /** Public URL prefix where bundled JS is served (no trailing slash). */
   baseUrl: string;
-  /** Vite `base` path prefix (e.g. `/app/`). */
+  /** Vite `base` path prefix (e.g. `/app/`) or absolute CDN URL. */
   viteBase?: string;
   /** Telemetry API base URL. */
   baseApiUrl?: string;
@@ -36,20 +36,39 @@ export function resolveUploadEndpoint(baseApiUrl: string): string {
   return `${apiUrl.origin}${pathPrefix}/api/project/source-maps`;
 }
 
+function isAbsoluteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function appendToUrl(base: string, ...pathParts: string[]): string {
+  const url = new URL(base.endsWith("/") ? base : `${base}/`);
+  const segments = [
+    ...url.pathname.split("/").filter(Boolean),
+    ...pathParts.flatMap((part) => part.split("/")).filter(Boolean),
+  ];
+  url.pathname = `/${segments.join("/")}`;
+  return url.href;
+}
+
 export function bundleUrlForMapFile(
   mapFilePath: string,
   outDir: string,
   baseUrl: string,
-  /** Vite `base` path prefix (e.g. `/app/`). */
+  /** Vite `base` path prefix (e.g. `/app/`) or absolute CDN URL. */
   viteBase = "/"
 ): string {
   const resolvedOutDir = resolve(outDir);
   const resolvedMapPath = resolve(mapFilePath);
   const relativePath = relative(resolvedOutDir, resolvedMapPath);
   const jsPath = relativePath.replace(/\.map$/, "");
+  const normalizedJsPath = jsPath.split("\\").join("/");
+
+  if (isAbsoluteUrl(viteBase)) {
+    return appendToUrl(viteBase, normalizedJsPath);
+  }
+
   const prefix = baseUrl.replace(/\/$/, "");
   const basePath = viteBase.replace(/\/$/, "").replace(/^\//, "");
-  const normalizedJsPath = jsPath.split("\\").join("/");
   if (basePath) {
     return `${prefix}/${basePath}/${normalizedJsPath}`;
   }

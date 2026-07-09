@@ -49,6 +49,28 @@ describe("bundleUrlForMapFile", () => {
       )
     ).toBe("https://cdn.example.com/app/assets/app.js");
   });
+
+  it("uses absolute Vite base URLs without duplicating the host", () => {
+    expect(
+      bundleUrlForMapFile(
+        "/app/dist/assets/app.js.map",
+        "/app/dist",
+        "https://cdn.example.com",
+        "https://cdn.example.com/"
+      )
+    ).toBe("https://cdn.example.com/assets/app.js");
+  });
+
+  it("preserves path prefix on absolute Vite base URLs", () => {
+    expect(
+      bundleUrlForMapFile(
+        "/app/dist/assets/app.js.map",
+        "/app/dist",
+        "https://cdn.example.com",
+        "https://cdn.example.com/app/"
+      )
+    ).toBe("https://cdn.example.com/app/assets/app.js");
+  });
 });
 
 describe("findMapFiles", () => {
