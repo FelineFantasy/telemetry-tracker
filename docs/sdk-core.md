@@ -30,6 +30,7 @@ init({
   release: "1.2.3",                          // optional
   batchInterval: 5000,                        // optional: ms between flushes (default 5000; 0 = no batching)
   batchSize: 10,                             // optional: flush when queue reaches this size (default 10)
+  webVitals: true,                           // optional: capture LCP, INP, CLS, TTFB in browser (default true)
 });
 ```
 
@@ -78,6 +79,26 @@ import { screen } from "@telemetry-tracker/core";
 screen("/home");
 screen("Settings");
 ```
+
+### Web Vitals (browser)
+
+When `webVitals` is not set to `false`, the SDK registers listeners (via the [`web-vitals`](https://github.com/GoogleChrome/web-vitals) library) and sends a **`$web_vital`** auto-captured event for each finalized **LCP**, **INP**, **CLS**, and **TTFB** sample:
+
+```json
+{
+  "metric": "LCP",
+  "value": 2100,
+  "rating": "good",
+  "path": "/dashboard/overview",
+  "id": "v3-…",
+  "navigation_type": "navigate",
+  "connection_type": "4g"
+}
+```
+
+Set `webVitals: false` in `init()` to disable. Node and React Native skip vitals automatically.
+
+The dashboard **Performance** page aggregates ingested `$web_vital` samples via `GET /api/performance/summary` (p75/p95, rating distribution, and time series per vital).
 
 ### `identify(userId)`
 

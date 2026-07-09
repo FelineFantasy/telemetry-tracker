@@ -13,6 +13,83 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.6.0] - 2026-07-08
+
+Continues **v1.6.0 — Launch hardening** ([#3](https://github.com/Telemetry-Tracker/telemetry-tracker/milestone/3)).
+
+### Added
+
+- **Automated product update email** — MINOR/MAJOR `vX.Y.Z` tag push triggers [Release product email](.github/workflows/release-email.yml); patch-only tags skipped ([#291](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/291))
+- **`MarketingReleaseEmailSend`** — per-subscriber delivery ledger so workflow retries skip already-sent recipients and do not rotate unsubscribe tokens again
+- **Release email scripts** — semver bump check, idempotent send with `--previous-version` / `--force` for manual override
+
+### Changed
+
+- **Marketing & release docs** — automation secrets, migrate-before-tag runbook order, and backfill guidance ([MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md), [RELEASE.md](docs/RELEASE.md))
+
+### Database
+
+- Migration `20260708140000_marketing_release_email_send` — `MarketingReleaseEmailSend` table
+
+---
+
+## [1.5.18] - 2026-07-08
+
+### Fixed
+
+- **Overview Signals charts** — restore visible Y-axis labels (remove negative left margin)
+- **Overview key metrics** — full-width KPI sparklines on all breakpoints
+- **Dashboard top nav** — align scope picker row with page content column
+
+---
+
+## [1.5.17] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#195](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/195)).
+
+### Added
+
+- **Performance dashboard page** — KPI row (LCP, INP/FID, CLS, TTFB with prior-period compare and sparklines), vitals-over-time charts with bucket control, Good/Needs improvement/Poor rating bars, env/platform/release filters, and optional avg response + Apdex when `$request` data exists ([#195](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/195))
+
+### Fixed
+
+- **Performance page labels** — page subtitle and rating distribution caption use the API metrics window label (e.g. “Last 7 days”) instead of “Recent data” when no time filter is selected
+
+---
+
+## [1.5.16] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#194](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/194)).
+
+### Added
+
+- **`GET /api/performance/summary`** — Web Vitals aggregates (p75/p95 LCP, INP/FID, CLS, TTFB), Good/Needs improvement/Poor rating distribution, per-vital time series, and Node `$request` latency (avg, p95, Apdex) with app/env/release/platform filters ([#194](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/194))
+
+---
+
+## [1.5.15] - 2026-07-08
+
+Continues the **v1.5.0 — Analytics dashboard** milestone ([#193](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/193)).
+
+### Added
+
+- **SDK Web Vitals ingest** — browser/Next SDK captures LCP, INP, CLS, and TTFB as `$web_vital` events ([#193](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/193))
+
+### Fixed
+
+- **SDK Web Vitals opt-out** — re-init with `webVitals: false` stops `$web_vital` events (including async import race)
+- **SDK Web Vitals unload flush** — batched vitals flush with keepalive on page hide and tab hidden so CLS/LCP on short visits are not lost
+
+---
+
+## [1.5.14] - 2026-07-08
+
+### Fixed
+
+- **Overview key metrics sparklines** — full-width charts on mobile; keep compact width only in multi-column desktop grids
+
+---
+
 ## [1.5.13] - 2026-07-08
 
 ### Fixed

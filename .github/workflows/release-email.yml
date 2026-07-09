@@ -1,0 +1,111 @@
+name: Release product email
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (X.Y.Z) to send"
+        required: true
+      previous_version:
+        description: "Previous tag (X.Y.Z) for bump check; omit for first tag"
+        required: false
+
+concurrency:
+  group: release-email-${{ github.event_name == 'workflow_dispatch' && format('manual-{0}', inputs.version) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release version
+        id: tags
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          DISPATCH_PREVIOUS_VERSION: ${{ inputs.previous_version }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CURRENT="$DISPATCH_VERSION"
+            PREVIOUS="$DISPATCH_PREVIOUS_VERSION"
+          else
+            CURRENT="${GITHUB_REF_NAME#v}"
+            if ! [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid release tag: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+            PREVIOUS=$(git tag -l "v*.*.*" --merged HEAD --sort=-version:refname \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | grep -v "^${GITHUB_REF_NAME}$" \
+              | head -1 \
+              | sed 's/^v//')
+          fi
+          if ! [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version: ${CURRENT}" >&2
+            exit 1
+          fi
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "Release ${CURRENT} (previous: ${PREVIOUS:-none})"
+
+      - name: Check minor/major bump
+        id: bump
+        working-directory: apps/api
+        env:
+          RELEASE_CURRENT: ${{ steps.tags.outputs.current }}
+          RELEASE_PREVIOUS: ${{ steps.tags.outputs.previous }}
+        run: |
+          ARGS=(--current="$RELEASE_CURRENT")
+          if [ -n "$RELEASE_PREVIOUS" ]; then
+            ARGS+=(--previous="$RELEASE_PREVIOUS")
+          fi
+          BUMP=$(pnpm exec tsx scripts/check-release-email-bump.ts "${ARGS[@]}")
+          echo "should_send=$(node -e "console.log(JSON.parse(process.argv[1]).send)" "$BUMP")" >> "$GITHUB_OUTPUT"
+          echo "reason=$(node -e "console.log(JSON.parse(process.argv[1]).reason)" "$BUMP")" >> "$GITHUB_OUTPUT"
+          echo "Bump decision: $BUMP"
+
+      - name: Apply database migrations
+        if: steps.bump.outputs.should_send == 'true'
+        run: pnpm --filter api exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Send product update email
+        if: steps.bump.outputs.should_send == 'true'
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TELEMETRY_EMAIL_FROM: ${{ secrets.TELEMETRY_EMAIL_FROM }}
+          TELEMETRY_DASHBOARD_ORIGIN: ${{ secrets.TELEMETRY_DASHBOARD_ORIGIN }}
+          RELEASE_CURRENT: ${{ steps.tags.outputs.current }}
+          RELEASE_PREVIOUS: ${{ steps.tags.outputs.previous }}
+        run: |
+          ARGS=(--version="$RELEASE_CURRENT")
+          if [ -n "$RELEASE_PREVIOUS" ]; then
+            ARGS+=(--previous-version="$RELEASE_PREVIOUS")
+          fi
+          pnpm exec tsx scripts/send-release-email.ts "${ARGS[@]}"
+
+      - name: Skip patch-only release
+        if: steps.bump.outputs.should_send != 'true'
+        env:
+          SKIP_REASON: ${{ steps.bump.outputs.reason }}
+        run: echo "Skipped product update email — ${SKIP_REASON}"
