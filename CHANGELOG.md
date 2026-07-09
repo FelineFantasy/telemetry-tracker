@@ -11,9 +11,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.6.6] - 2026-07-09
+
 ### Added
 
-- **Production config verifier** — `scripts/verify-prod-config.sh` runs external checks for the Railway deployment checklist (health, ingest/read auth, CORS, dashboard reachability); documented in [DEPLOYMENT.md](DEPLOYMENT.md) ([#85](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/85))
+- **Production config verifier** — `scripts/verify-prod-config.sh` runs external checks for the Railway deployment checklist (health, ingest/read auth, CORS, dashboard reachability); documented in [DEPLOYMENT.md](DEPLOYMENT.md) ([#325](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/325), [#85](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/85))
+- **German README** — `README.de.md` with full German translation of the project README ([#246](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/246))
 
 ---
 
