@@ -17,7 +17,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
-- **API `/health` version** — build injects the latest released semver from [CHANGELOG.md](../CHANGELOG.md); `TELEMETRY_API_VERSION` is optional override only (no per-release Railway env)
+- **API `/health` version** — build injects the latest released semver from [CHANGELOG.md](../CHANGELOG.md); `TELEMETRY_API_VERSION` is optional override only (no per-release Railway env) ([#317](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/317))
 
 ---
 
