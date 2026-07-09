@@ -87,9 +87,8 @@ function extractChangelogSection(version: string): string | null {
 function isResendDomainVerificationError(error: string | undefined): boolean {
   const message = error?.toLowerCase() ?? "";
   return (
-    message.includes("domain is not verified") ||
-    message.includes("verify a domain") ||
-    message.includes("domain is not")
+    /domain (is )?not verified/.test(message) ||
+    message.includes("verify a domain")
   );
 }
 
