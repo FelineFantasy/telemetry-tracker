@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Self-hosted source map uploads** — GitHub Action `base_api_url` input for CI uploads against a custom API host ([#303](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/303))
+
 ---
 
 ## [1.6.1] - 2026-07-09
