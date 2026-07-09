@@ -176,3 +176,24 @@ jobs:
 ```
 
 Create a project API key in **Settings → API keys** and store it as `TT_API_KEY` in your repository secrets.
+
+### Self-hosted API
+
+The action defaults to the hosted cloud API (`https://api.telemetry-tracker.com`). For a self-hosted install, set `base_api_url` to your deployment’s public API URL — the same value as `API_URL` on the dashboard (no trailing slash):
+
+```yaml
+      - name: Upload Source Maps
+        uses: ./.github/actions/upload-source-maps
+        with:
+          api_key: ${{ secrets.TT_API_KEY }}
+          project_id: "your-project-uuid-here"
+          release: ${{ github.event.release.tag_name }}
+          app: "my-telemetry-app"
+          artifact_path: "./dist"
+          base_url: "https://cdn.example.com"
+          base_api_url: "https://telemetry-api.example.com"
+```
+
+Use `http://localhost:3001` (or your dev API port) when testing uploads against a local API from CI or a runner on your network.
+
+See [DEPLOYMENT.md](../DEPLOYMENT.md) for self-host setup and [docs/hosted-cloud](https://telemetry-tracker.com/docs/hosted-cloud) for the managed service.
