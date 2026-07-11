@@ -9,4 +9,4 @@ alwaysApply: true
 2. Run locally: `pnpm lint && pnpm test && pnpm build` (plus migrations if schema changed).
 3. Only then push and open the PR.
 
-**Merge gates:** `develop` uses **0 human approvals** + required checks `build`, `Cursor Bugbot`, `maintainer-review`. Maintainer-authored PRs pass `maintainer-review` automatically; do not ask the user to self-approve.
+**Merge gates:** `develop` uses **0 human approvals** + required checks `build`, `bugbot-review`, `maintainer-review`. Maintainer-authored PRs pass `maintainer-review` and must have green `Cursor Bugbot`; other authors pass `bugbot-review` automatically (fork PRs often skip GitHub Bugbot).

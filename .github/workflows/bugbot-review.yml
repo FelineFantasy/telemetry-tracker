@@ -1,0 +1,68 @@
+# Require Cursor Bugbot on maintainer PRs only. Fork and external contributor PRs
+# often never receive the Bugbot GitHub App check, so this job passes automatically
+# when the author is not @unjica. Use this as a required check instead of
+# requiring "Cursor Bugbot" directly in branch protection.
+name: Bugbot review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop]
+
+permissions:
+  pull-requests: read
+  checks: read
+
+concurrency:
+  group: bugbot-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  bugbot-review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Gate maintainer PRs on Cursor Bugbot
+        uses: actions/github-script@v7
+        env:
+          MAINTAINER: unjica
+        with:
+          script: |
+            const maintainer = process.env.MAINTAINER.toLowerCase();
+            const pr = context.payload.pull_request;
+            const author = pr.user.login.toLowerCase();
+
+            if (author !== maintainer) {
+              core.info(
+                `Author @${pr.user.login} is not @${process.env.MAINTAINER} — Cursor Bugbot not required.`
+              );
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const { data } = await github.rest.checks.listForRef({
+              owner,
+              repo,
+              ref: pr.head.sha,
+            });
+
+            const bugbot = data.check_runs.find((run) => run.name === "Cursor Bugbot");
+            if (!bugbot) {
+              core.setFailed(
+                "Maintainer PR requires Cursor Bugbot. Comment `bugbot run` on the PR or run `/review-bugbot` locally before push."
+              );
+              return;
+            }
+
+            if (bugbot.status !== "completed") {
+              core.setFailed(`Cursor Bugbot is still ${bugbot.status}.`);
+              return;
+            }
+
+            const allowed = new Set(["success", "neutral", "skipped"]);
+            if (!allowed.has(bugbot.conclusion)) {
+              core.setFailed(`Cursor Bugbot concluded: ${bugbot.conclusion}.`);
+              return;
+            }
+
+            core.info(`Cursor Bugbot: ${bugbot.conclusion}`);
