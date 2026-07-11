@@ -25,6 +25,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.7.2] - 2026-07-11
+
 ### Added
 
 - **Contributing** — README section pointing newcomers to `good first issue` labels ([#337](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/337))

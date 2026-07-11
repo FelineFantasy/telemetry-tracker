@@ -99,7 +99,7 @@ When registration is **open**, keep existing CTAs; ensure `TELEMETRY_ALLOW_REGIS
 ## Acceptance checklist (#92)
 
 - [x] Policy decided: **open registration**
-- [ ] `TELEMETRY_ALLOW_REGISTRATION=true` confirmed on production API (Railway)
+- [x] `TELEMETRY_ALLOW_REGISTRATION=true` confirmed on production API (Railway)
 - [x] Marketing CTAs match policy (`/register`)
 - [x] Ops runbook documented (this doc)
-- [ ] `./scripts/verify-prod-config.sh` passes with `EXPECT_REGISTRATION_POLICY=open` — verified 2026-07-12 (14 PASS)
+- [x] `./scripts/verify-prod-config.sh` passes with `EXPECT_REGISTRATION_POLICY=open` — verified 2026-07-12 (14 PASS)
