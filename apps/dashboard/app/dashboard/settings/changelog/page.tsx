@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default function ChangelogSettingsPage() {
   const releases = loadChangelog();
   const latest = releases.find((r) => !r.prerelease);
-  const recent = releases.slice(0, 6);
+  const recent = releases.filter((r) => !r.prerelease).slice(0, 6);
 
   return (
     <>
