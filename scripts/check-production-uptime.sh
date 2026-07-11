@@ -17,11 +17,15 @@ http_code() {
   curl -sS -o /dev/null -w '%{http_code}' "$@" 2>/dev/null || echo "000"
 }
 
-HEALTH_CODE=$(http_code "$API/health")
-HEALTH=$(curl -sS "$API/health" 2>/dev/null || true)
+HEALTH_RESP=$(curl -sS "$API/health" -w '\n%{http_code}' 2>/dev/null || echo -e '\n000')
+HEALTH=$(echo "$HEALTH_RESP" | sed '$d')
+HEALTH_CODE=$(echo "$HEALTH_RESP" | tail -1)
 
-if [[ "$HEALTH_CODE" == "000" || -z "$HEALTH" ]]; then
+if [[ "$HEALTH_CODE" == "000" ]]; then
   fail "GET $API/health unreachable"
+fi
+if [[ -z "$HEALTH" ]]; then
+  fail "GET $API/health empty response (HTTP $HEALTH_CODE)"
 fi
 if [[ "$HEALTH_CODE" != "200" ]]; then
   fail "GET $API/health → $HEALTH_CODE — $HEALTH"
