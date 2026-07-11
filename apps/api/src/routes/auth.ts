@@ -406,4 +406,36 @@ export async function authRoutes(
       })),
     });
   });
+
+  app.patch("/auth/me", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    const body = (request.body ?? {}) as { displayName?: string };
+    if ("displayName" in body && typeof body.displayName !== "string") {
+      return reply.status(400).send({ error: "displayName must be a string" });
+    }
+
+    const data: { display_name?: string | null } = {};
+    if ("displayName" in body) {
+      const trimmed = body.displayName!.trim();
+      data.display_name = trimmed !== "" ? trimmed.slice(0, 120) : null;
+    }
+
+    const user = await prisma.user.update({
+      where: { id: session.userId },
+      data,
+      select: { id: true, email: true, display_name: true },
+    });
+
+    return reply.send({
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.display_name,
+      },
+    });
+  });
 }

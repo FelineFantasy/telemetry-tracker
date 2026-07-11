@@ -65,6 +65,33 @@ export async function resetDashboardProjectId(): Promise<void> {
   revalidatePath("/dashboard", "layout");
 }
 
+export async function updateProfileAction(
+  displayName: string
+): Promise<{ ok: true; displayName: string | null } | { ok: false; error: string }> {
+  const trimmed = displayName.trim();
+  const res = await dashboardApiFetch(
+    "/api/auth/me",
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayName: trimmed }),
+    },
+    { omitOrganizationHeader: true, omitProjectHeader: true }
+  );
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { user?: { displayName?: string | null } };
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/settings/profile");
+    return { ok: true, displayName: data.user?.displayName ?? null };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
 const cookieOpts = {
   path: "/",
   sameSite: "lax" as const,
