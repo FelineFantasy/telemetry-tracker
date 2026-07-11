@@ -22,15 +22,15 @@ import type { DashboardUser } from "@/lib/dashboard-user";
 export function ProfileSettingsClient({ user }: { user: DashboardUser }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const initialDisplayName = user.displayName ?? "";
-  const [displayName, setDisplayName] = useState(initialDisplayName);
+  const [savedDisplayName, setSavedDisplayName] = useState(user.displayName ?? "");
+  const [displayName, setDisplayName] = useState(savedDisplayName);
   const dirty = useMemo(
-    () => displayName.trim() !== initialDisplayName.trim(),
-    [displayName, initialDisplayName]
+    () => displayName.trim() !== savedDisplayName.trim(),
+    [displayName, savedDisplayName]
   );
 
   function discard() {
-    setDisplayName(initialDisplayName);
+    setDisplayName(savedDisplayName);
   }
 
   function save() {
@@ -40,6 +40,9 @@ export function ProfileSettingsClient({ user }: { user: DashboardUser }) {
         toast.error(result.error);
         return;
       }
+      const next = result.displayName ?? "";
+      setSavedDisplayName(next);
+      setDisplayName(next);
       toast.success("Profile updated");
       router.refresh();
     });
