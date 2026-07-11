@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.7.4] - 2026-07-12
+
+### Added
+
+- **Production monitoring** — `docs/MONITORING.md` runbook (Sentry, uptime, on-call); `scripts/check-production-uptime.sh` external probe; GitHub Actions **Production uptime** workflow every 15 minutes on `main` ([#93](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/93))
+
+---
+
 ## [1.7.3] - 2026-07-12
 
 ### Added

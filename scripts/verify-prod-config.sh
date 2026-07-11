@@ -167,5 +167,6 @@ log "  - Registration policy: TELEMETRY_ALLOW_REGISTRATION (see docs/REGISTRATIO
 log "  - Verify policy: EXPECT_REGISTRATION_POLICY=closed|open ./scripts/verify-prod-config.sh"
 log ""
 log "Full E2E flow (register, ingest, billing): scripts/smoke-production.sh"
+log "Uptime probe (ops): scripts/check-production-uptime.sh — see docs/MONITORING.md"
 
 if [[ "$fail" -gt 0 ]]; then exit 1; fi
