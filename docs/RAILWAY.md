@@ -47,6 +47,8 @@ Optional: Resend, Stripe, registration flags — [BILLING.md](./BILLING.md) and 
 
 **Resend (API service only):** set `RESEND_API_KEY`, `TELEMETRY_EMAIL_FROM`, and optionally `CONTACT_INBOX_EMAIL`. After deploy, `GET /health` should include `"email":"configured"`. Full DNS and verification steps: [BILLING.md → Production setup](./BILLING.md#production-setup-hosted-cloud).
 
+**Monitoring:** optional `SENTRY_DSN` on the API; external uptime via [MONITORING.md](./MONITORING.md) and [`.github/workflows/production-uptime.yml`](../.github/workflows/production-uptime.yml).
+
 ---
 
 ## Dashboard service

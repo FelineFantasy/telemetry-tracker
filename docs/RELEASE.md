@@ -257,6 +257,9 @@ Same `DATABASE_URL` as the API. See [RAILWAY.md](./RAILWAY.md#retention-cron).
 ```bash
 ./scripts/verify-prod-config.sh
 # Custom hosts: VERIFY_API_URL=... VERIFY_DASHBOARD_URL=... ./scripts/verify-prod-config.sh
+
+# Uptime probe (also runs every 15 min via GitHub Actions on main):
+./scripts/check-production-uptime.sh
 ```
 
 Or individual curls:
