@@ -9,7 +9,7 @@ Use this before exposing Telemetry Tracker on the public internet or handing it 
 | Ingest auth | **`INGEST_ALLOW_UNAUTHENTICATED` must be off** in production. SDKs must send `apiKey` (`tt_live_…`). |
 | Dashboard reads | With `NODE_ENV=production`, `GET /api/*` requires a session. Do not set `TELEMETRY_ALLOW_UNAUTHENTICATED_READS` unless you have a deliberate legacy tooling need. |
 | CORS | Set `CORS_ORIGINS` or `DASHBOARD_ORIGIN` so only your dashboard origin can call the API with credentials. |
-| Registration | After bootstrap, set `TELEMETRY_ALLOW_REGISTRATION=false` if you do not want open signups. |
+| Registration | After bootstrap, set `TELEMETRY_ALLOW_REGISTRATION=false` (or omit) for invite-only; `true` for open signups. See [REGISTRATION-POLICY.md](./REGISTRATION-POLICY.md). |
 | Secrets | Store `DATABASE_URL`, Stripe keys, and API keys in your platform secret manager — never in git. |
 | HTTPS | Terminate TLS at your reverse proxy / Railway / load balancer for both API and dashboard. |
 
