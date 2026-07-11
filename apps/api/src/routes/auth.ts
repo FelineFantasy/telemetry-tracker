@@ -418,6 +418,14 @@ export async function authRoutes(
       return reply.status(400).send({ error: "displayName must be a string" });
     }
 
+    const existing = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
     const data: { display_name?: string | null } = {};
     if ("displayName" in body) {
       const trimmed = body.displayName!.trim();
