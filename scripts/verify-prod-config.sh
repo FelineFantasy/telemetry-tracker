@@ -121,32 +121,34 @@ if [[ -z "$REG_POLICY" ]]; then
 elif [[ "$REG_POLICY" != "open" && "$REG_POLICY" != "closed" ]]; then
   bad "EXPECT_REGISTRATION_POLICY must be 'open' or 'closed' (got: $REG_POLICY)"
 else
-  PROBE_EMAIL="verify-reg-policy-$(date +%s)@telemetry-tracker-verify.test"
-  REG_RESP=$(curl -sS -X POST "$API/api/auth/register" \
-    -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$PROBE_EMAIL\",\"password\":\"VerifyProbe-$(date +%s)!x\",\"displayName\":\"Verify Probe\"}" \
-    -w '\n%{http_code}' 2>/dev/null || echo -e '\n000')
-  REG_BODY=$(echo "$REG_RESP" | sed '$d')
-  REG_CODE=$(echo "$REG_RESP" | tail -1)
-  if [[ "$REG_POLICY" == "closed" ]]; then
-    if [[ "${REGISTRATION_BOOTSTRAP_COMPLETE:-}" != "1" ]]; then
-      warn_step "Skipping closed registration probe — empty User table always allows first signup; set REGISTRATION_BOOTSTRAP_COMPLETE=1 after bootstrap"
-    elif [[ "$REG_CODE" == "403" ]] && echo "$REG_BODY" | grep -qi 'disabled'; then
-      ok "Self-serve register → 403 (invite-only policy)"
-    elif [[ "$REG_CODE" == "201" ]]; then
-      warn_step "Probe account created: $PROBE_EMAIL — delete from User table if undesired"
-      bad "Self-serve register → 201 but EXPECT_REGISTRATION_POLICY=closed — set TELEMETRY_ALLOW_REGISTRATION=false on API"
-    else
-      bad "Self-serve register → $REG_CODE (expected 403 for closed policy) — $REG_BODY"
-    fi
+  if [[ "$REG_POLICY" == "closed" && "${REGISTRATION_BOOTSTRAP_COMPLETE:-}" != "1" ]]; then
+    warn_step "Skipping closed registration probe — empty User table always allows first signup; set REGISTRATION_BOOTSTRAP_COMPLETE=1 after bootstrap"
   else
-    if [[ "$REG_CODE" == "201" ]]; then
-      ok "Self-serve register → 201 (open policy)"
-      warn_step "Probe account created: $PROBE_EMAIL — delete from User table if undesired"
-    elif [[ "$REG_CODE" == "403" ]]; then
-      bad "Self-serve register → 403 but EXPECT_REGISTRATION_POLICY=open — set TELEMETRY_ALLOW_REGISTRATION=true on API"
+    PROBE_EMAIL="verify-reg-policy-$(date +%s)@telemetry-tracker-verify.test"
+    REG_RESP=$(curl -sS -X POST "$API/api/auth/register" \
+      -H 'Content-Type: application/json' \
+      -d "{\"email\":\"$PROBE_EMAIL\",\"password\":\"VerifyProbe-$(date +%s)!x\",\"displayName\":\"Verify Probe\"}" \
+      -w '\n%{http_code}' 2>/dev/null || echo -e '\n000')
+    REG_BODY=$(echo "$REG_RESP" | sed '$d')
+    REG_CODE=$(echo "$REG_RESP" | tail -1)
+    if [[ "$REG_POLICY" == "closed" ]]; then
+      if [[ "$REG_CODE" == "403" ]] && echo "$REG_BODY" | grep -qi 'disabled'; then
+        ok "Self-serve register → 403 (invite-only policy)"
+      elif [[ "$REG_CODE" == "201" ]]; then
+        warn_step "Probe account created: $PROBE_EMAIL — delete from User table if undesired"
+        bad "Self-serve register → 201 but EXPECT_REGISTRATION_POLICY=closed — set TELEMETRY_ALLOW_REGISTRATION=false on API"
+      else
+        bad "Self-serve register → $REG_CODE (expected 403 for closed policy) — $REG_BODY"
+      fi
     else
-      bad "Self-serve register → $REG_CODE (expected 201 for open policy) — $REG_BODY"
+      if [[ "$REG_CODE" == "201" ]]; then
+        ok "Self-serve register → 201 (open policy)"
+        warn_step "Probe account created: $PROBE_EMAIL — delete from User table if undesired"
+      elif [[ "$REG_CODE" == "403" ]]; then
+        bad "Self-serve register → 403 but EXPECT_REGISTRATION_POLICY=open — set TELEMETRY_ALLOW_REGISTRATION=true on API"
+      else
+        bad "Self-serve register → $REG_CODE (expected 201 for open policy) — $REG_BODY"
+      fi
     fi
   fi
 fi
