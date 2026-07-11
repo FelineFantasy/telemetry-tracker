@@ -43,7 +43,10 @@ Redeploy is not required beyond a normal API restart when changing the var.
 # Open policy (creates a throwaway probe account):
 EXPECT_REGISTRATION_POLICY=open ./scripts/verify-prod-config.sh
 
-# Closed policy (only after bootstrap — first user always allowed on empty DB):
+# Closed policy — 403 passes (invite-only); 201 warns on empty DB bootstrap:
+EXPECT_REGISTRATION_POLICY=closed ./scripts/verify-prod-config.sh
+
+# After bootstrap — 201 on closed probe fails hard (registration still open):
 REGISTRATION_BOOTSTRAP_COMPLETE=1 EXPECT_REGISTRATION_POLICY=closed ./scripts/verify-prod-config.sh
 ```
 
