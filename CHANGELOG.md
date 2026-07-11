@@ -13,7 +13,17 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
-## [1.7.2] - 2026-07-11
+## [1.7.3] - 2026-07-12
+
+### Added
+
+- **Registration policy** — document open vs invite-only production signup (`docs/REGISTRATION-POLICY.md`); optional `EXPECT_REGISTRATION_POLICY` check in `scripts/verify-prod-config.sh` ([#344](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/344), closes [#92](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/92))
+
+### Changed
+
+- **Deployment docs** — link `TELEMETRY_ALLOW_REGISTRATION` to registration policy runbook ([#344](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/344))
+
+---
 
 ### Added
 

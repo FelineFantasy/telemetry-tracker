@@ -33,7 +33,7 @@ Copy `apps/api/.env.example` and `apps/dashboard/.env.example` for local dev.
 | `HEALTH_CHECK_DATABASE` | `true` — `GET /health` checks Postgres and reports `database_latency_ms` |
 | `HEALTH_DETAILED` | `true` — add `uptime_seconds` and `node_version` to `/health` (no secrets) |
 | `TELEMETRY_API_VERSION` | Optional override for `/health` `version`; normally set automatically at build from [CHANGELOG.md](../CHANGELOG.md) |
-| `TELEMETRY_ALLOW_REGISTRATION` | Set `false` after bootstrap if you do not want open signups |
+| `TELEMETRY_ALLOW_REGISTRATION` | `true` for open signups; omit or `false` for invite-only after bootstrap — see [docs/REGISTRATION-POLICY.md](docs/REGISTRATION-POLICY.md) |
 | `SENTRY_DSN` | Optional uncaught-error reporting |
 
 ### API — never in production
