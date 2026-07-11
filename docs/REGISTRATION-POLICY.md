@@ -37,12 +37,14 @@ TELEMETRY_ALLOW_REGISTRATION=false
 
 Redeploy is not required beyond a normal API restart when changing the var.
 
-**Verify (non-destructive when closed is configured correctly):**
+**Verify:**
 
 ```bash
-EXPECT_REGISTRATION_POLICY=closed ./scripts/verify-prod-config.sh
-# Open policy (creates a throwaway probe account — use only in staging):
+# Open policy (creates a throwaway probe account):
 EXPECT_REGISTRATION_POLICY=open ./scripts/verify-prod-config.sh
+
+# Closed policy (only after bootstrap — first user always allowed on empty DB):
+REGISTRATION_BOOTSTRAP_COMPLETE=1 EXPECT_REGISTRATION_POLICY=closed ./scripts/verify-prod-config.sh
 ```
 
 ## Ops: onboarding when registration is closed
