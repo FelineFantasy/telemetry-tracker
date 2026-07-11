@@ -13,6 +13,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.8.0] - 2026-07-12
+
+### Added
+
+- **Profile settings** — `PATCH /api/auth/me` updates `displayName`; dashboard profile page loads real user data and saves via server action ([#98](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/98))
+
+### Changed
+
+- **Settings hub** — What's new reads `CHANGELOG.md` via `loadChangelog()`; contact support links to GitHub issues and shows platform version from API `/health`; profile and changelog nav items no longer marked coming soon ([#98](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/98))
+
+---
+
 ## [1.7.4] - 2026-07-12
 
 ### Added

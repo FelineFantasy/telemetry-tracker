@@ -139,6 +139,52 @@ describe.skipIf(!runDbIntegration)("Auth and RBAC (integration)", () => {
     expect(meBody.memberships.some((m) => m.role === "VIEWER")).toBe(true);
   });
 
+  it("PATCH /api/auth/me updates displayName for authenticated user", async () => {
+    const login = await app!.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "content-type": "application/json" },
+      payload: { email: emailEditor, password },
+    });
+    expect(login.statusCode).toBe(200);
+    const { sessionId } = JSON.parse(login.body) as { sessionId: string };
+
+    const patch = await app!.inject({
+      method: "PATCH",
+      url: "/api/auth/me",
+      headers: {
+        authorization: `Bearer ${sessionId}`,
+        "content-type": "application/json",
+      },
+      payload: { displayName: "Updated Editor" },
+    });
+    expect(patch.statusCode).toBe(200);
+    const patchBody = JSON.parse(patch.body) as {
+      user: { displayName: string | null; email: string };
+    };
+    expect(patchBody.user.displayName).toBe("Updated Editor");
+    expect(patchBody.user.email).toBe(emailEditor);
+
+    const me = await app!.inject({
+      method: "GET",
+      url: "/api/auth/me",
+      headers: { authorization: `Bearer ${sessionId}` },
+    });
+    expect(me.statusCode).toBe(200);
+    const meBody = JSON.parse(me.body) as { user: { displayName: string | null } };
+    expect(meBody.user.displayName).toBe("Updated Editor");
+  });
+
+  it("PATCH /api/auth/me returns 401 without session", async () => {
+    const res = await app!.inject({
+      method: "PATCH",
+      url: "/api/auth/me",
+      headers: { "content-type": "application/json" },
+      payload: { displayName: "Nobody" },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
   it("GET /api/errors returns 401 without session in production", async () => {
     const prevNodeEnv = process.env.NODE_ENV;
     const prevAllowReads = process.env.TELEMETRY_ALLOW_UNAUTHENTICATED_READS;

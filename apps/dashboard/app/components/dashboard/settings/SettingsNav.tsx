@@ -11,7 +11,7 @@ const GROUPS: Group[] = [
   {
     label: "Account",
     items: [
-      { href: "/dashboard/settings/profile", label: "Profile", comingSoon: true },
+      { href: "/dashboard/settings/profile", label: "Profile" },
       { href: "/dashboard/settings/preferences", label: "Preferences", comingSoon: true },
       { href: "/dashboard/settings/appearance", label: "Appearance" },
       { href: "/dashboard/settings/notifications", label: "Notifications" },
@@ -36,7 +36,7 @@ const GROUPS: Group[] = [
     label: "Resources",
     items: [
       { href: "/docs", label: "Documentation" },
-      { href: "/dashboard/settings/changelog", label: "What's new", comingSoon: true },
+      { href: "/dashboard/settings/changelog", label: "What's new" },
       { href: "/dashboard/settings/support", label: "Contact support" },
     ],
   },
