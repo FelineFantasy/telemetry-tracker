@@ -13,6 +13,20 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.8.6] - 2026-07-12
+
+### Added
+
+- **Profile avatars** — upload PNG/JPEG/WebP (≤512 KB) to Cloudflare R2; `avatar_key` on `User`; authenticated API and dashboard `/avatar/[userId]` proxy; profile settings, user menu, and team members ([#361](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/361), [#396](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/396))
+
+### Fixed
+
+- **Avatar upload** — accept standard image `Content-Type` values so browser uploads are not rejected with 415 ([#396](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/396))
+
+---
+
+
+
 ## [1.8.5] - 2026-07-12
 
 ### Added
