@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   changePasswordAction,
+  fetchAuthSessionsAction,
   revokeAuthSessionAction,
   revokeOtherAuthSessionsAction,
 } from "@/app/dashboard/actions";
@@ -49,6 +50,15 @@ export function SecuritySettingsClient({
     setShowPasswordForm(false);
   }
 
+  async function refreshSessions() {
+    const result = await fetchAuthSessionsAction();
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    setSessions(result.sessions);
+  }
+
   function changePassword() {
     if (newPassword !== confirmPassword) {
       toast.error("New passwords do not match");
@@ -62,6 +72,7 @@ export function SecuritySettingsClient({
       }
       toast.success("Password updated");
       resetPasswordForm();
+      await refreshSessions();
       router.refresh();
     });
   }

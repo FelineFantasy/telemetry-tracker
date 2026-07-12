@@ -21,7 +21,19 @@ export default async function SecuritySettingsPage() {
     );
   }
 
-  const sessions = await fetchAuthSessions();
+  const loaded = await fetchAuthSessions();
 
-  return <SecuritySettingsClient initialSessions={sessions} />;
+  if (!loaded.ok) {
+    return (
+      <>
+        <SettingsPageHeader
+          title="Security"
+          description="Password, sessions, and account protection."
+        />
+        <ErrorState message={loaded.error} />
+      </>
+    );
+  }
+
+  return <SecuritySettingsClient initialSessions={loaded.sessions} />;
 }

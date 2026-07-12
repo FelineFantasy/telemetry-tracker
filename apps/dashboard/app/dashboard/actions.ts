@@ -23,6 +23,10 @@ import {
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
+  fetchAuthSessions,
+  type FetchAuthSessionsResult,
+} from "@/lib/security-settings";
+import {
   DEFAULT_PROJECT_ID,
   TELEMETRY_PROJECT_COOKIE,
   getDashboardProjectId,
@@ -694,6 +698,10 @@ async function readApiError(res: Response): Promise<string> {
     /* ignore */
   }
   return text.slice(0, 400) || res.statusText;
+}
+
+export async function fetchAuthSessionsAction(): Promise<FetchAuthSessionsResult> {
+  return fetchAuthSessions();
 }
 
 export async function changePasswordAction(
