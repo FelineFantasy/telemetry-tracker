@@ -13,6 +13,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.8.1] - 2026-07-12
+
+### Fixed
+
+- **Release email ops** — shared `changelog-section` resolves `CHANGELOG.md` from the script module path (not cwd), parses dated semver section headers correctly, and the release-email workflow falls back to `origin/main` when a tag is pushed before the release merge lands ([#355](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/355))
+
+### Changed
+
+- **Release docs** — document release-email CHANGELOG lookup and tag/merge ordering ([#355](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/355))
+
+---
+
 ## [1.8.0] - 2026-07-12
 
 ### Added
