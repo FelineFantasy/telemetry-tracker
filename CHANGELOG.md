@@ -11,9 +11,13 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.8.3] - 2026-07-12
+
 ### Added
 
-- **Dashboard Sentry** — optional `@sentry/nextjs` error monitoring (client, server, edge); gated on `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`; `error.tsx` / `global-error.tsx` capture; docs updated ([#385](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/385))
+- **Dashboard Sentry** — optional `@sentry/nextjs` error monitoring (client, server, edge); gated on `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`; `error.tsx` / `global-error.tsx` capture; docs updated ([#385](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/385), closes [#385](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/385))
 
 ---
 
