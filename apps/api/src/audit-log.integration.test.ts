@@ -174,4 +174,38 @@ describe.skipIf(!runDbIntegration)("Organization audit log (integration)", () =>
     );
     expect(currentLogin?.actorEmail).toBe(updatedEmail);
   });
+
+  it("preserves audit events when actor user is deleted", async () => {
+    const suffix = randomBytes(4).toString("hex");
+    const tempEmail = `audit-temp-${suffix}@test.local`;
+    const tempUser = await prisma.user.create({
+      data: {
+        email: tempEmail,
+        password_hash: hashPassword(password),
+        memberships: {
+          create: { organization_id: organizationId, role: OrgRole.VIEWER },
+        },
+      },
+    });
+
+    const event = await prisma.organizationAuditEvent.create({
+      data: {
+        organization_id: organizationId,
+        actor_user_id: tempUser.id,
+        actor_email: tempEmail,
+        action: AUDIT_ACTIONS.PROFILE_UPDATE,
+        target: tempEmail,
+      },
+    });
+
+    await prisma.user.delete({ where: { id: tempUser.id } });
+
+    const persisted = await prisma.organizationAuditEvent.findUnique({
+      where: { id: event.id },
+    });
+    expect(persisted).not.toBeNull();
+    expect(persisted?.actor_user_id).toBeNull();
+    expect(persisted?.actor_email).toBe(tempEmail);
+    expect(persisted?.action).toBe(AUDIT_ACTIONS.PROFILE_UPDATE);
+  });
 });

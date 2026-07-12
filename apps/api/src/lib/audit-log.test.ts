@@ -3,6 +3,7 @@ import {
   AUDIT_ACTIONS,
   DEFAULT_AUDIT_LOG_LIMIT,
   encodeAuditLogCursor,
+  listOrganizationAuditEvents,
   parseAuditLogQuery,
   recordUserAuditEvents,
 } from "./audit-log.js";
@@ -89,5 +90,41 @@ describe("audit-log", () => {
     );
 
     expect(createManyCalled).toBe(false);
+  });
+
+  it("lists audit events with null actorUserId after user deletion", async () => {
+    const createdAt = new Date("2026-07-12T12:00:00.000Z");
+    const prisma = {
+      organizationAuditEvent: {
+        findMany: async () => [
+          {
+            id: "evt-1",
+            created_at: createdAt,
+            action: AUDIT_ACTIONS.AUTH_LOGIN,
+            target: "former@example.com",
+            actor_user_id: null,
+            actor_email: "former@example.com",
+          },
+        ],
+      },
+    };
+
+    const result = await listOrganizationAuditEvents(
+      prisma as never,
+      "org-1",
+      { limit: 10, cursor: null }
+    );
+
+    expect(result.events).toEqual([
+      {
+        id: "evt-1",
+        createdAt: createdAt.toISOString(),
+        actorUserId: null,
+        actorEmail: "former@example.com",
+        action: AUDIT_ACTIONS.AUTH_LOGIN,
+        target: "former@example.com",
+      },
+    ]);
+    expect(result.nextCursor).toBeNull();
   });
 });

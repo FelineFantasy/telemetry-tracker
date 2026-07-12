@@ -19,7 +19,7 @@ export const MAX_AUDIT_LOG_LIMIT = 100;
 export type AuditLogEventRow = {
   id: string;
   createdAt: string;
-  actorUserId: string;
+  actorUserId: string | null;
   actorEmail: string;
   action: string;
   target: string;

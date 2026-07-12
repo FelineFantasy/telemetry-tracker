@@ -38,8 +38,8 @@ model OrganizationAuditEvent {
   id              String       @id @default(uuid())
   organization_id String       @map("organization_id")
   organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
-  actor_user_id   String       @map("actor_user_id")
-  actor           User         @relation(fields: [actor_user_id], references: [id], onDelete: Cascade)
+  actor_user_id   String?      @map("actor_user_id")
+  actor           User?        @relation(fields: [actor_user_id], references: [id], onDelete: SetNull)
   actor_email     String       @map("actor_email")
   action          String
   target          String

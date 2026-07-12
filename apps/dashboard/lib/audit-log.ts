@@ -3,7 +3,7 @@ import { dashboardApiFetch } from "@/lib/dashboard-api";
 export type AuditLogEvent = {
   id: string;
   createdAt: string;
-  actorUserId: string;
+  actorUserId: string | null;
   actorEmail: string;
   action: string;
   target: string;
