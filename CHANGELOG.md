@@ -13,6 +13,19 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.8.5] - 2026-07-12
+
+### Added
+
+- **Security settings** — list and revoke dashboard sessions (device/browser hints on sign-in), change password via API; settings page loads real session data ([#357](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/357), [#390](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/390))
+
+### Fixed
+
+- **Issue detail tabs** — ARIA `tablist` / `tab` / `tabpanel` roles and wiring for Stack trace and Occurrences ([#379](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/379), [#393](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/393), thanks [@MFA-G](https://github.com/MFA-G))
+- **Security settings** — refresh session list after password change; surface session fetch errors; correct iOS vs macOS labels in session user-agent parsing ([#390](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/390))
+
+---
+
 ## [1.8.4] - 2026-07-12
 
 ### Changed
