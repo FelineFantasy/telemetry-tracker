@@ -594,9 +594,10 @@ export async function authRoutes(
 
     const version = (request.query as { v?: string }).v;
     const expectedVersion = String(user.avatar_updated_at.getTime());
-    if (version && version !== expectedVersion) {
-      return reply.status(404).send({ error: "Avatar not found" });
-    }
+    const cacheControl =
+      version && version !== expectedVersion
+        ? "private, no-cache"
+        : "private, max-age=3600";
 
     const object = await getAvatarObject(user.avatar_key);
     if (!object) {
@@ -605,7 +606,7 @@ export async function authRoutes(
 
     return reply
       .header("Content-Type", user.avatar_content_type)
-      .header("Cache-Control", "private, max-age=3600")
+      .header("Cache-Control", cacheControl)
       .send(object.body);
   });
 

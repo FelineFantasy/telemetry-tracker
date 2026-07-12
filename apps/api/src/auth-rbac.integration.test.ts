@@ -229,6 +229,16 @@ describe.skipIf(!runDbIntegration)("Auth and RBAC (integration)", () => {
     expect(avatar.headers["content-type"]).toBe("image/png");
     expect(Buffer.from(avatar.rawPayload)).toEqual(png);
 
+    const staleVersion = await app!.inject({
+      method: "GET",
+      url: `/api/auth/avatars/${editorUser!.id}?v=1`,
+      headers: { authorization: `Bearer ${viewerSession}` },
+    });
+    expect(staleVersion.statusCode).toBe(200);
+    expect(staleVersion.headers["content-type"]).toBe("image/png");
+    expect(staleVersion.headers["cache-control"]).toBe("private, no-cache");
+    expect(Buffer.from(staleVersion.rawPayload)).toEqual(png);
+
     const forbidden = await app!.inject({
       method: "GET",
       url: `/api/auth/avatars/${editorUser!.id}`,
