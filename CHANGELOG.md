@@ -14,6 +14,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ---
 
 
+## [1.8.8] - 2026-07-13
+
+### Added
+
+- **Organization audit log** — org-scoped trail for dashboard security and profile actions (login, password change, session revoke, profile and avatar updates); `GET /meta/organizations/:orgId/audit-log` with cursor pagination; Settings → Audit log UI ([#358](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/358), [#403](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/403))
+
+---
+
 ## [1.8.7] - 2026-07-12
 
 ### Fixed
