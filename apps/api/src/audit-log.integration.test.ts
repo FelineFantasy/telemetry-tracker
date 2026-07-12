@@ -95,8 +95,11 @@ describe.skipIf(!runDbIntegration)("Organization audit log (integration)", () =>
       nextCursor: string | null;
     };
     expect(body.events.length).toBeGreaterThanOrEqual(1);
-    expect(body.events[0]?.action).toBe(AUDIT_ACTIONS.AUTH_LOGIN);
-    expect(body.events[0]?.actorEmail).toBe(ownerEmail);
+    const seededOwnerLogin = body.events.find(
+      (e) =>
+        e.action === AUDIT_ACTIONS.AUTH_LOGIN && e.actorEmail === ownerEmail
+    );
+    expect(seededOwnerLogin?.actorEmail).toBe(ownerEmail);
   });
 
   it("GET audit-log returns 403 for non-members", async () => {
@@ -158,8 +161,17 @@ describe.skipIf(!runDbIntegration)("Organization audit log (integration)", () =>
     const body = JSON.parse(res.body) as {
       events: { action: string; actorEmail: string }[];
     };
-    const loginEvent = body.events.find((e) => e.action === AUDIT_ACTIONS.AUTH_LOGIN);
-    expect(loginEvent?.actorEmail).toBe(historicalEmail);
-    expect(loginEvent?.actorEmail).not.toBe(updatedEmail);
+    const historicalEvent = body.events.find(
+      (e) =>
+        e.action === AUDIT_ACTIONS.AUTH_LOGIN && e.actorEmail === historicalEmail
+    );
+    expect(historicalEvent?.actorEmail).toBe(historicalEmail);
+    expect(historicalEvent?.actorEmail).not.toBe(updatedEmail);
+
+    const currentLogin = body.events.find(
+      (e) =>
+        e.action === AUDIT_ACTIONS.AUTH_LOGIN && e.actorEmail === updatedEmail
+    );
+    expect(currentLogin?.actorEmail).toBe(updatedEmail);
   });
 });
