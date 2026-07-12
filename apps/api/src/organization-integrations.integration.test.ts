@@ -57,28 +57,35 @@ describe.skipIf(!runDbIntegration)("Organization integrations (integration)", ()
   });
 
   afterAll(async () => {
-    await app?.close();
+    if (app) await app.close();
+    if (organizationId) {
+      await prisma.organization.delete({ where: { id: organizationId } }).catch(() => {});
+    }
+    const emails = [ownerEmail, outsiderEmail].filter(Boolean);
+    if (emails.length > 0) {
+      await prisma.user.deleteMany({ where: { email: { in: emails } } }).catch(() => {});
+    }
   });
 
-  async function login(email: string): Promise<string> {
-    const res = await app!.inject({
+  async function loginSessionId(email: string): Promise<string> {
+    const login = await app!.inject({
       method: "POST",
       url: "/api/auth/login",
+      headers: { "content-type": "application/json" },
       payload: { email, password },
     });
-    expect(res.statusCode).toBe(200);
-    const cookie = res.cookies.find((c) => c.name === "tt_session");
-    expect(cookie?.value).toBeTruthy();
-    return `tt_session=${cookie!.value}`;
+    expect(login.statusCode).toBe(200);
+    const { sessionId } = JSON.parse(login.body) as { sessionId: string };
+    return sessionId;
   }
 
   it("GET /api/meta/organizations/:orgId/integrations returns catalog for org members", async () => {
-    const cookie = await login(ownerEmail);
+    const sessionId = await loginSessionId(ownerEmail);
     const res = await app!.inject({
       method: "GET",
       url: `/api/meta/organizations/${organizationId}/integrations`,
       headers: {
-        cookie,
+        authorization: `Bearer ${sessionId}`,
         "x-project-id": projectId,
       },
     });
@@ -101,12 +108,12 @@ describe.skipIf(!runDbIntegration)("Organization integrations (integration)", ()
     const created = await createProjectApiKey(prisma, projectId, { name: `Key ${suffix}` });
     expect(created.ok).toBe(true);
 
-    const cookie = await login(ownerEmail);
+    const sessionId = await loginSessionId(ownerEmail);
     const res = await app!.inject({
       method: "GET",
       url: `/api/meta/organizations/${organizationId}/integrations`,
       headers: {
-        cookie,
+        authorization: `Bearer ${sessionId}`,
         "x-project-id": projectId,
       },
     });
@@ -137,12 +144,12 @@ describe.skipIf(!runDbIntegration)("Organization integrations (integration)", ()
       },
     });
 
-    const cookie = await login(ownerEmail);
+    const sessionId = await loginSessionId(ownerEmail);
     const res = await app!.inject({
       method: "GET",
       url: `/api/meta/organizations/${organizationId}/integrations`,
       headers: {
-        cookie,
+        authorization: `Bearer ${sessionId}`,
         "x-project-id": isolatedProject.id,
       },
     });
@@ -153,11 +160,11 @@ describe.skipIf(!runDbIntegration)("Organization integrations (integration)", ()
   });
 
   it("GET integrations returns 403 for non-members", async () => {
-    const cookie = await login(outsiderEmail);
+    const sessionId = await loginSessionId(outsiderEmail);
     const res = await app!.inject({
       method: "GET",
       url: `/api/meta/organizations/${organizationId}/integrations`,
-      headers: { cookie },
+      headers: { authorization: `Bearer ${sessionId}` },
     });
     expect(res.statusCode).toBe(403);
   });

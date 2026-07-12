@@ -139,11 +139,26 @@ export async function loadOrganizationIntegrationSignals(
   return { activeApiKeyCount: 0, projectCount: 0 };
 }
 
+function projectScopedHref(
+  href: string,
+  scope: IntegrationScope,
+  projectId?: string | null
+): string {
+  if (scope !== "project") return href;
+  const id = projectId?.trim().toLowerCase();
+  if (!id) return href;
+  const separator = href.includes("?") ? "&" : "?";
+  return `${href}${separator}projectId=${encodeURIComponent(id)}`;
+}
+
 export function resolveOrganizationIntegrations(
-  signals: OrganizationIntegrationSignals
+  signals: OrganizationIntegrationSignals,
+  projectId?: string | null
 ): OrganizationIntegration[] {
   return INTEGRATION_CATALOG.map((entry) => ({
     ...entry,
+    connectHref: projectScopedHref(entry.connectHref, entry.scope, projectId),
+    configureHref: projectScopedHref(entry.configureHref, entry.scope, projectId),
     status: resolveIntegrationStatus(entry.id, signals),
   }));
 }
@@ -182,6 +197,6 @@ export async function listOrganizationIntegrations(
   );
   return {
     organizationId,
-    integrations: resolveOrganizationIntegrations(signals),
+    integrations: resolveOrganizationIntegrations(signals, projectId),
   };
 }

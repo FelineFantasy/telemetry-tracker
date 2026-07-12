@@ -24,7 +24,7 @@ describe("organization-integrations", () => {
       "org-1",
       "proj-1"
     );
-    const integrations = resolveOrganizationIntegrations(signals);
+    const integrations = resolveOrganizationIntegrations(signals, "proj-1");
 
     expect(signals).toEqual({
       activeApiKeyCount: 2,
@@ -101,6 +101,26 @@ describe("organization-integrations", () => {
 
     expect(capturedWhere).toMatchObject({
       OR: [{ expires_at: null }, { expires_at: { gt: expect.any(Date) } }],
+    });
+  });
+
+  it("scopes project integration hrefs when a project id is provided", () => {
+    const integrations = resolveOrganizationIntegrations(
+      { activeApiKeyCount: 0, projectCount: 1 },
+      "proj-1"
+    );
+
+    expect(integrations.find((i) => i.id === "sdk")).toMatchObject({
+      connectHref: "/dashboard/settings/keys?projectId=proj-1",
+      configureHref: "/dashboard/settings/keys?projectId=proj-1",
+    });
+    expect(integrations.find((i) => i.id === "email_alerts")).toMatchObject({
+      connectHref: "/dashboard/alerts?projectId=proj-1",
+      configureHref: "/dashboard/alerts?projectId=proj-1",
+    });
+    expect(integrations.find((i) => i.id === "slack")).toMatchObject({
+      connectHref: "/dashboard/alerts",
+      configureHref: "/dashboard/alerts",
     });
   });
 
