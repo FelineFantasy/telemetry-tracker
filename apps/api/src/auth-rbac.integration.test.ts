@@ -175,6 +175,157 @@ describe.skipIf(!runDbIntegration)("Auth and RBAC (integration)", () => {
     expect(meBody.user.displayName).toBe("Updated Editor");
   });
 
+  it("POST /api/auth/me/avatar uploads and serves avatar for org members", async () => {
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"
+    );
+
+    const editorLogin = await app!.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "content-type": "application/json" },
+      payload: { email: emailEditor, password },
+    });
+    const { sessionId: editorSession } = JSON.parse(editorLogin.body) as {
+      sessionId: string;
+    };
+
+    const upload = await app!.inject({
+      method: "POST",
+      url: "/api/auth/me/avatar",
+      headers: {
+        authorization: `Bearer ${editorSession}`,
+        "content-type": "image/png",
+      },
+      payload: png,
+    });
+    expect(upload.statusCode).toBe(200);
+    const uploadBody = JSON.parse(upload.body) as {
+      user: { avatarUrl: string | null };
+    };
+    expect(uploadBody.user.avatarUrl).toMatch(/^\/api\/auth\/avatars\//);
+
+    const viewerLogin = await app!.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "content-type": "application/json" },
+      payload: { email: emailViewer, password },
+    });
+    const { sessionId: viewerSession } = JSON.parse(viewerLogin.body) as {
+      sessionId: string;
+    };
+
+    const editorUser = await prisma.user.findUnique({
+      where: { email: emailEditor },
+      select: { id: true },
+    });
+    const avatar = await app!.inject({
+      method: "GET",
+      url: uploadBody.user.avatarUrl!,
+      headers: { authorization: `Bearer ${viewerSession}` },
+    });
+    expect(avatar.statusCode).toBe(200);
+    expect(avatar.headers["content-type"]).toBe("image/png");
+    expect(Buffer.from(avatar.rawPayload)).toEqual(png);
+
+    const staleVersion = await app!.inject({
+      method: "GET",
+      url: `/api/auth/avatars/${editorUser!.id}?v=1`,
+      headers: { authorization: `Bearer ${viewerSession}` },
+    });
+    expect(staleVersion.statusCode).toBe(200);
+    expect(staleVersion.headers["content-type"]).toBe("image/png");
+    expect(staleVersion.headers["cache-control"]).toBe("private, no-cache");
+    expect(Buffer.from(staleVersion.rawPayload)).toEqual(png);
+
+    const forbidden = await app!.inject({
+      method: "GET",
+      url: `/api/auth/avatars/${editorUser!.id}`,
+      headers: { authorization: `Bearer ${editorSession}` },
+    });
+    expect(forbidden.statusCode).toBe(200);
+
+    const removed = await app!.inject({
+      method: "DELETE",
+      url: "/api/auth/me/avatar",
+      headers: { authorization: `Bearer ${editorSession}` },
+    });
+    expect(removed.statusCode).toBe(200);
+    const removedBody = JSON.parse(removed.body) as {
+      user: { avatarUrl: string | null };
+    };
+    expect(removedBody.user.avatarUrl).toBeNull();
+  });
+
+  it("avatar routes return 503 when R2 is not configured in production", async () => {
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevR2 = {
+      R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID,
+      R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+      R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+      R2_BUCKET_NAME: process.env.R2_BUCKET_NAME,
+    };
+    process.env.NODE_ENV = "production";
+    delete process.env.R2_ACCOUNT_ID;
+    delete process.env.R2_ACCESS_KEY_ID;
+    delete process.env.R2_SECRET_ACCESS_KEY;
+    delete process.env.R2_BUCKET_NAME;
+
+    try {
+      const editorLogin = await app!.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        headers: { "content-type": "application/json" },
+        payload: { email: emailEditor, password },
+      });
+      const { sessionId: editorSession } = JSON.parse(editorLogin.body) as {
+        sessionId: string;
+      };
+      const editorUser = await prisma.user.findUnique({
+        where: { email: emailEditor },
+        select: { id: true },
+      });
+
+      const png = Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        "base64"
+      );
+
+      const upload = await app!.inject({
+        method: "POST",
+        url: "/api/auth/me/avatar",
+        headers: {
+          authorization: `Bearer ${editorSession}`,
+          "content-type": "image/png",
+        },
+        payload: png,
+      });
+      expect(upload.statusCode).toBe(503);
+
+      const avatarGet = await app!.inject({
+        method: "GET",
+        url: `/api/auth/avatars/${editorUser!.id}`,
+        headers: { authorization: `Bearer ${editorSession}` },
+      });
+      expect(avatarGet.statusCode).toBe(503);
+
+      const removed = await app!.inject({
+        method: "DELETE",
+        url: "/api/auth/me/avatar",
+        headers: { authorization: `Bearer ${editorSession}` },
+      });
+      expect(removed.statusCode).toBe(503);
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prevNodeEnv;
+      for (const [key, value] of Object.entries(prevR2)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
   it("PATCH /api/auth/me returns 401 without session", async () => {
     const res = await app!.inject({
       method: "PATCH",

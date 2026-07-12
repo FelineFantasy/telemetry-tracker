@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes, ButtonHTMLAttributes } from "react";
 import {
   settingsInputClassName,
@@ -213,9 +214,11 @@ export function SettingsPill({
 
 export function SettingsAvatar({
   name,
+  src,
   size = 32,
 }: {
   name: string;
+  src?: string | null;
   size?: number;
 }) {
   const initials = name
@@ -224,6 +227,18 @@ export function SettingsAvatar({
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  if (src) {
+    return (
+      <Image
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        unoptimized
+        className="shrink-0 rounded-full border border-border bg-surface object-cover"
+      />
+    );
+  }
   return (
     <span
       style={{ width: size, height: size, fontSize: size * 0.36 }}
