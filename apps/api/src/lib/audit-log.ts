@@ -83,16 +83,23 @@ export async function recordUserAuditEvents(
   if (!trimmedTarget) return;
 
   try {
-    const memberships = await db.organizationMembership.findMany({
-      where: { user_id: actorUserId },
-      select: { organization_id: true },
-    });
-    if (memberships.length === 0) return;
+    const [memberships, actor] = await Promise.all([
+      db.organizationMembership.findMany({
+        where: { user_id: actorUserId },
+        select: { organization_id: true },
+      }),
+      db.user.findUnique({
+        where: { id: actorUserId },
+        select: { email: true },
+      }),
+    ]);
+    if (!actor || memberships.length === 0) return;
 
     await db.organizationAuditEvent.createMany({
       data: memberships.map((m) => ({
         organization_id: m.organization_id,
         actor_user_id: actorUserId,
+        actor_email: actor.email,
         action,
         target: trimmedTarget,
       })),
@@ -130,7 +137,7 @@ export async function listOrganizationAuditEvents(
       action: true,
       target: true,
       actor_user_id: true,
-      actor: { select: { email: true } },
+      actor_email: true,
     },
   });
 
@@ -143,7 +150,7 @@ export async function listOrganizationAuditEvents(
       id: row.id,
       createdAt: row.created_at.toISOString(),
       actorUserId: row.actor_user_id,
-      actorEmail: row.actor.email,
+      actorEmail: row.actor_email,
       action: row.action,
       target: row.target,
     })),

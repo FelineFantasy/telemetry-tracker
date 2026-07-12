@@ -50,6 +50,7 @@ describe.skipIf(!runDbIntegration)("Organization audit log (integration)", () =>
       data: {
         organization_id: org.id,
         actor_user_id: owner.id,
+        actor_email: ownerEmail,
         action: AUDIT_ACTIONS.AUTH_LOGIN,
         target: ownerEmail,
       },
@@ -135,5 +136,30 @@ describe.skipIf(!runDbIntegration)("Organization audit log (integration)", () =>
       url: `/api/meta/organizations/${organizationId}/audit-log`,
     });
     expect(res.statusCode).toBe(401);
+  });
+
+  it("GET audit-log returns stored actor email, not current user email", async () => {
+    const historicalEmail = ownerEmail;
+    const updatedEmail = `audit-owner-updated-${randomBytes(4).toString("hex")}@test.local`;
+
+    await prisma.user.update({
+      where: { email: ownerEmail },
+      data: { email: updatedEmail },
+    });
+    ownerEmail = updatedEmail;
+
+    const sessionId = await loginSessionId(updatedEmail);
+    const res = await app!.inject({
+      method: "GET",
+      url: `/api/meta/organizations/${organizationId}/audit-log`,
+      headers: { authorization: `Bearer ${sessionId}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      events: { action: string; actorEmail: string }[];
+    };
+    const loginEvent = body.events.find((e) => e.action === AUDIT_ACTIONS.AUTH_LOGIN);
+    expect(loginEvent?.actorEmail).toBe(historicalEmail);
+    expect(loginEvent?.actorEmail).not.toBe(updatedEmail);
   });
 });

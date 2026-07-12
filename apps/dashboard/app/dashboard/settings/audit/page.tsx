@@ -53,6 +53,7 @@ export default async function AuditSettingsPage() {
 
   return (
     <AuditSettingsClient
+      key={organizationId}
       organizationId={organizationId}
       initialEvents={loaded.events}
       initialNextCursor={loaded.nextCursor}

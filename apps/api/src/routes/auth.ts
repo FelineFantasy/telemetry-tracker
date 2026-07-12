@@ -576,12 +576,14 @@ export async function authRoutes(
       },
     });
 
-    void recordUserAuditEvents(
-      prisma,
-      user.id,
-      AUDIT_ACTIONS.PROFILE_AVATAR_REMOVE,
-      user.email
-    );
+    if (existing?.avatar_key) {
+      void recordUserAuditEvents(
+        prisma,
+        user.id,
+        AUDIT_ACTIONS.PROFILE_AVATAR_REMOVE,
+        user.email
+      );
+    }
 
     return reply.send({ user: mapAuthUser(user) });
   });

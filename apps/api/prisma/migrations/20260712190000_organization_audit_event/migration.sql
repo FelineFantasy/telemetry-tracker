@@ -3,6 +3,7 @@ CREATE TABLE "OrganizationAuditEvent" (
     "id" TEXT NOT NULL,
     "organization_id" TEXT NOT NULL,
     "actor_user_id" TEXT NOT NULL,
+    "actor_email" TEXT NOT NULL,
     "action" TEXT NOT NULL,
     "target" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
