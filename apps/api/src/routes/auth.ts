@@ -55,10 +55,22 @@ function mapAuthUser(user: {
   };
 }
 
+const AVATAR_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+
 export async function authRoutes(
   app: FastifyInstance,
   _opts: FastifyPluginOptions
 ) {
+  for (const contentType of AVATAR_CONTENT_TYPES) {
+    app.addContentTypeParser(
+      contentType,
+      { parseAs: "buffer" },
+      (_req, body, done) => {
+        done(null, body);
+      }
+    );
+  }
+
   app.post("/auth/register", async (request, reply) => {
     const body = (request.body ?? {}) as {
       email?: string;
