@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  AUDIT_ACTIONS,
   DEFAULT_AUDIT_LOG_LIMIT,
   encodeAuditLogCursor,
   parseAuditLogQuery,
+  recordUserAuditEvents,
 } from "./audit-log.js";
 
 describe("audit-log", () => {
@@ -27,5 +29,65 @@ describe("audit-log", () => {
       error: "limit must be between 1 and 100",
     });
     expect(parseAuditLogQuery({ cursor: "bad" })).toEqual({ error: "Invalid cursor" });
+  });
+
+  it("records audit events only for active organizations", async () => {
+    let capturedMembershipWhere: unknown;
+    let createManyCalled = false;
+    const prisma = {
+      organizationMembership: {
+        findMany: async (args: { where: unknown }) => {
+          capturedMembershipWhere = args.where;
+          return [{ organization_id: "org-active" }];
+        },
+      },
+      user: {
+        findUnique: async () => ({ email: "actor@example.com" }),
+      },
+      organizationAuditEvent: {
+        createMany: async () => {
+          createManyCalled = true;
+        },
+      },
+    };
+
+    await recordUserAuditEvents(
+      prisma as never,
+      "user-1",
+      AUDIT_ACTIONS.AUTH_LOGIN,
+      "actor@example.com"
+    );
+
+    expect(capturedMembershipWhere).toEqual({
+      user_id: "user-1",
+      organization: { deleted_at: null },
+    });
+    expect(createManyCalled).toBe(true);
+  });
+
+  it("skips createMany when user has no active organization memberships", async () => {
+    let createManyCalled = false;
+    const prisma = {
+      organizationMembership: {
+        findMany: async () => [],
+      },
+      user: {
+        findUnique: async () => ({ email: "actor@example.com" }),
+      },
+      organizationAuditEvent: {
+        createMany: async () => {
+          createManyCalled = true;
+        },
+      },
+    };
+
+    await recordUserAuditEvents(
+      prisma as never,
+      "user-1",
+      AUDIT_ACTIONS.AUTH_LOGIN,
+      "actor@example.com"
+    );
+
+    expect(createManyCalled).toBe(false);
   });
 });

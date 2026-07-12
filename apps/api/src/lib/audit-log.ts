@@ -85,7 +85,7 @@ export async function recordUserAuditEvents(
   try {
     const [memberships, actor] = await Promise.all([
       db.organizationMembership.findMany({
-        where: { user_id: actorUserId },
+        where: { user_id: actorUserId, organization: { deleted_at: null } },
         select: { organization_id: true },
       }),
       db.user.findUnique({
