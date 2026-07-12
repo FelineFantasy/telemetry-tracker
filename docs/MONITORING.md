@@ -9,7 +9,8 @@ GitHub issue [#93](https://github.com/Telemetry-Tracker/telemetry-tracker/issues
 | **API liveness** | `GET /health` → `200`, `"ok":true`, `"database":"ok"` | Non-200, `ok:false`, or DB unavailable |
 | **Dashboard reachability** | `GET https://telemetry-tracker.com` → `200` | Non-200 or TLS errors |
 | **Ingest auth** | `POST /ingest/event` without API key → `401` | Returns 200/204 without key (misconfiguration) |
-| **Uncaught API errors** | [Sentry](#sentry-optional) (`SENTRY_DSN`) | New error groups or spike in volume |
+| **Uncaught API errors** | [Sentry](#sentry-optional) (`SENTRY_DSN` on API) | New error groups or spike in volume |
+| **Uncaught dashboard errors** | [Sentry](#sentry-optional) (`SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` on dashboard) | New error groups or spike in volume |
 | **Ingest quota pressure** | Railway API logs / metrics — `429` responses | Sustained 429 rate above baseline |
 | **API 5xx** | Sentry + Railway deploy logs | Any 5xx spike after deploy |
 | **Retention cron** | Railway `retention-cron` service — last run exited 0 | Failed run, stuck deployment, or missing `"ok":true` in logs |
@@ -73,12 +74,17 @@ Point alert contacts to **info@tacko.io** or your team Slack/email.
 
 Uncaught API errors are reported when `SENTRY_DSN` is set on the **API** service ([`apps/api/src/lib/observability.ts`](../apps/api/src/lib/observability.ts)).
 
+Uncaught dashboard errors (server, edge, and client error boundaries) are reported when both `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` are set on the **dashboard** service ([`apps/dashboard/lib/sentry.ts`](../apps/dashboard/lib/sentry.ts), `@sentry/nextjs`).
+
 ### Railway setup
 
-1. Create a Sentry project (Node / Fastify).
-2. API service → **Variables** → `SENTRY_DSN=https://…@sentry.io/…`
-3. Redeploy API.
-4. Trigger a test error in staging or verify events in Sentry after a deploy.
+1. Create Sentry projects — Node / Fastify for API, Next.js for dashboard (or reuse one project).
+2. **API** service → **Variables** → `SENTRY_DSN=https://…@sentry.io/…`
+3. **Dashboard** service → **Variables** → `SENTRY_DSN=https://…@sentry.io/…` and `NEXT_PUBLIC_SENTRY_DSN=https://…@sentry.io/…` (same DSN value)
+4. Redeploy both services.
+5. Trigger a test error in staging or verify events in Sentry after a deploy.
+
+**Optional source maps (dashboard):** set `SENTRY_AUTH_TOKEN` in CI to upload `.map` files after release — see [DEPLOYMENT.md](../DEPLOYMENT.md#source-maps). Not required for error capture.
 
 **Alert rules (Sentry dashboard):**
 
@@ -138,6 +144,7 @@ Dashboard **project-level** alerts (error spikes, quota) are for **customers**, 
 ## Acceptance checklist (#93)
 
 - [ ] `SENTRY_DSN` set on production API (optional but recommended)
+- [ ] `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` set on production dashboard (optional but recommended)
 - [ ] GitHub **Production uptime** workflow enabled (on `main`)
 - [ ] External uptime monitor configured (redundancy)
 - [ ] Alert channel defined (GitHub Actions email and/or UptimeRobot → email/Slack)

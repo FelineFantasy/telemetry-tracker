@@ -53,6 +53,8 @@ Rate limits (`RATE_LIMIT_*`), legacy org fallback (`TELEMETRY_ORGANIZATION_ID`),
 |----------|-------------|
 | `API_URL` | Public API base URL (no trailing `/`). Default locally: `http://localhost:3001` |
 | `NEXT_PUBLIC_SITE_URL` | Public dashboard URL for SEO/metadata (recommended in production) |
+| `SENTRY_DSN` | Optional server/edge uncaught-error reporting |
+| `NEXT_PUBLIC_SENTRY_DSN` | Optional browser error reporting (same DSN value as `SENTRY_DSN`) |
 
 Do not set `NEXT_PUBLIC_TELEMETRY_PUBLIC_DASHBOARD=true` on a public production URL.
 
