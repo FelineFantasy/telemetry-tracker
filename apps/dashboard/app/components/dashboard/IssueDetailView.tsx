@@ -12,6 +12,11 @@ import { cn } from "@/lib/cn";
 
 type TabId = "stack" | "occurrences";
 
+const ISSUE_DETAIL_TABS = [
+  { id: "stack" as const, label: "Stack trace" },
+  { id: "occurrences" as const, label: "Occurrences" },
+] as const;
+
 export function IssueDetailView({
   issueId,
   title,
@@ -73,12 +78,7 @@ export function IssueDetailView({
               role="tablist"
               aria-label="Issue detail sections"
             >
-              {(
-                [
-                  { id: "stack" as const, label: "Stack trace" },
-                  { id: "occurrences" as const, label: "Occurrences" },
-                ] as const
-              ).map((t) => {
+              {ISSUE_DETAIL_TABS.map((t) => {
                 const selected = tab === t.id;
                 const tabId = `issue-${issueId}-${t.id}-tab`;
                 const panelId = `issue-${issueId}-${t.id}-panel`;
@@ -105,14 +105,25 @@ export function IssueDetailView({
                 );
               })}
             </div>
-            <div
-              id={`issue-${issueId}-${tab}-panel`}
-              className="p-4 sm:p-5"
-              role="tabpanel"
-              aria-labelledby={`issue-${issueId}-${tab}-tab`}
-            >
-              {tab === "stack" ? stackTrace : occurrences}
-            </div>
+            {ISSUE_DETAIL_TABS.map((t) => {
+              const selected = tab === t.id;
+              const tabId = `issue-${issueId}-${t.id}-tab`;
+              const panelId = `issue-${issueId}-${t.id}-panel`;
+
+              return (
+                <div
+                  key={t.id}
+                  id={panelId}
+                  className="p-4 sm:p-5"
+                  role="tabpanel"
+                  aria-labelledby={tabId}
+                  hidden={!selected}
+                  aria-hidden={!selected}
+                >
+                  {t.id === "stack" ? stackTrace : occurrences}
+                </div>
+              );
+            })}
           </AnalyticsPanel>
         }
         sidebar={
