@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { SessionUser } from "./auth-session.js";
 import { tryResolveReadProjectId } from "./read-project-request.js";
 import { loadNavScopeForProject, loadWorkspaceMetaForUser } from "./workspace-meta.js";
+import { avatarUrlFromUser } from "./user-avatar.js";
 
 const bootstrapDebug =
   process.env.DASHBOARD_DEBUG === "1" ||
@@ -18,6 +19,7 @@ export type DashboardBootstrapUser = {
   id: string;
   email: string;
   displayName: string | null;
+  avatarUrl: string | null;
 };
 
 export type DashboardBootstrapPayload = {
@@ -51,7 +53,13 @@ export async function buildDashboardBootstrap(
     loadWorkspaceMetaForUser(prisma, session.userId, headerOrg),
     prisma.user.findUnique({
       where: { id: session.userId },
-      select: { id: true, email: true, display_name: true },
+      select: {
+        id: true,
+        email: true,
+        display_name: true,
+        avatar_key: true,
+        avatar_updated_at: true,
+      },
     }),
   ]);
 
@@ -64,6 +72,7 @@ export async function buildDashboardBootstrap(
     id: userRow.id,
     email: userRow.email,
     displayName: userRow.display_name,
+    avatarUrl: avatarUrlFromUser(userRow),
   };
 
   if (workspace.forbiddenOrg) {

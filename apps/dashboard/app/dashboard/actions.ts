@@ -35,6 +35,17 @@ import {
   sessionScopedMetaHeaders,
 } from "@/lib/dashboard-project";
 
+async function readApiError(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text) as { error?: string };
+    if (typeof data.error === "string" && data.error.trim()) return data.error;
+  } catch {
+    /* ignore */
+  }
+  return text.slice(0, 400) || res.statusText;
+}
+
 export async function setDashboardProjectId(projectId: string): Promise<
   { ok: true } | { ok: false; error: string }
 > {
@@ -98,6 +109,60 @@ export async function updateProfileAction(
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }
+}
+
+export async function uploadAvatarAction(
+  formData: FormData
+): Promise<{ ok: true; avatarUrl: string | null } | { ok: false; error: string }> {
+  const raw = formData.get("avatar");
+  if (!(raw instanceof File) || raw.size === 0) {
+    return { ok: false, error: "Choose an image to upload" };
+  }
+  const contentType = raw.type.trim().toLowerCase();
+  if (!["image/jpeg", "image/png", "image/webp"].includes(contentType)) {
+    return { ok: false, error: "Avatar must be a JPEG, PNG, or WebP image" };
+  }
+
+  const res = await dashboardApiFetch(
+    "/api/auth/me/avatar",
+    {
+      method: "POST",
+      headers: { "Content-Type": contentType },
+      body: await raw.arrayBuffer(),
+    },
+    { omitOrganizationHeader: true, omitProjectHeader: true }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { user?: { avatarUrl?: string | null } };
+    const { toDashboardAvatarUrl } = await import("@/lib/avatar-url");
+    revalidatePath("/dashboard", "layout");
+    revalidatePath("/dashboard/settings/profile");
+    return {
+      ok: true,
+      avatarUrl: toDashboardAvatarUrl(data.user?.avatarUrl ?? null),
+    };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function removeAvatarAction(): Promise<
+  { ok: true } | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch(
+    "/api/auth/me/avatar",
+    { method: "DELETE" },
+    { omitOrganizationHeader: true, omitProjectHeader: true }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/settings/profile");
+  return { ok: true };
 }
 
 const cookieOpts = {
@@ -687,17 +752,6 @@ export async function listProjectSourceMapsAction(
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }
-}
-
-async function readApiError(res: Response): Promise<string> {
-  const text = await res.text();
-  try {
-    const data = JSON.parse(text) as { error?: string };
-    if (typeof data.error === "string" && data.error.trim()) return data.error;
-  } catch {
-    /* ignore */
-  }
-  return text.slice(0, 400) || res.statusText;
 }
 
 export async function fetchAuthSessionsAction(): Promise<FetchAuthSessionsResult> {

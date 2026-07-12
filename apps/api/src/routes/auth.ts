@@ -10,8 +10,23 @@ import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 import { subscribeMarketingEmail, REGISTRATION_CONSENT_LABEL } from "../lib/marketing-subscriber.js";
 import { MarketingSubscriberSource } from "@prisma/client";
 import { createUserSession } from "../lib/user-session.js";
+import {
+  MAX_AVATAR_BYTES,
+  validateAvatarUpload,
+} from "../lib/avatar-upload.js";
+import { canViewUserAvatar } from "../lib/avatar-access.js";
+import { publicUserAvatarFields } from "../lib/user-avatar.js";
+import {
+  avatarObjectKey,
+  deleteAvatarObject,
+  getAvatarObject,
+  isAvatarStorageConfigured,
+  putAvatarObject,
+} from "../lib/avatar-storage.js";
 
 const RESET_TOKEN_HOURS = 1;
+const USER_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
@@ -19,6 +34,25 @@ function normalizeEmail(raw: string): string {
 
 function isStrongPassword(p: string): boolean {
   return p.length >= 8 && p.length <= 256;
+}
+
+function mapAuthUser(user: {
+  id: string;
+  email: string;
+  display_name: string | null;
+  avatar_key?: string | null;
+  avatar_updated_at?: Date | null;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.display_name,
+    ...publicUserAvatarFields({
+      id: user.id,
+      avatar_key: user.avatar_key ?? null,
+      avatar_updated_at: user.avatar_updated_at ?? null,
+    }),
+  };
 }
 
 export async function authRoutes(
@@ -166,11 +200,7 @@ export async function authRoutes(
         sessionId,
         expiresAt: expiresAt.toISOString(),
         organizationId: inviteOutcome.organizationId,
-        user: {
-          id: user.id,
-          email: user.email,
-          displayName: user.display_name,
-        },
+        user: mapAuthUser(user),
       });
     }
 
@@ -217,11 +247,7 @@ export async function authRoutes(
       sessionId,
       expiresAt: expiresAt.toISOString(),
       organizationId: null,
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.display_name,
-      },
+      user: mapAuthUser(user),
     });
   });
 
@@ -252,11 +278,7 @@ export async function authRoutes(
       sessionId,
       expiresAt: expiresAt.toISOString(),
       organizationId: firstMembership?.organization_id ?? null,
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.display_name,
-      },
+      user: mapAuthUser(user),
     });
   });
 
@@ -357,6 +379,8 @@ export async function authRoutes(
         id: true,
         email: true,
         display_name: true,
+        avatar_key: true,
+        avatar_updated_at: true,
         memberships: {
           select: {
             role: true,
@@ -370,11 +394,7 @@ export async function authRoutes(
       return reply.status(401).send({ error: "Unauthorized" });
     }
     return reply.send({
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.display_name,
-      },
+      user: mapAuthUser(user),
       memberships: user.memberships.map((m) => ({
         organizationId: m.organization_id,
         organizationName: m.organization.name,
@@ -411,16 +431,157 @@ export async function authRoutes(
     const user = await prisma.user.update({
       where: { id: session.userId },
       data,
-      select: { id: true, email: true, display_name: true },
+      select: {
+        id: true,
+        email: true,
+        display_name: true,
+        avatar_key: true,
+        avatar_updated_at: true,
+      },
     });
 
     return reply.send({
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.display_name,
+      user: mapAuthUser(user),
+    });
+  });
+
+  app.post(
+    "/auth/me/avatar",
+    { bodyLimit: MAX_AVATAR_BYTES + 16 * 1024 },
+    async (request, reply) => {
+      const session = await getSessionUser(request);
+      if (!session) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      if (!isAvatarStorageConfigured() && process.env.NODE_ENV === "production") {
+        return reply.status(503).send({ error: "Avatar storage is not configured" });
+      }
+
+      const raw = request.body;
+      const buf = Buffer.isBuffer(raw)
+        ? raw
+        : typeof raw === "string"
+          ? Buffer.from(raw, "binary")
+          : Buffer.alloc(0);
+      const contentType =
+        typeof request.headers["content-type"] === "string"
+          ? request.headers["content-type"]
+          : undefined;
+      const validated = validateAvatarUpload(buf, contentType);
+      if (!validated.ok) {
+        return reply.status(400).send({ error: validated.error });
+      }
+
+      const updatedAt = new Date();
+      const objectKey = avatarObjectKey(session.userId, validated.contentType);
+
+      const existing = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { avatar_key: true },
+      });
+      if (existing?.avatar_key && existing.avatar_key !== objectKey) {
+        await deleteAvatarObject(existing.avatar_key);
+      }
+
+      await putAvatarObject(objectKey, buf, validated.contentType);
+
+      const user = await prisma.user.update({
+        where: { id: session.userId },
+        data: {
+          avatar_key: objectKey,
+          avatar_content_type: validated.contentType,
+          avatar_updated_at: updatedAt,
+        },
+        select: {
+          id: true,
+          email: true,
+          display_name: true,
+          avatar_key: true,
+          avatar_updated_at: true,
+        },
+      });
+
+      return reply.send({ user: mapAuthUser(user) });
+    }
+  );
+
+  app.delete("/auth/me/avatar", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { avatar_key: true },
+    });
+    if (existing?.avatar_key) {
+      await deleteAvatarObject(existing.avatar_key);
+    }
+
+    const user = await prisma.user.update({
+      where: { id: session.userId },
+      data: {
+        avatar_key: null,
+        avatar_content_type: null,
+        avatar_updated_at: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        display_name: true,
+        avatar_key: true,
+        avatar_updated_at: true,
       },
     });
+
+    return reply.send({ user: mapAuthUser(user) });
+  });
+
+  app.get("/auth/avatars/:userId", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    const userId = (request.params as { userId?: string }).userId?.trim() ?? "";
+    if (!USER_ID_RE.test(userId)) {
+      return reply.status(400).send({ error: "Invalid user id" });
+    }
+
+    const allowed = await canViewUserAvatar(prisma, session.userId, userId);
+    if (!allowed) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        avatar_key: true,
+        avatar_content_type: true,
+        avatar_updated_at: true,
+      },
+    });
+    if (!user?.avatar_key || !user.avatar_content_type || !user.avatar_updated_at) {
+      return reply.status(404).send({ error: "Avatar not found" });
+    }
+
+    const version = (request.query as { v?: string }).v;
+    const expectedVersion = String(user.avatar_updated_at.getTime());
+    if (version && version !== expectedVersion) {
+      return reply.status(404).send({ error: "Avatar not found" });
+    }
+
+    const object = await getAvatarObject(user.avatar_key);
+    if (!object) {
+      return reply.status(404).send({ error: "Avatar not found" });
+    }
+
+    return reply
+      .header("Content-Type", user.avatar_content_type)
+      .header("Cache-Control", "private, max-age=3600")
+      .send(object.body);
   });
 
   app.get("/auth/sessions", async (request, reply) => {

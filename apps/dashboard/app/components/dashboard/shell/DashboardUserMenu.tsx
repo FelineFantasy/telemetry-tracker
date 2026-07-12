@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { ComponentType, ReactNode } from "react";
 import {
   BookOpen,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { logoutAction } from "@/app/auth/actions";
 import type { DashboardUser } from "@/lib/dashboard-user";
+import { toDashboardAvatarUrl } from "@/lib/avatar-url";
 import { DashboardPopover } from "./DashboardPopover";
 import { ShellKbd } from "./DashboardPopover";
 import { ThemeMenuLink } from "./ThemeMenuLink";
@@ -54,8 +56,36 @@ const HELP_LINKS = [
   { href: "/dashboard/settings/changelog", label: "What's new", icon: Sparkles },
 ];
 
+function UserAvatarBadge({
+  user,
+  className,
+}: {
+  user: DashboardUser;
+  className: string;
+}) {
+  const avatarUrl = toDashboardAvatarUrl(user.avatarUrl);
+  if (avatarUrl) {
+    const sizeMatch = className.match(/h-(\d+)/);
+    const size = sizeMatch ? Number(sizeMatch[1]) * 4 : 24;
+    return (
+      <Image
+        src={avatarUrl}
+        alt=""
+        width={size}
+        height={size}
+        unoptimized
+        className={`rounded-full object-cover ${className}`}
+      />
+    );
+  }
+  return (
+    <span className={`grid place-items-center rounded-full bg-brand font-semibold text-primary-foreground ${className}`}>
+      {userInitials(user)}
+    </span>
+  );
+}
+
 export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
-  const initials = user ? userInitials(user) : "?";
   const name = user?.displayName?.trim() || user?.email || "Account";
 
   return (
@@ -69,9 +99,13 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
           aria-expanded={open}
           className="flex items-center gap-1.5 rounded-full border border-border bg-surface/60 p-1 pr-2 text-xs text-foreground hover:bg-surface"
         >
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[10px] font-semibold text-primary-foreground">
-            {initials}
-          </span>
+          {user ? (
+            <UserAvatarBadge user={user} className="h-6 w-6 text-[10px]" />
+          ) : (
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[10px] font-semibold text-primary-foreground">
+              ?
+            </span>
+          )}
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       )}
@@ -79,9 +113,13 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
       {(close) => (
         <div>
           <div className="flex items-center gap-3 border-b border-border px-3 py-3">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-brand text-xs font-semibold text-primary-foreground">
-              {initials}
-            </span>
+            {user ? (
+              <UserAvatarBadge user={user} className="h-9 w-9 text-xs" />
+            ) : (
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-brand text-xs font-semibold text-primary-foreground">
+                ?
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm">{name}</p>
               {user?.email ? (
