@@ -87,6 +87,7 @@ describe.skipIf(!runDbIntegration)("Organization integrations (integration)", ()
     expect(body.organizationId).toBe(organizationId);
     expect(body.integrations.some((i) => i.id === "sdk")).toBe(true);
     expect(body.integrations.find((i) => i.id === "sdk")?.status).toBe("disconnected");
+    expect(body.integrations.find((i) => i.id === "email_alerts")?.status).toBe("connected");
     expect(body.integrations.find((i) => i.id === "slack")?.status).toBe("disconnected");
   });
 

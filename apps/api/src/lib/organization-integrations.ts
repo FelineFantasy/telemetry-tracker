@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@prisma/client";
-import { parseProjectAlertSettings } from "./project-alert-settings.js";
 
 export const INTEGRATION_IDS = [
   "sdk",
@@ -103,7 +102,6 @@ const INTEGRATION_CATALOG: IntegrationCatalogEntry[] = [
 export type OrganizationIntegrationSignals = {
   activeApiKeyCount: number;
   projectCount: number;
-  alertsEnabledProjectCount: number;
 };
 
 export async function loadOrganizationIntegrationSignals(
@@ -112,7 +110,7 @@ export async function loadOrganizationIntegrationSignals(
 ): Promise<OrganizationIntegrationSignals> {
   const projects = await db.project.findMany({
     where: { organization_id: organizationId, deleted_at: null },
-    select: { id: true, alert_settings: true },
+    select: { id: true },
   });
 
   const projectIds = projects.map((p) => p.id);
@@ -127,18 +125,9 @@ export async function loadOrganizationIntegrationSignals(
           },
         });
 
-  let alertsEnabledProjectCount = 0;
-  for (const project of projects) {
-    const settings = parseProjectAlertSettings(project.alert_settings);
-    if (settings.errorSpike.enabled || settings.quota.enabled) {
-      alertsEnabledProjectCount += 1;
-    }
-  }
-
   return {
     activeApiKeyCount,
     projectCount: projects.length,
-    alertsEnabledProjectCount,
   };
 }
 
@@ -159,7 +148,8 @@ function resolveIntegrationStatus(
     case "sdk":
       return signals.activeApiKeyCount > 0 ? "connected" : "disconnected";
     case "email_alerts":
-      return signals.alertsEnabledProjectCount > 0 ? "connected" : "disconnected";
+      // QUOTA_EXCEEDED emails fire at monthly cap even when quota.enabled is false.
+      return signals.projectCount > 0 ? "connected" : "disconnected";
     case "webhooks":
     case "slack":
     case "discord":

@@ -9,8 +9,8 @@ describe("organization-integrations", () => {
     const prisma = {
       project: {
         findMany: async () => [
-          { id: "proj-1", alert_settings: null },
-          { id: "proj-2", alert_settings: null },
+          { id: "proj-1" },
+          { id: "proj-2" },
         ],
       },
       apiKey: {
@@ -24,7 +24,6 @@ describe("organization-integrations", () => {
     expect(signals).toEqual({
       activeApiKeyCount: 2,
       projectCount: 2,
-      alertsEnabledProjectCount: 2,
     });
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("connected");
     expect(integrations.find((i) => i.id === "email_alerts")?.status).toBe("connected");
@@ -36,29 +35,26 @@ describe("organization-integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 0,
-      alertsEnabledProjectCount: 0,
     });
 
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("disconnected");
     expect(integrations.find((i) => i.id === "email_alerts")?.status).toBe("disconnected");
   });
 
-  it("marks email alerts disconnected when all alert channels are disabled", () => {
+  it("marks email alerts connected when projects exist even if optional toggles are off", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 1,
       projectCount: 1,
-      alertsEnabledProjectCount: 0,
     });
 
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("connected");
-    expect(integrations.find((i) => i.id === "email_alerts")?.status).toBe("disconnected");
+    expect(integrations.find((i) => i.id === "email_alerts")?.status).toBe("connected");
   });
 
   it("exposes configure links for planned integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 0,
-      alertsEnabledProjectCount: 0,
     });
 
     expect(integrations.find((i) => i.id === "slack")).toMatchObject({
