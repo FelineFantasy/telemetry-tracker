@@ -68,29 +68,49 @@ export function IssueDetailView({
       <AnalyticsDetailLayout
         main={
           <AnalyticsPanel>
-            <div className="flex gap-0 border-b border-border px-4 sm:px-5">
+            <div
+              className="flex gap-0 border-b border-border px-4 sm:px-5"
+              role="tablist"
+              aria-label="Issue detail sections"
+            >
               {(
                 [
                   { id: "stack" as const, label: "Stack trace" },
                   { id: "occurrences" as const, label: "Occurrences" },
                 ] as const
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  className={cn(
-                    "relative -mb-px border-b-2 px-3 py-3 text-[13px] transition-colors sm:px-4",
-                    tab === t.id
-                      ? "border-brand text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {t.label}
-                </button>
-              ))}
+              ).map((t) => {
+                const selected = tab === t.id;
+                const tabId = `issue-${issueId}-${t.id}-tab`;
+                const panelId = `issue-${issueId}-${t.id}-panel`;
+
+                return (
+                  <button
+                    key={t.id}
+                    id={tabId}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={panelId}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setTab(t.id)}
+                    className={cn(
+                      "relative -mb-px border-b-2 px-3 py-3 text-[13px] transition-colors sm:px-4",
+                      selected
+                        ? "border-brand text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
             </div>
-            <div className="p-4 sm:p-5">
+            <div
+              id={`issue-${issueId}-${tab}-panel`}
+              className="p-4 sm:p-5"
+              role="tabpanel"
+              aria-labelledby={`issue-${issueId}-${tab}-tab`}
+            >
               {tab === "stack" ? stackTrace : occurrences}
             </div>
           </AnalyticsPanel>
