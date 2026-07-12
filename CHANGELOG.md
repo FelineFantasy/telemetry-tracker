@@ -17,7 +17,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
-- **Profile avatars** — upload PNG/JPEG/WebP (≤2MB) to Cloudflare R2; `avatar_key` on `User`; authenticated API and dashboard `/avatar/[userId]` proxy; profile settings, user menu, and team members ([#361](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/361), [#396](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/396))
+- **Profile avatars** — upload PNG/JPEG/WebP (≤512 KB) to Cloudflare R2; `avatar_key` on `User`; authenticated API and dashboard `/avatar/[userId]` proxy; profile settings, user menu, and team members ([#361](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/361), [#396](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/396))
 
 ### Fixed
 

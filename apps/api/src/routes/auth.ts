@@ -492,9 +492,10 @@ export async function authRoutes(
         where: { id: session.userId },
         select: { avatar_key: true },
       });
-      if (existing?.avatar_key && existing.avatar_key !== objectKey) {
-        await deleteAvatarObject(existing.avatar_key);
-      }
+      const previousKey =
+        existing?.avatar_key && existing.avatar_key !== objectKey
+          ? existing.avatar_key
+          : null;
 
       await putAvatarObject(objectKey, buf, validated.contentType);
 
@@ -514,6 +515,10 @@ export async function authRoutes(
         },
       });
 
+      if (previousKey) {
+        await deleteAvatarObject(previousKey);
+      }
+
       return reply.send({ user: mapAuthUser(user) });
     }
   );
@@ -522,6 +527,10 @@ export async function authRoutes(
     const session = await getSessionUser(request);
     if (!session) {
       return reply.status(401).send({ error: "Unauthorized" });
+    }
+
+    if (!isAvatarStorageConfigured() && process.env.NODE_ENV === "production") {
+      return reply.status(503).send({ error: "Avatar storage is not configured" });
     }
 
     const existing = await prisma.user.findUnique({
@@ -565,6 +574,10 @@ export async function authRoutes(
     const allowed = await canViewUserAvatar(prisma, session.userId, userId);
     if (!allowed) {
       return reply.status(403).send({ error: "Forbidden" });
+    }
+
+    if (!isAvatarStorageConfigured() && process.env.NODE_ENV === "production") {
+      return reply.status(503).send({ error: "Avatar storage is not configured" });
     }
 
     const user = await prisma.user.findUnique({
