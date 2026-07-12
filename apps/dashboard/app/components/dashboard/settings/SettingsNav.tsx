@@ -16,7 +16,7 @@ const GROUPS: Group[] = [
       { href: "/dashboard/settings/appearance", label: "Appearance" },
       { href: "/dashboard/settings/notifications", label: "Notifications" },
       { href: "/dashboard/settings/shortcuts", label: "Keyboard shortcuts" },
-      { href: "/dashboard/settings/security", label: "Security", comingSoon: true },
+      { href: "/dashboard/settings/security", label: "Security" },
       { href: "/dashboard/settings/keys", label: "API keys" },
       { href: "/dashboard/settings/source-maps", label: "Source maps" },
     ],
