@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.8.4] - 2026-07-12
+
+### Changed
+
+- **Marketing hero** — updated supporting line copy under the primary CTAs
+
+---
+
 ## [1.8.3] - 2026-07-12
 
 ### Added
