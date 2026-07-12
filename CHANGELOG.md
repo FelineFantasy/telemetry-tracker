@@ -13,6 +13,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+
+## [1.8.7] - 2026-07-12
+
+### Fixed
+
+- **Avatar access** — exclude deleted orgs from avatar access
+
+---
+
 ## [1.8.6] - 2026-07-12
 
 ### Added
