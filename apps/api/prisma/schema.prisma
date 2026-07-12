@@ -38,6 +38,9 @@ model User {
   email          String                     @unique
   password_hash  String                     @map("password_hash")
   display_name   String?                    @map("display_name")
+  avatar_key          String?              @map("avatar_key")
+  avatar_content_type String?              @map("avatar_content_type")
+  avatar_updated_at   DateTime?            @map("avatar_updated_at")
   notification_preferences Json?            @map("notification_preferences")
   dashboard_preferences    Json?            @map("dashboard_preferences")
   created_at     DateTime                   @default(now()) @map("created_at")

@@ -3,6 +3,7 @@ import { coalesceApiRequest } from "@/lib/api-inflight";
 import { dashboardApiFetchFromCookies } from "@/lib/dashboard-api";
 import { dashboardDebug } from "@/lib/dashboard-debug";
 import type { DashboardUser } from "@/lib/dashboard-user";
+import { toDashboardAvatarUrl } from "@/lib/avatar-url";
 import { getDashboardOrganizationId } from "@/lib/dashboard-org";
 import {
   getDashboardProjectCookie,
@@ -45,7 +46,7 @@ async function loadDashboardBootstrapFromApi(): Promise<DashboardBootstrapData |
       organizationId?: string;
     }[];
     navScope?: { apps?: string[]; environments?: string[] };
-    user?: { id: string; email: string; displayName: string | null };
+    user?: { id: string; email: string; displayName: string | null; avatarUrl?: string | null };
   };
 
   const organizations = Array.isArray(data.organizations)
@@ -75,6 +76,7 @@ async function loadDashboardBootstrapFromApi(): Promise<DashboardBootstrapData |
           id: data.user.id,
           email: data.user.email,
           displayName: data.user.displayName ?? null,
+          avatarUrl: toDashboardAvatarUrl(data.user.avatarUrl ?? null),
         }
       : null;
 

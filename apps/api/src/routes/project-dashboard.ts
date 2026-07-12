@@ -47,6 +47,7 @@ import {
   assertSourceMapAppAllowed,
   resolveSourceMapUploadAuth,
 } from "../lib/source-map-upload-auth.js";
+import { avatarUrlFromUser } from "../lib/user-avatar.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -857,7 +858,7 @@ export async function projectDashboardRoutes(
       select: {
         role: true,
         created_at: true,
-        user: { select: { id: true, email: true, display_name: true } },
+        user: { select: { id: true, email: true, display_name: true, avatar_key: true, avatar_updated_at: true } },
       },
       orderBy: { created_at: "asc" },
     });
@@ -867,6 +868,7 @@ export async function projectDashboardRoutes(
         userId: r.user.id,
         email: r.user.email,
         displayName: r.user.display_name,
+        avatarUrl: avatarUrlFromUser(r.user),
         role: r.role,
         joinedAt: r.created_at.toISOString(),
       })),
