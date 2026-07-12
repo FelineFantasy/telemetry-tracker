@@ -1,55 +1,61 @@
-"use client";
+import { ErrorState } from "@/app/components/ErrorState";
+import { SettingsPageHeader } from "@/app/components/dashboard/settings/SettingsPageHeader";
+import { fetchOrganizationIntegrations } from "@/lib/organization-integrations";
+import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
+import { getDashboardUser } from "@/lib/dashboard-user";
+import { IntegrationsSettingsClient } from "./IntegrationsSettingsClient";
 
-import {
-  SettingsPageBody,
-  SettingsPageHeader,
-  SettingsComingSoonNote,
-} from "@/app/components/dashboard/settings/SettingsPageHeader";
-import { Section, SettingsBtn, SettingsPill } from "@/app/components/dashboard/settings/settings-ui";
+export const dynamic = "force-dynamic";
 
-const INTEGRATIONS = [
-  { name: "Slack", desc: "Post alerts and error summaries to a channel", connected: false },
-  { name: "GitHub", desc: "Link commits and releases to deployments", connected: false },
-  { name: "Webhooks", desc: "HTTP callbacks for events and errors", connected: true },
-];
+export default async function IntegrationsSettingsPage() {
+  const [workspace, user] = await Promise.all([
+    getDashboardWorkspaceForRequest(),
+    getDashboardUser(),
+  ]);
 
-export default function IntegrationsSettingsPage() {
+  if (!user) {
+    return (
+      <>
+        <SettingsPageHeader
+          title="Integrations"
+          description="Sign in to manage organization integrations."
+        />
+        <ErrorState message="You must be signed in to view this page." />
+      </>
+    );
+  }
+
+  const organizationId = workspace.resolvedOrgId;
+  if (organizationId === null) {
+    return (
+      <>
+        <SettingsPageHeader
+          title="Integrations"
+          description="Connect Telemetry Tracker to your toolchain."
+        />
+        <ErrorState message="No organization selected. Create or join an organization first." />
+      </>
+    );
+  }
+
+  const loaded = await fetchOrganizationIntegrations(organizationId);
+  if (!loaded.ok) {
+    return (
+      <>
+        <SettingsPageHeader
+          title="Integrations"
+          description="Connect Telemetry Tracker to your toolchain."
+        />
+        <ErrorState message={loaded.error} />
+      </>
+    );
+  }
+
   return (
-    <>
-      <SettingsPageHeader
-        title="Integrations"
-        description="Connect Telemetry Tracker to your toolchain."
-      />
-      <SettingsPageBody>
-        <SettingsComingSoonNote />
-        <Section title="Available integrations">
-          <ul className="divide-y divide-border">
-            {INTEGRATIONS.map((i) => (
-              <li key={i.name} className="flex items-center gap-3 py-3">
-                <span className="grid h-9 w-9 place-items-center rounded-md border border-border bg-surface text-[11px] font-medium">
-                  {i.name.charAt(0)}
-                </span>
-                <div className="flex-1">
-                  <div className="text-[13px]">{i.name}</div>
-                  <div className="text-[11px] text-muted-foreground">{i.desc}</div>
-                </div>
-                {i.connected ? (
-                  <>
-                    <SettingsPill tone="success">Connected</SettingsPill>
-                    <SettingsBtn variant="ghost" size="sm">
-                      Configure
-                    </SettingsBtn>
-                  </>
-                ) : (
-                  <SettingsBtn variant="default" size="sm">
-                    Connect
-                  </SettingsBtn>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      </SettingsPageBody>
-    </>
+    <IntegrationsSettingsClient
+      key={organizationId}
+      organizationId={organizationId}
+      integrations={loaded.integrations}
+    />
   );
 }
