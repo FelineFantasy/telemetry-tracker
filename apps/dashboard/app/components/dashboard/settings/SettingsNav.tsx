@@ -27,7 +27,7 @@ const GROUPS: Group[] = [
       { href: "/dashboard/settings/organization", label: "General" },
       { href: "/dashboard/settings/team", label: "Team members" },
       { href: "/dashboard/settings/billing", label: "Billing & usage" },
-      { href: "/dashboard/settings/audit", label: "Audit log", comingSoon: true },
+      { href: "/dashboard/settings/audit", label: "Audit log" },
       { href: "/dashboard/settings/integrations", label: "Integrations", comingSoon: true },
       { href: "/dashboard/settings/labs", label: "Labs", comingSoon: true },
     ],

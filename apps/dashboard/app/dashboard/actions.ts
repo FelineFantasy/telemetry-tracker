@@ -27,6 +27,10 @@ import {
   type FetchAuthSessionsResult,
 } from "@/lib/security-settings";
 import {
+  fetchAuditLog,
+  type FetchAuditLogResult,
+} from "@/lib/audit-log";
+import {
   DEFAULT_PROJECT_ID,
   TELEMETRY_PROJECT_COOKIE,
   getDashboardProjectId,
@@ -815,4 +819,11 @@ export async function revokeOtherAuthSessionsAction(): Promise<
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }
+}
+
+export async function fetchAuditLogAction(
+  organizationId: string,
+  options?: { cursor?: string; limit?: number }
+): Promise<FetchAuditLogResult> {
+  return fetchAuditLog(organizationId, options);
 }

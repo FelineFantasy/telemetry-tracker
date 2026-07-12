@@ -28,8 +28,24 @@ model Organization {
   projects             Project[]
   memberships          OrganizationMembership[]
   invites              OrganizationInvite[]
+  audit_events         OrganizationAuditEvent[]
 
   @@index([deleted_at])
+}
+
+/// Org-scoped dashboard audit trail (settings / security MVP).
+model OrganizationAuditEvent {
+  id              String       @id @default(uuid())
+  organization_id String       @map("organization_id")
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  actor_user_id   String       @map("actor_user_id")
+  actor           User         @relation(fields: [actor_user_id], references: [id], onDelete: Cascade)
+  action          String
+  target          String
+  created_at      DateTime     @default(now()) @map("created_at")
+
+  @@index([organization_id, created_at(sort: Desc), id(sort: Desc)])
+  @@index([actor_user_id])
 }
 
 /// Dashboard user (email + password). Ingest remains API-key only.
@@ -51,6 +67,7 @@ model User {
   password_reset_tokens PasswordResetToken[]
   notification_reads    NotificationRead[]
   notification_email_logs NotificationEmailLog[]
+  audit_events          OrganizationAuditEvent[]
 }
 
 model NotificationRead {
