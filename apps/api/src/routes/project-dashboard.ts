@@ -40,6 +40,7 @@ import {
   allowUnauthenticatedReads,
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
+  tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 import { SOURCE_MAP_UPLOAD_BODY_LIMIT } from "../lib/source-map-artifact.js";
@@ -900,7 +901,21 @@ export async function projectDashboardRoutes(
         return reply.status(404).send({ error: "Organization not found or archived" });
       }
 
-      const payload = await listOrganizationIntegrations(prisma, orgId);
+      const headerProjectId = await tryResolveReadProjectId(request);
+      let scopedProjectId: string | null = null;
+      if (headerProjectId) {
+        const project = await prisma.project.findFirst({
+          where: {
+            id: headerProjectId,
+            organization_id: orgId,
+            deleted_at: null,
+          },
+          select: { id: true },
+        });
+        if (project) scopedProjectId = project.id;
+      }
+
+      const payload = await listOrganizationIntegrations(prisma, orgId, scopedProjectId);
       return reply.send(payload);
     }
   );

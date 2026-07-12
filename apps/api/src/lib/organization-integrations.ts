@@ -104,31 +104,39 @@ export type OrganizationIntegrationSignals = {
   projectCount: number;
 };
 
+function activeApiKeyWhere(projectId: string, now: Date) {
+  return {
+    project_id: projectId,
+    deleted_at: null,
+    revoked_at: null,
+    OR: [{ expires_at: null }, { expires_at: { gt: now } }],
+  };
+}
+
 export async function loadOrganizationIntegrationSignals(
   db: PrismaClient,
-  organizationId: string
+  organizationId: string,
+  projectId?: string | null
 ): Promise<OrganizationIntegrationSignals> {
-  const projects = await db.project.findMany({
-    where: { organization_id: organizationId, deleted_at: null },
-    select: { id: true },
-  });
+  const now = new Date();
 
-  const projectIds = projects.map((p) => p.id);
-  const activeApiKeyCount =
-    projectIds.length === 0
-      ? 0
-      : await db.apiKey.count({
-          where: {
-            project_id: { in: projectIds },
-            deleted_at: null,
-            revoked_at: null,
-          },
-        });
+  if (projectId) {
+    const project = await db.project.findFirst({
+      where: { id: projectId, organization_id: organizationId, deleted_at: null },
+      select: { id: true },
+    });
+    if (!project) {
+      return { activeApiKeyCount: 0, projectCount: 0 };
+    }
 
-  return {
-    activeApiKeyCount,
-    projectCount: projects.length,
-  };
+    const activeApiKeyCount = await db.apiKey.count({
+      where: activeApiKeyWhere(project.id, now),
+    });
+
+    return { activeApiKeyCount, projectCount: 1 };
+  }
+
+  return { activeApiKeyCount: 0, projectCount: 0 };
 }
 
 export function resolveOrganizationIntegrations(
@@ -164,9 +172,14 @@ function resolveIntegrationStatus(
 
 export async function listOrganizationIntegrations(
   db: PrismaClient,
-  organizationId: string
+  organizationId: string,
+  projectId?: string | null
 ): Promise<{ organizationId: string; integrations: OrganizationIntegration[] }> {
-  const signals = await loadOrganizationIntegrationSignals(db, organizationId);
+  const signals = await loadOrganizationIntegrationSignals(
+    db,
+    organizationId,
+    projectId
+  );
   return {
     organizationId,
     integrations: resolveOrganizationIntegrations(signals),

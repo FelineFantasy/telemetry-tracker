@@ -38,7 +38,10 @@ export default async function IntegrationsSettingsPage() {
     );
   }
 
-  const loaded = await fetchOrganizationIntegrations(organizationId);
+  const loaded = await fetchOrganizationIntegrations(
+    organizationId,
+    workspace.effectiveProjectId || undefined
+  );
   if (!loaded.ok) {
     return (
       <>

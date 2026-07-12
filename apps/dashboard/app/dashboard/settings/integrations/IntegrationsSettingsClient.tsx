@@ -81,12 +81,12 @@ export function IntegrationsSettingsClient({
     <>
       <SettingsPageHeader
         title="Integrations"
-        description="Connect Telemetry Tracker to your toolchain. Status reflects your organization and projects."
+        description="Connect Telemetry Tracker to your toolchain. Project integrations reflect the header-selected project."
       />
       <SettingsPageBody>
         <Section
           title="Available integrations"
-          description={`${connectedCount} of ${integrations.length} connected in this organization.`}
+          description={`${connectedCount} of ${integrations.length} connected for this organization and project.`}
           footer={
             <span>
               Organization ID{" "}

@@ -35,12 +35,14 @@ export type FetchOrganizationIntegrationsResult =
   | { ok: false; error: string };
 
 export async function fetchOrganizationIntegrations(
-  organizationId: string
+  organizationId: string,
+  projectId?: string
 ): Promise<FetchOrganizationIntegrationsResult> {
   const path = `/api/meta/organizations/${encodeURIComponent(organizationId)}/integrations`;
 
   const res = await dashboardApiFetch(path, undefined, {
     organizationIdOverride: organizationId,
+    ...(projectId?.trim() ? { projectIdOverride: projectId.trim() } : {}),
   });
   if (!res.ok) {
     const text = await res.text();
