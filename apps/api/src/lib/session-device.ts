@@ -17,9 +17,9 @@ function parseBrowser(ua: string): string | undefined {
 
 function parseOs(ua: string): string | undefined {
   if (/Windows NT/i.test(ua)) return "Windows";
+  if (/(iPhone|iPad|iPod)/i.test(ua)) return "iOS";
   if (/Mac OS X|Macintosh/i.test(ua)) return "macOS";
   if (/Android/i.test(ua)) return "Android";
-  if (/(iPhone|iPad|iPod)/i.test(ua)) return "iOS";
   if (/Linux/i.test(ua)) return "Linux";
   return undefined;
 }
