@@ -23,6 +23,10 @@ import {
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
+  fetchAuthSessions,
+  type FetchAuthSessionsResult,
+} from "@/lib/security-settings";
+import {
   DEFAULT_PROJECT_ID,
   TELEMETRY_PROJECT_COOKIE,
   getDashboardProjectId,
@@ -680,6 +684,80 @@ export async function listProjectSourceMapsAction(
   try {
     const data = (await res.json()) as { artifacts?: SourceMapArtifactSummaryRow[] };
     return { ok: true, artifacts: data.artifacts ?? [] };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+async function readApiError(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text) as { error?: string };
+    if (typeof data.error === "string" && data.error.trim()) return data.error;
+  } catch {
+    /* ignore */
+  }
+  return text.slice(0, 400) || res.statusText;
+}
+
+export async function fetchAuthSessionsAction(): Promise<FetchAuthSessionsResult> {
+  return fetchAuthSessions();
+}
+
+export async function changePasswordAction(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    "/api/auth/change-password",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    },
+    { omitOrganizationHeader: true, omitProjectHeader: true }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  revalidatePath("/dashboard/settings/security");
+  return { ok: true };
+}
+
+export async function revokeAuthSessionAction(
+  sessionId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = sessionId.trim();
+  if (!trimmed) {
+    return { ok: false, error: "Session id required" };
+  }
+  const res = await dashboardApiFetch(
+    `/api/auth/sessions/${encodeURIComponent(trimmed)}`,
+    { method: "DELETE" },
+    { omitOrganizationHeader: true, omitProjectHeader: true }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  revalidatePath("/dashboard/settings/security");
+  return { ok: true };
+}
+
+export async function revokeOtherAuthSessionsAction(): Promise<
+  { ok: true; revoked: number } | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch(
+    "/api/auth/sessions/others",
+    { method: "DELETE" },
+    { omitOrganizationHeader: true, omitProjectHeader: true }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { revoked?: number };
+    revalidatePath("/dashboard/settings/security");
+    return { ok: true, revoked: typeof data.revoked === "number" ? data.revoked : 0 };
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }

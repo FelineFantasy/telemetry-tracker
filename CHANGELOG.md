@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Security settings** — list and revoke dashboard sessions (device/browser hints on sign-in), change password via API; settings page loads real session data ([#357](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/357), closes [#357](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/357))
+
 ---
 
 ## [1.8.3] - 2026-07-12
