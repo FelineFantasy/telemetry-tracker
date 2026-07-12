@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Preferences settings** — `GET`/`PATCH /api/meta/dashboard-preferences` persist dashboard defaults (time range, table density, resolved issues, usage analytics); settings page loads and saves via server action ([#356](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/356))
+
 ---
 
 ## [1.8.1] - 2026-07-12

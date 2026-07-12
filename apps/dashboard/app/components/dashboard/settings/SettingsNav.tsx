@@ -12,7 +12,7 @@ const GROUPS: Group[] = [
     label: "Account",
     items: [
       { href: "/dashboard/settings/profile", label: "Profile" },
-      { href: "/dashboard/settings/preferences", label: "Preferences", comingSoon: true },
+      { href: "/dashboard/settings/preferences", label: "Preferences" },
       { href: "/dashboard/settings/appearance", label: "Appearance" },
       { href: "/dashboard/settings/notifications", label: "Notifications" },
       { href: "/dashboard/settings/shortcuts", label: "Keyboard shortcuts" },
