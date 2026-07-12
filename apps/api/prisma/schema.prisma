@@ -39,6 +39,7 @@ model User {
   password_hash  String                     @map("password_hash")
   display_name   String?                    @map("display_name")
   notification_preferences Json?            @map("notification_preferences")
+  dashboard_preferences    Json?            @map("dashboard_preferences")
   created_at     DateTime                   @default(now()) @map("created_at")
   updated_at     DateTime                   @updatedAt @map("updated_at")
   sessions       UserSession[]

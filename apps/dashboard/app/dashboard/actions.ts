@@ -15,6 +15,10 @@ import {
   type NotificationPreferences,
 } from "@/lib/notification-preferences-shared";
 import {
+  parseDashboardPreferences,
+  type DashboardPreferences,
+} from "@/lib/dashboard-preferences-shared";
+import {
   parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
@@ -537,6 +541,30 @@ export async function saveNotificationPreferencesAction(
     revalidatePath("/dashboard/settings/notifications");
     revalidatePath("/dashboard", "layout");
     return { ok: true, preferences: parseNotificationPreferences(data.preferences) };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function saveDashboardPreferencesAction(
+  preferences: DashboardPreferences
+): Promise<
+  | { ok: true; preferences: DashboardPreferences }
+  | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch("/api/meta/dashboard-preferences", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(preferences),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { preferences?: unknown };
+    revalidatePath("/dashboard/settings/preferences");
+    return { ok: true, preferences: parseDashboardPreferences(data.preferences) };
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }
