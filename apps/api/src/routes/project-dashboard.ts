@@ -48,6 +48,10 @@ import {
   resolveSourceMapUploadAuth,
 } from "../lib/source-map-upload-auth.js";
 import { avatarUrlFromUser } from "../lib/user-avatar.js";
+import {
+  listOrganizationAuditEvents,
+  parseAuditLogQuery,
+} from "../lib/audit-log.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -827,6 +831,47 @@ export async function projectDashboardRoutes(
 
     return reply.send({ preferences: parsed.preferences });
   });
+
+  app.get<{ Params: { orgId: string } }>(
+    "/meta/organizations/:orgId/audit-log",
+    async (request, reply) => {
+      const session = await getSessionUser(request);
+      if (!session) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+      const orgId = request.params.orgId.trim();
+      if (!UUID_RE.test(orgId)) {
+        return reply.status(400).send({ error: "Invalid organization id" });
+      }
+      const membership = await prisma.organizationMembership.findFirst({
+        where: { user_id: session.userId, organization_id: orgId },
+        select: { id: true },
+      });
+      if (!membership) {
+        return reply.status(403).send({ error: "Not a member of this organization" });
+      }
+      const org = await prisma.organization.findFirst({
+        where: { id: orgId, deleted_at: null },
+        select: { id: true },
+      });
+      if (!org) {
+        return reply.status(404).send({ error: "Organization not found or archived" });
+      }
+
+      const q = request.query as { limit?: string; cursor?: string };
+      const parsed = parseAuditLogQuery(q);
+      if ("error" in parsed) {
+        return reply.status(400).send({ error: parsed.error });
+      }
+
+      const { events, nextCursor } = await listOrganizationAuditEvents(
+        prisma,
+        orgId,
+        parsed
+      );
+      return reply.send({ organizationId: orgId, events, nextCursor });
+    }
+  );
 
   app.get("/meta/members", async (request, reply) => {
     const session = await getSessionUser(request);

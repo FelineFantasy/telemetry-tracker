@@ -23,6 +23,7 @@ import {
   isAvatarStorageConfigured,
   putAvatarObject,
 } from "../lib/avatar-storage.js";
+import { AUDIT_ACTIONS, recordUserAuditEvents } from "../lib/audit-log.js";
 
 const RESET_TOKEN_HOURS = 1;
 const USER_ID_RE =
@@ -280,6 +281,8 @@ export async function authRoutes(
 
     const { sessionId, expiresAt } = await createUserSession(user.id, request);
 
+    void recordUserAuditEvents(prisma, user.id, AUDIT_ACTIONS.AUTH_LOGIN, user.email);
+
     const firstMembership = await prisma.organizationMembership.findFirst({
       where: { user_id: user.id },
       orderBy: { created_at: "asc" },
@@ -452,6 +455,15 @@ export async function authRoutes(
       },
     });
 
+    if ("displayName" in body) {
+      void recordUserAuditEvents(
+        prisma,
+        user.id,
+        AUDIT_ACTIONS.PROFILE_UPDATE,
+        user.display_name ?? user.email
+      );
+    }
+
     return reply.send({
       user: mapAuthUser(user),
     });
@@ -519,6 +531,13 @@ export async function authRoutes(
         await deleteAvatarObject(previousKey);
       }
 
+      void recordUserAuditEvents(
+        prisma,
+        user.id,
+        AUDIT_ACTIONS.PROFILE_AVATAR_UPLOAD,
+        user.email
+      );
+
       return reply.send({ user: mapAuthUser(user) });
     }
   );
@@ -556,6 +575,15 @@ export async function authRoutes(
         avatar_updated_at: true,
       },
     });
+
+    if (existing?.avatar_key) {
+      void recordUserAuditEvents(
+        prisma,
+        user.id,
+        AUDIT_ACTIONS.PROFILE_AVATAR_REMOVE,
+        user.email
+      );
+    }
 
     return reply.send({ user: mapAuthUser(user) });
   });
@@ -655,6 +683,12 @@ export async function authRoutes(
         id: { not: currentToken },
       },
     });
+    void recordUserAuditEvents(
+      prisma,
+      session.userId,
+      AUDIT_ACTIONS.AUTH_SESSIONS_REVOKE_OTHERS,
+      `${result.count} session${result.count === 1 ? "" : "s"}`
+    );
     return reply.send({ revoked: result.count });
   });
 
@@ -679,6 +713,12 @@ export async function authRoutes(
       return reply.status(404).send({ error: "Session not found" });
     }
     await prisma.userSession.delete({ where: { id: row.id } });
+    void recordUserAuditEvents(
+      prisma,
+      session.userId,
+      AUDIT_ACTIONS.AUTH_SESSION_REVOKE,
+      sessionId.slice(0, 8)
+    );
     return reply.status(204).send();
   });
 
@@ -727,6 +767,19 @@ export async function authRoutes(
           ]
         : [prisma.userSession.deleteMany({ where: { user_id: user.id } })]),
     ]);
+
+    const actor = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { email: true },
+    });
+    if (actor) {
+      void recordUserAuditEvents(
+        prisma,
+        user.id,
+        AUDIT_ACTIONS.AUTH_PASSWORD_CHANGE,
+        actor.email
+      );
+    }
 
     return reply.send({ ok: true });
   });
