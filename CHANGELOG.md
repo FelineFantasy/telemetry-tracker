@@ -14,6 +14,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ---
 
 
+## [1.8.9] - 2026-07-13
+
+### Added
+
+- **Integrations hub** — `GET /meta/organizations/:orgId/integrations` with session auth and org membership checks; dashboard Settings → Integrations loads connected state from the API (GitHub, Stripe, and catalog stubs for Slack, Discord, webhooks) ([#359](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/359), [#406](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/406))
+
+---
+
 ## [1.8.8] - 2026-07-13
 
 ### Added
