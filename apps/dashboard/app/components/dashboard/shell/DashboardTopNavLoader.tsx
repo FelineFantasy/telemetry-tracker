@@ -1,4 +1,5 @@
 import { fetchDashboardBootstrap } from "@/lib/dashboard-bootstrap-server";
+import { fetchLabsPreferences } from "@/lib/labs-preferences";
 import { dashboardDebug } from "@/lib/dashboard-debug";
 import { getDashboardProjectCookie } from "@/lib/dashboard-project";
 import {
@@ -11,10 +12,11 @@ export async function DashboardTopNavLoader() {
   const started = Date.now();
   dashboardDebug("top-nav", "load start");
 
-  const [workspace, bootstrap, cookieProjectId] = await Promise.all([
+  const [workspace, bootstrap, cookieProjectId, labsPreferences] = await Promise.all([
     getDashboardWorkspaceForRequest(),
     fetchDashboardBootstrap(),
     getDashboardProjectCookie(),
+    fetchLabsPreferences(),
   ]);
 
   const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
@@ -49,6 +51,7 @@ export async function DashboardTopNavLoader() {
       user={user}
       environments={navScope.environments}
       apps={navScope.apps}
+      commandPaletteEnabled={labsPreferences.commandPalette}
     />
   );
 }

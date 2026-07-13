@@ -163,18 +163,21 @@ export function SettingsToggle({
   on,
   onChange,
   label,
+  disabled,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   label?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
+      disabled={disabled}
       onClick={() => onChange(!on)}
-      className="inline-flex items-center gap-2 text-[13px]"
+      className={`inline-flex items-center gap-2 text-[13px] ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
     >
       <span
         className={`relative h-[18px] w-[30px] rounded-full transition-colors ${on ? "bg-brand" : "bg-surface-elevated"}`}

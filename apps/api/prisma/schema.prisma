@@ -60,6 +60,7 @@ model User {
   avatar_updated_at   DateTime?            @map("avatar_updated_at")
   notification_preferences Json?            @map("notification_preferences")
   dashboard_preferences    Json?            @map("dashboard_preferences")
+  labs_preferences         Json?            @map("labs_preferences")
   created_at     DateTime                   @default(now()) @map("created_at")
   updated_at     DateTime                   @updatedAt @map("updated_at")
   sessions       UserSession[]

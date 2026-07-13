@@ -11,16 +11,18 @@ import type { DashboardUser } from "@/lib/dashboard-user";
 
 export function DashboardTopNavActions({
   user,
+  commandPaletteEnabled,
   notificationsSlot,
   className,
 }: {
   user: DashboardUser | null;
+  commandPaletteEnabled: boolean;
   notificationsSlot: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn("flex shrink-0 items-center gap-1", className)}>
-      <DashboardCommandPalette />
+      {commandPaletteEnabled ? <DashboardCommandPalette /> : null}
       <div className="hidden sm:contents">
         <DashboardQuickActions />
       </div>

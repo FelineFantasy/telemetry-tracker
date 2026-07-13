@@ -1,44 +1,27 @@
-"use client";
+import { ErrorState } from "@/app/components/ErrorState";
+import { SettingsPageHeader } from "@/app/components/dashboard/settings/SettingsPageHeader";
+import { fetchLabsPreferences } from "@/lib/labs-preferences";
+import { getDashboardUser } from "@/lib/dashboard-user";
+import { LabsSettingsClient } from "./LabsSettingsClient";
 
-import {
-  SettingsPageBody,
-  SettingsPageHeader,
-  SettingsComingSoonNote,
-} from "@/app/components/dashboard/settings/SettingsPageHeader";
-import { Section, SettingsPill, SettingsToggle } from "@/app/components/dashboard/settings/settings-ui";
+export const dynamic = "force-dynamic";
 
-const FLAGS = [
-  { id: "cmdk", label: "Command palette", desc: "Global ⌘K navigation", on: false },
-  { id: "traces", label: "Traces view", desc: "Distributed tracing UI", on: false },
-  { id: "alerts", label: "Alert rules", desc: "Threshold-based alerting", on: false },
-];
+export default async function LabsSettingsPage() {
+  const user = await getDashboardUser();
 
-export default function LabsSettingsPage() {
-  return (
-    <>
-      <SettingsPageHeader
-        title="Labs"
-        description="Experimental features — may change or be removed."
-      />
-      <SettingsPageBody>
-        <SettingsComingSoonNote />
-        <Section title="Feature previews">
-          <ul className="divide-y divide-border">
-            {FLAGS.map((f) => (
-              <li key={f.id} className="flex items-center gap-3 py-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 text-[13px]">
-                    {f.label}
-                    <SettingsPill tone="muted">Coming soon</SettingsPill>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">{f.desc}</div>
-                </div>
-                <SettingsToggle on={f.on} onChange={() => {}} />
-              </li>
-            ))}
-          </ul>
-        </Section>
-      </SettingsPageBody>
-    </>
-  );
+  if (!user) {
+    return (
+      <>
+        <SettingsPageHeader
+          title="Labs"
+          description="Sign in to manage experimental features."
+        />
+        <ErrorState message="You must be signed in to view this page." />
+      </>
+    );
+  }
+
+  const preferences = await fetchLabsPreferences();
+
+  return <LabsSettingsClient initialPreferences={preferences} />;
 }
