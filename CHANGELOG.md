@@ -14,6 +14,16 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ---
 
 
+
+
+## [1.8.10] - 2026-07-13
+
+### Added
+
+- **Labs settings** — user-scoped `labs_preferences` with `GET`/`PATCH /api/meta/labs-preferences`; Settings → Labs toggles (including command palette ⌘K gating in top nav) persisted per user ([#360](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/360), [#409](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/409))
+
+---
+
 ## [1.8.9] - 2026-07-13
 
 ### Added
