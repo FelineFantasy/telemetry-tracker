@@ -28,6 +28,7 @@ export function DashboardTopNav({
   user,
   environments,
   apps,
+  commandPaletteEnabled,
 }: {
   organizations: OrgOption[];
   currentOrganizationId: string | null;
@@ -36,6 +37,7 @@ export function DashboardTopNav({
   user: DashboardUser | null;
   environments: string[];
   apps: string[];
+  commandPaletteEnabled: boolean;
 }) {
   return (
     <header className="sticky top-0 z-40 w-full max-w-[100vw] overflow-x-clip border-b border-border bg-background/80 backdrop-blur-xl">
@@ -52,6 +54,7 @@ export function DashboardTopNav({
           <DashboardTopNavActions
             className="relative z-[60] sm:order-3"
             user={user}
+            commandPaletteEnabled={commandPaletteEnabled}
             notificationsSlot={
               <Suspense fallback={<NotificationsFallback />}>
                 <DashboardNotificationsLoader />

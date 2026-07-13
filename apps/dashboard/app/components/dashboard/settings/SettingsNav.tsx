@@ -29,7 +29,7 @@ const GROUPS: Group[] = [
       { href: "/dashboard/settings/billing", label: "Billing & usage" },
       { href: "/dashboard/settings/audit", label: "Audit log" },
       { href: "/dashboard/settings/integrations", label: "Integrations" },
-      { href: "/dashboard/settings/labs", label: "Labs", comingSoon: true },
+      { href: "/dashboard/settings/labs", label: "Labs" },
     ],
   },
   {

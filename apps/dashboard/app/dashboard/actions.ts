@@ -19,6 +19,10 @@ import {
   type DashboardPreferences,
 } from "@/lib/dashboard-preferences-shared";
 import {
+  parseLabsPreferences,
+  type LabsPreferences,
+} from "@/lib/labs-preferences-shared";
+import {
   parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
@@ -638,6 +642,31 @@ export async function saveDashboardPreferencesAction(
     const data = (await res.json()) as { preferences?: unknown };
     revalidatePath("/dashboard/settings/preferences");
     return { ok: true, preferences: parseDashboardPreferences(data.preferences) };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function saveLabsPreferencesAction(
+  preferences: LabsPreferences
+): Promise<
+  | { ok: true; preferences: LabsPreferences }
+  | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch("/api/meta/labs-preferences", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(preferences),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { preferences?: unknown };
+    revalidatePath("/dashboard/settings/labs");
+    revalidatePath("/dashboard", "layout");
+    return { ok: true, preferences: parseLabsPreferences(data.preferences) };
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }

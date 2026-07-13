@@ -20,6 +20,10 @@ import {
   parseDashboardPreferences,
   validateDashboardPreferencesPatch,
 } from "../lib/dashboard-preferences.js";
+import {
+  parseLabsPreferences,
+  validateLabsPreferencesPatch,
+} from "../lib/labs-preferences.js";
 import { sendOrganizationInviteEmail } from "../lib/notification-email-dispatch.js";
 import {
   attachNotificationReadState,
@@ -829,6 +833,37 @@ export async function projectDashboardRoutes(
     await prisma.user.update({
       where: { id: session.userId },
       data: { dashboard_preferences: parsed.preferences },
+    });
+
+    return reply.send({ preferences: parsed.preferences });
+  });
+
+  app.get("/meta/labs-preferences", async (request, reply) => {
+    const session = await getSessionUser(request);
+    if (!session) {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { labs_preferences: true },
+    });
+    return reply.send({
+      preferences: parseLabsPreferences(user?.labs_preferences),
+    });
+  });
+
+  app.patch("/meta/labs-preferences", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+
+    const parsed = validateLabsPreferencesPatch(request.body);
+    if (!parsed.ok) {
+      return reply.status(400).send({ error: parsed.error });
+    }
+
+    await prisma.user.update({
+      where: { id: session.userId },
+      data: { labs_preferences: parsed.preferences },
     });
 
     return reply.send({ preferences: parsed.preferences });
