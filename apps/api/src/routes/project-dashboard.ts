@@ -40,6 +40,7 @@ import {
   allowUnauthenticatedReads,
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
+  tryResolveReadProjectId,
 } from "../lib/read-project-request.js";
 import { dashboardOriginOrNull } from "../lib/dashboard-origin.js";
 import { SOURCE_MAP_UPLOAD_BODY_LIMIT } from "../lib/source-map-artifact.js";
@@ -52,6 +53,7 @@ import {
   listOrganizationAuditEvents,
   parseAuditLogQuery,
 } from "../lib/audit-log.js";
+import { listOrganizationIntegrations } from "../lib/organization-integrations.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -870,6 +872,51 @@ export async function projectDashboardRoutes(
         parsed
       );
       return reply.send({ organizationId: orgId, events, nextCursor });
+    }
+  );
+
+  app.get<{ Params: { orgId: string } }>(
+    "/meta/organizations/:orgId/integrations",
+    async (request, reply) => {
+      const session = await getSessionUser(request);
+      if (!session) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+      const orgId = request.params.orgId.trim();
+      if (!UUID_RE.test(orgId)) {
+        return reply.status(400).send({ error: "Invalid organization id" });
+      }
+      const membership = await prisma.organizationMembership.findFirst({
+        where: { user_id: session.userId, organization_id: orgId },
+        select: { id: true },
+      });
+      if (!membership) {
+        return reply.status(403).send({ error: "Not a member of this organization" });
+      }
+      const org = await prisma.organization.findFirst({
+        where: { id: orgId, deleted_at: null },
+        select: { id: true },
+      });
+      if (!org) {
+        return reply.status(404).send({ error: "Organization not found or archived" });
+      }
+
+      const headerProjectId = await tryResolveReadProjectId(request);
+      let scopedProjectId: string | null = null;
+      if (headerProjectId) {
+        const project = await prisma.project.findFirst({
+          where: {
+            id: headerProjectId,
+            organization_id: orgId,
+            deleted_at: null,
+          },
+          select: { id: true },
+        });
+        if (project) scopedProjectId = project.id;
+      }
+
+      const payload = await listOrganizationIntegrations(prisma, orgId, scopedProjectId);
+      return reply.send(payload);
     }
   );
 
