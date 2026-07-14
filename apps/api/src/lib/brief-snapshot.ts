@@ -206,9 +206,9 @@ export async function buildWorkspaceBriefSnapshot(
   prisma: PrismaClient,
   input: BuildWorkspaceBriefSnapshotInput
 ): Promise<BuildWorkspaceBriefSnapshotResult> {
-  const sortedProjects = [...input.projects]
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .slice(0, BRIEF_MAX_PROJECTS);
+  const sortedAll = [...input.projects].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedProjects = sortedAll.slice(0, BRIEF_MAX_PROJECTS);
+  const projectCapDroppedIds = sortedAll.slice(BRIEF_MAX_PROJECTS).map((project) => project.id);
 
   if (sortedProjects.length === 0) {
     return { ok: false, code: "no_projects" };
@@ -263,7 +263,7 @@ export async function buildWorkspaceBriefSnapshot(
       maxBytes: sizeResult.maxBytes,
       projectCount: sizeResult.projectCount,
       truncationSteps: sizeResult.truncationSteps,
-      droppedProjectIds: sizeResult.droppedProjectIds,
+      droppedProjectIds: [...projectCapDroppedIds, ...sizeResult.droppedProjectIds],
     };
   }
 
@@ -277,7 +277,11 @@ export async function buildWorkspaceBriefSnapshot(
     snapshot: sizeResult.snapshot,
     contentHash: computeContentHash(sizeResult.snapshot),
     snapshotHash: computeSnapshotHash(sizeResult.snapshot),
-    meta: sizeResult.meta,
+    meta: {
+      ...sizeResult.meta,
+      truncated: sizeResult.meta.truncated || projectCapDroppedIds.length > 0,
+      droppedProjectIds: [...projectCapDroppedIds, ...sizeResult.meta.droppedProjectIds],
+    },
   };
 }
 

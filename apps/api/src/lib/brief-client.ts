@@ -120,13 +120,6 @@ export async function postWorkspaceBrief(
   const retryMinRemainingMs = config.retryMinRemainingMs ?? BRIEF_AI_RETRY_MIN_REMAINING_MS;
 
   const rawBody = Buffer.from(JSON.stringify(snapshot), "utf8");
-  const timestampSec = Math.floor(Date.now() / 1000);
-  const signingHeaders: BriefSigningHeaders = buildBriefSigningHeaders(config.secret, {
-    timestampSec,
-    requestId: snapshot.requestId,
-    contentHash,
-    rawBody,
-  });
 
   const url = `${trimTrailingSlash(config.baseUrl)}${BRIEF_AI_WORKSPACE_PATH}`;
   let attempts = 0;
@@ -134,6 +127,14 @@ export async function postWorkspaceBrief(
 
   while (true) {
     attempts += 1;
+    const timestampSec = Math.floor(Date.now() / 1000);
+    const signingHeaders: BriefSigningHeaders = buildBriefSigningHeaders(config.secret, {
+      timestampSec,
+      requestId: snapshot.requestId,
+      contentHash,
+      rawBody,
+    });
+
     const remaining = remainingBudgetMs(startedAt, totalBudgetMs);
     if (remaining <= 0) {
       return {

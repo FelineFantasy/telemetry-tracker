@@ -4,16 +4,21 @@ import { BRIEF_RESPONSE_SCHEMA_VERSION } from "./brief-constants.js";
 import type { BriefSnapshotRequest, WorkspaceBriefResponse } from "./brief-contracts.js";
 import { authorizeWorkspaceBrief } from "./brief-authz.js";
 import {
-  briefSemanticCache,
+  getBriefSemanticCache,
   rebindCachedBriefResponse,
   type BriefCacheKey,
+  type BriefSemanticCache,
 } from "./brief-cache.js";
 import { acquireBriefPrivateCallPermission, getBriefCircuitBreaker } from "./brief-circuit.js";
 import { postWorkspaceBrief, resolveBriefAiClientConfigFromEnv } from "./brief-client.js";
 import { buildWorkspaceBriefFallback } from "./brief-fallback.js";
 import { computePresentationHash } from "./brief-presentation-hash.js";
 import { floorToCompletedMinute } from "./brief-request-until.js";
-import { briefServedMetaStore } from "./brief-served-meta.js";
+import {
+  getBriefServedMetaStore,
+  type BriefServedMetaStore,
+} from "./brief-served-meta.js";
+import { resolveRequestUntilBucketMs } from "./brief-runtime-config.js";
 import { buildWorkspaceBriefSnapshot } from "./brief-snapshot.js";
 import { validatePrivateBriefResponse } from "./brief-validate-response.js";
 
@@ -68,8 +73,8 @@ export type WorkspaceBriefServiceDeps = {
   prisma: PrismaClient;
   env?: NodeJS.ProcessEnv;
   now?: () => Date;
-  cache?: typeof briefSemanticCache;
-  servedMeta?: typeof briefServedMetaStore;
+  cache?: BriefSemanticCache;
+  servedMeta?: BriefServedMetaStore;
 };
 
 function mapAiFailure(
@@ -98,7 +103,7 @@ function storeServedMeta(
     snapshot: BriefSnapshotRequest;
   }
 ): void {
-  (deps.servedMeta ?? briefServedMetaStore).store(userId, {
+  (deps.servedMeta ?? getBriefServedMetaStore(deps.env ?? process.env)).store(userId, {
     requestId: input.requestId,
     snapshotHash: input.snapshotHash,
     organizationId: input.organizationId,
@@ -150,8 +155,8 @@ export async function getWorkspaceBrief(
 ): Promise<WorkspaceBriefServiceResult> {
   const nowFn = deps.now ?? (() => new Date());
   const now = nowFn();
-  const cache = deps.cache ?? briefSemanticCache;
   const env = deps.env ?? process.env;
+  const cache = deps.cache ?? getBriefSemanticCache(env);
 
   const authz = await authorizeWorkspaceBrief(deps.prisma, input.userId, input.organizationId);
   if (!authz.ok) {
@@ -162,7 +167,7 @@ export async function getWorkspaceBrief(
   }
 
   const requestId = randomUUID();
-  const requestUntil = floorToCompletedMinute(now);
+  const requestUntil = floorToCompletedMinute(now, resolveRequestUntilBucketMs(env));
 
   const built = await buildWorkspaceBriefSnapshot(deps.prisma, {
     userId: input.userId,
@@ -279,76 +284,95 @@ export async function getWorkspaceBrief(
   }
 
   const probing = permission.probing;
+  let probeResult: boolean | null = null;
 
-  const aiResult = await postWorkspaceBrief(snapshot, contentHash, aiConfig);
+  try {
+    const aiResult = await postWorkspaceBrief(snapshot, contentHash, aiConfig);
 
-  if (!aiResult.ok) {
-    const reason = mapAiFailure(aiResult);
-    if (reason === "ai_misconfigured") {
-      breaker.recordFailure({ immediateOpen: true });
-    } else if (
-      reason === "ai_idempotency_conflict" ||
-      reason === "ai_invalid_request" ||
-      reason === "ai_invalid_response" ||
-      reason === "ai_timeout" ||
-      reason === "ai_unreachable" ||
-      reason === "ai_http_5xx"
-    ) {
-      if (probing) breaker.endProbe(false);
-      else breaker.recordFailure();
+    if (!aiResult.ok) {
+      const reason = mapAiFailure(aiResult);
+      if (reason === "ai_misconfigured") {
+        breaker.recordFailure({ immediateOpen: true });
+        if (probing) probeResult = false;
+      } else if (
+        reason === "ai_idempotency_conflict" ||
+        reason === "ai_invalid_request" ||
+        reason === "ai_invalid_response" ||
+        reason === "ai_timeout" ||
+        reason === "ai_unreachable" ||
+        reason === "ai_http_5xx"
+      ) {
+        if (probing) probeResult = false;
+        else breaker.recordFailure();
+      }
+      return unavailableFallbackResult({
+        requestId,
+        snapshotHash,
+        contentHash,
+        snapshot,
+        buildMeta,
+        now,
+        reason,
+      });
     }
-    return unavailableFallbackResult({
+
+    const validated = validatePrivateBriefResponse(snapshot, aiResult.response);
+    if (!validated.ok) {
+      if (probing) probeResult = false;
+      else breaker.recordFailure();
+      return unavailableFallbackResult({
+        requestId,
+        snapshotHash,
+        contentHash,
+        snapshot,
+        buildMeta,
+        now,
+        reason: "ai_invalid_response",
+      });
+    }
+
+    if (probing) probeResult = true;
+    else breaker.recordSuccess();
+
+    cache.put(cacheKey, {
+      contentHash,
+      presentationHash,
+      responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
+      workspace: validated.data.workspace,
+      projects: validated.data.projects.map(({ generatedThrough: _gt, ...rest }) => rest),
+    });
+
+    storeServedMeta(deps, input.userId, {
+      requestId,
+      snapshotHash,
+      organizationId: authz.organizationId,
+      source: "ai",
+      snapshot,
+    });
+
+    return {
+      status: "ok",
+      httpStatus: 200,
       requestId,
       snapshotHash,
       contentHash,
-      snapshot,
-      buildMeta,
-      now,
-      reason,
-    });
+      brief: validated.data,
+      meta: { ...buildMeta, source: "ai", aiLatencyMs: aiResult.latencyMs },
+    };
+  } catch {
+    if (probing) probeResult = false;
+    return {
+      status: "error",
+      httpStatus: 500,
+      code: "internal_error",
+      message: "Unexpected workspace brief failure",
+      meta: buildMeta,
+    };
+  } finally {
+    if (probing && probeResult !== null) {
+      breaker.endProbe(probeResult);
+    } else if (probing) {
+      breaker.endProbe(false);
+    }
   }
-
-  const validated = validatePrivateBriefResponse(snapshot, aiResult.response);
-  if (!validated.ok) {
-    if (probing) breaker.endProbe(false);
-    else breaker.recordFailure();
-    return unavailableFallbackResult({
-      requestId,
-      snapshotHash,
-      contentHash,
-      snapshot,
-      buildMeta,
-      now,
-      reason: "ai_invalid_response",
-    });
-  }
-
-  if (probing) breaker.endProbe(true);
-  else breaker.recordSuccess();
-
-  cache.put(cacheKey, {
-    contentHash,
-    presentationHash,
-    responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
-    workspace: validated.data.workspace,
-    projects: validated.data.projects.map(({ generatedThrough: _gt, ...rest }) => rest),
-  });
-
-  storeServedMeta(deps, input.userId, {
-    requestId,
-    snapshotHash,
-    organizationId: authz.organizationId,
-    source: "ai",
-    snapshot,
-  });
-
-  return {
-    status: "ok",
-    httpStatus: 200,
-    requestId,
-    snapshotHash,
-    contentHash,
-    brief: validated.data,
-    meta: { ...buildMeta, source: "ai", aiLatencyMs: aiResult.latencyMs },
-  };
 }

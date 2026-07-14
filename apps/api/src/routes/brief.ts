@@ -12,7 +12,7 @@ import {
   upsertBriefAcknowledgements,
   validateAckAgainstBriefMeta,
 } from "../lib/brief-ack.js";
-import { briefServedMetaStore } from "../lib/brief-served-meta.js";
+import { getBriefServedMetaStore } from "../lib/brief-served-meta.js";
 import { getWorkspaceBrief } from "../lib/brief-service.js";
 
 export async function briefRoutes(
@@ -68,7 +68,7 @@ export async function briefRoutes(
       return reply.status(400).send({ ok: false, error: "invalid_request", message: parsed.error });
     }
 
-    const meta = briefServedMetaStore.get(
+    const meta = getBriefServedMetaStore().get(
       session.userId,
       organizationId,
       parsed.data.requestId

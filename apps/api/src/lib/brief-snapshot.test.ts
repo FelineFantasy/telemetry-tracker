@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { BRIEF_MAX_SNAPSHOT_BYTES, BRIEF_SCHEMA_VERSION } from "./brief-constants.js";
+import { BRIEF_MAX_SNAPSHOT_BYTES, BRIEF_MAX_PROJECTS, BRIEF_SCHEMA_VERSION } from "./brief-constants.js";
 import type { BriefBatchData } from "./brief-snapshot-batch.js";
 import { computeContentHash, computeSnapshotHash } from "./brief-snapshot-hash.js";
 import {
@@ -277,5 +277,31 @@ describe("buildWorkspaceBriefSnapshot", () => {
       expect(result.meta.byteLength).toBeLessThanOrEqual(BRIEF_MAX_SNAPSHOT_BYTES);
       expect(result.snapshot.schemaVersion).toBe(BRIEF_SCHEMA_VERSION);
     }
+  });
+
+  it("records project-cap drops in meta.droppedProjectIds", async () => {
+    const projects = Array.from({ length: BRIEF_MAX_PROJECTS + 2 }, (_, index) => ({
+      id: `a0000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      name: `Project ${index}`,
+      slug: `project-${index}`,
+      createdAt: projectCreatedAt,
+    }));
+    const includedIds = projects.slice(0, BRIEF_MAX_PROJECTS).map((project) => project.id);
+    const droppedIds = projects.slice(BRIEF_MAX_PROJECTS).map((project) => project.id);
+    vi.mocked(fetchBriefBatchData).mockResolvedValue(batchForProjects(includedIds));
+
+    const result = await buildWorkspaceBriefSnapshot(prisma, {
+      organizationId: ORG_ID,
+      requestId: REQUEST_ID,
+      requestUntil,
+      userId: USER_ID,
+      projects,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.projects).toHaveLength(BRIEF_MAX_PROJECTS);
+    expect(result.meta.droppedProjectIds).toEqual(droppedIds);
+    expect(result.meta.truncated).toBe(true);
   });
 });

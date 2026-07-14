@@ -11,6 +11,7 @@ import {
   BRIEF_SERVED_META_MAX_PER_USER_ORG,
   BRIEF_SERVED_META_TTL_MS,
 } from "./brief-constants.js";
+import { resolveBriefServedMetaOptions } from "./brief-runtime-config.js";
 
 export type ServedBriefSource = "ai" | "cache" | "fallback";
 
@@ -114,5 +115,14 @@ export class BriefServedMetaStore {
   }
 }
 
-/** Process-wide served-meta store (Phase 3A foundation). */
-export const briefServedMetaStore = new BriefServedMetaStore();
+let servedMetaStoreInstance: BriefServedMetaStore | null = null;
+
+export function getBriefServedMetaStore(env: NodeJS.ProcessEnv = process.env): BriefServedMetaStore {
+  if (!servedMetaStoreInstance) {
+    servedMetaStoreInstance = new BriefServedMetaStore(resolveBriefServedMetaOptions(env));
+  }
+  return servedMetaStoreInstance;
+}
+
+/** @deprecated Prefer getBriefServedMetaStore(env) for env-aware configuration. */
+export const briefServedMetaStore = getBriefServedMetaStore();

@@ -4,6 +4,7 @@ import {
   BRIEF_RESPONSE_SCHEMA_VERSION,
 } from "./brief-constants.js";
 import type { BriefSnapshotRequest, ProjectBrief, WorkspaceBriefResponse } from "./brief-contracts.js";
+import { resolveBriefCacheOptions } from "./brief-runtime-config.js";
 
 export type BriefCacheSemanticProject = Omit<ProjectBrief, "generatedThrough">;
 
@@ -118,9 +119,20 @@ export function rebindCachedBriefResponse(
   };
 }
 
-export const briefSemanticCache = new BriefSemanticCache();
+let semanticCacheInstance: BriefSemanticCache | null = null;
+
+export function getBriefSemanticCache(env: NodeJS.ProcessEnv = process.env): BriefSemanticCache {
+  if (!semanticCacheInstance) {
+    semanticCacheInstance = new BriefSemanticCache(resolveBriefCacheOptions(env));
+  }
+  return semanticCacheInstance;
+}
+
+/** @deprecated Prefer getBriefSemanticCache(env) for env-aware configuration. */
+export const briefSemanticCache = getBriefSemanticCache();
 
 /** @internal Test helper */
 export function resetBriefSemanticCache(): void {
-  briefSemanticCache.clear();
+  semanticCacheInstance?.clear();
+  semanticCacheInstance = null;
 }

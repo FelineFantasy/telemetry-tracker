@@ -122,8 +122,10 @@ describe("postWorkspaceBrief", () => {
 
   it("retries retryable HTTP failures within the total budget", async () => {
     let hits = 0;
-    await withMockServer((_req, res) => {
+    const timestamps: string[] = [];
+    await withMockServer((req, res) => {
       hits += 1;
+      timestamps.push(String(req.headers["x-telemetry-timestamp"] ?? ""));
       if (hits === 1) {
         res.writeHead(503);
         res.end("busy");
@@ -135,6 +137,7 @@ describe("postWorkspaceBrief", () => {
       const result = await postWorkspaceBrief(snapshot(), CONTENT_HASH, clientConfig(baseUrl));
       expect(result.ok).toBe(true);
       expect(hits).toBe(2);
+      expect(timestamps).toHaveLength(2);
       if (result.ok) expect(result.attempts).toBe(2);
     });
   });
