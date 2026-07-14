@@ -11,13 +11,14 @@ export type UserCohort = "new" | "returning";
 
 export function cohortIdentityKey(
   userId: string | null | undefined,
-  anonymousId: string | null | undefined
+  anonymousId: string | null | undefined,
+  anonymousToUserId: ReadonlyMap<string, string> = new Map()
 ): string | null {
   const uid = userId?.trim();
   if (uid) return uid;
   const aid = anonymousId?.trim();
-  if (aid) return aid;
-  return null;
+  if (!aid) return null;
+  return anonymousToUserId.get(aid) ?? aid;
 }
 
 /** Classify one identity active in the window by project first-seen vs window start. */

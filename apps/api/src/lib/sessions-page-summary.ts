@@ -570,7 +570,6 @@ async function fetchUserCohortCounts(
 ): Promise<UserCohortRow> {
   const { since, until, previousSince, previousUntil } = window;
   const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
-  const identity = sessionIdentityExpr("s");
   const currentWindow = sessionWindowWithEventScope(
     projectId,
     f,
@@ -638,14 +637,26 @@ async function fetchUserCohortCounts(
     ),
     window_flags AS (
       SELECT
-        ${identity} AS identity,
+        COALESCE(
+          NULLIF(TRIM(COALESCE(s."user_id", '')), ''),
+          (
+            SELECT udl.user_id
+            FROM user_device_links udl
+            WHERE udl.anonymous_id = NULLIF(TRIM(s."anonymous_id"), '')
+            LIMIT 1
+          ),
+          NULLIF(TRIM(COALESCE(s."anonymous_id", '')), '')
+        ) AS identity,
         bool_or((${currentWindow})) AS active_current,
         bool_or((${previousWindow})) AS active_previous
       FROM "Session" s
       WHERE ${filters}
         AND s."started_at" >= ${queryLowerBound}
         AND s."started_at" <= ${until}
-        AND ${identity} IS NOT NULL
+        AND COALESCE(
+          NULLIF(TRIM(COALESCE(s."user_id", '')), ''),
+          NULLIF(TRIM(COALESCE(s."anonymous_id", '')), '')
+        ) IS NOT NULL
       GROUP BY 1
     )
     SELECT

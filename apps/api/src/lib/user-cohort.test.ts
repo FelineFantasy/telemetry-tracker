@@ -18,6 +18,11 @@ describe("cohortIdentityKey", () => {
     expect(cohortIdentityKey("user-1", "anon-1")).toBe("user-1");
   });
 
+  it("maps linked anonymous activity to user_id for cohort joins", () => {
+    const links = new Map([["anon-1", "user-1"]]);
+    expect(cohortIdentityKey(null, "anon-1", links)).toBe("user-1");
+  });
+
   it("keeps the same user_id key across apps", () => {
     expect(cohortIdentityKey("user-1", null)).toBe(
       cohortIdentityKey("user-1", "other-anon")
