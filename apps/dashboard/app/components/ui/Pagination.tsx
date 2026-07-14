@@ -1,6 +1,12 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 const NEIGHBOR_PAGES = 2;
+
+const navControlClass =
+  "grid h-8 place-items-center rounded-md border border-border px-2 font-mono text-[12px] text-muted-foreground transition-colors hover:bg-surface hover:text-foreground";
+const navControlDisabledClass =
+  "grid h-8 place-items-center rounded-md border border-border px-2 font-mono text-[12px] text-muted-foreground opacity-40";
 
 function normalizeTotalCount(total: unknown, pageSize: number): number {
   const n = typeof total === "number" ? total : Number(total);
@@ -30,6 +36,47 @@ function buildPageItems(
     out.push(n!);
   }
   return out;
+}
+
+function PageNavControl({
+  targetPage,
+  label,
+  children,
+  hrefForPage,
+  onPageChange,
+  disabled,
+}: {
+  targetPage: number;
+  label: string;
+  children: ReactNode;
+  hrefForPage: (page: number) => string;
+  onPageChange?: (page: number) => void;
+  disabled?: boolean;
+}) {
+  if (disabled) {
+    return (
+      <span className={navControlDisabledClass} aria-disabled="true" aria-label={label}>
+        {children}
+      </span>
+    );
+  }
+  if (onPageChange) {
+    return (
+      <button
+        type="button"
+        onClick={() => onPageChange(targetPage)}
+        className={navControlClass}
+        aria-label={label}
+      >
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link href={hrefForPage(targetPage)} className={navControlClass} aria-label={label}>
+      {children}
+    </Link>
+  );
 }
 
 export function Pagination({
@@ -66,6 +113,15 @@ export function Pagination({
         <span className="hidden sm:inline"> · Page {page} of {totalPages}</span>
       </div>
       <div className="flex items-center gap-1" role="group" aria-label="Page navigation">
+        <PageNavControl
+          targetPage={page - 1}
+          label="Previous page"
+          hrefForPage={hrefForPage}
+          onPageChange={onPageChange}
+          disabled={page <= 1}
+        >
+          Previous
+        </PageNavControl>
         <ol className="flex items-center gap-1">
           {pageItems.map((item, i) =>
             item === "ellipsis" ? (
@@ -104,6 +160,15 @@ export function Pagination({
             )
           )}
         </ol>
+        <PageNavControl
+          targetPage={page + 1}
+          label="Next page"
+          hrefForPage={hrefForPage}
+          onPageChange={onPageChange}
+          disabled={page >= totalPages}
+        >
+          Next
+        </PageNavControl>
       </div>
     </nav>
   );
