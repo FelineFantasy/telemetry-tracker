@@ -3,7 +3,7 @@ import { acquireBriefPrivateCallPermission, BriefCircuitBreaker } from "./brief-
 
 describe("BriefCircuitBreaker", () => {
   function breaker(nowMs = 0) {
-    let current = nowMs;
+    const current = nowMs;
     return new BriefCircuitBreaker({
       failureThreshold: 3,
       windowMs: 60_000,

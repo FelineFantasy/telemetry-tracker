@@ -54,7 +54,7 @@ export function buildBriefSigningPayload(input: BriefSigningInput): string {
 /** Decode a base64 shared secret; rejects secrets shorter than 32 decoded bytes in production. */
 export function decodeBriefServiceSecret(
   encoded: string | undefined,
-  options?: { requireProductionLength?: boolean }
+  _options?: { requireProductionLength?: boolean }
 ): Buffer | null {
   if (!encoded || encoded.trim() === "") return null;
   let decoded: Buffer;
