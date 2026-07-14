@@ -1,17 +1,19 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Loader2 } from "lucide-react";
 import { dashboardPathForAppFilter } from "@/lib/dashboard-app-href";
 import { buildDashboardHrefWithEnvironment, resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
+import { cn } from "@/lib/utils";
 import { DashboardPopover } from "./DashboardPopover";
 import { NavPickerLabel, NavPickerTrigger } from "./shell-primitives";
 
 export function DashboardEnvSelector({ environments }: { environments: string[] }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const { push, replace, isPending } = useDashboardNavigation();
   const pathForLinks = dashboardPathForAppFilter(pathname);
 
   const rawEnv = searchParams.get("environment") ?? "";
@@ -20,10 +22,8 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
 
   useEffect(() => {
     if (rawEnv === "" || environments.includes(rawEnv)) return;
-    router.replace(
-      buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams)
-    );
-  }, [environments, pathForLinks, rawEnv, router, searchParams]);
+    replace(buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams));
+  }, [environments, pathForLinks, rawEnv, replace, searchParams]);
 
   return (
     <DashboardPopover
@@ -33,11 +33,17 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
           onClick={toggle}
           aria-expanded={open}
           aria-label="Environment"
-          className="max-w-[10rem]"
+          aria-busy={isPending ? "true" : undefined}
+          disabled={isPending}
+          className={cn("max-w-[10rem]", isPending && "opacity-80")}
         >
           <NavPickerLabel>Env</NavPickerLabel>
           <span className="truncate font-medium uppercase">{displayEnv}</span>
-          <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+          {isPending ? (
+            <Loader2 className="ml-auto h-3 w-3 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+          ) : (
+            <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+          )}
         </NavPickerTrigger>
       )}
     >
@@ -50,7 +56,7 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
             type="button"
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
             onClick={() => {
-              router.push(buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams));
+              push(buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams));
               close();
             }}
           >
@@ -63,7 +69,7 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
               type="button"
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface"
               onClick={() => {
-                router.push(buildDashboardHrefWithEnvironment(pathForLinks, e, searchParams));
+                push(buildDashboardHrefWithEnvironment(pathForLinks, e, searchParams));
                 close();
               }}
             >

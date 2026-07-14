@@ -21,6 +21,7 @@ import { IssueList, OverviewListItem } from "@/app/components/dashboard/IssueLis
 import { OverviewGreeting } from "@/app/components/dashboard/overview/OverviewGreeting";
 import { OverviewIngestSetupBanner } from "@/app/components/dashboard/overview/OverviewIngestSetupBanner";
 import { OverviewApiResponseLogger } from "@/app/components/dashboard/overview/OverviewApiResponseLogger";
+import { OverviewScopeBanner } from "@/app/components/dashboard/overview/OverviewScopeBanner";
 import { OverviewAppHealth } from "@/app/components/dashboard/overview/OverviewAppHealth";
 import { OverviewActiveIncidents } from "@/app/components/dashboard/overview/OverviewActiveIncidents";
 import { OverviewMetricsSection } from "@/app/components/dashboard/overview/OverviewMetricsSection";
@@ -29,7 +30,7 @@ import {
   OverviewRecentSessionsPanel,
   OverviewTopErrorsPanel,
 } from "@/app/components/dashboard/overview/OverviewBreakdownGrid";
-import { mergeListQuery } from "@/lib/list-filters-url";
+import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
@@ -227,6 +228,11 @@ export default async function OverviewPage({
     to: firstQueryValue(params.to),
   };
   const currentOverviewParams = buildOverviewParamsRecord(params);
+  const defaultTimeHref = redirectHrefIfMissingTimeRange(
+    OVERVIEW_PATH,
+    currentOverviewParams
+  );
+  if (defaultTimeHref) redirect(defaultTimeHref);
   const timeParse = parseOverviewTimeRangeQuery(timeQuery);
   if (!timeParse.ok) {
     redirect(
@@ -424,6 +430,8 @@ export default async function OverviewPage({
           />
         }
       />
+
+      <OverviewScopeBanner visible={!app && apps.length > 0} />
 
       <OverviewAppHealth health={health} />
       <OverviewActiveIncidents issues={activeIssues} />

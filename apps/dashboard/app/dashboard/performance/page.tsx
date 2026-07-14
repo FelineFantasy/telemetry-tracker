@@ -1,4 +1,5 @@
 import { PageTitle } from "@/app/components/PageTitle";
+import { redirect } from "next/navigation";
 import { PerformanceListToolbar } from "@/app/components/dashboard/PerformanceListToolbar";
 import { PerformanceRatingDistribution } from "@/app/components/dashboard/PerformanceRatingDistribution";
 import { PerformanceSummaryMetrics } from "@/app/components/dashboard/PerformanceSummaryMetrics";
@@ -8,6 +9,7 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { fetchPerformanceSummary } from "@/lib/performance-summary";
+import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 
@@ -70,6 +72,9 @@ export default async function PerformancePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const currentParams = buildPerformanceParamsRecord(sp);
+  const defaultTimeHref = redirectHrefIfMissingTimeRange(PERFORMANCE_PATH, currentParams);
+  if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const from = firstQueryValue(sp.from) ?? "";
   const to = firstQueryValue(sp.to) ?? "";
@@ -122,7 +127,6 @@ export default async function PerformancePage({
     );
   }
 
-  const currentParams = buildPerformanceParamsRecord(sp);
   const metricsRangeLabel = summary?.window.label ?? timeRange.label;
   const hasVitals = summary?.webVitals.available === true;
   const hasRequestLatency = summary?.requestLatency.available === true;

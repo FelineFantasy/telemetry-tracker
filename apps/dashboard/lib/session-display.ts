@@ -13,3 +13,15 @@ export function formatSessionDevice(
   const parts = [browser?.trim(), os?.trim()].filter(Boolean) as string[];
   return parts.length ? parts.join(" · ") : null;
 }
+
+/** Display identity — user_id takes precedence; blank user_id falls back to anonymous_id. */
+export function resolveSessionIdentityLabel(
+  userId: string | null | undefined,
+  anonymousId: string | null | undefined
+): string | null {
+  const uid = userId?.trim();
+  if (uid) return uid;
+  const aid = anonymousId?.trim();
+  if (aid) return aid;
+  return null;
+}

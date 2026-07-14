@@ -70,6 +70,7 @@ model User {
   notification_reads    NotificationRead[]
   notification_email_logs NotificationEmailLog[]
   audit_events          OrganizationAuditEvent[]
+  brief_acknowledgements BriefAcknowledgement[]
 }
 
 model NotificationRead {
@@ -80,6 +81,24 @@ model NotificationRead {
 
   @@id([user_id, notification_id])
   @@index([user_id])
+}
+
+/// Per-user watermark for workspace briefs. Advanced only via explicit "Mark as read".
+model BriefAcknowledgement {
+  id                   String   @id @default(uuid())
+  user_id              String   @map("user_id")
+  user                 User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project_id           String   @map("project_id")
+  project              Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  /// Upper bound of telemetry included in the last acknowledged brief for this project.
+  acknowledged_through DateTime @map("acknowledged_through")
+  created_at           DateTime @default(now()) @map("created_at")
+  updated_at           DateTime @updatedAt @map("updated_at")
+
+  @@unique([user_id, project_id])
+  @@index([user_id])
+  @@index([project_id])
+  @@index([acknowledged_through])
 }
 
 model NotificationEmailLog {
@@ -180,6 +199,7 @@ model Project {
   alert_settings  Json?          @map("alert_settings")
   alert_events    AlertEvent[]
   source_map_artifacts SourceMapArtifact[]
+  brief_acknowledgements BriefAcknowledgement[]
 
   @@unique([organization_id, slug])
   @@index([organization_id])

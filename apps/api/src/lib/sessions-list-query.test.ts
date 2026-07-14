@@ -98,6 +98,19 @@ describe("serializeSessionListItem", () => {
     const item = serializeSessionListItem(baseRow);
     expect(item.max_duration_sec).toBeNull();
   });
+
+  it("includes identity_first_seen_at when present", () => {
+    const item = serializeSessionListItem({
+      ...baseRow,
+      identity_first_seen_at: new Date("2026-05-01T08:00:00.000Z"),
+    });
+    expect(item.identity_first_seen_at).toBe("2026-05-01T08:00:00.000Z");
+  });
+
+  it("defaults identity_first_seen_at to null when omitted", () => {
+    const item = serializeSessionListItem(baseRow);
+    expect(item.identity_first_seen_at).toBeNull();
+  });
 });
 
 describe("SESSION_PAGE_EVENT_NAMES", () => {
