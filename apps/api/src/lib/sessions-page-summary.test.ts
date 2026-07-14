@@ -3,6 +3,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   BOUNCE_MAX_DURATION_SECONDS,
   buildSessionListFilter,
+  computeAvgDurationPerUserSec,
   parseSessionsMetricsAnchor,
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
@@ -108,6 +109,20 @@ describe("resolveSessionListStartedAtBounds", () => {
 describe("BOUNCE_MAX_DURATION_SECONDS", () => {
   it("is 10 seconds", () => {
     expect(BOUNCE_MAX_DURATION_SECONDS).toBe(10);
+  });
+});
+
+describe("computeAvgDurationPerUserSec", () => {
+  it("returns total session time divided by distinct users", () => {
+    expect(computeAvgDurationPerUserSec(300, 2)).toBe(150);
+  });
+
+  it("returns 0 when there are no users", () => {
+    expect(computeAvgDurationPerUserSec(120, 0)).toBe(0);
+  });
+
+  it("rounds to the nearest second", () => {
+    expect(computeAvgDurationPerUserSec(100, 3)).toBe(33);
   });
 });
 
