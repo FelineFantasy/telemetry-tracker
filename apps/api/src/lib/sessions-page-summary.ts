@@ -206,9 +206,12 @@ export function identityFirstSeenWhereSql(
     const userMatch = Prisma.sql`NULLIF(TRIM(${s}."user_id"), '') = ${identity.value}`;
     const linkedAnonymous = linkedAnonymousId?.trim();
     if (linkedAnonymous) {
+      const anonymousOnlyMatch = Prisma.sql`(
+        NULLIF(TRIM(${s}."anonymous_id"), '') = ${linkedAnonymous}
+        AND NULLIF(TRIM(COALESCE(${s}."user_id", '')), '') IS NULL
+      )`;
       return Prisma.sql`${s}."project_id" = ${projectId}
-        AND (${userMatch}
-          OR NULLIF(TRIM(${s}."anonymous_id"), '') = ${linkedAnonymous})`;
+        AND (${userMatch} OR ${anonymousOnlyMatch})`;
     }
     return Prisma.sql`${s}."project_id" = ${projectId} AND ${userMatch}`;
   }

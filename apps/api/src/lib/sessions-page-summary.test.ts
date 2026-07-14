@@ -277,6 +277,7 @@ describe("identityFirstSeenWhereSql", () => {
     );
     expect(text).toContain('"user_id"');
     expect(text).toContain('"anonymous_id"');
+    expect(text).toContain("IS NULL");
   });
 
   it("matches anonymous_id within project", () => {
