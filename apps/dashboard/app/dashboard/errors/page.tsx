@@ -212,11 +212,11 @@ export default async function ErrorsListPage({
   summaryQuery.delete("trendFrom");
   summaryQuery.delete("trendTo");
 
-  let initialListData = {
-    items: [] as ErrorGroupRow[],
-    total: 0,
-    page: 1,
-    pageSize,
+  let initialListData: {
+    items: ErrorGroupRow[];
+    total: number;
+    page: number;
+    pageSize: number;
   };
   let summary: ErrorsPageSummary | null = null;
   let analytics: ErrorsAnalyticsData | null = null;

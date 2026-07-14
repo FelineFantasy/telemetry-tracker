@@ -200,6 +200,11 @@ export function SessionsListToolbar({
               listLabelledBy={id("plat-l")}
             />
           </FilterField>
+          {onSortApply ? (
+            <FilterSubmitWrap>
+              <FilterSubmitBtn>Apply filters</FilterSubmitBtn>
+            </FilterSubmitWrap>
+          ) : null}
         </FilterRow>
 
         {onSortApply ? (

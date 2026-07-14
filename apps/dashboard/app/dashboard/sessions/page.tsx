@@ -164,12 +164,12 @@ export default async function SessionsPage({
   summaryQuery.delete("sort");
   summaryQuery.delete("order");
 
-  let initialListData = {
-    items: [] as SessionsTableRow[],
-    total: 0,
-    page: 1,
-    pageSize,
-    max_duration_sec: 0,
+  let initialListData: {
+    items: SessionsTableRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    max_duration_sec: number;
   };
   let summary: SessionsPageSummary | null = null;
   let analytics: SessionsAnalyticsData | null = null;

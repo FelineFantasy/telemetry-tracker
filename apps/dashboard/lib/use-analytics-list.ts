@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { dashboardApiClientFetch } from "@/lib/dashboard-api-client";
 
@@ -13,9 +13,22 @@ type UseAnalyticsListOptions<T> = {
   path: string;
   initialData: T;
   initialListParams: AnalyticsListQueryParams;
-  /** Full URL params (filters + list) for bookmarkable replaceState. */
+  /** Full URL params (filters + list) for bookmarkable history updates. */
   urlParams: AnalyticsListQueryParams;
 };
+
+function listParamsFromSearch(
+  keys: string[],
+  search: string
+): AnalyticsListQueryParams {
+  const sp = new URLSearchParams(search);
+  const next: AnalyticsListQueryParams = {};
+  for (const key of keys) {
+    const value = sp.get(key);
+    if (value !== null && value !== "") next[key] = value;
+  }
+  return next;
+}
 
 export function useAnalyticsList<T>({
   cacheKey,
@@ -25,6 +38,10 @@ export function useAnalyticsList<T>({
   initialListParams,
   urlParams,
 }: UseAnalyticsListOptions<T>) {
+  const listParamKeys = useMemo(
+    () => Object.keys(initialListParams),
+    [initialListParams]
+  );
   const [listParams, setListParamsState] = useState(initialListParams);
 
   const queryString = useMemo(() => {
@@ -34,6 +51,16 @@ export function useAnalyticsList<T>({
     }
     return search.toString();
   }, [listParams]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setListParamsState(
+        listParamsFromSearch(listParamKeys, window.location.search)
+      );
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [listParamKeys]);
 
   const { data, error, isValidating } = useSWR<T>(
     [cacheKey, queryString],
@@ -49,6 +76,7 @@ export function useAnalyticsList<T>({
       fallbackData: initialData,
       keepPreviousData: true,
       revalidateOnFocus: false,
+      revalidateOnMount: false,
     }
   );
 
@@ -64,7 +92,7 @@ export function useAnalyticsList<T>({
           }
         }
         const href = mergeListQuery(path, { ...urlParams, ...next }, updates);
-        window.history.replaceState(null, "", href);
+        window.history.pushState(null, "", href);
         return next;
       });
     },

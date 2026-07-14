@@ -154,11 +154,11 @@ export default async function EventsPage({
   summaryQuery.delete("order");
   summaryQuery.delete("view");
 
-  let initialListData = {
-    items: [] as EventNameRow[],
-    total: 0,
-    page: 1,
-    pageSize,
+  let initialListData: {
+    items: EventNameRow[];
+    total: number;
+    page: number;
+    pageSize: number;
   };
   let summary: EventsPageSummary | null = null;
   let analytics: EventsAnalyticsData | null = null;
