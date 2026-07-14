@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Pin, Plus, Search } from "lucide-react";
+import { Check, ChevronDown, Loader2, Pin, Plus, Search } from "lucide-react";
 import {
   buildDashboardHrefWithApp,
   dashboardPathForAppFilter,
@@ -18,6 +18,7 @@ import {
 import type { ProjectNavHealthStatus, ProjectNavSummary } from "@/lib/project-nav-summary-types";
 import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { searchInputClassName } from "@/lib/input-classes";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import { cn } from "@/lib/utils";
 import { DashboardPopover, ShellKbd } from "./DashboardPopover";
 import { NavPickerSection } from "./NavPickerSection";
@@ -45,7 +46,7 @@ export function TopNavAppSwitcher({
 }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const { push, replace, isPending } = useDashboardNavigation();
   const pathForLinks = dashboardPathForAppFilter(pathname);
 
   const rawApp = searchParams.get("app") ?? "";
@@ -63,8 +64,8 @@ export function TopNavAppSwitcher({
   useEffect(() => {
     if (apps.length === 0) return;
     if (rawApp === "" || apps.includes(rawApp)) return;
-    router.replace(buildDashboardHrefWithApp(pathForLinks, null, searchParams));
-  }, [apps, pathForLinks, rawApp, router, searchParams]);
+    replace(buildDashboardHrefWithApp(pathForLinks, null, searchParams));
+  }, [apps, pathForLinks, rawApp, replace, searchParams]);
 
   useEffect(() => {
     setPrefs(getAppPickerPrefs(projectId));
@@ -112,10 +113,10 @@ export function TopNavAppSwitcher({
       if (nextApp) {
         setPrefs({ ...prefs, recent: recordRecentApp(projectId, nextApp) });
       }
-      router.push(buildDashboardHrefWithApp(pathForLinks, nextApp, searchParams));
+      push(buildDashboardHrefWithApp(pathForLinks, nextApp, searchParams));
       close();
     },
-    [appValue, pathForLinks, prefs, projectId, router, searchParams]
+    [appValue, pathForLinks, prefs, projectId, push, searchParams]
   );
 
   const onTogglePin = useCallback(
@@ -139,12 +140,18 @@ export function TopNavAppSwitcher({
           onClick={toggle}
           aria-expanded={isOpen}
           aria-label="App"
-          className="max-w-[11rem]"
+          aria-busy={isPending ? "true" : undefined}
+          disabled={isPending}
+          className={cn("max-w-[11rem]", isPending && "opacity-80")}
         >
           <ProjectStatusDot status={triggerStatus} />
           <NavPickerLabel>App</NavPickerLabel>
           <span className="truncate font-medium">{displayApp}</span>
-          <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+          {isPending ? (
+            <Loader2 className="ml-auto h-3 w-3 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+          ) : (
+            <ChevronDown className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" />
+          )}
         </NavPickerTrigger>
       )}
     >
