@@ -1,16 +1,11 @@
 import type { BriefSnapshotRequest, WorkspaceBriefResponse } from "./brief-contracts.js";
 import { parseWorkspaceBriefResponse } from "./brief-contracts.js";
-import { validateWorkspaceBriefResponseIntegrity } from "./brief-response-integrity.js";
+import {
+  validateWorkspaceBriefResponseIntegrity,
+  type BriefResponseIntegrityFailure,
+} from "./brief-response-integrity.js";
 
-export type PrivateBriefValidationFailure =
-  | "invalid_response"
-  | "request_id_mismatch"
-  | "duplicate_project"
-  | "unknown_project"
-  | "missing_project"
-  | "generated_through_mismatch"
-  | "action_project_mismatch"
-  | "action_error_group_unknown";
+export type PrivateBriefValidationFailure = "invalid_response" | BriefResponseIntegrityFailure;
 
 export type PrivateBriefValidationResult =
   | { ok: true; data: WorkspaceBriefResponse }
