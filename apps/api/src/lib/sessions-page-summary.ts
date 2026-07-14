@@ -11,6 +11,7 @@ import { escapeLikePattern } from "./list-query.js";
 import { generateOverviewChartBuckets, overviewChartQuerySince } from "./overview-timeseries.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
+import { cohortSharePct } from "./user-cohort.js";
 
 export const BOUNCE_MAX_DURATION_SECONDS = 10;
 
@@ -69,6 +70,16 @@ export type SessionsPageSummary = {
   bounceRatePctPrevious: number;
   crashFreeRatePct: number;
   crashFreeRatePctPrevious: number;
+  userCohorts: {
+    newUsers: number;
+    returningUsers: number;
+    newUsersPrevious: number;
+    returningUsersPrevious: number;
+    newUsersPct: number;
+    returningUsersPct: number;
+    newUsersPctPrevious: number;
+    returningUsersPctPrevious: number;
+  };
   sparklines: {
     totalSessions: SessionsSummarySparklinePoint[];
     distinctUsers: SessionsSummarySparklinePoint[];
@@ -168,11 +179,34 @@ export function sessionHasNoProjectErrorsSql(
   )`;
 }
 
-function sessionIdentityExpr(alias = "s"): Prisma.Sql {
-  const a = Prisma.raw(`"${alias}"`);
+function userDeviceLinksCteSql(
+  projectId: string,
+  f: SessionListFilterInput
+): Prisma.Sql {
+  const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
+  return Prisma.sql`
+    user_device_links AS (
+      SELECT DISTINCT
+        NULLIF(TRIM(s."user_id"), '') AS user_id,
+        NULLIF(TRIM(s."anonymous_id"), '') AS anonymous_id
+      FROM "Session" s
+      WHERE ${filters}
+        AND NULLIF(TRIM(s."user_id"), '') IS NOT NULL
+    )`;
+}
+
+/** Merges linked anonymous activity onto user_id — shared by Users KPI and cohorts. */
+function cohortIdentityExpr(sessionAlias = "s"): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
   return Prisma.sql`COALESCE(
-    NULLIF(TRIM(COALESCE(${a}."user_id", '')), ''),
-    NULLIF(TRIM(COALESCE(${a}."anonymous_id", '')), '')
+    NULLIF(TRIM(COALESCE(${s}."user_id", '')), ''),
+    (
+      SELECT udl.user_id
+      FROM user_device_links udl
+      WHERE udl.anonymous_id = NULLIF(TRIM(${s}."anonymous_id"), '')
+      LIMIT 1
+    ),
+    NULLIF(TRIM(COALESCE(${s}."anonymous_id", '')), '')
   )`;
 }
 
@@ -432,7 +466,7 @@ async function fetchSessionSummaryScalars(
 ): Promise<SummaryRow> {
   const { since, until, previousSince, previousUntil } = window;
   const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
-  const identity = sessionIdentityExpr("s");
+  const userIdentity = cohortIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
   const currentWindow = sessionWindowWithEventScope(
     projectId,
@@ -456,6 +490,7 @@ async function fetchSessionSummaryScalars(
   );
 
   const rows = await prisma.$queryRaw<[SummaryRow]>(Prisma.sql`
+    WITH ${userDeviceLinksCteSql(projectId, f)}
     SELECT
       COUNT(*) FILTER (
         WHERE ${currentWindow}
@@ -463,10 +498,10 @@ async function fetchSessionSummaryScalars(
       COUNT(*) FILTER (
         WHERE ${previousWindow}
       )::bigint AS total_sessions_previous,
-      COUNT(DISTINCT ${identity}) FILTER (
+      COUNT(DISTINCT ${userIdentity}) FILTER (
         WHERE ${currentWindow}
       )::bigint AS distinct_users,
-      COUNT(DISTINCT ${identity}) FILTER (
+      COUNT(DISTINCT ${userIdentity}) FILTER (
         WHERE ${previousWindow}
       )::bigint AS distinct_users_previous,
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) FILTER (
@@ -480,20 +515,20 @@ async function fetchSessionSummaryScalars(
       (
         SUM(${durationSec}) FILTER (
           WHERE ${currentWindow}
-            AND ${identity} IS NOT NULL
+            AND ${userIdentity} IS NOT NULL
         )
         / NULLIF(
-          COUNT(DISTINCT ${identity}) FILTER (WHERE ${currentWindow}),
+          COUNT(DISTINCT ${userIdentity}) FILTER (WHERE ${currentWindow}),
           0
         )
       ) AS avg_duration_per_user_sec,
       (
         SUM(${durationSec}) FILTER (
           WHERE ${previousWindow}
-            AND ${identity} IS NOT NULL
+            AND ${userIdentity} IS NOT NULL
         )
         / NULLIF(
-          COUNT(DISTINCT ${identity}) FILTER (WHERE ${previousWindow}),
+          COUNT(DISTINCT ${userIdentity}) FILTER (WHERE ${previousWindow}),
           0
         )
       ) AS avg_duration_per_user_sec_previous,
@@ -544,6 +579,134 @@ async function fetchSessionSummaryScalars(
   };
 }
 
+type UserCohortRow = {
+  new_users: bigint;
+  returning_users: bigint;
+  new_users_previous: bigint;
+  returning_users_previous: bigint;
+};
+
+async function fetchUserCohortCounts(
+  prisma: PrismaClient,
+  f: SessionListFilterInput,
+  projectId: string,
+  window: ResolvedSummaryWindow
+): Promise<UserCohortRow> {
+  const { since, until, previousSince, previousUntil } = window;
+  const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
+  const currentWindow = sessionWindowWithEventScope(
+    projectId,
+    f,
+    "s",
+    since,
+    until
+  );
+  const previousWindow = sessionWindowWithEventScope(
+    projectId,
+    f,
+    "s",
+    previousSince,
+    previousUntil,
+    true
+  );
+  const queryLowerBound = new Date(
+    Math.min(since.getTime(), previousSince.getTime())
+  );
+
+  const rows = await prisma.$queryRaw<[UserCohortRow]>(Prisma.sql`
+    WITH ${userDeviceLinksCteSql(projectId, f)},
+    identified_first_seen AS (
+      SELECT
+        udl.user_id AS identity,
+        MIN(s."started_at") AS first_seen_at
+      FROM user_device_links udl
+      INNER JOIN "Session" s
+        ON (
+          NULLIF(TRIM(s."user_id"), '') = udl.user_id
+          OR (
+            NULLIF(TRIM(COALESCE(s."user_id", '')), '') IS NULL
+            AND udl.anonymous_id IS NOT NULL
+            AND NULLIF(TRIM(s."anonymous_id"), '') = udl.anonymous_id
+          )
+        )
+      WHERE ${filters}
+      GROUP BY udl.user_id
+    ),
+    anonymous_first_seen AS (
+      SELECT
+        NULLIF(TRIM(s."anonymous_id"), '') AS identity,
+        MIN(s."started_at") AS first_seen_at
+      FROM "Session" s
+      WHERE ${filters}
+        AND NULLIF(TRIM(COALESCE(s."user_id", '')), '') IS NULL
+        AND NULLIF(TRIM(s."anonymous_id"), '') IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_device_links udl
+          WHERE udl.anonymous_id = NULLIF(TRIM(s."anonymous_id"), '')
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM identified_first_seen ifs
+          WHERE ifs.identity = NULLIF(TRIM(s."anonymous_id"), '')
+        )
+      GROUP BY 1
+    ),
+    project_identity AS (
+      SELECT identity, MIN(first_seen_at) AS first_seen_at
+      FROM (
+        SELECT identity, first_seen_at FROM identified_first_seen
+        UNION ALL
+        SELECT identity, first_seen_at FROM anonymous_first_seen
+      ) AS merged_identities
+      GROUP BY identity
+    ),
+    window_flags AS (
+      SELECT
+        ${cohortIdentityExpr("s")} AS identity,
+        bool_or((${currentWindow})) AS active_current,
+        bool_or((${previousWindow})) AS active_previous
+      FROM "Session" s
+      WHERE ${filters}
+        AND s."started_at" >= ${queryLowerBound}
+        AND s."started_at" <= ${until}
+        AND COALESCE(
+          NULLIF(TRIM(COALESCE(s."user_id", '')), ''),
+          NULLIF(TRIM(COALESCE(s."anonymous_id", '')), '')
+        ) IS NOT NULL
+      GROUP BY 1
+    )
+    SELECT
+      COUNT(*) FILTER (
+        WHERE wf.active_current
+          AND pi.first_seen_at >= ${since}
+      )::bigint AS new_users,
+      COUNT(*) FILTER (
+        WHERE wf.active_current
+          AND pi.first_seen_at < ${since}
+      )::bigint AS returning_users,
+      COUNT(*) FILTER (
+        WHERE wf.active_previous
+          AND pi.first_seen_at >= ${previousSince}
+      )::bigint AS new_users_previous,
+      COUNT(*) FILTER (
+        WHERE wf.active_previous
+          AND pi.first_seen_at < ${previousSince}
+      )::bigint AS returning_users_previous
+    FROM window_flags wf
+    INNER JOIN project_identity pi ON wf.identity = pi.identity
+  `);
+
+  return (
+    rows[0] ?? {
+      new_users: 0n,
+      returning_users: 0n,
+      new_users_previous: 0n,
+      returning_users_previous: 0n,
+    }
+  );
+}
+
 type SparklineBucketRow = {
   bucket: Date;
   total_sessions: bigint;
@@ -565,15 +728,16 @@ async function fetchSessionSummarySparklines(
   const trunc = bucket === "week" ? "week" : bucket;
   const chartSince = overviewChartQuerySince(since, until, bucket);
   const filters = sessionFilterSql(projectId, f, { gte: chartSince, lte: until });
-  const identity = sessionIdentityExpr("s");
+  const userIdentity = cohortIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
 
   const rows = await prisma.$queryRaw<SparklineBucketRow[]>(Prisma.sql`
+    WITH ${userDeviceLinksCteSql(projectId, f)}
     SELECT
       (date_trunc(${trunc}, s."started_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS total_sessions,
-      COUNT(DISTINCT ${identity})::bigint AS distinct_users,
+      COUNT(DISTINCT ${userIdentity})::bigint AS distinct_users,
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) FILTER (
         WHERE s."ended_at" IS NOT NULL
       ) AS avg_duration_sec,
@@ -637,9 +801,10 @@ export async function fetchSessionsPageSummary(
   projectId: string,
   window: ResolvedSummaryWindow
 ): Promise<SessionsPageSummary> {
-  const [row, sparklines] = await Promise.all([
+  const [row, sparklines, cohorts] = await Promise.all([
     fetchSessionSummaryScalars(prisma, f, projectId, window),
     fetchSessionSummarySparklines(prisma, f, projectId, window),
+    fetchUserCohortCounts(prisma, f, projectId, window),
   ]);
 
   const totalSessions = Number(row.total_sessions);
@@ -654,6 +819,12 @@ export async function fetchSessionsPageSummary(
     Number(row.crash_free_sessions_previous),
     totalSessionsPrevious
   );
+  const newUsers = Number(cohorts.new_users);
+  const returningUsers = Number(cohorts.returning_users);
+  const newUsersPrevious = Number(cohorts.new_users_previous);
+  const returningUsersPrevious = Number(cohorts.returning_users_previous);
+  const cohortTotal = newUsers + returningUsers;
+  const cohortTotalPrevious = newUsersPrevious + returningUsersPrevious;
 
   return {
     window: {
@@ -676,6 +847,19 @@ export async function fetchSessionsPageSummary(
     bounceRatePctPrevious,
     crashFreeRatePct,
     crashFreeRatePctPrevious,
+    userCohorts: {
+      newUsers,
+      returningUsers,
+      newUsersPrevious,
+      returningUsersPrevious,
+      newUsersPct: cohortSharePct(newUsers, cohortTotal),
+      returningUsersPct: cohortSharePct(returningUsers, cohortTotal),
+      newUsersPctPrevious: cohortSharePct(newUsersPrevious, cohortTotalPrevious),
+      returningUsersPctPrevious: cohortSharePct(
+        returningUsersPrevious,
+        cohortTotalPrevious
+      ),
+    },
     sparklines,
   };
 }

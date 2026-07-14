@@ -5,6 +5,7 @@ import {
   SessionsSummaryMetrics,
   type SessionsPageSummary,
 } from "@/app/components/dashboard/SessionsSummaryMetrics";
+import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
 import {
   SessionsAnalyticsPanels,
   type SessionsAnalyticsData,
@@ -233,6 +234,7 @@ export default async function SessionsPage({
 
       <AnalyticsListShell>
         {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
+        {summary ? <SessionsUserCohortMetrics summary={summary} /> : null}
 
         {analytics ? (
           <SessionsAnalyticsPanels
