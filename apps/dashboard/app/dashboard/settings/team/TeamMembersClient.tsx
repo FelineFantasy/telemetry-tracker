@@ -10,6 +10,7 @@ import { Section, SettingsAvatar, SettingsBtn, SettingsInput } from "@/app/compo
 import { toDashboardAvatarUrl } from "@/lib/avatar-url";
 import { Table, TableWrap, tableDateColumnClass } from "@/app/components/ui/Table";
 import { TimeAgo } from "@/app/components/TimeAgo";
+import { toast } from "sonner";
 
 export type TeamMemberRow = {
   userId: string;
@@ -137,10 +138,28 @@ export function TeamMembersClient({
               </p>
             ) : null}
             {inviteUrl ? (
-              <p className="text-sm text-muted-foreground">
-                Share this link to register:{" "}
-                <code className="break-all text-xs text-foreground">{inviteUrl}</code>
-              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <p className="text-sm text-muted-foreground">
+                  Share this link to register:{" "}
+                  <code className="break-all text-xs text-foreground">{inviteUrl}</code>
+                </p>
+                <SettingsBtn
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(inviteUrl);
+                      toast.success("Invite link copied to clipboard");
+                    } catch {
+                      toast.error("Could not copy invite link.");
+                    }
+                  }}
+                  aria-label="Copy invite link"
+                >
+                  Copy link
+                </SettingsBtn>
+              </div>
             ) : null}
             <SettingsBtn type="submit" variant="primary" disabled={pending}>
               {pending ? "Sending…" : "Add or invite"}
