@@ -3,6 +3,21 @@ import {
   hasExplicitTimeRangeQuery,
 } from "./time-range";
 
+/** API-only query keys never written to the dashboard URL. */
+const API_ONLY_URL_KEYS = new Set(["metricsUntil", "view"]);
+
+/** Merge URL-backed params for history updates and shareable links. */
+export function mergeDashboardUrlParams(
+  urlParams: Record<string, string>,
+  listParams: Record<string, string>
+): Record<string, string> {
+  const merged = { ...urlParams, ...listParams };
+  for (const key of API_ONLY_URL_KEYS) {
+    delete merged[key];
+  }
+  return merged;
+}
+
 /**
  * Merge updates into current query params for dashboard list pages.
  * Clears `page` so filter changes return to page 1.

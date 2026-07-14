@@ -1,26 +1,17 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
-import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListToolbar";
+import { SessionsClientListSection } from "@/app/components/dashboard/SessionsClientListSection";
 import {
   SessionsSummaryMetrics,
   type SessionsPageSummary,
 } from "@/app/components/dashboard/SessionsSummaryMetrics";
 import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
-import {
-  SessionsAnalyticsPanels,
-  type SessionsAnalyticsData,
-} from "@/app/components/dashboard/SessionsAnalyticsPanels";
-import {
-  SessionsTable,
-  type SessionsTableRow,
-} from "@/app/components/dashboard/SessionsTable";
-import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
+import type { SessionsAnalyticsData } from "@/app/components/dashboard/SessionsAnalyticsPanels";
+import { type SessionsTableRow } from "@/app/components/dashboard/SessionsTable";
+import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
-import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
-import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
-import { Pagination } from "@/app/components/ui/Pagination";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -170,9 +161,13 @@ export default async function SessionsPage({
   summaryQuery.delete("sort");
   summaryQuery.delete("order");
 
-  let items: SessionsTableRow[] = [];
-  let total = 0;
-  let maxDurationSec = 0;
+  let initialListData: {
+    items: SessionsTableRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    max_duration_sec: number;
+  };
   let summary: SessionsPageSummary | null = null;
   let analytics: SessionsAnalyticsData | null = null;
   let platforms: string[] = [];
@@ -186,9 +181,13 @@ export default async function SessionsPage({
       getSessionsSummary(summaryQuery),
       getSessionsAnalytics(summaryQuery),
     ]);
-    items = data.items ?? [];
-    total = resolveApiListTotal(data.total, items.length);
-    maxDurationSec = data.max_duration_sec ?? 0;
+    initialListData = {
+      items: data.items ?? [],
+      total: resolveApiListTotal(data.total, data.items?.length ?? 0),
+      page: data.page ?? page,
+      pageSize: data.pageSize ?? pageSize,
+      max_duration_sec: data.max_duration_sec ?? 0,
+    };
     platforms = opts.platforms;
     environments = opts.environments;
     releases = opts.releases;
@@ -204,21 +203,9 @@ export default async function SessionsPage({
     );
   }
 
-  const hrefForPage = (p: number) =>
-    mergeListQuery(SESSIONS_PATH, currentParams, { page: String(p) });
-
+  const initialListParams = Object.fromEntries(apiQuery.entries());
   const effectiveSort = sort ?? "duration";
   const effectiveOrder = order ?? "desc";
-  const listSubtitle =
-    page === 1 && effectiveSort === "duration" && effectiveOrder === "desc"
-      ? "Showing top sessions by duration"
-      : undefined;
-
-  const sessionHref = (row: SessionsTableRow) =>
-    appFilter
-      ? `/dashboard/sessions/${row.id}?app=${encodeURIComponent(appFilter)}`
-      : `/dashboard/sessions/${row.id}`;
-
   const rangeLabel = timeRange.label;
 
   return (
@@ -236,60 +223,31 @@ export default async function SessionsPage({
         {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
         {summary ? <SessionsUserCohortMetrics summary={summary} /> : null}
 
-        {analytics ? (
-          <SessionsAnalyticsPanels
-            analytics={analytics}
-            path={SESSIONS_PATH}
-            currentParams={currentParams}
-          />
-        ) : null}
-
-        <SessionsListToolbar
-        path={SESSIONS_PATH}
-        currentParams={currentParams}
-        timeRange={timeRange}
-        fromParam={from}
-        toParam={to}
-        appFilter={appFilter}
-        pageSize={String(pageSize)}
-        defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
-        q={q ?? ""}
-        environment={environment ?? ""}
-        release={release ?? ""}
-        country={country ?? ""}
-        platform={platform ?? ""}
-        sort={effectiveSort}
-        order={effectiveOrder}
-        environments={environments}
-        releases={releases}
-        countries={countries}
-        platforms={platforms}
+        <SessionsClientListSection
+          path={SESSIONS_PATH}
+          urlParams={currentParams}
+          initialListParams={initialListParams}
+          initialData={initialListData}
+          analytics={analytics}
+          timeRange={timeRange}
+          fromParam={from}
+          toParam={to}
+          appFilter={appFilter}
+          pageSize={String(pageSize)}
+          defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
+          q={q ?? ""}
+          environment={environment ?? ""}
+          release={release ?? ""}
+          country={country ?? ""}
+          platform={platform ?? ""}
+          sort={effectiveSort}
+          order={effectiveOrder}
+          environments={environments}
+          releases={releases}
+          countries={countries}
+          platforms={platforms}
+          rangeLabel={rangeLabel}
         />
-
-        <ListResultCount
-          total={total}
-          noun={total === 1 ? "session" : "sessions"}
-          subtitle={listSubtitle}
-        />
-
-        {items.length ? (
-          <SessionsTable
-            rows={items}
-            hrefForSession={sessionHref}
-            hrefForView={sessionHref}
-            maxDurationSec={maxDurationSec}
-          />
-      ) : (
-        <EmptyState
-          title="No sessions recorded"
-          message={
-            appFilter
-              ? `No sessions for app "${appFilter}" with these filters.`
-              : `No sessions match ${rangeLabel}. Try another range or clear filters.`
-          }
-        />
-        )}
-        <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
       </AnalyticsListShell>
     </>
   );

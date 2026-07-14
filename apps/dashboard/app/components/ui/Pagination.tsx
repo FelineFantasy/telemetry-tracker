@@ -37,11 +37,14 @@ export function Pagination({
   page,
   pageSize,
   hrefForPage,
+  onPageChange,
 }: {
   total: unknown;
   page: number;
   pageSize: number;
   hrefForPage: (page: number) => string;
+  /** Client navigation without full page reload. */
+  onPageChange?: (page: number) => void;
 }) {
   const totalCount = normalizeTotalCount(total, pageSize);
   if (totalCount <= 0) return null;
@@ -79,6 +82,15 @@ export function Pagination({
                   >
                     {item}
                   </span>
+                ) : onPageChange ? (
+                  <button
+                    type="button"
+                    onClick={() => onPageChange(item)}
+                    className="grid h-8 min-w-8 place-items-center rounded-md border border-border px-2 font-mono text-[12px] text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+                    aria-label={`Page ${item}`}
+                  >
+                    {item}
+                  </button>
                 ) : (
                   <Link
                     href={hrefForPage(item)}

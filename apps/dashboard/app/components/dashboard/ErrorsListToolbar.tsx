@@ -20,12 +20,25 @@ import {
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 import { TimeRangePicker } from "@/app/components/dashboard/TimeRangePicker";
+import { ClientListSortRow } from "@/app/components/dashboard/ClientListSortRow";
 import {
   listTimeRangeHiddenFields,
   trendTimeRangeHiddenFields,
   TREND_TIME_RANGE_QUERY_KEYS,
   type ParsedTimeRange,
 } from "@/lib/time-range";
+
+export const ERRORS_SORT_OPTIONS: DashboardSelectOption[] = [
+  { value: "last_seen", label: "Last seen" },
+  { value: "first_seen", label: "First seen" },
+  { value: "occurrences", label: "Occurrences" },
+  { value: "message", label: "Message" },
+  { value: "app", label: "App" },
+  { value: "environment", label: "Environment" },
+  { value: "users", label: "Users affected" },
+  { value: "sessions", label: "Sessions" },
+  { value: "trend", label: "Trend" },
+];
 
 type Props = {
   path: string;
@@ -47,6 +60,8 @@ type Props = {
   order: string;
   environments: string[];
   releases: string[];
+  onSortApply?: (sort: string, order: string) => void;
+  sortLoading?: boolean;
 };
 
 export function ErrorsListToolbar({
@@ -69,6 +84,8 @@ export function ErrorsListToolbar({
   order,
   environments,
   releases,
+  onSortApply,
+  sortLoading = false,
 }: Props) {
   const fieldIds = useId();
 
@@ -94,20 +111,7 @@ export function ErrorsListToolbar({
     lte: trendToParam || trendTimeRange.lte.toISOString(),
   };
 
-  const sortOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "last_seen", label: "Last seen" },
-      { value: "first_seen", label: "First seen" },
-      { value: "occurrences", label: "Occurrences" },
-      { value: "message", label: "Message" },
-      { value: "app", label: "App" },
-      { value: "environment", label: "Environment" },
-      { value: "users", label: "Users affected" },
-      { value: "sessions", label: "Sessions" },
-      { value: "trend", label: "Trend" },
-    ],
-    []
-  );
+  const sortOptions = ERRORS_SORT_OPTIONS;
 
   const environmentOptions: DashboardSelectOption[] = useMemo(
     () => [
@@ -156,6 +160,12 @@ export function ErrorsListToolbar({
         {Number(pageSize) !== defaultPageSize ? (
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}
+        {onSortApply ? (
+          <>
+            <input type="hidden" name="sort" value={sort || "last_seen"} />
+            <input type="hidden" name="order" value={order || "desc"} />
+          </>
+        ) : null}
 
         <FilterRow>
           <FilterField grow>
@@ -198,32 +208,51 @@ export function ErrorsListToolbar({
               listLabelledBy={id("release-l")}
             />
           </FilterField>
+          {onSortApply ? (
+            <FilterSubmitWrap>
+              <FilterSubmitBtn>Apply filters</FilterSubmitBtn>
+            </FilterSubmitWrap>
+          ) : null}
         </FilterRow>
 
-        <FilterRow>
-          <FilterField>
-            <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
-            <DashboardCustomSelect
-              name="sort"
-              value={sort || "last_seen"}
-              options={sortOptions}
-              triggerId={id("sort-t")}
-              listLabelledBy={id("sort-l")}
-            />
-          </FilterField>
+        {onSortApply ? (
+          <ClientListSortRow
+            sort={sort || "last_seen"}
+            order={order}
+            sortOptions={sortOptions}
+            onApply={onSortApply}
+            isLoading={sortLoading}
+          />
+        ) : null}
 
-          <FilterSegment
-            legend="Order"
-            title="Descending: newest dates and largest counts first. Ascending: the opposite."
-            ariaLabel="Sort order"
-          >
-            <FilterSegmentItem name="order" value="desc" defaultChecked={order !== "asc"}>
-              Desc
-            </FilterSegmentItem>
-            <FilterSegmentItem name="order" value="asc" defaultChecked={order === "asc"}>
-              Asc
-            </FilterSegmentItem>
-          </FilterSegment>
+        <FilterRow>
+          {!onSortApply ? (
+            <>
+              <FilterField>
+                <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
+                <DashboardCustomSelect
+                  name="sort"
+                  value={sort || "last_seen"}
+                  options={sortOptions}
+                  triggerId={id("sort-t")}
+                  listLabelledBy={id("sort-l")}
+                />
+              </FilterField>
+
+              <FilterSegment
+                legend="Order"
+                title="Descending: newest dates and largest counts first. Ascending: the opposite."
+                ariaLabel="Sort order"
+              >
+                <FilterSegmentItem name="order" value="desc" defaultChecked={order !== "asc"}>
+                  Desc
+                </FilterSegmentItem>
+                <FilterSegmentItem name="order" value="asc" defaultChecked={order === "asc"}>
+                  Asc
+                </FilterSegmentItem>
+              </FilterSegment>
+            </>
+          ) : null}
 
           <FilterField>
             <FilterLabel>Trend window</FilterLabel>
@@ -239,9 +268,11 @@ export function ErrorsListToolbar({
             />
           </FilterField>
 
-          <FilterSubmitWrap>
-            <FilterSubmitBtn>Apply</FilterSubmitBtn>
-          </FilterSubmitWrap>
+          {!onSortApply ? (
+            <FilterSubmitWrap>
+              <FilterSubmitBtn>Apply</FilterSubmitBtn>
+            </FilterSubmitWrap>
+          ) : null}
         </FilterRow>
       </FilterForm>
     </FiltersSortPanel>

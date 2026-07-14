@@ -5,7 +5,7 @@ import {
   hasExplicitTimeRangeQuery,
   listTimeRangeHiddenFields,
 } from "./time-range";
-import { redirectHrefIfMissingTimeRange } from "./list-filters-url";
+import { redirectHrefIfMissingTimeRange, mergeDashboardUrlParams } from "./list-filters-url";
 
 describe("hasExplicitTimeRangeQuery", () => {
   it("is false when no time params", () => {
@@ -30,6 +30,17 @@ describe("redirectHrefIfMissingTimeRange", () => {
     expect(
       redirectHrefIfMissingTimeRange("/dashboard/overview", { range: "none" })
     ).toBeNull();
+  });
+});
+
+describe("mergeDashboardUrlParams", () => {
+  it("drops API-only keys from merged params", () => {
+    expect(
+      mergeDashboardUrlParams(
+        { range: "24h", page: "1" },
+        { page: "2", sort: "duration", metricsUntil: "2026-01-01T00:00:00.000Z", view: "grouped" }
+      )
+    ).toEqual({ range: "24h", page: "2", sort: "duration" });
   });
 });
 
