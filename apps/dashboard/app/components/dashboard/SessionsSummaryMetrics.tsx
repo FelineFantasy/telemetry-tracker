@@ -31,6 +31,16 @@ export type SessionsPageSummary = {
   bounceRatePctPrevious: number;
   crashFreeRatePct: number;
   crashFreeRatePctPrevious: number;
+  userCohorts: {
+    newUsers: number;
+    returningUsers: number;
+    newUsersPrevious: number;
+    returningUsersPrevious: number;
+    newUsersPct: number;
+    returningUsersPct: number;
+    newUsersPctPrevious: number;
+    returningUsersPctPrevious: number;
+  };
   sparklines: {
     totalSessions: SparklinePoint[];
     distinctUsers: SparklinePoint[];
