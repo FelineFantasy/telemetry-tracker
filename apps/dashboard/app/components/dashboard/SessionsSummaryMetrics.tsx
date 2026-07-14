@@ -25,6 +25,8 @@ export type SessionsPageSummary = {
   distinctUsersPrevious: number;
   avgDurationSec: number;
   avgDurationSecPrevious: number;
+  avgDurationPerUserSec: number;
+  avgDurationPerUserSecPrevious: number;
   bounceRatePct: number;
   bounceRatePctPrevious: number;
   crashFreeRatePct: number;
@@ -151,7 +153,7 @@ export function SessionsSummaryMetrics({ summary }: { summary: SessionsPageSumma
           {summary.window.label} · {summary.window.compareLabel}
         </p>
       </div>
-      <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y lg:grid-cols-5 lg:divide-y-0">
+      <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y lg:grid-cols-3 lg:divide-y-0 xl:grid-cols-6">
         <MetricCell
           label="Total sessions"
           value={formatCompact(summary.totalSessions)}
@@ -169,12 +171,20 @@ export function SessionsSummaryMetrics({ summary }: { summary: SessionsPageSumma
           sparklineLabel="Distinct users over time"
         />
         <MetricCell
-          label="Avg duration"
+          label="Avg duration / session"
           value={formatDurationSec(summary.avgDurationSec)}
           current={summary.avgDurationSec}
           previous={summary.avgDurationSecPrevious}
           sparkline={summary.sparklines.avgDurationSec}
           sparklineLabel="Average session duration over time"
+        />
+        <MetricCell
+          label="Avg time / user"
+          value={formatDurationSec(summary.avgDurationPerUserSec)}
+          current={summary.avgDurationPerUserSec}
+          previous={summary.avgDurationPerUserSecPrevious}
+          sparkline={summary.sparklines.totalSessions.map((p) => ({ t: p.t, count: null }))}
+          sparklineLabel="Average total time per user over time"
         />
         <MetricCell
           label="Bounce rate"

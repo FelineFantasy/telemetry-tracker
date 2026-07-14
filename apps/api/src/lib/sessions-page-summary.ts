@@ -62,6 +62,9 @@ export type SessionsPageSummary = {
   distinctUsersPrevious: number;
   avgDurationSec: number;
   avgDurationSecPrevious: number;
+  /** Total session time per identity, averaged across distinct users in the window. */
+  avgDurationPerUserSec: number;
+  avgDurationPerUserSecPrevious: number;
   bounceRatePct: number;
   bounceRatePctPrevious: number;
   crashFreeRatePct: number;
@@ -171,6 +174,43 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
     NULLIF(TRIM(COALESCE(${a}."user_id", '')), ''),
     NULLIF(TRIM(COALESCE(${a}."anonymous_id", '')), '')
   )`;
+}
+
+function sessionSummaryEventLateralSql(sessionAlias = "s"): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`LEFT JOIN LATERAL (
+    SELECT
+      COUNT(*)::int AS event_count,
+      MAX(e."created_at") AS last_event_at
+    FROM "Event" e
+    WHERE e."project_id" = ${s}."project_id"
+      AND e."session_id" = ${s}."session_id"
+      AND e."app" = ${s}."app"
+  ) ev ON TRUE`;
+}
+
+function sessionDurationSecExpr(sessionAlias = "s"): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`COALESCE(
+    CASE
+      WHEN ${s}."ended_at" IS NOT NULL
+        THEN EXTRACT(EPOCH FROM (${s}."ended_at" - ${s}."started_at"))
+    END,
+    CASE
+      WHEN ev.last_event_at IS NOT NULL
+        THEN EXTRACT(EPOCH FROM (ev.last_event_at - ${s}."started_at"))
+    END,
+    0
+  )`;
+}
+
+/** @internal Exported for unit tests. */
+export function computeAvgDurationPerUserSec(
+  totalDurationSec: number,
+  distinctUsers: number
+): number {
+  if (distinctUsers <= 0) return 0;
+  return Math.round(totalDurationSec / distinctUsers);
 }
 
 function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
@@ -305,6 +345,8 @@ type SummaryRow = {
   distinct_users_previous: bigint;
   avg_duration_sec: number | null;
   avg_duration_sec_previous: number | null;
+  avg_duration_per_user_sec: number | null;
+  avg_duration_per_user_sec_previous: number | null;
   bounce_sessions: bigint;
   bounce_sessions_previous: bigint;
   crash_free_sessions: bigint;
@@ -342,6 +384,7 @@ async function fetchSessionSummaryScalars(
     true
   );
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
+  const durationSec = sessionDurationSecExpr("s");
   const queryLowerBound = new Date(
     Math.min(since.getTime(), previousSince.getTime())
   );
@@ -368,6 +411,26 @@ async function fetchSessionSummaryScalars(
         WHERE ${previousWindow}
           AND s."ended_at" IS NOT NULL
       ) AS avg_duration_sec_previous,
+      (
+        SUM(${durationSec}) FILTER (
+          WHERE ${currentWindow}
+            AND ${identity} IS NOT NULL
+        )
+        / NULLIF(
+          COUNT(DISTINCT ${identity}) FILTER (WHERE ${currentWindow}),
+          0
+        )
+      ) AS avg_duration_per_user_sec,
+      (
+        SUM(${durationSec}) FILTER (
+          WHERE ${previousWindow}
+            AND ${identity} IS NOT NULL
+        )
+        / NULLIF(
+          COUNT(DISTINCT ${identity}) FILTER (WHERE ${previousWindow}),
+          0
+        )
+      ) AS avg_duration_per_user_sec_previous,
       COUNT(*) FILTER (
         WHERE ${currentWindow}
           AND (
@@ -393,13 +456,7 @@ async function fetchSessionSummaryScalars(
           AND ${noErrors}
       )::bigint AS crash_free_sessions_previous
     FROM "Session" s
-    LEFT JOIN LATERAL (
-      SELECT COUNT(*)::int AS event_count
-      FROM "Event" e
-      WHERE e."project_id" = s."project_id"
-        AND e."session_id" = s."session_id"
-        AND e."app" = s."app"
-    ) ev ON TRUE
+    ${sessionSummaryEventLateralSql("s")}
     WHERE ${filters}
       AND s."started_at" >= ${queryLowerBound}
       AND s."started_at" <= ${until}
@@ -412,6 +469,8 @@ async function fetchSessionSummaryScalars(
     distinct_users_previous: 0n,
     avg_duration_sec: null,
     avg_duration_sec_previous: null,
+    avg_duration_per_user_sec: null,
+    avg_duration_per_user_sec_previous: null,
     bounce_sessions: 0n,
     bounce_sessions_previous: 0n,
     crash_free_sessions: 0n,
@@ -543,6 +602,10 @@ export async function fetchSessionsPageSummary(
     distinctUsersPrevious: Number(row.distinct_users_previous),
     avgDurationSec: Math.round(Number(row.avg_duration_sec ?? 0)),
     avgDurationSecPrevious: Math.round(Number(row.avg_duration_sec_previous ?? 0)),
+    avgDurationPerUserSec: Math.round(Number(row.avg_duration_per_user_sec ?? 0)),
+    avgDurationPerUserSecPrevious: Math.round(
+      Number(row.avg_duration_per_user_sec_previous ?? 0)
+    ),
     bounceRatePct,
     bounceRatePctPrevious,
     crashFreeRatePct,
