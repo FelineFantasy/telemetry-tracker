@@ -1,4 +1,5 @@
 import { PageTitle } from "@/app/components/PageTitle";
+import { redirect } from "next/navigation";
 import { SessionsListToolbar } from "@/app/components/dashboard/SessionsListToolbar";
 import {
   SessionsSummaryMetrics,
@@ -12,7 +13,7 @@ import {
   SessionsTable,
   type SessionsTableRow,
 } from "@/app/components/dashboard/SessionsTable";
-import { mergeListQuery } from "@/lib/list-filters-url";
+import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
@@ -115,6 +116,9 @@ export default async function SessionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const currentParams = buildSessionsParamsRecord(sp);
+  const defaultTimeHref = redirectHrefIfMissingTimeRange(SESSIONS_PATH, currentParams);
+  if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const page = parsePageParam(firstQueryValue(sp.page));
   const pageSize = parsePageSizeParam(
@@ -199,7 +203,6 @@ export default async function SessionsPage({
     );
   }
 
-  const currentParams = buildSessionsParamsRecord(sp);
   const hrefForPage = (p: number) =>
     mergeListQuery(SESSIONS_PATH, currentParams, { page: String(p) });
 

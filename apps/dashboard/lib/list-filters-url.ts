@@ -1,3 +1,8 @@
+import {
+  DEFAULT_DASHBOARD_TIME_RANGE,
+  hasExplicitTimeRangeQuery,
+} from "./time-range";
+
 /**
  * Merge updates into current query params for dashboard list pages.
  * Clears `page` so filter changes return to page 1.
@@ -20,6 +25,28 @@ export function mergeListQuery(
   }
   const q = p.toString();
   return q ? `${path}?${q}` : path;
+}
+
+/** Redirect target when the URL has no explicit time filter (first visit). */
+export function redirectHrefIfMissingTimeRange(
+  path: string,
+  current: Record<string, string>,
+  defaultKey: string = DEFAULT_DASHBOARD_TIME_RANGE
+): string | null {
+  if (
+    hasExplicitTimeRangeQuery({
+      range: current.range,
+      from: current.from,
+      to: current.to,
+    })
+  ) {
+    return null;
+  }
+  return mergeListQuery(path, current, {
+    range: defaultKey,
+    from: null,
+    to: null,
+  });
 }
 
 /** @deprecated Use parseListTimeRangeOrDefault from @/lib/time-range */

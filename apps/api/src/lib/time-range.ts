@@ -238,8 +238,8 @@ export function isUnselectedTimeRange(key: string): boolean {
 export function buildUnselectedTimeRange(now: Date = new Date()): ParsedTimeRange {
   return {
     key: "none",
-    label: "Recent data",
-    shortLabel: "Recent",
+    label: "Recent (charts: last 30 days)",
+    shortLabel: "Recent · 30d charts",
     gte: new Date(0),
     lte: now,
     durationMs: now.getTime(),

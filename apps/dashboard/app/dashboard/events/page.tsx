@@ -7,7 +7,7 @@ import {
   type EventsAnalyticsData,
 } from "@/app/components/dashboard/EventsAnalyticsPanels";
 import { EventsTable } from "@/app/components/dashboard/EventsTable";
-import { mergeListQuery } from "@/lib/list-filters-url";
+import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
@@ -118,6 +118,8 @@ export default async function EventsPage({
   const sp = await searchParams;
   const pageAnchor = new Date();
   const currentParams = buildEventsParamsRecord(sp);
+  const defaultTimeHref = redirectHrefIfMissingTimeRange(EVENTS_PATH, currentParams);
+  if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
 

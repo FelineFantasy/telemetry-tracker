@@ -8,6 +8,8 @@ import {
   MiniSparkline,
   type SparklinePoint,
 } from "@/app/components/dashboard/MiniSparkline";
+import { MetricHelp } from "@/app/components/dashboard/MetricHelp";
+import type { ReactNode } from "react";
 import {
   calcDeltaPct,
   formatCompact,
@@ -120,6 +122,8 @@ function MetricCell({
   sparklineLabel,
   sparklineColor,
   compareText,
+  title,
+  help,
 }: {
   label: string;
   value: string;
@@ -131,11 +135,21 @@ function MetricCell({
   sparklineLabel?: string;
   sparklineColor?: string;
   compareText: string;
+  title?: string;
+  help?: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-2 px-4 py-3 sm:px-5 sm:py-4">
       <div>
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+        <div className="flex items-center gap-1.5">
+          <p
+            className="text-[11px] uppercase tracking-wider text-muted-foreground"
+            title={title}
+          >
+            {label}
+          </p>
+          {help ? <MetricHelp label={label}>{help}</MetricHelp> : null}
+        </div>
         <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight sm:text-xl">{value}</p>
         {previous == null ? (
           <p className="mt-1 text-[11px] text-muted-foreground">— {compareText}</p>
@@ -230,6 +244,13 @@ export function OverviewKeyMetrics({
         <div className={`grid grid-cols-1 divide-y divide-border ${primaryCols} lg:divide-x lg:divide-y-0`}>
           <MetricCell
             label="Events"
+            title="Count of SDK events ingested in the selected time range."
+            help={
+              <>
+                Custom events and automatic SDK events. Filtered by app and environment when set.
+                The ▲/▼ percentage is the change versus {compareText}.
+              </>
+            }
             value={formatCompact(eventsCount)}
             current={eventsCount}
             previous={eventsPrevious}
@@ -240,6 +261,13 @@ export function OverviewKeyMetrics({
           />
           <MetricCell
             label="Errors"
+            title="Count of error occurrences ingested in the selected time range."
+            help={
+              <>
+                Each row is one captured exception or error report. The delta compares to{" "}
+                {compareText}; down is good.
+              </>
+            }
             value={formatCompact(errorsCount)}
             current={errorsCount}
             previous={errorsPrevious}
@@ -251,6 +279,13 @@ export function OverviewKeyMetrics({
           />
           <MetricCell
             label="Sessions"
+            title="Count of user visits (session start markers) that began in the selected period."
+            help={
+              <>
+                A session is one browser or app visit from SDK init until tab close or navigation
+                away. Not the same as active users.
+              </>
+            }
             value={formatCompact(sessionsCount)}
             current={sessionsCount}
             previous={sessionsPrevious}
@@ -261,6 +296,13 @@ export function OverviewKeyMetrics({
           />
           <MetricCell
             label="Active users"
+            title="Distinct users with at least one event in the selected period."
+            help={
+              <>
+                Counts unique identities using user_id when present, otherwise anonymous_id. Based
+                on events, not session rows. Compared to {compareText}.
+              </>
+            }
             value={formatCompact(activeUsers)}
             current={activeUsers}
             previous={activeUsersPrevious}

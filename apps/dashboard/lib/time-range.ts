@@ -17,6 +17,9 @@ export type ParsedTimeRange = {
   bucketSeconds: number;
 };
 
+/** Default preset when dashboard pages load without a time filter in the URL. */
+export const DEFAULT_DASHBOARD_TIME_RANGE = "24h";
+
 export const TIME_RANGE_PRESETS = [
   { key: "1h", label: "1 hour", shortLabel: "1H" },
   { key: "24h", label: "24 hours", shortLabel: "24H" },
@@ -213,6 +216,16 @@ export function tryParseCustomRelativeInput(input: string): string | null {
   return ms !== null ? trimmed : null;
 }
 
+/** True when URL explicitly sets a time filter (including intentional "no date filter"). */
+export function hasExplicitTimeRangeQuery(query: {
+  range?: string;
+  from?: string;
+  to?: string;
+}): boolean {
+  if (query.from?.trim() || query.to?.trim()) return true;
+  return Boolean(query.range?.trim());
+}
+
 /** No date filter — show latest data by sort/pagination, any age. */
 export function isUnselectedTimeRange(key: string): boolean {
   return key === "none" || key === "all";
@@ -221,8 +234,8 @@ export function isUnselectedTimeRange(key: string): boolean {
 export function buildUnselectedTimeRange(now: Date = new Date()): ParsedTimeRange {
   return {
     key: "none",
-    label: "Recent data",
-    shortLabel: "Recent",
+    label: "Recent (charts: last 30 days)",
+    shortLabel: "Recent · 30d charts",
     gte: new Date(0),
     lte: now,
     durationMs: now.getTime(),
