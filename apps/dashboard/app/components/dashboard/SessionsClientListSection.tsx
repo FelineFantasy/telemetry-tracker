@@ -11,6 +11,10 @@ import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
+import {
+  SessionsAnalyticsPanels,
+  type SessionsAnalyticsData,
+} from "@/app/components/dashboard/SessionsAnalyticsPanels";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
 import { resolveApiListTotal } from "@/lib/pagination";
@@ -29,6 +33,7 @@ type Props = {
   urlParams: Record<string, string>;
   initialListParams: Record<string, string>;
   initialData: SessionsListResponse;
+  analytics?: SessionsAnalyticsData | null;
   timeRange: ParsedTimeRange;
   fromParam: string;
   toParam: string;
@@ -54,6 +59,7 @@ export function SessionsClientListSection({
   urlParams,
   initialListParams,
   initialData,
+  analytics,
   timeRange,
   fromParam,
   toParam,
@@ -99,8 +105,8 @@ export function SessionsClientListSection({
   );
 
   const hrefForPage = useCallback(
-    (p: number) => mergeListQuery(path, { ...urlParams, ...listParams }, { page: String(p) }),
-    [path, urlParams, listParams]
+    (p: number) => mergeListQuery(path, liveUrlParams, { page: String(p) }),
+    [path, liveUrlParams]
   );
 
   const onPageChange = useCallback(
@@ -124,6 +130,14 @@ export function SessionsClientListSection({
 
   return (
     <>
+      {analytics ? (
+        <SessionsAnalyticsPanels
+          analytics={analytics}
+          path={path}
+          currentParams={liveUrlParams}
+        />
+      ) : null}
+
       <SessionsListToolbar
         path={path}
         currentParams={liveUrlParams}

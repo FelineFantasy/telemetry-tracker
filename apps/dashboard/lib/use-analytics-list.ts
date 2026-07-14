@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { mergeListQuery } from "@/lib/list-filters-url";
+import { mergeDashboardUrlParams, mergeListQuery } from "@/lib/list-filters-url";
 import { dashboardApiClientFetch } from "@/lib/dashboard-api-client";
 
 export type AnalyticsListQueryParams = Record<string, string>;
@@ -131,7 +131,7 @@ export function useAnalyticsList<T>({
   );
 
   const liveUrlParams = useMemo(
-    () => ({ ...urlParams, ...listParams }),
+    () => mergeDashboardUrlParams(urlParams, listParams),
     [urlParams, listParams]
   );
 
@@ -146,8 +146,18 @@ export function useAnalyticsList<T>({
             next[key] = value;
           }
         }
-        const href = mergeListQuery(path, { ...urlParams, ...next }, updates);
-        window.history.pushState(null, "", href);
+        if (serializeListParams(prev) === serializeListParams(next)) {
+          return prev;
+        }
+        const href = mergeListQuery(
+          path,
+          mergeDashboardUrlParams(urlParams, next),
+          updates
+        );
+        const currentHref = `${window.location.pathname}${window.location.search}`;
+        if (href !== currentHref) {
+          window.history.pushState(null, "", href);
+        }
         return next;
       });
     },

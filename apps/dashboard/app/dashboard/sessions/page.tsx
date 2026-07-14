@@ -6,10 +6,7 @@ import {
   type SessionsPageSummary,
 } from "@/app/components/dashboard/SessionsSummaryMetrics";
 import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
-import {
-  SessionsAnalyticsPanels,
-  type SessionsAnalyticsData,
-} from "@/app/components/dashboard/SessionsAnalyticsPanels";
+import type { SessionsAnalyticsData } from "@/app/components/dashboard/SessionsAnalyticsPanels";
 import { type SessionsTableRow } from "@/app/components/dashboard/SessionsTable";
 import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
@@ -226,19 +223,12 @@ export default async function SessionsPage({
         {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
         {summary ? <SessionsUserCohortMetrics summary={summary} /> : null}
 
-        {analytics ? (
-          <SessionsAnalyticsPanels
-            analytics={analytics}
-            path={SESSIONS_PATH}
-            currentParams={currentParams}
-          />
-        ) : null}
-
         <SessionsClientListSection
           path={SESSIONS_PATH}
           urlParams={currentParams}
           initialListParams={initialListParams}
           initialData={initialListData}
+          analytics={analytics}
           timeRange={timeRange}
           fromParam={from}
           toParam={to}

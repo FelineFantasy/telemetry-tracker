@@ -112,8 +112,8 @@ export function ErrorsClientListSection({
   );
 
   const hrefForPage = useCallback(
-    (p: number) => mergeListQuery(path, { ...urlParams, ...listParams }, { page: String(p) }),
-    [path, urlParams, listParams]
+    (p: number) => mergeListQuery(path, liveUrlParams, { page: String(p) }),
+    [path, liveUrlParams]
   );
 
   const onPageChange = useCallback(
