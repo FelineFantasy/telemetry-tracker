@@ -98,7 +98,6 @@ function storeServedMeta(
     snapshot: BriefSnapshotRequest;
   }
 ): void {
-  deps.servedMeta ?? briefServedMetaStore;
   (deps.servedMeta ?? briefServedMetaStore).store(userId, {
     requestId: input.requestId,
     snapshotHash: input.snapshotHash,

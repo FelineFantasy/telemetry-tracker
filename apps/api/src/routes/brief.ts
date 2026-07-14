@@ -7,6 +7,7 @@ import {
   workspaceBriefRequestBodySchema,
 } from "../lib/brief-contracts.js";
 import { authorizeBriefAck } from "../lib/brief-authz.js";
+import { getMembershipRoleForOrganization } from "../lib/org-permissions.js";
 import {
   upsertBriefAcknowledgements,
   validateAckAgainstBriefMeta,
@@ -55,6 +56,11 @@ export async function briefRoutes(
     const organizationId = readOrganizationIdHeader(request);
     if (!organizationId) {
       return reply.status(400).send({ error: "X-Organization-Id header is required" });
+    }
+
+    const membership = await getMembershipRoleForOrganization(session.userId, organizationId);
+    if (!membership) {
+      return reply.status(403).send({ ok: false, error: "forbidden", message: "Forbidden" });
     }
 
     const parsed = parseAcknowledgeBriefRequest(request.body);

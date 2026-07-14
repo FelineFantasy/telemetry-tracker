@@ -130,7 +130,7 @@ export async function postWorkspaceBrief(
 
   const url = `${trimTrailingSlash(config.baseUrl)}${BRIEF_AI_WORKSPACE_PATH}`;
   let attempts = 0;
-  let lastMessage = "Unknown AI client failure";
+  let lastMessage: string;
 
   while (true) {
     attempts += 1;
