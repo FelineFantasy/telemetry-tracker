@@ -7,7 +7,7 @@ import { SessionStatusBadge } from "@/app/components/dashboard/analytics-ui";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
 import { formatDurationSec } from "@/lib/format-duration";
-import { countryFlagEmoji, formatSessionDevice } from "@/lib/session-display";
+import { countryFlagEmoji, formatSessionDevice, resolveSessionIdentityLabel } from "@/lib/session-display";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 type SessionDetail = {
@@ -73,7 +73,7 @@ export default async function SessionDetailPage({
     );
   }
 
-  const identity = session.user_id ?? session.anonymous_id ?? null;
+  const identity = resolveSessionIdentityLabel(session.user_id, session.anonymous_id);
   const device = formatSessionDevice(session.device_browser, session.device_os);
   const countryLabel = session.country
     ? `${countryFlagEmoji(session.country) ?? ""} ${session.country.toUpperCase()}`.trim()
