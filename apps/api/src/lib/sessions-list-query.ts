@@ -5,6 +5,8 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import {
   type SessionListFilterInput,
+  fetchIdentityFirstSeenAt,
+  resolveSessionIdentity,
   sessionFilterSql,
   sessionHasNoProjectErrorsSql,
 } from "./sessions-page-summary.js";
@@ -49,6 +51,7 @@ export type SessionListRow = {
   event_count: number;
   page_count: number;
   status: SessionListStatus;
+  identity_first_seen_at?: Date | null;
 };
 
 export function parseSessionListSortParam(
@@ -266,7 +269,16 @@ export async function fetchSessionEnrichedById(
     LIMIT 1
   `);
   const row = rows[0];
-  return row ? mapEnrichedRow(row) : null;
+  if (!row) return null;
+  const enriched = mapEnrichedRow(row);
+  if (!resolveSessionIdentity(enriched.user_id, enriched.anonymous_id)) return enriched;
+  const identityFirstSeenAt = await fetchIdentityFirstSeenAt(
+    prisma,
+    projectId,
+    enriched.user_id,
+    enriched.anonymous_id
+  );
+  return { ...enriched, identity_first_seen_at: identityFirstSeenAt };
 }
 
 export function serializeSessionListItem(
@@ -292,5 +304,6 @@ export function serializeSessionListItem(
     page_count: row.page_count,
     status: row.status,
     max_duration_sec: maxDurationSec ?? null,
+    identity_first_seen_at: row.identity_first_seen_at?.toISOString() ?? null,
   };
 }

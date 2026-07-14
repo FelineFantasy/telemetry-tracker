@@ -28,6 +28,7 @@ type SessionDetail = {
   event_count: number;
   page_count: number;
   status: "healthy" | "warning";
+  identity_first_seen_at?: string | null;
 };
 
 async function getSession(id: string): Promise<SessionDetail | null> {
@@ -90,6 +91,12 @@ export default async function SessionDetailPage({
         <DetailMetaItem label="Platform" value={session.platform} />
         <DetailMetaItem label="Email" value={session.user_email} />
         <DetailMetaItem label="Identity" value={identity} />
+        {identity && session.identity_first_seen_at ? (
+          <DetailMetaItem
+            label="First seen"
+            value={<TimeAgo iso={session.identity_first_seen_at} />}
+          />
+        ) : null}
         <DetailMetaItem label="Country" value={countryLabel} />
         <DetailMetaItem label="Device" value={device} />
         <DetailMetaItem label="SDK version" value={session.sdk_version} />

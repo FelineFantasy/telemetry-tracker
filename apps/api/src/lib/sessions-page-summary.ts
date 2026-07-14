@@ -176,6 +176,69 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
   )`;
 }
 
+/** Resolved session identity — user_id takes precedence over anonymous_id. */
+export type SessionIdentity = {
+  kind: "user_id" | "anonymous_id";
+  value: string;
+};
+
+/** Resolve display identity from session fields; null when neither is set. */
+export function resolveSessionIdentity(
+  userId: string | null | undefined,
+  anonymousId: string | null | undefined
+): SessionIdentity | null {
+  const uid = userId?.trim();
+  if (uid) return { kind: "user_id", value: uid };
+  const aid = anonymousId?.trim();
+  if (aid) return { kind: "anonymous_id", value: aid };
+  return null;
+}
+
+/** WHERE clause matching all sessions for one identity within a project. @internal */
+export function identityFirstSeenWhereSql(
+  projectId: string,
+  identity: SessionIdentity,
+  sessionAlias = "s",
+  linkedAnonymousId?: string | null
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  if (identity.kind === "user_id") {
+    const userMatch = Prisma.sql`NULLIF(TRIM(${s}."user_id"), '') = ${identity.value}`;
+    const linkedAnonymous = linkedAnonymousId?.trim();
+    if (linkedAnonymous) {
+      return Prisma.sql`${s}."project_id" = ${projectId}
+        AND (${userMatch}
+          OR NULLIF(TRIM(${s}."anonymous_id"), '') = ${linkedAnonymous})`;
+    }
+    return Prisma.sql`${s}."project_id" = ${projectId} AND ${userMatch}`;
+  }
+  return Prisma.sql`${s}."project_id" = ${projectId}
+    AND NULLIF(TRIM(${s}."anonymous_id"), '') = ${identity.value}`;
+}
+
+/** Earliest session start for an identity in a project (indexed on project_id, started_at). */
+export async function fetchIdentityFirstSeenAt(
+  prisma: PrismaClient,
+  projectId: string,
+  userId: string | null | undefined,
+  anonymousId: string | null | undefined
+): Promise<Date | null> {
+  const identity = resolveSessionIdentity(userId, anonymousId);
+  if (!identity) return null;
+  const where = identityFirstSeenWhereSql(
+    projectId,
+    identity,
+    "s",
+    identity.kind === "user_id" ? anonymousId : undefined
+  );
+  const rows = await prisma.$queryRaw<[{ first_seen_at: Date | null }]>(Prisma.sql`
+    SELECT MIN(s."started_at") AS first_seen_at
+    FROM "Session" s
+    WHERE ${where}
+  `);
+  return rows[0]?.first_seen_at ?? null;
+}
+
 function sessionSummaryEventLateralSql(sessionAlias = "s"): Prisma.Sql {
   const s = Prisma.raw(`"${sessionAlias}"`);
   return Prisma.sql`LEFT JOIN LATERAL (
