@@ -17,16 +17,41 @@ type UseAnalyticsListOptions<T> = {
   urlParams: AnalyticsListQueryParams;
 };
 
-function listParamsFromSearch(
+/** List params mirrored in the dashboard URL (omitted values use API defaults). */
+const URL_LIST_KEYS = new Set(["page", "pageSize", "sort", "order"]);
+
+function listParamsFromPopState(
+  prev: AnalyticsListQueryParams,
+  initialListParams: AnalyticsListQueryParams,
+  urlParams: AnalyticsListQueryParams,
   keys: string[],
   search: string
 ): AnalyticsListQueryParams {
   const sp = new URLSearchParams(search);
   const next: AnalyticsListQueryParams = {};
+
   for (const key of keys) {
-    const value = sp.get(key);
-    if (value !== null && value !== "") next[key] = value;
+    if (sp.has(key)) {
+      const value = sp.get(key);
+      if (value !== null && value !== "") next[key] = value;
+      continue;
+    }
+
+    if (URL_LIST_KEYS.has(key)) {
+      continue;
+    }
+
+    const urlBacked = Object.prototype.hasOwnProperty.call(urlParams, key);
+    if (urlBacked) {
+      continue;
+    }
+
+    const preserved = prev[key] ?? initialListParams[key];
+    if (preserved !== undefined && preserved !== "") {
+      next[key] = preserved;
+    }
   }
+
   return next;
 }
 
@@ -54,13 +79,19 @@ export function useAnalyticsList<T>({
 
   useEffect(() => {
     const onPopState = () => {
-      setListParamsState(
-        listParamsFromSearch(listParamKeys, window.location.search)
+      setListParamsState((prev) =>
+        listParamsFromPopState(
+          prev,
+          initialListParams,
+          urlParams,
+          listParamKeys,
+          window.location.search
+        )
       );
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [listParamKeys]);
+  }, [initialListParams, listParamKeys, urlParams]);
 
   const { data, error, isValidating } = useSWR<T>(
     [cacheKey, queryString],
