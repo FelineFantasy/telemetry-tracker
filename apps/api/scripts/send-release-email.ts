@@ -92,7 +92,7 @@ async function main() {
     process.exit(1);
   }
 
-  if (PREVIOUS_VERSION_ARG !== undefined && !FORCE) {
+  if (PREVIOUS_VERSION_ARG !== undefined && !FORCE && !TEST_TO_ARG) {
     const bump = isMinorOrMajorBump(version, PREVIOUS_VERSION_ARG || null);
     if (!bump.send) {
       console.log(`Skipping release email: ${bump.reason}`);
