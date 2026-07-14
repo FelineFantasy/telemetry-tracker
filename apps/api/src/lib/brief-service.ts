@@ -364,7 +364,7 @@ export async function getWorkspaceBrief(
       meta: { ...buildMeta, source: "ai", aiLatencyMs: aiResult.latencyMs },
     };
   } catch {
-    if (probing) probeResult = false;
+    if (probing && probeResult === null) probeResult = false;
     return {
       status: "error",
       httpStatus: 500,

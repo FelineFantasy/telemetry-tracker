@@ -711,6 +711,39 @@ describe("getWorkspaceBrief", () => {
     vi.useRealTimers();
   });
 
+  it("closes circuit after successful half-open probe when post-AI work throws", async () => {
+    vi.useFakeTimers();
+    resetBriefCircuitBreakers();
+
+    const breaker = getBriefCircuitBreaker("http://127.0.0.1:3100");
+    breaker.recordFailure({ immediateOpen: true });
+    vi.advanceTimersByTime(31_000);
+    expect(breaker.getState()).toBe("half_open");
+
+    vi.spyOn(client, "postWorkspaceBrief").mockImplementation(async (snap) => ({
+      ok: true,
+      response: {
+        ...validAiResponse,
+        requestId: snap.requestId,
+      },
+      attempts: 1,
+      latencyMs: 5,
+    }));
+    vi.spyOn(servedMeta, "store").mockImplementation(() => {
+      throw new Error("served meta store failed");
+    });
+
+    const result = await getWorkspaceBrief(serviceDeps(cache, servedMeta), {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+    });
+
+    expect(result.status).toBe("error");
+    expect(breaker.getState()).toBe("closed");
+
+    vi.useRealTimers();
+  });
+
   it("returns ai_misconfigured fallback for a missing secret without served-meta", async () => {
     const result = await getWorkspaceBrief(
       serviceDeps(cache, servedMeta, {
