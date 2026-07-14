@@ -238,8 +238,8 @@ export function isUnselectedTimeRange(key: string): boolean {
 export function buildUnselectedTimeRange(now: Date = new Date()): ParsedTimeRange {
   return {
     key: "none",
-    label: "Recent data",
-    shortLabel: "Recent",
+    label: "Recent (charts: last 30 days)",
+    shortLabel: "Recent · 30d charts",
     gte: new Date(0),
     lte: now,
     durationMs: now.getTime(),
@@ -320,7 +320,9 @@ export function listTimeRangeHiddenFields(
   fromParam?: string,
   toParam?: string
 ): Record<string, string> {
-  if (isUnselectedTimeRange(range.key)) return {};
+  if (isUnselectedTimeRange(range.key)) {
+    return { range: range.key };
+  }
   if (range.key === "absolute") {
     const from = fromParam?.trim() || range.gte.toISOString().slice(0, 10);
     const to = toParam?.trim() || range.lte.toISOString().slice(0, 10);

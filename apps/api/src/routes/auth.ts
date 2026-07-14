@@ -281,7 +281,7 @@ export async function authRoutes(
 
     const { sessionId, expiresAt } = await createUserSession(user.id, request);
 
-    void recordUserAuditEvents(prisma, user.id, AUDIT_ACTIONS.AUTH_LOGIN, user.email);
+    await recordUserAuditEvents(prisma, user.id, AUDIT_ACTIONS.AUTH_LOGIN, user.email);
 
     const firstMembership = await prisma.organizationMembership.findFirst({
       where: { user_id: user.id },
