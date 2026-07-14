@@ -6,6 +6,7 @@ import { IssuesTable } from "@/app/components/dashboard/IssueList";
 import { AnalyticsListTableFrame } from "@/app/components/dashboard/AnalyticsListTableFrame";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
@@ -88,7 +89,7 @@ export function ErrorsClientListSection({
   environments,
   releases,
 }: Props) {
-  const { data, isValidating, listParams, patchListQuery } =
+  const { data, error, isValidating, listParams, patchListQuery } =
     useAnalyticsList<ErrorsListResponse>({
       cacheKey: "errors-list",
       apiPath: "/api/errors",
@@ -152,8 +153,10 @@ export function ErrorsClientListSection({
 
       <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
 
-      <AnalyticsListTableFrame isLoading={isValidating}>
-        {items.length ? (
+      <AnalyticsListTableFrame isLoading={isValidating && !error}>
+        {error && !isValidating ? (
+          <ErrorState message={error instanceof Error ? error.message : String(error)} />
+        ) : items.length ? (
           <IssuesTable
             rows={items}
             hrefForRow={(g) =>

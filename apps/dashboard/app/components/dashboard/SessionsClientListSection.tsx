@@ -9,6 +9,7 @@ import {
 import { AnalyticsListTableFrame } from "@/app/components/dashboard/AnalyticsListTableFrame";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
@@ -74,7 +75,7 @@ export function SessionsClientListSection({
   platforms,
   rangeLabel,
 }: Props) {
-  const { data, isValidating, listParams, patchListQuery } =
+  const { data, error, isValidating, listParams, patchListQuery } =
     useAnalyticsList<SessionsListResponse>({
       cacheKey: "sessions-list",
       apiPath: "/api/sessions",
@@ -155,8 +156,10 @@ export function SessionsClientListSection({
         subtitle={listSubtitle}
       />
 
-      <AnalyticsListTableFrame isLoading={isValidating}>
-        {items.length ? (
+      <AnalyticsListTableFrame isLoading={isValidating && !error}>
+        {error && !isValidating ? (
+          <ErrorState message={error instanceof Error ? error.message : String(error)} />
+        ) : items.length ? (
           <SessionsTable
             rows={items}
             hrefForSession={sessionHref}

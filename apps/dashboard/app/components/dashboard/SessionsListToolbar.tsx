@@ -145,6 +145,12 @@ export function SessionsListToolbar({
         {currentParams.chartBucket ? (
           <input type="hidden" name="chartBucket" value={currentParams.chartBucket} />
         ) : null}
+        {onSortApply ? (
+          <>
+            <input type="hidden" name="sort" value={sort || "duration"} />
+            <input type="hidden" name="order" value={order || "desc"} />
+          </>
+        ) : null}
 
         <FilterRow>
           <FilterField grow>

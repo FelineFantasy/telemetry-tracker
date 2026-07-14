@@ -6,6 +6,7 @@ import { EventsTable, type EventsTableRow } from "@/app/components/dashboard/Eve
 import { AnalyticsListTableFrame } from "@/app/components/dashboard/AnalyticsListTableFrame";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
+import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
@@ -66,7 +67,7 @@ export function EventsClientListSection({
   platforms,
   releases,
 }: Props) {
-  const { data, isValidating, listParams, patchListQuery } =
+  const { data, error, isValidating, listParams, patchListQuery } =
     useAnalyticsList<EventsListResponse>({
       cacheKey: "events-list",
       apiPath: "/api/events",
@@ -136,8 +137,10 @@ export function EventsClientListSection({
         noun={total === 1 ? "event name" : "event names"}
       />
 
-      <AnalyticsListTableFrame isLoading={isValidating}>
-        {items.length ? (
+      <AnalyticsListTableFrame isLoading={isValidating && !error}>
+        {error && !isValidating ? (
+          <ErrorState message={error instanceof Error ? error.message : String(error)} />
+        ) : items.length ? (
           <EventsTable
             rows={items}
             hrefForName={(row) =>

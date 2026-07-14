@@ -160,6 +160,12 @@ export function ErrorsListToolbar({
         {Number(pageSize) !== defaultPageSize ? (
           <input type="hidden" name="pageSize" value={pageSize} />
         ) : null}
+        {onSortApply ? (
+          <>
+            <input type="hidden" name="sort" value={sort || "last_seen"} />
+            <input type="hidden" name="order" value={order || "desc"} />
+          </>
+        ) : null}
 
         <FilterRow>
           <FilterField grow>
