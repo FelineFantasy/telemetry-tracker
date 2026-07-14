@@ -153,8 +153,8 @@ export function ErrorsClientListSection({
 
       <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
 
-      <AnalyticsListTableFrame isLoading={isValidating && !error}>
-        {error && !isValidating ? (
+      <AnalyticsListTableFrame isLoading={isValidating}>
+        {error ? (
           <ErrorState message={error instanceof Error ? error.message : String(error)} />
         ) : items.length ? (
           <IssuesTable

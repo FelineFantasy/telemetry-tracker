@@ -137,8 +137,8 @@ export function EventsClientListSection({
         noun={total === 1 ? "event name" : "event names"}
       />
 
-      <AnalyticsListTableFrame isLoading={isValidating && !error}>
-        {error && !isValidating ? (
+      <AnalyticsListTableFrame isLoading={isValidating}>
+        {error ? (
           <ErrorState message={error instanceof Error ? error.message : String(error)} />
         ) : items.length ? (
           <EventsTable

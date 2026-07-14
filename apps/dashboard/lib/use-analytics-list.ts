@@ -65,7 +65,11 @@ export function useAnalyticsList<T>({
   const { data, error, isValidating } = useSWR<T>(
     [cacheKey, queryString],
     async () => {
-      const res = await dashboardApiClientFetch(`${apiPath}?${queryString}`);
+      const search = new URLSearchParams(queryString);
+      if (search.has("metricsUntil")) {
+        search.set("metricsUntil", new Date().toISOString());
+      }
+      const res = await dashboardApiClientFetch(`${apiPath}?${search.toString()}`);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`API error ${res.status}: ${text.slice(0, 200)}`);
