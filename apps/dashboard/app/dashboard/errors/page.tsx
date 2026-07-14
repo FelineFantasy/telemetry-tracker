@@ -279,7 +279,6 @@ export default async function ErrorsListPage({
 
         <ErrorsClientListSection
           path={ERRORS_PATH}
-          currentParams={currentParams}
           urlParams={currentParams}
           initialListParams={initialListParams}
           initialData={initialListData}

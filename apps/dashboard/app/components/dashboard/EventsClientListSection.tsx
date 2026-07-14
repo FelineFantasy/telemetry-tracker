@@ -22,7 +22,6 @@ type EventsListResponse = {
 
 type Props = {
   path: string;
-  currentParams: Record<string, string>;
   urlParams: Record<string, string>;
   initialListParams: Record<string, string>;
   initialData: EventsListResponse;
@@ -46,7 +45,6 @@ type Props = {
 
 export function EventsClientListSection({
   path,
-  currentParams,
   urlParams,
   initialListParams,
   initialData,
@@ -67,7 +65,7 @@ export function EventsClientListSection({
   platforms,
   releases,
 }: Props) {
-  const { data, error, isValidating, listParams, patchListQuery } =
+  const { data, error, isValidating, listParams, liveUrlParams, patchListQuery } =
     useAnalyticsList<EventsListResponse>({
       cacheKey: "events-list",
       apiPath: "/api/events",
@@ -107,7 +105,7 @@ export function EventsClientListSection({
     <>
       <EventsListToolbar
         path={path}
-        currentParams={currentParams}
+        currentParams={liveUrlParams}
         timeRange={timeRange}
         fromParam={fromParam}
         toParam={toParam}

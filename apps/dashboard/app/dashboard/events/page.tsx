@@ -224,7 +224,6 @@ export default async function EventsPage({
 
         <EventsClientListSection
           path={EVENTS_PATH}
-          currentParams={currentParams}
           urlParams={currentParams}
           initialListParams={initialListParams}
           initialData={initialListData}

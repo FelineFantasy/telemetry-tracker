@@ -42,7 +42,6 @@ type ErrorsListResponse = {
 
 type Props = {
   path: string;
-  currentParams: Record<string, string>;
   urlParams: Record<string, string>;
   initialListParams: Record<string, string>;
   initialData: ErrorsListResponse;
@@ -67,7 +66,6 @@ type Props = {
 
 export function ErrorsClientListSection({
   path,
-  currentParams,
   urlParams,
   initialListParams,
   initialData,
@@ -89,7 +87,7 @@ export function ErrorsClientListSection({
   environments,
   releases,
 }: Props) {
-  const { data, error, isValidating, listParams, patchListQuery } =
+  const { data, error, isValidating, listParams, liveUrlParams, patchListQuery } =
     useAnalyticsList<ErrorsListResponse>({
       cacheKey: "errors-list",
       apiPath: "/api/errors",
@@ -129,7 +127,7 @@ export function ErrorsClientListSection({
     <>
       <ErrorsListToolbar
         path={path}
-        currentParams={currentParams}
+        currentParams={liveUrlParams}
         timeRange={timeRange}
         fromParam={fromParam}
         toParam={toParam}

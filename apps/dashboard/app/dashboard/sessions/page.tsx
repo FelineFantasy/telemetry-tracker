@@ -236,7 +236,6 @@ export default async function SessionsPage({
 
         <SessionsClientListSection
           path={SESSIONS_PATH}
-          currentParams={currentParams}
           urlParams={currentParams}
           initialListParams={initialListParams}
           initialData={initialListData}

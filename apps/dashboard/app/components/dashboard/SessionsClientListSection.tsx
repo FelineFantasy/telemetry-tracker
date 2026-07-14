@@ -26,7 +26,6 @@ type SessionsListResponse = {
 
 type Props = {
   path: string;
-  currentParams: Record<string, string>;
   urlParams: Record<string, string>;
   initialListParams: Record<string, string>;
   initialData: SessionsListResponse;
@@ -52,7 +51,6 @@ type Props = {
 
 export function SessionsClientListSection({
   path,
-  currentParams,
   urlParams,
   initialListParams,
   initialData,
@@ -75,7 +73,7 @@ export function SessionsClientListSection({
   platforms,
   rangeLabel,
 }: Props) {
-  const { data, error, isValidating, listParams, patchListQuery } =
+  const { data, error, isValidating, listParams, liveUrlParams, patchListQuery } =
     useAnalyticsList<SessionsListResponse>({
       cacheKey: "sessions-list",
       apiPath: "/api/sessions",
@@ -128,7 +126,7 @@ export function SessionsClientListSection({
     <>
       <SessionsListToolbar
         path={path}
-        currentParams={currentParams}
+        currentParams={liveUrlParams}
         timeRange={timeRange}
         fromParam={fromParam}
         toParam={toParam}

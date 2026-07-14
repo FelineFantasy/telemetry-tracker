@@ -130,10 +130,15 @@ export function useAnalyticsList<T>({
     }
   );
 
+  const liveUrlParams = useMemo(
+    () => ({ ...urlParams, ...listParams }),
+    [urlParams, listParams]
+  );
+
   const patchListQuery = useCallback(
     (updates: Record<string, string | null | undefined>) => {
-      setListParamsState(() => {
-        const next: AnalyticsListQueryParams = { ...initialListParams };
+      setListParamsState((prev) => {
+        const next: AnalyticsListQueryParams = { ...prev };
         for (const [key, value] of Object.entries(updates)) {
           if (value === null || value === undefined || value === "") {
             delete next[key];
@@ -146,7 +151,7 @@ export function useAnalyticsList<T>({
         return next;
       });
     },
-    [path, urlParams, initialListParams]
+    [path, urlParams]
   );
 
   return {
@@ -154,6 +159,7 @@ export function useAnalyticsList<T>({
     error,
     isValidating,
     listParams,
+    liveUrlParams,
     patchListQuery,
   };
 }
