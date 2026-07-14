@@ -50,6 +50,14 @@ export function countUserCohorts(
   return { newUsers, returningUsers };
 }
 
+/** Active users in a window should equal new plus returning cohort counts. */
+export function assertCohortTotalsMatchDistinctUsers(
+  distinctUsers: number,
+  cohorts: UserCohortCounts
+): boolean {
+  return distinctUsers === cohorts.newUsers + cohorts.returningUsers;
+}
+
 export function cohortSharePct(part: number, total: number): number {
   if (total <= 0) return 0;
   return (part / total) * 100;

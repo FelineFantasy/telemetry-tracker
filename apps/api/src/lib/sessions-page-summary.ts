@@ -179,11 +179,34 @@ export function sessionHasNoProjectErrorsSql(
   )`;
 }
 
-function sessionIdentityExpr(alias = "s"): Prisma.Sql {
-  const a = Prisma.raw(`"${alias}"`);
+function userDeviceLinksCteSql(
+  projectId: string,
+  f: SessionListFilterInput
+): Prisma.Sql {
+  const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
+  return Prisma.sql`
+    user_device_links AS (
+      SELECT DISTINCT
+        NULLIF(TRIM(s."user_id"), '') AS user_id,
+        NULLIF(TRIM(s."anonymous_id"), '') AS anonymous_id
+      FROM "Session" s
+      WHERE ${filters}
+        AND NULLIF(TRIM(s."user_id"), '') IS NOT NULL
+    )`;
+}
+
+/** Merges linked anonymous activity onto user_id — shared by Users KPI and cohorts. */
+function cohortIdentityExpr(sessionAlias = "s"): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
   return Prisma.sql`COALESCE(
-    NULLIF(TRIM(COALESCE(${a}."user_id", '')), ''),
-    NULLIF(TRIM(COALESCE(${a}."anonymous_id", '')), '')
+    NULLIF(TRIM(COALESCE(${s}."user_id", '')), ''),
+    (
+      SELECT udl.user_id
+      FROM user_device_links udl
+      WHERE udl.anonymous_id = NULLIF(TRIM(${s}."anonymous_id"), '')
+      LIMIT 1
+    ),
+    NULLIF(TRIM(COALESCE(${s}."anonymous_id", '')), '')
   )`;
 }
 
@@ -443,7 +466,7 @@ async function fetchSessionSummaryScalars(
 ): Promise<SummaryRow> {
   const { since, until, previousSince, previousUntil } = window;
   const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
-  const identity = sessionIdentityExpr("s");
+  const userIdentity = cohortIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
   const currentWindow = sessionWindowWithEventScope(
     projectId,
@@ -467,6 +490,7 @@ async function fetchSessionSummaryScalars(
   );
 
   const rows = await prisma.$queryRaw<[SummaryRow]>(Prisma.sql`
+    WITH ${userDeviceLinksCteSql(projectId, f)}
     SELECT
       COUNT(*) FILTER (
         WHERE ${currentWindow}
@@ -474,10 +498,10 @@ async function fetchSessionSummaryScalars(
       COUNT(*) FILTER (
         WHERE ${previousWindow}
       )::bigint AS total_sessions_previous,
-      COUNT(DISTINCT ${identity}) FILTER (
+      COUNT(DISTINCT ${userIdentity}) FILTER (
         WHERE ${currentWindow}
       )::bigint AS distinct_users,
-      COUNT(DISTINCT ${identity}) FILTER (
+      COUNT(DISTINCT ${userIdentity}) FILTER (
         WHERE ${previousWindow}
       )::bigint AS distinct_users_previous,
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) FILTER (
@@ -491,20 +515,20 @@ async function fetchSessionSummaryScalars(
       (
         SUM(${durationSec}) FILTER (
           WHERE ${currentWindow}
-            AND ${identity} IS NOT NULL
+            AND ${userIdentity} IS NOT NULL
         )
         / NULLIF(
-          COUNT(DISTINCT ${identity}) FILTER (WHERE ${currentWindow}),
+          COUNT(DISTINCT ${userIdentity}) FILTER (WHERE ${currentWindow}),
           0
         )
       ) AS avg_duration_per_user_sec,
       (
         SUM(${durationSec}) FILTER (
           WHERE ${previousWindow}
-            AND ${identity} IS NOT NULL
+            AND ${userIdentity} IS NOT NULL
         )
         / NULLIF(
-          COUNT(DISTINCT ${identity}) FILTER (WHERE ${previousWindow}),
+          COUNT(DISTINCT ${userIdentity}) FILTER (WHERE ${previousWindow}),
           0
         )
       ) AS avg_duration_per_user_sec_previous,
@@ -590,14 +614,7 @@ async function fetchUserCohortCounts(
   );
 
   const rows = await prisma.$queryRaw<[UserCohortRow]>(Prisma.sql`
-    WITH user_device_links AS (
-      SELECT DISTINCT
-        NULLIF(TRIM(s."user_id"), '') AS user_id,
-        NULLIF(TRIM(s."anonymous_id"), '') AS anonymous_id
-      FROM "Session" s
-      WHERE ${filters}
-        AND NULLIF(TRIM(s."user_id"), '') IS NOT NULL
-    ),
+    WITH ${userDeviceLinksCteSql(projectId, f)},
     identified_first_seen AS (
       SELECT
         udl.user_id AS identity,
@@ -646,16 +663,7 @@ async function fetchUserCohortCounts(
     ),
     window_flags AS (
       SELECT
-        COALESCE(
-          NULLIF(TRIM(COALESCE(s."user_id", '')), ''),
-          (
-            SELECT udl.user_id
-            FROM user_device_links udl
-            WHERE udl.anonymous_id = NULLIF(TRIM(s."anonymous_id"), '')
-            LIMIT 1
-          ),
-          NULLIF(TRIM(COALESCE(s."anonymous_id", '')), '')
-        ) AS identity,
+        ${cohortIdentityExpr("s")} AS identity,
         bool_or((${currentWindow})) AS active_current,
         bool_or((${previousWindow})) AS active_previous
       FROM "Session" s
@@ -720,15 +728,16 @@ async function fetchSessionSummarySparklines(
   const trunc = bucket === "week" ? "week" : bucket;
   const chartSince = overviewChartQuerySince(since, until, bucket);
   const filters = sessionFilterSql(projectId, f, { gte: chartSince, lte: until });
-  const identity = sessionIdentityExpr("s");
+  const userIdentity = cohortIdentityExpr("s");
   const bounceSec = BOUNCE_MAX_DURATION_SECONDS;
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
 
   const rows = await prisma.$queryRaw<SparklineBucketRow[]>(Prisma.sql`
+    WITH ${userDeviceLinksCteSql(projectId, f)}
     SELECT
       (date_trunc(${trunc}, s."started_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS total_sessions,
-      COUNT(DISTINCT ${identity})::bigint AS distinct_users,
+      COUNT(DISTINCT ${userIdentity})::bigint AS distinct_users,
       AVG(EXTRACT(EPOCH FROM (s."ended_at" - s."started_at"))) FILTER (
         WHERE s."ended_at" IS NOT NULL
       ) AS avg_duration_sec,

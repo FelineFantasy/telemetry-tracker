@@ -5,6 +5,7 @@ import {
   cohortSharePct,
   countUserCohorts,
   mergeIdentityFirstSeen,
+  assertCohortTotalsMatchDistinctUsers,
 } from "./user-cohort.js";
 
 const WINDOW_SINCE = new Date("2026-06-01T00:00:00.000Z");
@@ -98,5 +99,13 @@ describe("mergeIdentityFirstSeen", () => {
       { identity: "user-1", firstSeenAt: new Date("2026-06-01T00:00:00.000Z") },
     ]);
     expect(merged.get("user-1")?.toISOString()).toBe("2026-05-01T00:00:00.000Z");
+  });
+});
+
+describe("assertCohortTotalsMatchDistinctUsers", () => {
+  it("passes when new plus returning equals distinct users", () => {
+    expect(
+      assertCohortTotalsMatchDistinctUsers(5, { newUsers: 2, returningUsers: 3 })
+    ).toBe(true);
   });
 });
