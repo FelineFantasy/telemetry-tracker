@@ -4,7 +4,9 @@ import {
   BOUNCE_MAX_DURATION_SECONDS,
   buildSessionListFilter,
   computeAvgDurationPerUserSec,
+  identityFirstSeenWhereSql,
   parseSessionsMetricsAnchor,
+  resolveSessionIdentity,
   resolveSessionListStartedAtBounds,
   resolveSessionsSummaryWindow,
   sessionFilterSql,
@@ -226,5 +228,67 @@ describe("sessionWindowWithEventScope", () => {
     expect(text).toContain('"started_at" <');
     expect(text).toContain('e."created_at" <');
     expect(text).not.toContain('e."created_at" <=');
+  });
+});
+
+describe("resolveSessionIdentity", () => {
+  it("prefers user_id over anonymous_id", () => {
+    expect(resolveSessionIdentity(" user-1 ", "anon-1")).toEqual({
+      kind: "user_id",
+      value: "user-1",
+    });
+  });
+
+  it("falls back to anonymous_id when user_id is blank", () => {
+    expect(resolveSessionIdentity("  ", "anon-1")).toEqual({
+      kind: "anonymous_id",
+      value: "anon-1",
+    });
+    expect(resolveSessionIdentity(null, "anon-1")).toEqual({
+      kind: "anonymous_id",
+      value: "anon-1",
+    });
+  });
+
+  it("returns null when neither identity is set", () => {
+    expect(resolveSessionIdentity(null, null)).toBeNull();
+    expect(resolveSessionIdentity("  ", undefined)).toBeNull();
+  });
+});
+
+describe("identityFirstSeenWhereSql", () => {
+  it("matches user_id within project", () => {
+    const text = prismaSqlText(
+      identityFirstSeenWhereSql("proj-1", { kind: "user_id", value: "user-1" })
+    );
+    expect(text).toContain('"project_id"');
+    expect(text).toContain('"user_id"');
+    expect(text).not.toContain('"anonymous_id"');
+  });
+
+  it("includes linked anonymous_id for user_id identity", () => {
+    const text = prismaSqlText(
+      identityFirstSeenWhereSql(
+        "proj-1",
+        { kind: "user_id", value: "user-1" },
+        "s",
+        "anon-1"
+      )
+    );
+    expect(text).toContain('"user_id"');
+    expect(text).toContain('"anonymous_id"');
+    expect(text).toContain("IS NULL");
+  });
+
+  it("matches anonymous_id within project", () => {
+    const text = prismaSqlText(
+      identityFirstSeenWhereSql("proj-1", {
+        kind: "anonymous_id",
+        value: "anon-1",
+      })
+    );
+    expect(text).toContain('"project_id"');
+    expect(text).toContain('"anonymous_id"');
+    expect(text).not.toContain('"user_id"');
   });
 });
