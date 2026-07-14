@@ -372,5 +372,55 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
         },
       });
     });
+
+    it("returns 403 when the organization is soft-deleted", async () => {
+      const brief = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/workspace",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {},
+      });
+      const briefBody = JSON.parse(brief.body) as {
+        status: string;
+        requestId: string;
+        snapshotHash: string;
+        brief: { projects: Array<{ projectId: string; generatedThrough: string }> };
+      };
+      expect(briefBody.status).toBe("ok");
+
+      await prisma.organization.update({
+        where: { id: organizationId },
+        data: { deleted_at: new Date() },
+      });
+
+      const ack = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/ack",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {
+          requestId: briefBody.requestId,
+          snapshotHash: briefBody.snapshotHash,
+          projects: briefBody.brief.projects.map((p) => ({
+            projectId: p.projectId,
+            acknowledgedThrough: p.generatedThrough,
+          })),
+        },
+      });
+
+      expect(ack.statusCode).toBe(403);
+
+      await prisma.organization.update({
+        where: { id: organizationId },
+        data: { deleted_at: null },
+      });
+    });
   }
 );

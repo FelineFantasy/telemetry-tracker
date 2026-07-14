@@ -263,6 +263,60 @@ describe("getWorkspaceBrief", () => {
     expect(postSpy).toHaveBeenCalledTimes(2);
   });
 
+  it("evicts cache entries that fail rebind and retries AI", async () => {
+    const postSpy = vi.spyOn(client, "postWorkspaceBrief").mockImplementation(async (snap) => ({
+      ok: true,
+      response: {
+        ...validAiResponse,
+        requestId: snap.requestId,
+      },
+      attempts: 1,
+      latencyMs: 10,
+    }));
+
+    await getWorkspaceBrief(serviceDeps(cache, servedMeta), {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+    });
+    expect(postSpy).toHaveBeenCalledTimes(1);
+
+    const presentationHash = computePresentationHash({
+      organizationId: ORG_ID,
+      organizationName: "Acme Corp",
+      projects: [{ projectId: PROJECT_ID, projectName: "Alpha", projectSlug: "alpha" }],
+    });
+    cache.put(
+      {
+        organizationId: ORG_ID,
+        contentHash: "c".repeat(64),
+        presentationHash,
+        responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
+      },
+      {
+        contentHash: "c".repeat(64),
+        presentationHash,
+        responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
+        workspace: { title: "Workspace brief" },
+        projects: [
+          {
+            projectId: "00000000-0000-4000-8000-000000000099",
+            significance: "low",
+            collapsedLabel: "orphan project",
+          },
+        ],
+      },
+      fixedNow.getTime()
+    );
+
+    const second = await getWorkspaceBrief(serviceDeps(cache, servedMeta), {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+    });
+
+    expect(second.status).toBe("ok");
+    expect(postSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("does not store served metadata for fallback responses", async () => {
     vi.spyOn(client, "postWorkspaceBrief").mockResolvedValue({
       ok: false,

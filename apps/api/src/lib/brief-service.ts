@@ -218,25 +218,29 @@ export async function getWorkspaceBrief(
   const cacheKey = cacheKeyFor(authz.organizationId, contentHash, presentationHash);
   const cached = cache.get(cacheKey, now.getTime());
   if (cached) {
-    const rebound = rebindCachedBriefResponse(snapshot, cached, requestId, now);
-    const validated = validatePrivateBriefResponse(snapshot, rebound);
-    if (validated.ok) {
-      storeServedMeta(deps, input.userId, {
-        requestId,
-        snapshotHash,
-        organizationId: authz.organizationId,
-        source: "cache",
-        snapshot,
-      });
-      return {
-        status: "ok",
-        httpStatus: 200,
-        requestId,
-        snapshotHash,
-        contentHash,
-        brief: validated.data,
-        meta: { ...buildMeta, source: "cache" },
-      };
+    try {
+      const rebound = rebindCachedBriefResponse(snapshot, cached, requestId, now);
+      const validated = validatePrivateBriefResponse(snapshot, rebound);
+      if (validated.ok) {
+        storeServedMeta(deps, input.userId, {
+          requestId,
+          snapshotHash,
+          organizationId: authz.organizationId,
+          source: "cache",
+          snapshot,
+        });
+        return {
+          status: "ok",
+          httpStatus: 200,
+          requestId,
+          snapshotHash,
+          contentHash,
+          brief: validated.data,
+          meta: { ...buildMeta, source: "cache" },
+        };
+      }
+    } catch {
+      // Rebind failed — evict and fall through to AI/fallback.
     }
     cache.evict(cacheKey);
   }

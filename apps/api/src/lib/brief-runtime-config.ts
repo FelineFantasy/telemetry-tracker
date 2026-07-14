@@ -1,6 +1,9 @@
 import {
   BRIEF_CACHE_MAX_ENTRIES,
   BRIEF_CACHE_TTL_MS,
+  BRIEF_CIRCUIT_COOLDOWN_MS,
+  BRIEF_CIRCUIT_FAILURE_THRESHOLD,
+  BRIEF_CIRCUIT_WINDOW_MS,
   BRIEF_REQUEST_UNTIL_BUCKET_MS,
   BRIEF_SERVED_META_MAX_PER_USER_ORG,
   BRIEF_SERVED_META_TTL_MS,
@@ -38,6 +41,30 @@ export function resolveBriefServedMetaOptions(env: NodeJS.ProcessEnv = process.e
       env,
       "TELEMETRY_BRIEF_SERVED_META_MAX_PER_USER_ORG",
       BRIEF_SERVED_META_MAX_PER_USER_ORG
+    ),
+  };
+}
+
+export function resolveBriefCircuitOptions(env: NodeJS.ProcessEnv = process.env): {
+  failureThreshold: number;
+  windowMs: number;
+  cooldownMs: number;
+} {
+  return {
+    failureThreshold: parsePositiveIntEnv(
+      env,
+      "TELEMETRY_AI_BRIEF_CIRCUIT_FAILURE_THRESHOLD",
+      BRIEF_CIRCUIT_FAILURE_THRESHOLD
+    ),
+    windowMs: parsePositiveIntEnv(
+      env,
+      "TELEMETRY_AI_BRIEF_CIRCUIT_WINDOW_MS",
+      BRIEF_CIRCUIT_WINDOW_MS
+    ),
+    cooldownMs: parsePositiveIntEnv(
+      env,
+      "TELEMETRY_AI_BRIEF_CIRCUIT_COOLDOWN_MS",
+      BRIEF_CIRCUIT_COOLDOWN_MS
     ),
   };
 }

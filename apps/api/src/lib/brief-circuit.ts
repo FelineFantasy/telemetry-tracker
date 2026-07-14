@@ -1,8 +1,4 @@
-import {
-  BRIEF_CIRCUIT_COOLDOWN_MS,
-  BRIEF_CIRCUIT_FAILURE_THRESHOLD,
-  BRIEF_CIRCUIT_WINDOW_MS,
-} from "./brief-constants.js";
+import { resolveBriefCircuitOptions } from "./brief-runtime-config.js";
 
 export type BriefCircuitState = "closed" | "open" | "half_open";
 
@@ -130,19 +126,14 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
-export function getBriefCircuitBreaker(baseUrl: string): BriefCircuitBreaker {
+export function getBriefCircuitBreaker(
+  baseUrl: string,
+  env: NodeJS.ProcessEnv = process.env
+): BriefCircuitBreaker {
   const key = normalizeBaseUrl(baseUrl);
   let breaker = breakers.get(key);
   if (!breaker) {
-    breaker = new BriefCircuitBreaker({
-      failureThreshold: Number(
-        process.env.TELEMETRY_AI_BRIEF_CIRCUIT_FAILURE_THRESHOLD ?? BRIEF_CIRCUIT_FAILURE_THRESHOLD
-      ),
-      windowMs: Number(process.env.TELEMETRY_AI_BRIEF_CIRCUIT_WINDOW_MS ?? BRIEF_CIRCUIT_WINDOW_MS),
-      cooldownMs: Number(
-        process.env.TELEMETRY_AI_BRIEF_CIRCUIT_COOLDOWN_MS ?? BRIEF_CIRCUIT_COOLDOWN_MS
-      ),
-    });
+    breaker = new BriefCircuitBreaker(resolveBriefCircuitOptions(env));
     breakers.set(key, breaker);
   }
   return breaker;

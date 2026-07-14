@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   BRIEF_CACHE_TTL_MS,
+  BRIEF_CIRCUIT_COOLDOWN_MS,
+  BRIEF_CIRCUIT_FAILURE_THRESHOLD,
+  BRIEF_CIRCUIT_WINDOW_MS,
   BRIEF_REQUEST_UNTIL_BUCKET_MS,
   BRIEF_SERVED_META_TTL_MS,
 } from "./brief-constants.js";
 import {
   resolveBriefCacheOptions,
+  resolveBriefCircuitOptions,
   resolveBriefServedMetaOptions,
   resolveRequestUntilBucketMs,
 } from "./brief-runtime-config.js";
@@ -34,5 +38,19 @@ describe("brief runtime config", () => {
     expect(resolveRequestUntilBucketMs(env)).toBe(BRIEF_REQUEST_UNTIL_BUCKET_MS);
     expect(resolveBriefCacheOptions(env).ttlMs).toBe(BRIEF_CACHE_TTL_MS);
     expect(resolveBriefServedMetaOptions({}).ttlMs).toBe(BRIEF_SERVED_META_TTL_MS);
+  });
+
+  it("falls back to circuit defaults for invalid env values", () => {
+    expect(
+      resolveBriefCircuitOptions({
+        TELEMETRY_AI_BRIEF_CIRCUIT_FAILURE_THRESHOLD: "NaN",
+        TELEMETRY_AI_BRIEF_CIRCUIT_WINDOW_MS: "-1",
+        TELEMETRY_AI_BRIEF_CIRCUIT_COOLDOWN_MS: "0",
+      })
+    ).toEqual({
+      failureThreshold: BRIEF_CIRCUIT_FAILURE_THRESHOLD,
+      windowMs: BRIEF_CIRCUIT_WINDOW_MS,
+      cooldownMs: BRIEF_CIRCUIT_COOLDOWN_MS,
+    });
   });
 });

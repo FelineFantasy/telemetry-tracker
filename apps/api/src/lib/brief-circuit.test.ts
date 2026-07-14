@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { acquireBriefPrivateCallPermission, BriefCircuitBreaker } from "./brief-circuit.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { BRIEF_CIRCUIT_FAILURE_THRESHOLD } from "./brief-constants.js";
+import { acquireBriefPrivateCallPermission, BriefCircuitBreaker, getBriefCircuitBreaker, resetBriefCircuitBreakers } from "./brief-circuit.js";
 
 describe("BriefCircuitBreaker", () => {
   function breaker(nowMs = 0) {
@@ -147,5 +148,23 @@ describe("acquireBriefPrivateCallPermission", () => {
       cooldownMs: 30_000,
     });
     expect(acquireBriefPrivateCallPermission(cb)).toEqual({ allowed: true, probing: false });
+  });
+});
+
+describe("getBriefCircuitBreaker", () => {
+  afterEach(() => {
+    resetBriefCircuitBreakers();
+  });
+
+  it("uses default failure threshold when circuit env values are invalid", () => {
+    const breaker = getBriefCircuitBreaker("http://127.0.0.1:3100", {
+      TELEMETRY_AI_BRIEF_CIRCUIT_FAILURE_THRESHOLD: "not-a-number",
+    });
+    for (let i = 0; i < BRIEF_CIRCUIT_FAILURE_THRESHOLD - 1; i += 1) {
+      breaker.recordFailure();
+      expect(breaker.isOpen()).toBe(false);
+    }
+    breaker.recordFailure();
+    expect(breaker.isOpen()).toBe(true);
   });
 });

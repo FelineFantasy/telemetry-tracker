@@ -63,6 +63,14 @@ export async function briefRoutes(
       return reply.status(403).send({ ok: false, error: "forbidden", message: "Forbidden" });
     }
 
+    const organization = await prisma.organization.findFirst({
+      where: { id: organizationId, deleted_at: null },
+      select: { id: true },
+    });
+    if (!organization) {
+      return reply.status(403).send({ ok: false, error: "forbidden", message: "Forbidden" });
+    }
+
     const parsed = parseAcknowledgeBriefRequest(request.body);
     if (!parsed.ok) {
       return reply.status(400).send({ ok: false, error: "invalid_request", message: parsed.error });
