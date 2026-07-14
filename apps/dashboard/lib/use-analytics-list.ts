@@ -20,6 +20,13 @@ type UseAnalyticsListOptions<T> = {
 /** List params mirrored in the dashboard URL (omitted values use API defaults). */
 const URL_LIST_KEYS = new Set(["page", "pageSize", "sort", "order"]);
 
+function serializeListParams(params: AnalyticsListQueryParams): string {
+  return Object.keys(params)
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join("&");
+}
+
 function listParamsFromPopState(
   prev: AnalyticsListQueryParams,
   initialListParams: AnalyticsListQueryParams,
@@ -67,7 +74,15 @@ export function useAnalyticsList<T>({
     () => Object.keys(initialListParams),
     [initialListParams]
   );
+  const initialListParamsKey = useMemo(
+    () => serializeListParams(initialListParams),
+    [initialListParams]
+  );
   const [listParams, setListParamsState] = useState(initialListParams);
+
+  useEffect(() => {
+    setListParamsState(initialListParams);
+  }, [initialListParamsKey, initialListParams]);
 
   const queryString = useMemo(() => {
     const search = new URLSearchParams();
@@ -117,8 +132,8 @@ export function useAnalyticsList<T>({
 
   const patchListQuery = useCallback(
     (updates: Record<string, string | null | undefined>) => {
-      setListParamsState((prev) => {
-        const next: AnalyticsListQueryParams = { ...prev };
+      setListParamsState(() => {
+        const next: AnalyticsListQueryParams = { ...initialListParams };
         for (const [key, value] of Object.entries(updates)) {
           if (value === null || value === undefined || value === "") {
             delete next[key];
@@ -131,7 +146,7 @@ export function useAnalyticsList<T>({
         return next;
       });
     },
-    [path, urlParams]
+    [path, urlParams, initialListParams]
   );
 
   return {
