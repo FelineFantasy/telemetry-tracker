@@ -168,16 +168,19 @@ export function SessionsClientListSection({
         subtitle={listSubtitle}
       />
 
-      <AnalyticsListTableFrame isLoading={isValidating}>
-        {error ? (
-          <ErrorState message={error instanceof Error ? error.message : String(error)} />
-        ) : items.length ? (
+      <AnalyticsListTableFrame
+        isLoading={isValidating}
+        refreshError={error && items.length ? error : undefined}
+      >
+        {items.length ? (
           <SessionsTable
             rows={items}
             hrefForSession={sessionHref}
             hrefForView={sessionHref}
             maxDurationSec={maxDurationSec}
           />
+        ) : error ? (
+          <ErrorState message={error instanceof Error ? error.message : String(error)} />
         ) : (
           <EmptyState
             title="No sessions recorded"

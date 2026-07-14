@@ -135,14 +135,15 @@ export function EventsClientListSection({
         noun={total === 1 ? "event name" : "event names"}
       />
 
-      <AnalyticsListTableFrame isLoading={isValidating}>
-        {error ? (
-          <ErrorState message={error instanceof Error ? error.message : String(error)} />
-        ) : items.length ? (
+      <AnalyticsListTableFrame
+        isLoading={isValidating}
+        refreshError={error && items.length ? error : undefined}
+      >
+        {items.length ? (
           <EventsTable
             rows={items}
             hrefForName={(row) =>
-              mergeListQuery(path, { ...urlParams, ...listParams }, { name: row.name, page: "1" })
+              mergeListQuery(path, liveUrlParams, { name: row.name, page: "1" })
             }
             hrefForView={(row) => {
               if (!row.latest_event_id) return null;
@@ -151,6 +152,8 @@ export function EventsClientListSection({
                 : `/dashboard/events/${row.latest_event_id}`;
             }}
           />
+        ) : error ? (
+          <ErrorState message={error instanceof Error ? error.message : String(error)} />
         ) : (
           <EmptyState
             title="No events recorded"

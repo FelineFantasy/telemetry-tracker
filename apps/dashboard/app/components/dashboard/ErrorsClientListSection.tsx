@@ -151,10 +151,11 @@ export function ErrorsClientListSection({
 
       <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
 
-      <AnalyticsListTableFrame isLoading={isValidating}>
-        {error ? (
-          <ErrorState message={error instanceof Error ? error.message : String(error)} />
-        ) : items.length ? (
+      <AnalyticsListTableFrame
+        isLoading={isValidating}
+        refreshError={error && items.length ? error : undefined}
+      >
+        {items.length ? (
           <IssuesTable
             rows={items}
             hrefForRow={(g) =>
@@ -163,6 +164,8 @@ export function ErrorsClientListSection({
                 : `/dashboard/errors/${g.id}`
             }
           />
+        ) : error ? (
+          <ErrorState message={error instanceof Error ? error.message : String(error)} />
         ) : (
           <EmptyState
             title="No errors recorded"
