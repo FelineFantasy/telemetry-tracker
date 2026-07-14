@@ -18,6 +18,7 @@ import {
   decodeBriefServiceSecret,
   type BriefSigningHeaders,
 } from "./brief-signing.js";
+import { resolveBriefAiClientOptions } from "./brief-runtime-config.js";
 
 export type BriefAiClientConfig = {
   baseUrl: string;
@@ -95,14 +96,7 @@ export function resolveBriefAiClientConfigFromEnv(
     config: {
       baseUrl: normalizedBaseUrl,
       secret,
-      totalBudgetMs: Number(env.TELEMETRY_AI_BRIEF_TOTAL_BUDGET_MS ?? BRIEF_AI_TOTAL_BUDGET_MS),
-      attemptTimeoutMs: Number(
-        env.TELEMETRY_AI_BRIEF_ATTEMPT_TIMEOUT_MS ?? BRIEF_AI_ATTEMPT_TIMEOUT_MS
-      ),
-      maxRetries: Number(env.TELEMETRY_AI_BRIEF_MAX_RETRIES ?? BRIEF_AI_MAX_RETRIES),
-      retryMinRemainingMs: Number(
-        env.TELEMETRY_AI_BRIEF_RETRY_MIN_REMAINING_MS ?? BRIEF_AI_RETRY_MIN_REMAINING_MS
-      ),
+      ...resolveBriefAiClientOptions(env),
     },
   };
 }

@@ -2,6 +2,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import {
+  BRIEF_AI_ATTEMPT_TIMEOUT_MS,
+  BRIEF_AI_MAX_RETRIES,
+  BRIEF_AI_RETRY_MIN_REMAINING_MS,
   BRIEF_AI_TOTAL_BUDGET_MS,
   BRIEF_RESPONSE_SCHEMA_VERSION,
   BRIEF_SCHEMA_VERSION,
@@ -236,5 +239,23 @@ describe("resolveBriefAiClientConfigFromEnv", () => {
       code: "misconfigured",
       baseUrl: "http://127.0.0.1:3100",
     });
+  });
+
+  it("falls back to default timing options when env values are invalid", () => {
+    const resolved = resolveBriefAiClientConfigFromEnv({
+      TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+      TELEMETRY_AI_BRIEF_SECRET: validSecret,
+      TELEMETRY_AI_BRIEF_TOTAL_BUDGET_MS: "0",
+      TELEMETRY_AI_BRIEF_ATTEMPT_TIMEOUT_MS: "NaN",
+      TELEMETRY_AI_BRIEF_MAX_RETRIES: "-5",
+      TELEMETRY_AI_BRIEF_RETRY_MIN_REMAINING_MS: "",
+    });
+    expect(resolved.ok).toBe(true);
+    if (resolved.ok) {
+      expect(resolved.config.totalBudgetMs).toBe(BRIEF_AI_TOTAL_BUDGET_MS);
+      expect(resolved.config.attemptTimeoutMs).toBe(BRIEF_AI_ATTEMPT_TIMEOUT_MS);
+      expect(resolved.config.maxRetries).toBe(BRIEF_AI_MAX_RETRIES);
+      expect(resolved.config.retryMinRemainingMs).toBe(BRIEF_AI_RETRY_MIN_REMAINING_MS);
+    }
   });
 });

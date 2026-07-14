@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  BRIEF_AI_ATTEMPT_TIMEOUT_MS,
+  BRIEF_AI_MAX_RETRIES,
+  BRIEF_AI_RETRY_MIN_REMAINING_MS,
+  BRIEF_AI_TOTAL_BUDGET_MS,
   BRIEF_CACHE_TTL_MS,
   BRIEF_CIRCUIT_COOLDOWN_MS,
   BRIEF_CIRCUIT_FAILURE_THRESHOLD,
@@ -8,6 +12,7 @@ import {
   BRIEF_SERVED_META_TTL_MS,
 } from "./brief-constants.js";
 import {
+  resolveBriefAiClientOptions,
   resolveBriefCacheOptions,
   resolveBriefCircuitOptions,
   resolveBriefServedMetaOptions,
@@ -52,5 +57,29 @@ describe("brief runtime config", () => {
       windowMs: BRIEF_CIRCUIT_WINDOW_MS,
       cooldownMs: BRIEF_CIRCUIT_COOLDOWN_MS,
     });
+  });
+
+  it("falls back to AI client defaults for invalid env values", () => {
+    expect(
+      resolveBriefAiClientOptions({
+        TELEMETRY_AI_BRIEF_TOTAL_BUDGET_MS: "0",
+        TELEMETRY_AI_BRIEF_ATTEMPT_TIMEOUT_MS: "abc",
+        TELEMETRY_AI_BRIEF_MAX_RETRIES: "-1",
+        TELEMETRY_AI_BRIEF_RETRY_MIN_REMAINING_MS: "",
+      })
+    ).toEqual({
+      totalBudgetMs: BRIEF_AI_TOTAL_BUDGET_MS,
+      attemptTimeoutMs: BRIEF_AI_ATTEMPT_TIMEOUT_MS,
+      maxRetries: BRIEF_AI_MAX_RETRIES,
+      retryMinRemainingMs: BRIEF_AI_RETRY_MIN_REMAINING_MS,
+    });
+  });
+
+  it("allows zero max retries when explicitly configured", () => {
+    expect(
+      resolveBriefAiClientOptions({
+        TELEMETRY_AI_BRIEF_MAX_RETRIES: "0",
+      }).maxRetries
+    ).toBe(0);
   });
 });
