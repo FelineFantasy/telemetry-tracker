@@ -13,10 +13,23 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.9.0] - 2026-07-14
 
+### Added
 
+- **Analytics lists** — client-side table sort and pagination for sessions, errors, and events without full page reload ([#418](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/418), [#432](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/432))
+- **Pagination** — Previous and Next controls on shared list pagination ([#365](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/365), [#433](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/433))
+- **Time range UX** — default **24h** on first visit; explicit **No date filter** uses `range=none` ([#420](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/420), [#427](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/427))
+- **Loading feedback** — transitions and route skeletons when changing time range, filters, or app scope ([#421](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/421), [#419](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/419), [#427](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/427), [#428](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/428))
+- **Overview** — all-apps banner, metric definition help, remove duplicate Ingest mix card ([#423](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/423), [#427](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/427))
+- **Sessions analytics** — average session duration per user ([#424](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/424), [#429](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/429)); new vs returning user cohorts ([#425](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/425), [#431](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/431)); user first-seen on session detail ([#426](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/426), [#430](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/430))
+- **Workspace brief (API)** — Phase 3C orchestration with snapshot signing, semantic cache, circuit breaker, and `POST /api/meta/brief/workspace` + ack ([#416](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/416))
 
-## [1.8.11] - 2026-07-14
+### Changed
+
+- **Time range picker** — clearer copy when the table is unfiltered but charts use a recent window ([#422](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/422), [#427](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/427))
+
+---
 
 ### Added
 
