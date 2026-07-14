@@ -12,7 +12,8 @@ export type BriefResponseIntegrityFailure =
   | "missing_project"
   | "generated_through_mismatch"
   | "action_project_mismatch"
-  | "action_error_group_unknown";
+  | "action_error_group_unknown"
+  | "evidence_error_group_unknown";
 
 export type BriefResponseIntegrityResult =
   | { ok: true }
@@ -52,6 +53,28 @@ function validateAction(
         code: "action_error_group_unknown",
         message: `Action references unknown error group ${action.errorGroupId}`,
       };
+    }
+  }
+  return { ok: true };
+}
+
+function validateEvidenceRefs(
+  projectId: string,
+  bullets: WorkspaceBriefResponse["projects"][number]["bullets"],
+  snapshot: BriefSnapshotRequest
+): BriefResponseIntegrityResult {
+  if (!bullets?.length) return { ok: true };
+
+  const allowed = collectCandidateIds(snapshot, projectId);
+  for (const bullet of bullets) {
+    for (const ref of bullet.evidenceRefs ?? []) {
+      if (ref.kind === "error_group" && !allowed.has(ref.id)) {
+        return {
+          ok: false,
+          code: "evidence_error_group_unknown",
+          message: `Evidence references unknown error group ${ref.id}`,
+        };
+      }
     }
   }
   return { ok: true };
@@ -100,6 +123,13 @@ export function validateWorkspaceBriefResponseIntegrity(
         message: `generatedThrough mismatch for project ${projectBrief.projectId}`,
       };
     }
+
+    const evidenceResult = validateEvidenceRefs(
+      projectBrief.projectId,
+      projectBrief.bullets,
+      snapshot
+    );
+    if (!evidenceResult.ok) return evidenceResult;
 
     if (projectBrief.suggestedNextStep) {
       const actionResult = validateAction(

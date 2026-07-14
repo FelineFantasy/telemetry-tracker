@@ -298,8 +298,9 @@ export async function getWorkspaceBrief(
       if (reason === "ai_misconfigured") {
         breaker.recordFailure({ immediateOpen: true });
         if (probing) probeResult = false;
+      } else if (reason === "ai_idempotency_conflict") {
+        if (probing) probeResult = true;
       } else if (
-        reason === "ai_idempotency_conflict" ||
         reason === "ai_invalid_request" ||
         reason === "ai_invalid_response" ||
         reason === "ai_timeout" ||

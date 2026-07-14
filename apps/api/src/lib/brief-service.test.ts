@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BRIEF_RESPONSE_SCHEMA_VERSION } from "./brief-constants.js";
+import { BRIEF_CIRCUIT_FAILURE_THRESHOLD, BRIEF_RESPONSE_SCHEMA_VERSION } from "./brief-constants.js";
 import type { BriefSnapshotRequest } from "./brief-contracts.js";
 import * as authz from "./brief-authz.js";
 import * as client from "./brief-client.js";
@@ -572,6 +572,32 @@ describe("getWorkspaceBrief", () => {
     expect(result.status).toBe("unavailable");
     if (result.status !== "unavailable") return;
     expect(result.reason).toBe("ai_idempotency_conflict");
+  });
+
+  it("does not count ai_idempotency_conflict as a circuit failure", async () => {
+    const breaker = getBriefCircuitBreaker("http://127.0.0.1:3100");
+    for (let i = 0; i < BRIEF_CIRCUIT_FAILURE_THRESHOLD - 1; i += 1) {
+      breaker.recordFailure();
+    }
+    expect(breaker.isOpen()).toBe(false);
+
+    vi.spyOn(client, "postWorkspaceBrief").mockResolvedValue({
+      ok: false,
+      reason: "http_error",
+      status: 409,
+      message: "AI HTTP 409",
+      attempts: 1,
+      latencyMs: 5,
+    });
+
+    await getWorkspaceBrief(serviceDeps(cache, servedMeta), {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+    });
+
+    expect(breaker.isOpen()).toBe(false);
+    breaker.recordFailure();
+    expect(breaker.isOpen()).toBe(true);
   });
 
   it("maps invalid private schema responses to ai_invalid_response", async () => {

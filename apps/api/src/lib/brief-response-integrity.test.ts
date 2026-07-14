@@ -176,4 +176,30 @@ describe("validateWorkspaceBriefResponseIntegrity", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("action_error_group_unknown");
   });
+
+  it("accepts bullets with snapshot-bound error_group evidence refs", () => {
+    const response = validResponse();
+    response.projects[0]!.bullets = [
+      {
+        tone: "warning",
+        text: "New error surfaced",
+        evidenceRefs: [{ kind: "error_group", id: ERROR_GROUP_A }],
+      },
+    ];
+    expect(validateWorkspaceBriefResponseIntegrity(snapshot(), response)).toEqual({ ok: true });
+  });
+
+  it("rejects bullets referencing unknown error_group evidence refs", () => {
+    const response = validResponse();
+    response.projects[0]!.bullets = [
+      {
+        tone: "warning",
+        text: "Fabricated evidence",
+        evidenceRefs: [{ kind: "error_group", id: "00000000-0000-4000-8000-000000000099" }],
+      },
+    ];
+    const result = validateWorkspaceBriefResponseIntegrity(snapshot(), response);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("evidence_error_group_unknown");
+  });
 });
