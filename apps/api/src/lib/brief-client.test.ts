@@ -7,7 +7,7 @@ import {
   BRIEF_SCHEMA_VERSION,
 } from "./brief-constants.js";
 import type { BriefSnapshotRequest } from "./brief-contracts.js";
-import { postWorkspaceBrief, type BriefAiClientConfig } from "./brief-client.js";
+import { postWorkspaceBrief, resolveBriefAiClientConfigFromEnv, type BriefAiClientConfig } from "./brief-client.js";
 
 const PROJECT_ID = "a0000000-0000-4000-8000-000000000001";
 const REQUEST_ID = "b0000000-0000-4000-8000-000000000003";
@@ -174,6 +174,64 @@ describe("postWorkspaceBrief", () => {
           "00000000-0000-4000-8000-000000000099"
         );
       }
+    });
+  });
+});
+
+describe("resolveBriefAiClientConfigFromEnv", () => {
+  const validSecret = Buffer.alloc(32, 7).toString("base64");
+
+  it("returns a config for a valid URL and secret", () => {
+    const resolved = resolveBriefAiClientConfigFromEnv({
+      TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+      TELEMETRY_AI_BRIEF_SECRET: validSecret,
+    });
+    expect(resolved.ok).toBe(true);
+    if (resolved.ok) {
+      expect(resolved.config.baseUrl).toBe("http://127.0.0.1:3100");
+      expect(resolved.config.secret.length).toBe(32);
+    }
+  });
+
+  it("classifies a missing URL as unconfigured", () => {
+    const resolved = resolveBriefAiClientConfigFromEnv({
+      TELEMETRY_AI_BRIEF_SECRET: validSecret,
+    });
+    expect(resolved).toEqual({ ok: false, code: "unconfigured" });
+  });
+
+  it("classifies a missing secret as misconfigured", () => {
+    const resolved = resolveBriefAiClientConfigFromEnv({
+      TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+    });
+    expect(resolved).toEqual({
+      ok: false,
+      code: "misconfigured",
+      baseUrl: "http://127.0.0.1:3100",
+    });
+  });
+
+  it("classifies invalid base64 secrets as misconfigured", () => {
+    const resolved = resolveBriefAiClientConfigFromEnv({
+      TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+      TELEMETRY_AI_BRIEF_SECRET: "not-valid-base64!!!",
+    });
+    expect(resolved).toEqual({
+      ok: false,
+      code: "misconfigured",
+      baseUrl: "http://127.0.0.1:3100",
+    });
+  });
+
+  it("classifies short decoded secrets as misconfigured", () => {
+    const resolved = resolveBriefAiClientConfigFromEnv({
+      TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+      TELEMETRY_AI_BRIEF_SECRET: Buffer.alloc(8).toString("base64"),
+    });
+    expect(resolved).toEqual({
+      ok: false,
+      code: "misconfigured",
+      baseUrl: "http://127.0.0.1:3100",
     });
   });
 });

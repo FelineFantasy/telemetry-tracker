@@ -6,7 +6,7 @@ import * as client from "./brief-client.js";
 import { BriefSemanticCache } from "./brief-cache.js";
 import { BriefServedMetaStore } from "./brief-served-meta.js";
 import { computePresentationHash } from "./brief-presentation-hash.js";
-import { resetBriefCircuitBreakers } from "./brief-circuit.js";
+import { resetBriefCircuitBreakers, getBriefCircuitBreaker } from "./brief-circuit.js";
 import { getWorkspaceBrief } from "./brief-service.js";
 import * as snapshot from "./brief-snapshot.js";
 
@@ -599,5 +599,125 @@ describe("getWorkspaceBrief", () => {
     if (result.status !== "error") return;
     expect(result.httpStatus).toBe(500);
     expect(result.code).toBe("invalid_snapshot");
+  });
+
+  it("allows only one private-service call during half-open recovery", async () => {
+    vi.useFakeTimers();
+    resetBriefCircuitBreakers();
+
+    const breaker = getBriefCircuitBreaker("http://127.0.0.1:3100");
+    breaker.recordFailure({ immediateOpen: true });
+    expect(breaker.getState()).toBe("open");
+
+    vi.advanceTimersByTime(31_000);
+    expect(breaker.getState()).toBe("half_open");
+
+    let inFlight = 0;
+    let maxConcurrent = 0;
+    const postSpy = vi.spyOn(client, "postWorkspaceBrief").mockImplementation(async (snap) => {
+      inFlight += 1;
+      maxConcurrent = Math.max(maxConcurrent, inFlight);
+      await vi.advanceTimersByTimeAsync(25);
+      inFlight -= 1;
+      return {
+        ok: true,
+        response: {
+          ...validAiResponse,
+          requestId: snap.requestId,
+        },
+        attempts: 1,
+        latencyMs: 25,
+      };
+    });
+
+    const [first, second, third] = await Promise.all([
+      getWorkspaceBrief(serviceDeps(cache, servedMeta), {
+        userId: USER_ID,
+        organizationId: ORG_ID,
+      }),
+      getWorkspaceBrief(serviceDeps(cache, servedMeta), {
+        userId: USER_ID,
+        organizationId: ORG_ID,
+      }),
+      getWorkspaceBrief(serviceDeps(cache, servedMeta), {
+        userId: USER_ID,
+        organizationId: ORG_ID,
+      }),
+    ]);
+
+    expect(postSpy).toHaveBeenCalledTimes(1);
+    expect(maxConcurrent).toBe(1);
+    expect([first, second, third].filter((result) => result.status === "ok")).toHaveLength(1);
+    expect(
+      [first, second, third].filter(
+        (result) => result.status === "unavailable" && result.reason === "circuit_open"
+      )
+    ).toHaveLength(2);
+
+    vi.useRealTimers();
+  });
+
+  it("returns ai_misconfigured fallback for a missing secret without served-meta", async () => {
+    const result = await getWorkspaceBrief(
+      serviceDeps(cache, servedMeta, {
+        TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+      }),
+      { userId: USER_ID, organizationId: ORG_ID }
+    );
+
+    expect(result.status).toBe("unavailable");
+    if (result.status !== "unavailable") return;
+    expect(result.httpStatus).toBe(200);
+    expect(result.reason).toBe("ai_misconfigured");
+    expect(result.fallback.schemaVersion).toBe("2026-07-brief-fallback-v1");
+    expect(servedMeta.listForUserOrg(USER_ID, ORG_ID)).toHaveLength(0);
+    expect(getBriefCircuitBreaker("http://127.0.0.1:3100").getState()).toBe("open");
+  });
+
+  it("returns ai_misconfigured fallback for invalid base64 secrets", async () => {
+    const result = await getWorkspaceBrief(
+      serviceDeps(cache, servedMeta, {
+        TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+        TELEMETRY_AI_BRIEF_SECRET: "%%%invalid%%%",
+      }),
+      { userId: USER_ID, organizationId: ORG_ID }
+    );
+
+    expect(result.status).toBe("unavailable");
+    if (result.status !== "unavailable") return;
+    expect(result.reason).toBe("ai_misconfigured");
+    expect(servedMeta.listForUserOrg(USER_ID, ORG_ID)).toHaveLength(0);
+  });
+
+  it("returns ai_misconfigured fallback for short decoded secrets", async () => {
+    const result = await getWorkspaceBrief(
+      serviceDeps(cache, servedMeta, {
+        TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+        TELEMETRY_AI_BRIEF_SECRET: Buffer.alloc(8).toString("base64"),
+      }),
+      { userId: USER_ID, organizationId: ORG_ID }
+    );
+
+    expect(result.status).toBe("unavailable");
+    if (result.status !== "unavailable") return;
+    expect(result.reason).toBe("ai_misconfigured");
+    expect(servedMeta.listForUserOrg(USER_ID, ORG_ID)).toHaveLength(0);
+  });
+
+  it("does not log the configured secret when misconfigured", async () => {
+    const secret = "short-secret-value";
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await getWorkspaceBrief(
+      serviceDeps(cache, servedMeta, {
+        TELEMETRY_AI_BRIEF_URL: "http://127.0.0.1:3100",
+        TELEMETRY_AI_BRIEF_SECRET: secret,
+      }),
+      { userId: USER_ID, organizationId: ORG_ID }
+    );
+
+    const logged = errorSpy.mock.calls.flat().join(" ");
+    expect(logged).not.toContain(secret);
+    errorSpy.mockRestore();
   });
 });

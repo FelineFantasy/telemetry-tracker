@@ -97,6 +97,33 @@ export class BriefCircuitBreaker {
   }
 }
 
+export type BriefPrivateCallPermission =
+  | { allowed: true; probing: boolean }
+  | { allowed: false; reason: "circuit_open" };
+
+/**
+ * Determine whether the orchestrator may call the private brief service.
+ *
+ * - closed: allowed
+ * - open (before cooldown): blocked
+ * - half-open: allowed for exactly one in-flight probe; concurrent callers blocked
+ */
+export function acquireBriefPrivateCallPermission(
+  breaker: BriefCircuitBreaker
+): BriefPrivateCallPermission {
+  const state = breaker.getState();
+  if (state === "open") {
+    return { allowed: false, reason: "circuit_open" };
+  }
+  if (state === "half_open") {
+    if (!breaker.tryBeginProbe()) {
+      return { allowed: false, reason: "circuit_open" };
+    }
+    return { allowed: true, probing: true };
+  }
+  return { allowed: true, probing: false };
+}
+
 const breakers = new Map<string, BriefCircuitBreaker>();
 
 function normalizeBaseUrl(baseUrl: string): string {

@@ -63,11 +63,8 @@ export function decodeBriefServiceSecret(
   } catch {
     return null;
   }
-  const requireLength = options?.requireProductionLength ?? process.env.NODE_ENV === "production";
-  if (requireLength && decoded.length < BRIEF_SECRET_MIN_BYTES) {
-    throw new Error(
-      `TELEMETRY_AI_BRIEF_SECRET must decode to at least ${BRIEF_SECRET_MIN_BYTES} bytes`
-    );
+  if (decoded.length < BRIEF_SECRET_MIN_BYTES) {
+    return null;
   }
   return decoded;
 }

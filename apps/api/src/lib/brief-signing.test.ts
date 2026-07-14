@@ -56,14 +56,14 @@ describe("brief signing", () => {
     expect(payload.includes("snapshotHash")).toBe(false);
   });
 
-  it("decodes base64 secrets and rejects short production secrets", () => {
+  it("rejects secrets shorter than 32 decoded bytes without throwing", () => {
     const decoded = decodeBriefServiceSecret(SECRET_B64, { requireProductionLength: false });
     expect(decoded?.length).toBe(BRIEF_SECRET_MIN_BYTES);
-    expect(() =>
+    expect(
       decodeBriefServiceSecret(Buffer.alloc(8).toString("base64"), {
         requireProductionLength: true,
       })
-    ).toThrow(/at least 32 bytes/);
+    ).toBeNull();
   });
 
   it("signs and verifies request headers", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BriefCircuitBreaker } from "./brief-circuit.js";
+import { acquireBriefPrivateCallPermission, BriefCircuitBreaker } from "./brief-circuit.js";
 
 describe("BriefCircuitBreaker", () => {
   function breaker(nowMs = 0) {
@@ -102,5 +102,50 @@ describe("BriefCircuitBreaker", () => {
     expect(cb.tryBeginProbe()).toBe(false);
     cb.endProbe(true);
     expect(cb.getState()).toBe("closed");
+  });
+});
+
+describe("acquireBriefPrivateCallPermission", () => {
+  it("blocks open circuits before cooldown", () => {
+    const cb = new BriefCircuitBreaker({
+      failureThreshold: 3,
+      windowMs: 60_000,
+      cooldownMs: 30_000,
+    });
+    cb.recordFailure();
+    cb.recordFailure();
+    cb.recordFailure();
+    expect(acquireBriefPrivateCallPermission(cb)).toEqual({
+      allowed: false,
+      reason: "circuit_open",
+    });
+  });
+
+  it("allows exactly one caller during half-open", () => {
+    let now = 0;
+    const cb = new BriefCircuitBreaker({
+      failureThreshold: 3,
+      windowMs: 60_000,
+      cooldownMs: 30_000,
+      now: () => now,
+    });
+    cb.recordFailure();
+    cb.recordFailure();
+    cb.recordFailure();
+    now = 31_000;
+    expect(acquireBriefPrivateCallPermission(cb)).toEqual({ allowed: true, probing: true });
+    expect(acquireBriefPrivateCallPermission(cb)).toEqual({
+      allowed: false,
+      reason: "circuit_open",
+    });
+  });
+
+  it("allows normal calls when closed", () => {
+    const cb = new BriefCircuitBreaker({
+      failureThreshold: 3,
+      windowMs: 60_000,
+      cooldownMs: 30_000,
+    });
+    expect(acquireBriefPrivateCallPermission(cb)).toEqual({ allowed: true, probing: false });
   });
 });

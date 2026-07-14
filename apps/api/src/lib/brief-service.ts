@@ -8,7 +8,7 @@ import {
   rebindCachedBriefResponse,
   type BriefCacheKey,
 } from "./brief-cache.js";
-import { getBriefCircuitBreaker } from "./brief-circuit.js";
+import { acquireBriefPrivateCallPermission, getBriefCircuitBreaker } from "./brief-circuit.js";
 import { postWorkspaceBrief, resolveBriefAiClientConfigFromEnv } from "./brief-client.js";
 import { buildWorkspaceBriefFallback } from "./brief-fallback.js";
 import { computePresentationHash } from "./brief-presentation-hash.js";
@@ -109,6 +109,27 @@ function storeServedMeta(
       generatedThrough: p.window.until,
     })),
   });
+}
+
+function unavailableFallbackResult(input: {
+  requestId: string;
+  snapshotHash: string;
+  contentHash: string;
+  snapshot: BriefSnapshotRequest;
+  buildMeta: BriefBuildMeta;
+  now: Date;
+  reason: UnavailableReason;
+}): Extract<WorkspaceBriefServiceResult, { status: "unavailable" }> {
+  return {
+    status: "unavailable",
+    httpStatus: 200,
+    requestId: input.requestId,
+    snapshotHash: input.snapshotHash,
+    contentHash: input.contentHash,
+    reason: input.reason,
+    fallback: buildWorkspaceBriefFallback(input.snapshot, input.requestId, input.now),
+    meta: input.buildMeta,
+  };
 }
 
 function cacheKeyFor(
@@ -216,91 +237,95 @@ export async function getWorkspaceBrief(
     cache.evict(cacheKey);
   }
 
-  const aiConfig = resolveBriefAiClientConfigFromEnv(env);
-  const breaker = aiConfig ? getBriefCircuitBreaker(aiConfig.baseUrl) : null;
+  const aiResolved = resolveBriefAiClientConfigFromEnv(env);
 
-  if (breaker?.isOpen()) {
-    if (!breaker.tryBeginProbe()) {
-      return {
-        status: "unavailable",
-        httpStatus: 200,
+  if (!aiResolved.ok) {
+    if (aiResolved.code === "misconfigured") {
+      const breaker = getBriefCircuitBreaker(aiResolved.baseUrl);
+      breaker.recordFailure({ immediateOpen: true });
+      return unavailableFallbackResult({
         requestId,
         snapshotHash,
         contentHash,
-        reason: "circuit_open",
-        fallback: buildWorkspaceBriefFallback(snapshot, requestId, now),
-        meta: buildMeta,
-      };
+        snapshot,
+        buildMeta,
+        now,
+        reason: "ai_misconfigured",
+      });
     }
-  }
-
-  if (!aiConfig) {
-    return {
-      status: "unavailable",
-      httpStatus: 200,
+    return unavailableFallbackResult({
       requestId,
       snapshotHash,
       contentHash,
+      snapshot,
+      buildMeta,
+      now,
       reason: "ai_unreachable",
-      fallback: buildWorkspaceBriefFallback(snapshot, requestId, now),
-      meta: buildMeta,
-    };
+    });
   }
 
+  const aiConfig = aiResolved.config;
+  const breaker = getBriefCircuitBreaker(aiConfig.baseUrl);
+  const permission = acquireBriefPrivateCallPermission(breaker);
+  if (!permission.allowed) {
+    return unavailableFallbackResult({
+      requestId,
+      snapshotHash,
+      contentHash,
+      snapshot,
+      buildMeta,
+      now,
+      reason: "circuit_open",
+    });
+  }
+
+  const probing = permission.probing;
+
   const aiResult = await postWorkspaceBrief(snapshot, contentHash, aiConfig);
-  const probing = breaker?.probeActive() ?? false;
 
   if (!aiResult.ok) {
     const reason = mapAiFailure(aiResult);
-    if (breaker) {
-      if (reason === "ai_misconfigured") {
-        breaker.recordFailure({ immediateOpen: true });
-      } else if (
-        reason === "ai_idempotency_conflict" ||
-        reason === "ai_invalid_request" ||
-        reason === "ai_invalid_response" ||
-        reason === "ai_timeout" ||
-        reason === "ai_unreachable" ||
-        reason === "ai_http_5xx"
-      ) {
-        if (probing) breaker.endProbe(false);
-        else breaker.recordFailure();
-      }
+    if (reason === "ai_misconfigured") {
+      breaker.recordFailure({ immediateOpen: true });
+    } else if (
+      reason === "ai_idempotency_conflict" ||
+      reason === "ai_invalid_request" ||
+      reason === "ai_invalid_response" ||
+      reason === "ai_timeout" ||
+      reason === "ai_unreachable" ||
+      reason === "ai_http_5xx"
+    ) {
+      if (probing) breaker.endProbe(false);
+      else breaker.recordFailure();
     }
-    return {
-      status: "unavailable",
-      httpStatus: 200,
+    return unavailableFallbackResult({
       requestId,
       snapshotHash,
       contentHash,
+      snapshot,
+      buildMeta,
+      now,
       reason,
-      fallback: buildWorkspaceBriefFallback(snapshot, requestId, now),
-      meta: buildMeta,
-    };
+    });
   }
 
   const validated = validatePrivateBriefResponse(snapshot, aiResult.response);
   if (!validated.ok) {
-    if (breaker) {
-      if (probing) breaker.endProbe(false);
-      else breaker.recordFailure();
-    }
-    return {
-      status: "unavailable",
-      httpStatus: 200,
+    if (probing) breaker.endProbe(false);
+    else breaker.recordFailure();
+    return unavailableFallbackResult({
       requestId,
       snapshotHash,
       contentHash,
+      snapshot,
+      buildMeta,
+      now,
       reason: "ai_invalid_response",
-      fallback: buildWorkspaceBriefFallback(snapshot, requestId, now),
-      meta: buildMeta,
-    };
+    });
   }
 
-  if (breaker) {
-    if (probing) breaker.endProbe(true);
-    else breaker.recordSuccess();
-  }
+  if (probing) breaker.endProbe(true);
+  else breaker.recordSuccess();
 
   cache.put(cacheKey, {
     contentHash,

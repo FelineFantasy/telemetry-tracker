@@ -29,6 +29,11 @@ export type BriefAiClientConfig = {
   fetchImpl?: typeof fetch;
 };
 
+export type BriefAiEnvResolution =
+  | { ok: true; config: BriefAiClientConfig }
+  | { ok: false; code: "unconfigured" }
+  | { ok: false; code: "misconfigured"; baseUrl: string };
+
 export type BriefAiClientFailureReason =
   | "unconfigured"
   | "timeout"
@@ -67,25 +72,38 @@ function remainingBudgetMs(startedAt: number, totalBudgetMs: number): number {
 }
 
 /** Resolve client config from environment variables. */
-export function resolveBriefAiClientConfigFromEnv(env: NodeJS.ProcessEnv = process.env): BriefAiClientConfig | null {
+export function resolveBriefAiClientConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env
+): BriefAiEnvResolution {
   const baseUrl = env.TELEMETRY_AI_BRIEF_URL?.trim();
   const secretEncoded = env.TELEMETRY_AI_BRIEF_SECRET?.trim();
-  if (!baseUrl || !secretEncoded) return null;
+  if (!baseUrl) {
+    return { ok: false, code: "unconfigured" };
+  }
+  const normalizedBaseUrl = trimTrailingSlash(baseUrl);
+  if (!secretEncoded) {
+    return { ok: false, code: "misconfigured", baseUrl: normalizedBaseUrl };
+  }
 
-  const secret = decodeBriefServiceSecret(secretEncoded, {
-    requireProductionLength: env.NODE_ENV === "production",
-  });
-  if (!secret) return null;
+  const secret = decodeBriefServiceSecret(secretEncoded);
+  if (!secret) {
+    return { ok: false, code: "misconfigured", baseUrl: normalizedBaseUrl };
+  }
 
   return {
-    baseUrl: trimTrailingSlash(baseUrl),
-    secret,
-    totalBudgetMs: Number(env.TELEMETRY_AI_BRIEF_TOTAL_BUDGET_MS ?? BRIEF_AI_TOTAL_BUDGET_MS),
-    attemptTimeoutMs: Number(env.TELEMETRY_AI_BRIEF_ATTEMPT_TIMEOUT_MS ?? BRIEF_AI_ATTEMPT_TIMEOUT_MS),
-    maxRetries: Number(env.TELEMETRY_AI_BRIEF_MAX_RETRIES ?? BRIEF_AI_MAX_RETRIES),
-    retryMinRemainingMs: Number(
-      env.TELEMETRY_AI_BRIEF_RETRY_MIN_REMAINING_MS ?? BRIEF_AI_RETRY_MIN_REMAINING_MS
-    ),
+    ok: true,
+    config: {
+      baseUrl: normalizedBaseUrl,
+      secret,
+      totalBudgetMs: Number(env.TELEMETRY_AI_BRIEF_TOTAL_BUDGET_MS ?? BRIEF_AI_TOTAL_BUDGET_MS),
+      attemptTimeoutMs: Number(
+        env.TELEMETRY_AI_BRIEF_ATTEMPT_TIMEOUT_MS ?? BRIEF_AI_ATTEMPT_TIMEOUT_MS
+      ),
+      maxRetries: Number(env.TELEMETRY_AI_BRIEF_MAX_RETRIES ?? BRIEF_AI_MAX_RETRIES),
+      retryMinRemainingMs: Number(
+        env.TELEMETRY_AI_BRIEF_RETRY_MIN_REMAINING_MS ?? BRIEF_AI_RETRY_MIN_REMAINING_MS
+      ),
+    },
   };
 }
 
@@ -205,15 +223,18 @@ export async function postWorkspaceBriefFromEnv(
   contentHash: string,
   env: NodeJS.ProcessEnv = process.env
 ): Promise<PostWorkspaceBriefResult> {
-  const config = resolveBriefAiClientConfigFromEnv(env);
-  if (!config) {
+  const resolved = resolveBriefAiClientConfigFromEnv(env);
+  if (!resolved.ok) {
     return {
       ok: false,
       reason: "unconfigured",
-      message: "TELEMETRY_AI_BRIEF_URL or TELEMETRY_AI_BRIEF_SECRET is not configured",
+      message:
+        resolved.code === "misconfigured"
+          ? "TELEMETRY_AI_BRIEF_SECRET is missing or invalid"
+          : "TELEMETRY_AI_BRIEF_URL is not configured",
       attempts: 0,
       latencyMs: 0,
     };
   }
-  return postWorkspaceBrief(snapshot, contentHash, config);
+  return postWorkspaceBrief(snapshot, contentHash, resolved.config);
 }
