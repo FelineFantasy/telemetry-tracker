@@ -15,6 +15,10 @@ import {
   revertReleaseEmailUnsubscribeToken,
   stageReleaseEmailUnsubscribeToken,
 } from "../src/lib/release-email-send.js";
+import {
+  appendReleaseEmailFooter,
+  buildReleaseEmailBodyHtml,
+} from "../src/lib/release-email-template.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const FORCE = process.argv.includes("--force");
@@ -44,32 +48,6 @@ Requires: DATABASE_URL, RESEND_API_KEY, TELEMETRY_EMAIL_FROM
 Optional: TELEMETRY_DASHBOARD_ORIGIN (default https://telemetry-tracker.com)
 
 See docs/MARKETING-EMAIL.md for maintainer workflow.`;
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function markdownToHtml(markdown: string): string {
-  return markdown
-    .split("\n")
-    .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return "";
-      if (trimmed.startsWith("### ")) {
-        return `<h3 style="margin:1.25em 0 0.5em;font-size:16px;">${escapeHtml(trimmed.slice(4))}</h3>`;
-      }
-      if (trimmed.startsWith("- ")) {
-        return `<li>${escapeHtml(trimmed.slice(2))}</li>`;
-      }
-      return `<p style="margin:0.75em 0;">${escapeHtml(trimmed)}</p>`;
-    })
-    .filter(Boolean)
-    .join("\n");
-}
 
 function isResendDomainVerificationError(error: string | undefined): boolean {
   const message = error?.toLowerCase() ?? "";
@@ -145,12 +123,11 @@ async function main() {
       ? "Telemetry Tracker — what's new"
       : `Telemetry Tracker ${version} is out`;
 
-  const bodyHtml = [
-    `<p>Hi,</p>`,
-    `<p>Here's what's new in Telemetry Tracker${version === "Unreleased" ? "" : ` ${version}`}:</p>`,
-    markdownToHtml(section),
-    `<p style="margin-top:1.5em;"><a href="${escapeHtml(dashboardOrigin)}/docs/releases">Read full release notes</a></p>`,
-  ].join("\n");
+  const bodyHtml = buildReleaseEmailBodyHtml({
+    version,
+    sectionMarkdown: section,
+    dashboardOrigin,
+  });
 
   console.log(`Prepared release email for ${subscribers.length} subscriber(s).`);
   console.log(`Subject: ${subject}`);
@@ -191,14 +168,7 @@ async function main() {
     });
 
     const unsubscribeUrl = buildMarketingUnsubscribeUrl(dashboardOrigin, rawToken);
-    const html = [
-      bodyHtml,
-      `<hr style="margin:2em 0;border:none;border-top:1px solid #eee;" />`,
-      `<p style="font-size:12px;color:#666;">`,
-      `You received this because you subscribed to Telemetry Tracker product updates.`,
-      ` <a href="${escapeHtml(unsubscribeUrl)}">Unsubscribe</a>`,
-      `</p>`,
-    ].join("\n");
+    const html = appendReleaseEmailFooter(bodyHtml, unsubscribeUrl);
 
     const result = await sendTransactionalEmail({ to: sub.email, subject, html });
     if (!result.sent) {
