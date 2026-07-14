@@ -154,7 +154,7 @@ describe.skipIf(!runDbIntegration)("Organization audit log (integration)", () =>
     const sessionId = await loginSessionId(updatedEmail);
     const res = await app!.inject({
       method: "GET",
-      url: `/api/meta/organizations/${organizationId}/audit-log`,
+      url: `/api/meta/organizations/${organizationId}/audit-log?limit=100`,
       headers: { authorization: `Bearer ${sessionId}` },
     });
     expect(res.statusCode).toBe(200);
