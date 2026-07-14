@@ -313,5 +313,64 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
       expect(ackBody.ok).toBe(false);
       expect(ackBody.error).toBe("stale_brief");
     });
+
+    it("returns 403 when the user is no longer an organization member", async () => {
+      const brief = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/workspace",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {},
+      });
+      const briefBody = JSON.parse(brief.body) as {
+        status: string;
+        requestId: string;
+        snapshotHash: string;
+        brief: { projects: Array<{ projectId: string; generatedThrough: string }> };
+      };
+      expect(briefBody.status).toBe("ok");
+
+      const user = await prisma.user.findFirstOrThrow({ where: { email } });
+      await prisma.organizationMembership.deleteMany({
+        where: {
+          user_id: user.id,
+          organization_id: organizationId,
+        },
+      });
+
+      const ack = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/ack",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {
+          requestId: briefBody.requestId,
+          snapshotHash: briefBody.snapshotHash,
+          projects: briefBody.brief.projects.map((p) => ({
+            projectId: p.projectId,
+            acknowledgedThrough: p.generatedThrough,
+          })),
+        },
+      });
+
+      expect(ack.statusCode).toBe(403);
+      const ackBody = JSON.parse(ack.body) as { ok: boolean; error?: string };
+      expect(ackBody.ok).toBe(false);
+      expect(ackBody.error).toBe("forbidden");
+
+      await prisma.organizationMembership.create({
+        data: {
+          user_id: user.id,
+          organization_id: organizationId,
+          role: OrgRole.VIEWER,
+        },
+      });
+    });
   }
 );
