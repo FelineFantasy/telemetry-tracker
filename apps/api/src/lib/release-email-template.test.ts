@@ -4,20 +4,62 @@ import {
   buildReleaseEmailBodyHtml,
   changelogMarkdownToHtml,
   parseInlineMarkdown,
+  resolveChangelogLink,
 } from "./release-email-template.js";
+
+const ORIGIN = "https://telemetry-tracker.com";
+
+describe("resolveChangelogLink", () => {
+  it("keeps absolute URLs unchanged", () => {
+    expect(resolveChangelogLink("https://github.com/foo/issues/1", ORIGIN)).toBe(
+      "https://github.com/foo/issues/1"
+    );
+  });
+
+  it("maps repo markdown docs to GitHub blob URLs", () => {
+    expect(resolveChangelogLink("docs/RELEASE.md", ORIGIN)).toBe(
+      "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main/docs/RELEASE.md"
+    );
+    expect(resolveChangelogLink("docs/sdk-vite.md", ORIGIN)).toBe(
+      "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main/docs/sdk-vite.md"
+    );
+  });
+
+  it("preserves hash fragments on relative docs links", () => {
+    expect(resolveChangelogLink("docs/RELEASE.md#v100-2026-06-26", ORIGIN)).toBe(
+      "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main/docs/RELEASE.md#v100-2026-06-26"
+    );
+  });
+
+  it("resolves site-root paths against dashboard origin", () => {
+    expect(resolveChangelogLink("/docs/releases", ORIGIN)).toBe(
+      "https://telemetry-tracker.com/docs/releases"
+    );
+  });
+});
 
 describe("parseInlineMarkdown", () => {
   it("renders bold without literal asterisks", () => {
-    expect(parseInlineMarkdown("**Analytics lists** — faster tables")).toContain(
+    expect(parseInlineMarkdown("**Analytics lists** — faster tables", ORIGIN)).toContain(
       "<strong"
     );
-    expect(parseInlineMarkdown("**Analytics lists** — faster tables")).not.toContain("**");
+    expect(parseInlineMarkdown("**Analytics lists** — faster tables", ORIGIN)).not.toContain("**");
   });
 
   it("renders markdown links", () => {
-    const html = parseInlineMarkdown("See [#418](https://github.com/example/issues/418)");
+    const html = parseInlineMarkdown(
+      "See [#418](https://github.com/example/issues/418)",
+      ORIGIN
+    );
     expect(html).toContain('href="https://github.com/example/issues/418"');
     expect(html).toContain("#418");
+  });
+
+  it("resolves relative markdown links", () => {
+    const html = parseInlineMarkdown("See [RELEASE.md](docs/RELEASE.md)", ORIGIN);
+    expect(html).toContain(
+      'href="https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main/docs/RELEASE.md"'
+    );
   });
 });
 
@@ -26,7 +68,7 @@ describe("changelogMarkdownToHtml", () => {
     const html = changelogMarkdownToHtml(`### Added
 
 - **Feature A** — detail
-- **Feature B** — detail`);
+- **Feature B** — detail`, ORIGIN);
     expect(html).toContain("Added");
     expect(html).toContain("<ul");
     expect(html).toContain("Feature A");

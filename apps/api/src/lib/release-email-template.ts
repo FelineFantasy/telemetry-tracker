@@ -18,8 +18,36 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+const GITHUB_REPO_DOCS_BASE =
+  "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main";
+
+/** Resolve repo-relative CHANGELOG links for email clients. */
+export function resolveChangelogLink(href: string, dashboardOrigin: string): string {
+  const trimmed = href.trim();
+  if (!trimmed) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const hashIndex = trimmed.indexOf("#");
+  const pathPart = hashIndex === -1 ? trimmed : trimmed.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : trimmed.slice(hashIndex);
+  const origin = dashboardOrigin.replace(/\/$/, "");
+
+  if (pathPart.startsWith("/")) {
+    return `${origin}${pathPart}${hash}`;
+  }
+
+  const path = pathPart.replace(/^(\.\.\/)+/, "").replace(/^\.\//, "");
+  if (path.endsWith(".md") || path.startsWith("docs/") || path.startsWith(".github/")) {
+    return `${GITHUB_REPO_DOCS_BASE}/${path}${hash}`;
+  }
+
+  return `${origin}/${path}${hash}`;
+}
+
 /** Parse **bold** and [label](url) in changelog lines. */
-export function parseInlineMarkdown(raw: string): string {
+export function parseInlineMarkdown(raw: string, dashboardOrigin: string): string {
   const tokenRe = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
   let result = "";
   let lastIndex = 0;
@@ -30,7 +58,7 @@ export function parseInlineMarkdown(raw: string): string {
     if (match[1] !== undefined) {
       result += `<strong style="font-weight:600;color:${COLORS.foreground};">${escapeHtml(match[1])}</strong>`;
     } else if (match[2] !== undefined && match[3] !== undefined) {
-      const href = escapeHtml(match[3]);
+      const href = escapeHtml(resolveChangelogLink(match[3], dashboardOrigin));
       result += `<a href="${href}" style="color:${COLORS.brand};text-decoration:none;font-weight:500;">${escapeHtml(match[2])}</a>`;
     }
     lastIndex = match.index + match[0].length;
@@ -46,7 +74,7 @@ function flushListItems(items: string[]): string {
 }
 
 /** Convert a CHANGELOG section body to HTML fragments (lists, headings). */
-export function changelogMarkdownToHtml(markdown: string): string {
+export function changelogMarkdownToHtml(markdown: string, dashboardOrigin: string): string {
   const lines = markdown.split("\n");
   const blocks: string[] = [];
   let listItems: string[] = [];
@@ -75,14 +103,14 @@ export function changelogMarkdownToHtml(markdown: string): string {
 
     if (trimmed.startsWith("- ")) {
       listItems.push(
-        `<li style="margin:0 0 10px;">${parseInlineMarkdown(trimmed.slice(2))}</li>`
+        `<li style="margin:0 0 10px;">${parseInlineMarkdown(trimmed.slice(2), dashboardOrigin)}</li>`
       );
       continue;
     }
 
     flushList();
     blocks.push(
-      `<p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:${COLORS.foreground};">${parseInlineMarkdown(trimmed)}</p>`
+      `<p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:${COLORS.foreground};">${parseInlineMarkdown(trimmed, dashboardOrigin)}</p>`
     );
   }
 
@@ -103,7 +131,7 @@ export function buildReleaseEmailBodyHtml(options: {
       ? "Here's what's new in Telemetry Tracker"
       : `Telemetry Tracker ${version} is here`;
 
-  const content = changelogMarkdownToHtml(sectionMarkdown);
+  const content = changelogMarkdownToHtml(sectionMarkdown, origin);
   const releasesUrl = `${origin}/docs/releases`;
   const dashboardUrl = `${origin}/dashboard/overview`;
   const logoUrl = `${origin}/telemetry-logo.jpg`;
