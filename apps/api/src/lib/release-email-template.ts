@@ -21,10 +21,24 @@ export function escapeHtml(value: string): string {
 const GITHUB_REPO_DOCS_BASE =
   "https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main";
 
-/** Resolve repo-relative CHANGELOG links for email clients. */
-export function resolveChangelogLink(href: string, dashboardOrigin: string): string {
+const ALLOWED_ABSOLUTE_SCHEMES = new Set(["http", "https", "mailto"]);
+
+/** Whether a changelog href may become a clickable email link. */
+export function isAllowedChangelogHref(href: string): boolean {
   const trimmed = href.trim();
-  if (!trimmed) return trimmed;
+  if (!trimmed) return false;
+  const schemeMatch = trimmed.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (!schemeMatch) return true;
+  return ALLOWED_ABSOLUTE_SCHEMES.has(schemeMatch[1]!.toLowerCase());
+}
+
+/** Resolve repo-relative CHANGELOG links for email clients. */
+export function resolveChangelogLink(
+  href: string,
+  dashboardOrigin: string
+): string | null {
+  const trimmed = href.trim();
+  if (!trimmed || !isAllowedChangelogHref(trimmed)) return null;
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
     return trimmed;
   }
@@ -58,8 +72,12 @@ export function parseInlineMarkdown(raw: string, dashboardOrigin: string): strin
     if (match[1] !== undefined) {
       result += `<strong style="font-weight:600;color:${COLORS.foreground};">${escapeHtml(match[1])}</strong>`;
     } else if (match[2] !== undefined && match[3] !== undefined) {
-      const href = escapeHtml(resolveChangelogLink(match[3], dashboardOrigin));
-      result += `<a href="${href}" style="color:${COLORS.brand};text-decoration:none;font-weight:500;">${escapeHtml(match[2])}</a>`;
+      const resolved = resolveChangelogLink(match[3], dashboardOrigin);
+      if (resolved === null) {
+        result += `<span style="color:${COLORS.muted};">${escapeHtml(match[2])}</span>`;
+      } else {
+        result += `<a href="${escapeHtml(resolved)}" style="color:${COLORS.brand};text-decoration:none;font-weight:500;">${escapeHtml(match[2])}</a>`;
+      }
     }
     lastIndex = match.index + match[0].length;
   }

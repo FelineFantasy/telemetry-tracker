@@ -36,6 +36,17 @@ describe("resolveChangelogLink", () => {
       "https://telemetry-tracker.com/docs/releases"
     );
   });
+
+  it("rejects dangerous absolute schemes", () => {
+    expect(resolveChangelogLink("javascript:alert(1)", ORIGIN)).toBeNull();
+    expect(resolveChangelogLink("data:text/html,test", ORIGIN)).toBeNull();
+  });
+
+  it("allows mailto links", () => {
+    expect(resolveChangelogLink("mailto:support@example.com", ORIGIN)).toBe(
+      "mailto:support@example.com"
+    );
+  });
 });
 
 describe("parseInlineMarkdown", () => {
@@ -60,6 +71,13 @@ describe("parseInlineMarkdown", () => {
     expect(html).toContain(
       'href="https://github.com/Telemetry-Tracker/telemetry-tracker/blob/main/docs/RELEASE.md"'
     );
+  });
+
+  it("renders unsafe link labels as plain text", () => {
+    const html = parseInlineMarkdown("[click me](javascript:alert(1))", ORIGIN);
+    expect(html).not.toContain("<a ");
+    expect(html).toContain("click me");
+    expect(html).not.toContain("javascript:");
   });
 });
 
