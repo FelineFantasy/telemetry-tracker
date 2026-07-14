@@ -16,6 +16,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 
 
+## [1.8.11] - 2026-07-14
+
+### Added
+
+- **Team settings** — copy invite link button on Settings → Team members ([#367](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/367), [#413](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/413))
+
+### Changed
+
+- **Documentation** — Spanish README translation ([#214](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/214), [#412](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/412))
+
+---
+
 ## [1.8.10] - 2026-07-13
 
 ### Added
