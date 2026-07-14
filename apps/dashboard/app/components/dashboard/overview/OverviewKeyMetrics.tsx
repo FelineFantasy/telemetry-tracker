@@ -248,7 +248,7 @@ export function OverviewKeyMetrics({
             help={
               <>
                 Custom events and automatic SDK events. Filtered by app and environment when set.
-                The ▲/▼ percentage is the change versus {compareText}.
+                The ▲/▼ percentage is the change versus {compareLabel}.
               </>
             }
             value={formatCompact(eventsCount)}
@@ -265,7 +265,7 @@ export function OverviewKeyMetrics({
             help={
               <>
                 Each row is one captured exception or error report. The delta compares to{" "}
-                {compareText}; down is good.
+                {compareLabel}; down is good.
               </>
             }
             value={formatCompact(errorsCount)}
@@ -300,7 +300,7 @@ export function OverviewKeyMetrics({
             help={
               <>
                 Counts unique identities using user_id when present, otherwise anonymous_id. Based
-                on events, not session rows. Compared to {compareText}.
+                on events, not session rows. Compared to {compareLabel}.
               </>
             }
             value={formatCompact(activeUsers)}
