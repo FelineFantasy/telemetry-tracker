@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DASHBOARD_TIME_RANGE,
+  buildUnselectedTimeRange,
   hasExplicitTimeRangeQuery,
+  listTimeRangeHiddenFields,
 } from "./time-range";
 import { redirectHrefIfMissingTimeRange } from "./list-filters-url";
 
@@ -28,5 +30,12 @@ describe("redirectHrefIfMissingTimeRange", () => {
     expect(
       redirectHrefIfMissingTimeRange("/dashboard/overview", { range: "none" })
     ).toBeNull();
+  });
+});
+
+describe("listTimeRangeHiddenFields", () => {
+  it("preserves no-date filter for GET filter forms", () => {
+    const range = buildUnselectedTimeRange();
+    expect(listTimeRangeHiddenFields(range)).toEqual({ range: "none" });
   });
 });

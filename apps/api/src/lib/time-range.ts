@@ -320,7 +320,9 @@ export function listTimeRangeHiddenFields(
   fromParam?: string,
   toParam?: string
 ): Record<string, string> {
-  if (isUnselectedTimeRange(range.key)) return {};
+  if (isUnselectedTimeRange(range.key)) {
+    return { range: range.key };
+  }
   if (range.key === "absolute") {
     const from = fromParam?.trim() || range.gte.toISOString().slice(0, 10);
     const to = toParam?.trim() || range.lte.toISOString().slice(0, 10);
