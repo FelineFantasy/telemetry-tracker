@@ -4,6 +4,7 @@ import {
   cohortIdentityKey,
   cohortSharePct,
   countUserCohorts,
+  mergeIdentityFirstSeen,
 } from "./user-cohort.js";
 
 const WINDOW_SINCE = new Date("2026-06-01T00:00:00.000Z");
@@ -87,5 +88,15 @@ describe("cohortSharePct", () => {
 
   it("returns the share of one cohort", () => {
     expect(cohortSharePct(1, 4)).toBe(25);
+  });
+});
+
+describe("mergeIdentityFirstSeen", () => {
+  it("keeps the earliest first-seen when identities collide", () => {
+    const merged = mergeIdentityFirstSeen([
+      { identity: "user-1", firstSeenAt: new Date("2026-05-01T00:00:00.000Z") },
+      { identity: "user-1", firstSeenAt: new Date("2026-06-01T00:00:00.000Z") },
+    ]);
+    expect(merged.get("user-1")?.toISOString()).toBe("2026-05-01T00:00:00.000Z");
   });
 });

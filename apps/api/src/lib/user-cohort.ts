@@ -54,3 +54,17 @@ export function cohortSharePct(part: number, total: number): number {
   if (total <= 0) return 0;
   return (part / total) * 100;
 }
+
+/** Collapse duplicate identity keys, keeping the earliest first-seen timestamp. */
+export function mergeIdentityFirstSeen(
+  entries: Array<{ identity: string; firstSeenAt: Date }>
+): Map<string, Date> {
+  const merged = new Map<string, Date>();
+  for (const entry of entries) {
+    const prev = merged.get(entry.identity);
+    if (!prev || entry.firstSeenAt < prev) {
+      merged.set(entry.identity, entry.firstSeenAt);
+    }
+  }
+  return merged;
+}

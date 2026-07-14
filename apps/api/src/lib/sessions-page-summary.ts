@@ -628,12 +628,21 @@ async function fetchUserCohortCounts(
           FROM user_device_links udl
           WHERE udl.anonymous_id = NULLIF(TRIM(s."anonymous_id"), '')
         )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM identified_first_seen ifs
+          WHERE ifs.identity = NULLIF(TRIM(s."anonymous_id"), '')
+        )
       GROUP BY 1
     ),
     project_identity AS (
-      SELECT identity, first_seen_at FROM identified_first_seen
-      UNION ALL
-      SELECT identity, first_seen_at FROM anonymous_first_seen
+      SELECT identity, MIN(first_seen_at) AS first_seen_at
+      FROM (
+        SELECT identity, first_seen_at FROM identified_first_seen
+        UNION ALL
+        SELECT identity, first_seen_at FROM anonymous_first_seen
+      ) AS merged_identities
+      GROUP BY identity
     ),
     window_flags AS (
       SELECT
