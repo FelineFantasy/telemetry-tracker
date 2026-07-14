@@ -6,7 +6,7 @@ import {
   ErrorsAnalyticsPanels,
   type ErrorsAnalyticsData,
 } from "@/app/components/dashboard/ErrorsAnalyticsPanels";
-import { mergeListQuery } from "@/lib/list-filters-url";
+import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { IssuesTable } from "@/app/components/dashboard/IssueList";
@@ -155,6 +155,8 @@ export default async function ErrorsListPage({
   const sp = await searchParams;
   const pageAnchor = new Date();
   const currentParams = buildErrorsParamsRecord(sp);
+  const defaultTimeHref = redirectHrefIfMissingTimeRange(ERRORS_PATH, currentParams);
+  if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
   const rawRelease = firstQueryValue(sp.release)?.trim() || null;

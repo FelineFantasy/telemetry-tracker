@@ -7,7 +7,7 @@ import { SessionStatusBadge } from "@/app/components/dashboard/analytics-ui";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
 import { formatDurationSec } from "@/lib/format-duration";
-import { countryFlagEmoji, formatSessionDevice } from "@/lib/session-display";
+import { countryFlagEmoji, formatSessionDevice, resolveSessionIdentityLabel } from "@/lib/session-display";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 type SessionDetail = {
@@ -28,6 +28,7 @@ type SessionDetail = {
   event_count: number;
   page_count: number;
   status: "healthy" | "warning";
+  identity_first_seen_at?: string | null;
 };
 
 async function getSession(id: string): Promise<SessionDetail | null> {
@@ -72,7 +73,7 @@ export default async function SessionDetailPage({
     );
   }
 
-  const identity = session.user_id ?? session.anonymous_id ?? null;
+  const identity = resolveSessionIdentityLabel(session.user_id, session.anonymous_id);
   const device = formatSessionDevice(session.device_browser, session.device_os);
   const countryLabel = session.country
     ? `${countryFlagEmoji(session.country) ?? ""} ${session.country.toUpperCase()}`.trim()
@@ -90,6 +91,12 @@ export default async function SessionDetailPage({
         <DetailMetaItem label="Platform" value={session.platform} />
         <DetailMetaItem label="Email" value={session.user_email} />
         <DetailMetaItem label="Identity" value={identity} />
+        {identity && session.identity_first_seen_at ? (
+          <DetailMetaItem
+            label="First seen"
+            value={<TimeAgo iso={session.identity_first_seen_at} />}
+          />
+        ) : null}
         <DetailMetaItem label="Country" value={countryLabel} />
         <DetailMetaItem label="Device" value={device} />
         <DetailMetaItem label="SDK version" value={session.sdk_version} />

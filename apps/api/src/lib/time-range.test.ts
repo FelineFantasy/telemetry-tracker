@@ -52,7 +52,7 @@ describe("parseOverviewTimeRangeQuery", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.range.key).toBe("none");
-    expect(r.range.label).toBe("Recent data");
+    expect(r.range.label).toBe("Recent (charts: last 30 days)");
   });
 });
 

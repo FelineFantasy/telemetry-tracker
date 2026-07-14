@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Loader2, Search } from "lucide-react";
 import { DashboardPopover } from "@/app/components/dashboard/shell/DashboardPopover";
 import { NavPickerTrigger } from "@/app/components/dashboard/shell/shell-primitives";
 import { mergeListQuery } from "@/lib/list-filters-url";
@@ -55,6 +55,7 @@ export function TimeRangePicker({
   align = "left",
 }: Props) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
   const [customInput, setCustomInput] = useState("");
   const [showAbsolute, setShowAbsolute] = useState(false);
@@ -65,14 +66,16 @@ export function TimeRangePicker({
 
   const navigate = useCallback(
     (updates: Record<string, string | null>) => {
-      router.push(
-        mergeListQuery(path, currentParams, {
-          ...updates,
-          page: null,
-          errorsPage: null,
-          eventsPage: null,
-        })
-      );
+      startTransition(() => {
+        router.push(
+          mergeListQuery(path, currentParams, {
+            ...updates,
+            page: null,
+            errorsPage: null,
+            eventsPage: null,
+          })
+        );
+      });
     },
     [currentParams, path, router]
   );
@@ -85,7 +88,7 @@ export function TimeRangePicker({
   );
 
   const clearDateFilter = useCallback(() => {
-    navigate({ [rangeKey]: null, [fromKey]: null, [toKey]: null });
+    navigate({ [rangeKey]: "none", [fromKey]: null, [toKey]: null });
   }, [fromKey, navigate, rangeKey, toKey]);
 
   const applyCustom = useCallback(
@@ -122,7 +125,7 @@ export function TimeRangePicker({
     !isUnselected &&
     !TIME_RANGE_PRESETS.some((p) => p.key === range.key);
 
-  const triggerLabel = isUnselected ? "Time range" : range.shortLabel;
+  const triggerLabel = isUnselected ? "Recent · 30d charts" : range.shortLabel;
 
   return (
     <DashboardPopover
@@ -138,21 +141,28 @@ export function TimeRangePicker({
           aria-expanded={isOpen}
           aria-haspopup="dialog"
           aria-label="Filter time range"
+          aria-busy={isPending ? "true" : undefined}
+          disabled={isPending}
           className={cn(
             compact
               ? "max-w-none font-mono text-[11px] uppercase tracking-wide"
               : "max-w-none font-mono text-xs uppercase tracking-wide",
-            isOpen && "border-border-strong bg-surface"
+            isOpen && "border-border-strong bg-surface",
+            isPending && "opacity-80"
           )}
         >
           <span className={isUnselected ? "text-muted-foreground" : undefined}>
             {triggerLabel}
           </span>
-          <ChevronDown
-            className={`ml-1 h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
+          {isPending ? (
+            <Loader2 className="ml-1 h-3 w-3 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+          ) : (
+            <ChevronDown
+              className={`ml-1 h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            />
+          )}
         </NavPickerTrigger>
       )}
     >
@@ -161,8 +171,10 @@ export function TimeRangePicker({
           <p className="px-3 pb-2 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             Filter by date
           </p>
-          <p className="px-3 pb-2 text-[11px] text-muted-foreground">
-            Leave unselected to show the latest rows regardless of age.
+          <p className="px-3 pb-2 text-[11px] leading-relaxed text-muted-foreground">
+            {includeAll
+              ? "No date filter shows the latest table rows at any age. Summary charts still use the last 30 days."
+              : "Choose a preset or custom range. Charts and KPIs use the selected window."}
           </p>
 
           <div className="mx-2 mb-2 flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 focus-within:border-border-strong">
@@ -192,7 +204,7 @@ export function TimeRangePicker({
                     className={`h-3.5 w-3.5 shrink-0 ${isUnselected ? "opacity-100" : "opacity-0"}`}
                     aria-hidden
                   />
-                  No date filter
+                  No date filter (all rows)
                 </button>
               </li>
             ) : null}

@@ -62,6 +62,9 @@ export type SessionsPageSummary = {
   distinctUsersPrevious: number;
   avgDurationSec: number;
   avgDurationSecPrevious: number;
+  /** Total session time per identity, averaged across distinct users in the window. */
+  avgDurationPerUserSec: number;
+  avgDurationPerUserSecPrevious: number;
   bounceRatePct: number;
   bounceRatePctPrevious: number;
   crashFreeRatePct: number;
@@ -171,6 +174,109 @@ function sessionIdentityExpr(alias = "s"): Prisma.Sql {
     NULLIF(TRIM(COALESCE(${a}."user_id", '')), ''),
     NULLIF(TRIM(COALESCE(${a}."anonymous_id", '')), '')
   )`;
+}
+
+/** Resolved session identity — user_id takes precedence over anonymous_id. */
+export type SessionIdentity = {
+  kind: "user_id" | "anonymous_id";
+  value: string;
+};
+
+/** Resolve display identity from session fields; null when neither is set. */
+export function resolveSessionIdentity(
+  userId: string | null | undefined,
+  anonymousId: string | null | undefined
+): SessionIdentity | null {
+  const uid = userId?.trim();
+  if (uid) return { kind: "user_id", value: uid };
+  const aid = anonymousId?.trim();
+  if (aid) return { kind: "anonymous_id", value: aid };
+  return null;
+}
+
+/** WHERE clause matching all sessions for one identity within a project. @internal */
+export function identityFirstSeenWhereSql(
+  projectId: string,
+  identity: SessionIdentity,
+  sessionAlias = "s",
+  linkedAnonymousId?: string | null
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  if (identity.kind === "user_id") {
+    const userMatch = Prisma.sql`NULLIF(TRIM(${s}."user_id"), '') = ${identity.value}`;
+    const linkedAnonymous = linkedAnonymousId?.trim();
+    if (linkedAnonymous) {
+      const anonymousOnlyMatch = Prisma.sql`(
+        NULLIF(TRIM(${s}."anonymous_id"), '') = ${linkedAnonymous}
+        AND NULLIF(TRIM(COALESCE(${s}."user_id", '')), '') IS NULL
+      )`;
+      return Prisma.sql`${s}."project_id" = ${projectId}
+        AND (${userMatch} OR ${anonymousOnlyMatch})`;
+    }
+    return Prisma.sql`${s}."project_id" = ${projectId} AND ${userMatch}`;
+  }
+  return Prisma.sql`${s}."project_id" = ${projectId}
+    AND NULLIF(TRIM(${s}."anonymous_id"), '') = ${identity.value}`;
+}
+
+/** Earliest session start for an identity in a project (indexed on project_id, started_at). */
+export async function fetchIdentityFirstSeenAt(
+  prisma: PrismaClient,
+  projectId: string,
+  userId: string | null | undefined,
+  anonymousId: string | null | undefined
+): Promise<Date | null> {
+  const identity = resolveSessionIdentity(userId, anonymousId);
+  if (!identity) return null;
+  const where = identityFirstSeenWhereSql(
+    projectId,
+    identity,
+    "s",
+    identity.kind === "user_id" ? anonymousId : undefined
+  );
+  const rows = await prisma.$queryRaw<[{ first_seen_at: Date | null }]>(Prisma.sql`
+    SELECT MIN(s."started_at") AS first_seen_at
+    FROM "Session" s
+    WHERE ${where}
+  `);
+  return rows[0]?.first_seen_at ?? null;
+}
+
+function sessionSummaryEventLateralSql(sessionAlias = "s"): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`LEFT JOIN LATERAL (
+    SELECT
+      COUNT(*)::int AS event_count,
+      MAX(e."created_at") AS last_event_at
+    FROM "Event" e
+    WHERE e."project_id" = ${s}."project_id"
+      AND e."session_id" = ${s}."session_id"
+      AND e."app" = ${s}."app"
+  ) ev ON TRUE`;
+}
+
+function sessionDurationSecExpr(sessionAlias = "s"): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`COALESCE(
+    CASE
+      WHEN ${s}."ended_at" IS NOT NULL
+        THEN EXTRACT(EPOCH FROM (${s}."ended_at" - ${s}."started_at"))
+    END,
+    CASE
+      WHEN ev.last_event_at IS NOT NULL
+        THEN EXTRACT(EPOCH FROM (ev.last_event_at - ${s}."started_at"))
+    END,
+    0
+  )`;
+}
+
+/** @internal Exported for unit tests. */
+export function computeAvgDurationPerUserSec(
+  totalDurationSec: number,
+  distinctUsers: number
+): number {
+  if (distinctUsers <= 0) return 0;
+  return Math.round(totalDurationSec / distinctUsers);
 }
 
 function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
@@ -305,6 +411,8 @@ type SummaryRow = {
   distinct_users_previous: bigint;
   avg_duration_sec: number | null;
   avg_duration_sec_previous: number | null;
+  avg_duration_per_user_sec: number | null;
+  avg_duration_per_user_sec_previous: number | null;
   bounce_sessions: bigint;
   bounce_sessions_previous: bigint;
   crash_free_sessions: bigint;
@@ -342,6 +450,7 @@ async function fetchSessionSummaryScalars(
     true
   );
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
+  const durationSec = sessionDurationSecExpr("s");
   const queryLowerBound = new Date(
     Math.min(since.getTime(), previousSince.getTime())
   );
@@ -368,6 +477,26 @@ async function fetchSessionSummaryScalars(
         WHERE ${previousWindow}
           AND s."ended_at" IS NOT NULL
       ) AS avg_duration_sec_previous,
+      (
+        SUM(${durationSec}) FILTER (
+          WHERE ${currentWindow}
+            AND ${identity} IS NOT NULL
+        )
+        / NULLIF(
+          COUNT(DISTINCT ${identity}) FILTER (WHERE ${currentWindow}),
+          0
+        )
+      ) AS avg_duration_per_user_sec,
+      (
+        SUM(${durationSec}) FILTER (
+          WHERE ${previousWindow}
+            AND ${identity} IS NOT NULL
+        )
+        / NULLIF(
+          COUNT(DISTINCT ${identity}) FILTER (WHERE ${previousWindow}),
+          0
+        )
+      ) AS avg_duration_per_user_sec_previous,
       COUNT(*) FILTER (
         WHERE ${currentWindow}
           AND (
@@ -393,13 +522,7 @@ async function fetchSessionSummaryScalars(
           AND ${noErrors}
       )::bigint AS crash_free_sessions_previous
     FROM "Session" s
-    LEFT JOIN LATERAL (
-      SELECT COUNT(*)::int AS event_count
-      FROM "Event" e
-      WHERE e."project_id" = s."project_id"
-        AND e."session_id" = s."session_id"
-        AND e."app" = s."app"
-    ) ev ON TRUE
+    ${sessionSummaryEventLateralSql("s")}
     WHERE ${filters}
       AND s."started_at" >= ${queryLowerBound}
       AND s."started_at" <= ${until}
@@ -412,6 +535,8 @@ async function fetchSessionSummaryScalars(
     distinct_users_previous: 0n,
     avg_duration_sec: null,
     avg_duration_sec_previous: null,
+    avg_duration_per_user_sec: null,
+    avg_duration_per_user_sec_previous: null,
     bounce_sessions: 0n,
     bounce_sessions_previous: 0n,
     crash_free_sessions: 0n,
@@ -543,6 +668,10 @@ export async function fetchSessionsPageSummary(
     distinctUsersPrevious: Number(row.distinct_users_previous),
     avgDurationSec: Math.round(Number(row.avg_duration_sec ?? 0)),
     avgDurationSecPrevious: Math.round(Number(row.avg_duration_sec_previous ?? 0)),
+    avgDurationPerUserSec: Math.round(Number(row.avg_duration_per_user_sec ?? 0)),
+    avgDurationPerUserSecPrevious: Math.round(
+      Number(row.avg_duration_per_user_sec_previous ?? 0)
+    ),
     bounceRatePct,
     bounceRatePctPrevious,
     crashFreeRatePct,
