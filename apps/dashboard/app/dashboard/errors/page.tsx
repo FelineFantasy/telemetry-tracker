@@ -1,6 +1,6 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
-import { ErrorsListToolbar } from "@/app/components/dashboard/ErrorsListToolbar";
+import { ErrorsClientListSection } from "@/app/components/dashboard/ErrorsClientListSection";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
 import {
   ErrorsAnalyticsPanels,
@@ -8,12 +8,8 @@ import {
 } from "@/app/components/dashboard/ErrorsAnalyticsPanels";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
-import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
-import { IssuesTable } from "@/app/components/dashboard/IssueList";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
-import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
-import { Pagination } from "@/app/components/ui/Pagination";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -216,8 +212,12 @@ export default async function ErrorsListPage({
   summaryQuery.delete("trendFrom");
   summaryQuery.delete("trendTo");
 
-  let items: ErrorGroupRow[] = [];
-  let total = 0;
+  let initialListData = {
+    items: [] as ErrorGroupRow[],
+    total: 0,
+    page: 1,
+    pageSize,
+  };
   let summary: ErrorsPageSummary | null = null;
   let analytics: ErrorsAnalyticsData | null = null;
   let filterOptions = { environments: [] as string[], releases: [] as string[] };
@@ -230,8 +230,12 @@ export default async function ErrorsListPage({
       getErrorsAnalytics(summaryQuery),
     ]);
     filterOptions = opts;
-    items = data.items ?? [];
-    total = resolveApiListTotal(data.total, items.length);
+    initialListData = {
+      items: data.items ?? [],
+      total: resolveApiListTotal(data.total, data.items?.length ?? 0),
+      page: data.page ?? page,
+      pageSize: data.pageSize ?? pageSize,
+    };
     summary = summaryData;
     analytics = analyticsData;
   } catch (e) {
@@ -253,8 +257,9 @@ export default async function ErrorsListPage({
     redirect(mergeListQuery(ERRORS_PATH, currentParams, { release }));
   }
 
-  const hrefForPage = (p: number) =>
-    mergeListQuery(ERRORS_PATH, currentParams, { page: String(p) });
+  const initialListParams = Object.fromEntries(apiQuery.entries());
+  const effectiveSort = sort ?? "last_seen";
+  const effectiveOrder = order ?? "desc";
 
   return (
     <>
@@ -272,12 +277,18 @@ export default async function ErrorsListPage({
 
         {analytics ? <ErrorsAnalyticsPanels analytics={analytics} /> : null}
 
-        <ErrorsListToolbar
+        <ErrorsClientListSection
           path={ERRORS_PATH}
           currentParams={currentParams}
+          urlParams={currentParams}
+          initialListParams={initialListParams}
+          initialData={initialListData}
           timeRange={timeRange}
           fromParam={from}
           toParam={to}
+          trendTimeRange={trendTimeRange}
+          trendFromParam={trendFrom}
+          trendToParam={trendTo}
           appFilter={appFilter}
           pageSize={String(pageSize)}
           defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
@@ -285,37 +296,11 @@ export default async function ErrorsListPage({
           environment={environment ?? ""}
           release={release ?? ""}
           status={status ?? "all"}
-          sort={sort ?? "last_seen"}
-          order={order ?? "desc"}
-          trendTimeRange={trendTimeRange}
-          trendFromParam={trendFrom}
-          trendToParam={trendTo}
+          sort={effectiveSort}
+          order={effectiveOrder}
           environments={filterOptions.environments}
           releases={filterOptions.releases}
         />
-
-        <ListResultCount total={total} noun={total === 1 ? "error group" : "error groups"} />
-
-        {items.length ? (
-          <IssuesTable
-            rows={items}
-            hrefForRow={(g) =>
-              appFilter
-                ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
-                : `/dashboard/errors/${g.id}`
-            }
-          />
-        ) : (
-          <EmptyState
-            title="No errors recorded"
-            message={
-              appFilter
-                ? `No error groups for "${appFilter}" with these filters.`
-                : "No error groups match these filters. Try another date range or clear filters."
-            }
-          />
-        )}
-        <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
       </AnalyticsListShell>
     </>
   );

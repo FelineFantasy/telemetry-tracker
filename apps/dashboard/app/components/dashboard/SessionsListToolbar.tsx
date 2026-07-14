@@ -19,9 +19,10 @@ import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
+import { ClientListSortRow } from "@/app/components/dashboard/ClientListSortRow";
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
 
-const SORT_OPTIONS: DashboardSelectOption[] = [
+export const SESSIONS_SORT_OPTIONS: DashboardSelectOption[] = [
   { value: "duration", label: "Duration" },
   { value: "events", label: "Events" },
   { value: "pages", label: "Pages" },
@@ -54,6 +55,9 @@ type Props = {
   releases: string[];
   countries: string[];
   platforms: string[];
+  /** When set, sort/order apply client-side without a full page navigation. */
+  onSortApply?: (sort: string, order: string) => void;
+  sortLoading?: boolean;
 };
 
 export function SessionsListToolbar({
@@ -76,6 +80,8 @@ export function SessionsListToolbar({
   releases,
   countries,
   platforms,
+  onSortApply,
+  sortLoading = false,
 }: Props) {
   const fieldIds = useId();
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
@@ -196,35 +202,45 @@ export function SessionsListToolbar({
           </FilterField>
         </FilterRow>
 
-        <FilterRow>
-          <FilterField>
-            <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
-            <DashboardCustomSelect
-              name="sort"
-              value={sort || "duration"}
-              options={SORT_OPTIONS}
-              triggerId={id("sort-t")}
-              listLabelledBy={id("sort-l")}
-            />
-          </FilterField>
+        {onSortApply ? (
+          <ClientListSortRow
+            sort={sort || "duration"}
+            order={order}
+            sortOptions={SESSIONS_SORT_OPTIONS}
+            onApply={onSortApply}
+            isLoading={sortLoading}
+          />
+        ) : (
+          <FilterRow>
+            <FilterField>
+              <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
+              <DashboardCustomSelect
+                name="sort"
+                value={sort || "duration"}
+                options={SESSIONS_SORT_OPTIONS}
+                triggerId={id("sort-t")}
+                listLabelledBy={id("sort-l")}
+              />
+            </FilterField>
 
-          <FilterSegment
-            legend="Order"
-            title="Descending vs ascending order for the selected column."
-            ariaLabel="Sort order"
-          >
-            <FilterSegmentItem name="order" value="desc" defaultChecked={order !== "asc"}>
-              Desc
-            </FilterSegmentItem>
-            <FilterSegmentItem name="order" value="asc" defaultChecked={order === "asc"}>
-              Asc
-            </FilterSegmentItem>
-          </FilterSegment>
+            <FilterSegment
+              legend="Order"
+              title="Descending vs ascending order for the selected column."
+              ariaLabel="Sort order"
+            >
+              <FilterSegmentItem name="order" value="desc" defaultChecked={order !== "asc"}>
+                Desc
+              </FilterSegmentItem>
+              <FilterSegmentItem name="order" value="asc" defaultChecked={order === "asc"}>
+                Asc
+              </FilterSegmentItem>
+            </FilterSegment>
 
-          <FilterSubmitWrap>
-            <FilterSubmitBtn>Apply</FilterSubmitBtn>
-          </FilterSubmitWrap>
-        </FilterRow>
+            <FilterSubmitWrap>
+              <FilterSubmitBtn>Apply</FilterSubmitBtn>
+            </FilterSubmitWrap>
+          </FilterRow>
+        )}
       </FilterForm>
     </FiltersSortPanel>
   );

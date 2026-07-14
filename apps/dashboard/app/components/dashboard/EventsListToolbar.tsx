@@ -20,8 +20,9 @@ import {
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
+import { ClientListSortRow } from "@/app/components/dashboard/ClientListSortRow";
 
-const SORT_OPTIONS: DashboardSelectOption[] = [
+export const EVENTS_SORT_OPTIONS: DashboardSelectOption[] = [
   { value: "last_seen", label: "Last seen" },
   { value: "first_seen", label: "First seen" },
   { value: "count", label: "Count" },
@@ -49,6 +50,8 @@ type Props = {
   environments: string[];
   platforms: string[];
   releases: string[];
+  onSortApply?: (sort: string, order: string) => void;
+  sortLoading?: boolean;
 };
 
 export function EventsListToolbar({
@@ -70,6 +73,8 @@ export function EventsListToolbar({
   environments,
   platforms,
   releases,
+  onSortApply,
+  sortLoading = false,
 }: Props) {
   const fieldIds = useId();
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
@@ -165,6 +170,11 @@ export function EventsListToolbar({
               listLabelledBy={id("rel-l")}
             />
           </FilterField>
+          {onSortApply ? (
+            <FilterSubmitWrap>
+              <FilterSubmitBtn>Apply filters</FilterSubmitBtn>
+            </FilterSubmitWrap>
+          ) : null}
         </FilterRow>
 
         <FilterRow>
@@ -180,13 +190,24 @@ export function EventsListToolbar({
           </FilterField>
         </FilterRow>
 
+        {onSortApply ? (
+          <ClientListSortRow
+            sort={sort || "last_seen"}
+            order={order}
+            sortOptions={EVENTS_SORT_OPTIONS}
+            onApply={onSortApply}
+            isLoading={sortLoading}
+          />
+        ) : null}
+
+        {!onSortApply ? (
         <FilterRow>
           <FilterField>
             <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
             <DashboardCustomSelect
               name="sort"
               value={sort || "last_seen"}
-              options={SORT_OPTIONS}
+              options={EVENTS_SORT_OPTIONS}
               triggerId={id("sort-t")}
               listLabelledBy={id("sort-l")}
             />
@@ -209,6 +230,7 @@ export function EventsListToolbar({
             <FilterSubmitBtn>Apply</FilterSubmitBtn>
           </FilterSubmitWrap>
         </FilterRow>
+        ) : null}
       </FilterForm>
     </FiltersSortPanel>
   );

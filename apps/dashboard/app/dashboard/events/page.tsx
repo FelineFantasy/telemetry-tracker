@@ -1,19 +1,16 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
-import { EventsListToolbar } from "@/app/components/dashboard/EventsListToolbar";
+import { EventsClientListSection } from "@/app/components/dashboard/EventsClientListSection";
 import { EventsSummaryMetrics, type EventsPageSummary } from "@/app/components/dashboard/EventsSummaryMetrics";
 import {
   EventsAnalyticsPanels,
   type EventsAnalyticsData,
 } from "@/app/components/dashboard/EventsAnalyticsPanels";
-import { EventsTable } from "@/app/components/dashboard/EventsTable";
+import { type EventsTableRow } from "@/app/components/dashboard/EventsTable";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
-import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
-import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
-import { Pagination } from "@/app/components/ui/Pagination";
 import {
   DEFAULT_LIST_PAGE_SIZE,
   parsePageParam,
@@ -26,19 +23,7 @@ import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const EVENTS_PATH = "/dashboard/events";
 
-type EventNameRow = {
-  name: string;
-  app: string;
-  platform?: string | null;
-  environment?: string | null;
-  count_in_range: number;
-  share_pct: number;
-  users_affected?: number;
-  last_seen: string;
-  latest_event_id?: string | null;
-  capture_kind?: "auto" | "custom";
-  sparkline?: { t: string; count: number }[];
-};
+type EventNameRow = EventsTableRow;
 
 async function getEvents(search: URLSearchParams) {
   const res = await dashboardApiFetch(`/api/events?${search.toString()}`);
@@ -169,8 +154,12 @@ export default async function EventsPage({
   summaryQuery.delete("order");
   summaryQuery.delete("view");
 
-  let items: EventNameRow[] = [];
-  let total = 0;
+  let initialListData = {
+    items: [] as EventNameRow[],
+    total: 0,
+    page: 1,
+    pageSize,
+  };
   let summary: EventsPageSummary | null = null;
   let analytics: EventsAnalyticsData | null = null;
   let filterOptions = {
@@ -187,8 +176,12 @@ export default async function EventsPage({
       getEventsAnalytics(summaryQuery),
     ]);
     filterOptions = opts;
-    items = data.items ?? [];
-    total = resolveApiListTotal(data.total, items.length);
+    initialListData = {
+      items: data.items ?? [],
+      total: resolveApiListTotal(data.total, data.items?.length ?? 0),
+      page: data.page ?? page,
+      pageSize: data.pageSize ?? pageSize,
+    };
     summary = summaryData;
     analytics = analyticsData;
   } catch (e) {
@@ -205,8 +198,9 @@ export default async function EventsPage({
     redirect(mergeListQuery(EVENTS_PATH, currentParams, { environment }));
   }
 
-  const hrefForPage = (p: number) =>
-    mergeListQuery(EVENTS_PATH, currentParams, { page: String(p) });
+  const initialListParams = Object.fromEntries(apiQuery.entries());
+  const effectiveSort = sort ?? "last_seen";
+  const effectiveOrder = order ?? "desc";
 
   const contextParts = [timeRange.label];
   if (appFilter) contextParts.push(`App: ${appFilter}`);
@@ -228,9 +222,12 @@ export default async function EventsPage({
 
         {analytics ? <EventsAnalyticsPanels analytics={analytics} /> : null}
 
-        <EventsListToolbar
+        <EventsClientListSection
           path={EVENTS_PATH}
           currentParams={currentParams}
+          urlParams={currentParams}
+          initialListParams={initialListParams}
+          initialData={initialListData}
           timeRange={timeRange}
           fromParam={from}
           toParam={to}
@@ -242,46 +239,12 @@ export default async function EventsPage({
           platform={platform ?? ""}
           release={release ?? ""}
           propertiesContains={propertiesContains ?? ""}
-          sort={sort ?? "last_seen"}
-          order={order ?? "desc"}
+          sort={effectiveSort}
+          order={effectiveOrder}
           environments={filterOptions.environments}
           platforms={filterOptions.platforms}
           releases={filterOptions.releases}
         />
-
-        <p className="text-sm text-muted-foreground">
-          Properties search matches raw JSON text (useful for known keys or values).
-        </p>
-
-        <ListResultCount
-          total={total}
-          noun={total === 1 ? "event name" : "event names"}
-        />
-
-        {items.length ? (
-          <EventsTable
-            rows={items}
-            hrefForName={(row) =>
-              mergeListQuery(EVENTS_PATH, currentParams, { name: row.name, page: "1" })
-            }
-            hrefForView={(row) => {
-              if (!row.latest_event_id) return null;
-              return appFilter
-                ? `/dashboard/events/${row.latest_event_id}?app=${encodeURIComponent(appFilter)}`
-                : `/dashboard/events/${row.latest_event_id}`;
-            }}
-          />
-        ) : (
-          <EmptyState
-            title="No events recorded"
-            message={
-              appFilter || name
-                ? "No event names match these filters. Try adjusting the name filter or date range."
-                : "No events have been recorded yet. Instrument your app and send events to see them here."
-            }
-          />
-        )}
-        <Pagination total={total} page={page} pageSize={pageSize} hrefForPage={hrefForPage} />
       </AnalyticsListShell>
     </>
   );
