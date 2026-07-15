@@ -434,11 +434,6 @@ export async function listOverviewErrorGroupsInWindow(
 ): Promise<OverviewTopErrorGroup[]> {
   const window = { gte: scope.since, lte: scope.until };
   const orderSql = overviewErrorGroupsWindowOrderSql(opts.sort, opts.order);
-  // Match Issues / unscoped Overview membership: group last_seen must be in range.
-  const lastSeenClause = Prisma.sql`
-    AND eg."last_seen" >= ${window.gte}
-    AND eg."last_seen" <= ${window.lte}
-  `;
   const rows = await prisma.$queryRaw<
     Array<{
       id: string;
@@ -458,7 +453,6 @@ export async function listOverviewErrorGroupsInWindow(
     FROM "ErrorGroup" eg
     INNER JOIN "ErrorOccurrence" eo ON eo."error_group_id" = eg.id
     WHERE ${overviewErrorGroupsWindowClauses(scope.projectId, scope, window)}
-      ${lastSeenClause}
     GROUP BY eg.id, eg.message, eg.app
     ${orderSql}
     OFFSET ${opts.skip}
@@ -479,10 +473,6 @@ export async function countOverviewErrorGroupsInWindow(
   scope: Scope
 ): Promise<number> {
   const window = { gte: scope.since, lte: scope.until };
-  const lastSeenClause = Prisma.sql`
-    AND eg."last_seen" >= ${window.gte}
-    AND eg."last_seen" <= ${window.lte}
-  `;
   const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
     SELECT COUNT(*)::bigint AS c
     FROM (
@@ -490,7 +480,6 @@ export async function countOverviewErrorGroupsInWindow(
       FROM "ErrorGroup" eg
       INNER JOIN "ErrorOccurrence" eo ON eo."error_group_id" = eg.id
       WHERE ${overviewErrorGroupsWindowClauses(scope.projectId, scope, window)}
-        ${lastSeenClause}
       GROUP BY eg.id
     ) grouped
   `);
