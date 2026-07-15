@@ -99,6 +99,20 @@ describe("buildErrorGroupScopeSql", () => {
     expect(text).toContain('"last_seen" <= ?');
   });
 
+  it("scopes platform membership to in-window occurrences instead of last_seen", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const sql = buildErrorGroupScopeSql(
+      { range: { gte: since, lte: until }, status: "all", platform: "ios" },
+      "proj-1"
+    );
+    const text = prismaSqlText(sql);
+    expect(text).not.toContain('"last_seen"');
+    expect(text).toContain('rel."platform" = ?');
+    expect(text).toContain('rel."created_at" >= ?');
+    expect(text).toContain('rel."created_at" <= ?');
+  });
+
   it("applies message search on error groups", () => {
     const sql = buildErrorGroupScopeSql(
       { range: {}, q: "timeout", status: "all" },
