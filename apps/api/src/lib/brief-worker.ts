@@ -111,6 +111,7 @@ export async function processNextBriefGenerationJob(
     env,
   });
   if (!leaseHeld) {
+    await expireBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "expired", jobId: job.id };
   }
 
@@ -154,6 +155,7 @@ export async function processNextBriefGenerationJob(
     now: nowFn(),
   });
   if (!completed) {
+    await expireBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "expired", jobId: job.id };
   }
 

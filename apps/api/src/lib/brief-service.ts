@@ -197,7 +197,7 @@ export async function getWorkspaceBrief(
       httpStatus: 200,
       requestId: stale.requestId,
       snapshotHash: stale.snapshotHash,
-      contentHash,
+      contentHash: stale.contentHash,
       brief: stale.brief,
       meta: { ...buildMeta, source: "stale" },
     };
