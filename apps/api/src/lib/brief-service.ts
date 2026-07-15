@@ -186,6 +186,12 @@ export async function getWorkspaceBrief(
     env,
   });
   if (stale) {
+    try {
+      await enqueueBriefGenerationJob(deps.prisma, identity);
+    } catch {
+      // Non-blocking: stale display must not fail when enqueue races or errors.
+    }
+
     return {
       status: "ok",
       httpStatus: 200,

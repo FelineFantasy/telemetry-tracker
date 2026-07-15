@@ -84,18 +84,56 @@ export async function enqueueBriefGenerationJob(
           },
         },
       });
-      return mapJob(existing);
+
+      if (
+        existing.status === BriefGenerationJobStatus.PENDING ||
+        existing.status === BriefGenerationJobStatus.PROCESSING ||
+        existing.status === BriefGenerationJobStatus.COMPLETED
+      ) {
+        return mapJob(existing);
+      }
+
+      const retried = await prisma.briefGenerationJob.update({
+        where: { id: existing.id },
+        data: {
+          status: BriefGenerationJobStatus.PENDING,
+          request_id: requestId,
+          lease_owner: null,
+          lease_expires_at: null,
+          completed_at: null,
+        },
+      });
+      return mapJob(retried);
     }
     throw error;
   }
+}
+
+function resolveWorkerLeaseMs(env?: NodeJS.ProcessEnv): number {
+  const config = resolveBriefAsyncConfig(env);
+  return Math.max(config.workerLeaseMs, config.workerTotalBudgetMs) + 5_000;
+}
+
+export async function renewBriefGenerationJobLease(
+  prisma: PrismaClient,
+  input: { jobId: string; workerId: string; now: Date; env?: NodeJS.ProcessEnv }
+): Promise<void> {
+  const leaseExpiresAt = new Date(input.now.getTime() + resolveWorkerLeaseMs(input.env));
+  await prisma.briefGenerationJob.updateMany({
+    where: {
+      id: input.jobId,
+      lease_owner: input.workerId,
+      status: BriefGenerationJobStatus.PROCESSING,
+    },
+    data: { lease_expires_at: leaseExpiresAt },
+  });
 }
 
 export async function claimNextBriefGenerationJob(
   prisma: PrismaClient,
   input: { workerId: string; now: Date; env?: NodeJS.ProcessEnv }
 ): Promise<BriefGenerationJobRow | null> {
-  const config = resolveBriefAsyncConfig(input.env);
-  const leaseExpiresAt = new Date(input.now.getTime() + config.workerLeaseMs);
+  const leaseExpiresAt = new Date(input.now.getTime() + resolveWorkerLeaseMs(input.env));
 
   return prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<

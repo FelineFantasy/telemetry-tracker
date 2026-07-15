@@ -215,6 +215,7 @@ describe("getWorkspaceBrief (async read path)", () => {
     if (result.status !== "ok") return;
     expect(result.meta.source).toBe("stale");
     expect(result.requestId).toBe(STORED_REQUEST_ID);
+    expect(generationJob.enqueueBriefGenerationJob).toHaveBeenCalledTimes(1);
   });
 
   it("enqueues a job and returns factual fallback when no completed brief exists", async () => {

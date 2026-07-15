@@ -15,6 +15,7 @@ import {
   completeBriefGenerationJob,
   expireBriefGenerationJob,
   failBriefGenerationJob,
+  renewBriefGenerationJobLease,
   type BriefGenerationJobRow,
 } from "./brief-generation-job.js";
 import { buildOrganizationBriefSnapshot, loadOrganizationBriefContext } from "./brief-org-snapshot.js";
@@ -95,6 +96,13 @@ export async function processNextBriefGenerationJob(
     await expireBriefGenerationJob(deps.prisma, job.id);
     return { status: "expired", jobId: job.id };
   }
+
+  await renewBriefGenerationJobLease(deps.prisma, {
+    jobId: job.id,
+    workerId,
+    now,
+    env,
+  });
 
   const aiResolved = resolveBriefAiClientConfigFromEnv(env);
   if (!aiResolved.ok) {
