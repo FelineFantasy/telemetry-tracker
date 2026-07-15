@@ -290,6 +290,28 @@ function occurrenceInRangeExpr(f: ErrorListFilterInput, alias = "o"): Prisma.Sql
   return Prisma.sql`SUM(CASE WHEN ${Prisma.join(parts, " AND ")} THEN 1 ELSE 0 END)::bigint`;
 }
 
+/** First/last seen among platform/release matches inside the active list range. */
+function scopedSeenAggregateExprs(
+  f: Pick<ErrorListFilterInput, "range" | "occurrenceCountRange">
+): { firstSeen: Prisma.Sql; lastSeen: Prisma.Sql } {
+  const gte = f.range.gte ?? f.occurrenceCountRange?.gte;
+  const lte = f.range.lte ?? f.occurrenceCountRange?.lte;
+  const parts: Prisma.Sql[] = [];
+  if (gte) parts.push(Prisma.sql`o.created_at >= ${gte}`);
+  if (lte) parts.push(Prisma.sql`o.created_at <= ${lte}`);
+  if (parts.length === 0) {
+    return {
+      firstSeen: Prisma.sql`MIN(o.created_at)`,
+      lastSeen: Prisma.sql`MAX(o.created_at)`,
+    };
+  }
+  const inRange = Prisma.join(parts, " AND ");
+  return {
+    firstSeen: Prisma.sql`MIN(o.created_at) FILTER (WHERE ${inRange})`,
+    lastSeen: Prisma.sql`MAX(o.created_at) FILTER (WHERE ${inRange})`,
+  };
+}
+
 function aggregateJoinSql(
   f: ErrorListFilterInput,
   recentStart: Date,
@@ -298,6 +320,7 @@ function aggregateJoinSql(
 ): Prisma.Sql {
   const scopeClause = occurrenceScopeSql(f);
   const inRangeExpr = occurrenceInRangeExpr(f, "o");
+  const scopedSeen = scopedSeenAggregateExprs(f);
 
   return Prisma.sql`
   LEFT JOIN (
@@ -314,8 +337,8 @@ function aggregateJoinSql(
       SUM(CASE WHEN o.created_at >= ${recentStart} AND o.created_at < ${end} THEN 1 ELSE 0 END)::bigint AS occurrences_recent,
       SUM(CASE WHEN o.created_at >= ${prevStart} AND o.created_at < ${recentStart} THEN 1 ELSE 0 END)::bigint AS occurrences_previous,
       ${inRangeExpr} AS occurrences_in_range,
-      MIN(o.created_at) AS scoped_first_seen,
-      MAX(o.created_at) AS scoped_last_seen
+      ${scopedSeen.firstSeen} AS scoped_first_seen,
+      ${scopedSeen.lastSeen} AS scoped_last_seen
     FROM "ErrorOccurrence" o
     WHERE TRUE ${scopeClause}
     GROUP BY o.error_group_id
@@ -488,6 +511,7 @@ export async function fetchMetricsForGroupIds(
   const scopeClause = occurrenceScopeSql(filter);
   const inRangeExpr = occurrenceInRangeExpr(filter, "o");
   const scopedSeen = hasOccurrenceScope(filter);
+  const scopedSeenExprs = scopedSeenAggregateExprs(filter);
 
   const idList = ids.map((id) => Prisma.sql`${id}`);
   const rows = await prisma.$queryRaw<Record<string, unknown>[]>(
@@ -505,8 +529,8 @@ export async function fetchMetricsForGroupIds(
       SUM(CASE WHEN o.created_at >= ${recentStart} AND o.created_at < ${end} THEN 1 ELSE 0 END)::bigint AS occurrences_recent,
       SUM(CASE WHEN o.created_at >= ${prevStart} AND o.created_at < ${recentStart} THEN 1 ELSE 0 END)::bigint AS occurrences_previous,
       ${inRangeExpr} AS occurrences_in_range,
-      MIN(o.created_at) AS scoped_first_seen,
-      MAX(o.created_at) AS scoped_last_seen
+      ${scopedSeenExprs.firstSeen} AS scoped_first_seen,
+      ${scopedSeenExprs.lastSeen} AS scoped_last_seen
     FROM "ErrorOccurrence" o
     WHERE o.error_group_id IN (${Prisma.join(idList)})
       ${scopeClause}
