@@ -438,15 +438,48 @@ export function sessionWindowWithEventScope(
     ? sessionStartedInPreviousWindow(sessionAlias, since, until)
     : sessionStartedInCurrentWindow(sessionAlias, since, until);
   if (!f.environment && !f.release) return startedAt;
-  // Windowed KPI path still uses event matching; session columns lack started_at-aligned env for legacy.
-  const eventClauses = sessionEventScopeClauses(f);
-  if (eventClauses.length === 0) return startedAt;
-  return Prisma.sql`(${startedAt} AND ${sessionEventExistsSql(
-    projectId,
-    sessionAlias,
-    eventClauses,
-    { gte: since, lte: until, exclusiveLte: exclusiveUntil }
-  )})`;
+
+  // Prefer Session columns; fall back to events when those columns are still null (legacy).
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  const eventWindow: SessionEventWindow = {
+    gte: since,
+    lte: until,
+    exclusiveLte: exclusiveUntil,
+  };
+  const parts: Prisma.Sql[] = [];
+  if (f.environment) {
+    parts.push(
+      Prisma.sql`(
+        ${s}."environment" = ${f.environment}
+        OR (
+          ${s}."environment" IS NULL
+          AND ${sessionEventExistsSql(
+            projectId,
+            sessionAlias,
+            [Prisma.sql`e."environment" = ${f.environment}`],
+            eventWindow
+          )}
+        )
+      )`
+    );
+  }
+  if (f.release) {
+    parts.push(
+      Prisma.sql`(
+        ${s}."release" = ${f.release}
+        OR (
+          ${s}."release" IS NULL
+          AND ${sessionEventExistsSql(
+            projectId,
+            sessionAlias,
+            [Prisma.sql`e."release" = ${f.release}`],
+            eventWindow
+          )}
+        )
+      )`
+    );
+  }
+  return Prisma.sql`(${startedAt} AND ${Prisma.join(parts, " AND ")})`;
 }
 
 function sessionSearchSql(q: string): Prisma.Sql {

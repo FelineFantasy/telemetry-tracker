@@ -195,7 +195,7 @@ describe("sessionFilterSql", () => {
 });
 
 describe("sessionWindowWithEventScope", () => {
-  it("requires matching events inside the current metrics window", () => {
+  it("prefers session environment with event fallback inside the metrics window", () => {
     const since = new Date("2026-03-01T00:00:00.000Z");
     const until = new Date("2026-03-15T00:00:00.000Z");
     const text = prismaSqlText(
@@ -210,6 +210,7 @@ describe("sessionWindowWithEventScope", () => {
 
     expect(text).toContain('"started_at" >=');
     expect(text).toContain('"started_at" <=');
+    expect(text).toContain('"s"."environment"');
     expect(text).toContain('e."created_at" >=');
     expect(text).toContain('e."created_at" <=');
   });

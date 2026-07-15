@@ -60,6 +60,7 @@ function buildSessionPayload(cfg, endedAt) {
         app: cfg.app,
         platform: cfg.platform ?? undefined,
         environment: cfg.environment ?? undefined,
+        release: cfg.release ?? undefined,
         user_id: userId ?? undefined,
         user_email: userEmail ?? undefined,
         anonymous_id: getAnonymousId(),

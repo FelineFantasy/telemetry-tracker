@@ -313,7 +313,8 @@ function aggregateJoinSql(
 
 function orderByAggregateSql(
   sort: ErrorListSort,
-  order: ErrorListOrder
+  order: ErrorListOrder,
+  f: ErrorListFilterInput
 ): Prisma.Sql {
   const dir = order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
   const nulls = order === "asc" ? Prisma.sql`NULLS FIRST` : Prisma.sql`NULLS LAST`;
@@ -326,8 +327,37 @@ function orderByAggregateSql(
   if (sort === "occurrences") {
     return Prisma.sql`ORDER BY COALESCE(agg.occurrences_in_range, 0) ${dir} ${nulls}, eg.last_seen DESC`;
   }
+  if (sort === "first_seen") {
+    const expr = hasOccurrenceScope(f)
+      ? Prisma.sql`COALESCE(agg.scoped_first_seen, eg.first_seen)`
+      : Prisma.sql`eg.first_seen`;
+    return Prisma.sql`ORDER BY ${expr} ${dir} ${nulls}`;
+  }
+  if (sort === "last_seen") {
+    const expr = hasOccurrenceScope(f)
+      ? Prisma.sql`COALESCE(agg.scoped_last_seen, eg.last_seen)`
+      : Prisma.sql`eg.last_seen`;
+    return Prisma.sql`ORDER BY ${expr} ${dir} ${nulls}`;
+  }
+  if (sort === "message") {
+    return Prisma.sql`ORDER BY eg.message ${dir} ${nulls}`;
+  }
+  if (sort === "app") {
+    return Prisma.sql`ORDER BY eg.app ${dir} ${nulls}`;
+  }
+  if (sort === "environment") {
+    return Prisma.sql`ORDER BY eg.environment ${dir} ${nulls}`;
+  }
   const trendExpr = Prisma.sql`(COALESCE(agg.occurrences_recent, 0)::float / GREATEST(COALESCE(agg.occurrences_previous, 0), 1))`;
   return Prisma.sql`ORDER BY ${trendExpr} ${dir} ${nulls}, eg.last_seen DESC`;
+}
+
+/** True when release/platform filters require SQL order by scoped occurrence times. */
+export function requiresScopedSeenAggregateSort(
+  sort: ErrorListSort,
+  f: Pick<ErrorListFilterInput, "release" | "platform">
+): boolean {
+  return hasOccurrenceScope(f) && (sort === "first_seen" || sort === "last_seen");
 }
 
 export async function listErrorGroupsAggregated(
@@ -348,7 +378,7 @@ export async function listErrorGroupsAggregated(
 
   const whereSql = buildWhereSql(f, projectId);
   const joinSql = aggregateJoinSql(f, recentStart, prevStart, end);
-  const orderSql = orderByAggregateSql(sort, order);
+  const orderSql = orderByAggregateSql(sort, order, f);
 
   const countRows = await prisma.$queryRaw<[{ c: bigint }]>(
     Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "ErrorGroup" eg WHERE ${whereSql}`

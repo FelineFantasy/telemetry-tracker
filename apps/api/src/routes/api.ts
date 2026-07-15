@@ -11,6 +11,7 @@ import {
   parseErrorListOrderParam,
   parseErrorListSortParam,
   parseTrendWindowParam,
+  requiresScopedSeenAggregateSort,
   serializeErrorGroupListItem,
   type ErrorGroupListRow,
   type ErrorListFilterInput,
@@ -661,7 +662,10 @@ export async function apiRoutes(
     };
     const metricsFilter = enrichErrorListFilterForMetrics(filter, range, metricsAnchor);
 
-    if (isAggregateSort(sortParsed.sort)) {
+    if (
+      isAggregateSort(sortParsed.sort) ||
+      requiresScopedSeenAggregateSort(sortParsed.sort, metricsFilter)
+    ) {
       const { total, rows } = await listErrorGroupsAggregated(
         prisma,
         metricsFilter,

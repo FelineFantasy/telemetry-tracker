@@ -236,11 +236,11 @@ export default async function ErrorsListPage({
   };
   let summary: ErrorsPageSummary | null = null;
   let analytics: ErrorsAnalyticsData | null = null;
-  let filterOptions = {
-    environments: [] as string[],
-    platforms: [] as string[],
-    releases: [] as string[],
-  };
+  let filterOptions: {
+    environments: string[];
+    platforms: string[];
+    releases: string[];
+  } | null = null;
 
   try {
     const [opts, data, summaryData, analyticsData] = await Promise.all([
@@ -267,17 +267,23 @@ export default async function ErrorsListPage({
     );
   }
 
-  const environment = resolveScopedQueryValue(rawEnv, filterOptions.environments);
+  const options = filterOptions ?? {
+    environments: [] as string[],
+    platforms: [] as string[],
+    releases: [] as string[],
+  };
+
+  const environment = resolveScopedQueryValue(rawEnv, options.environments);
   if (rawEnv !== environment) {
     redirect(mergeListQuery(ERRORS_PATH, currentParams, { environment }));
   }
 
-  const release = resolveScopedQueryValue(rawRelease, filterOptions.releases);
+  const release = resolveScopedQueryValue(rawRelease, options.releases);
   if (rawRelease !== release) {
     redirect(mergeListQuery(ERRORS_PATH, currentParams, { release }));
   }
 
-  const platform = resolveScopedQueryValue(rawPlatform, filterOptions.platforms);
+  const platform = resolveScopedQueryValue(rawPlatform, options.platforms);
   if (rawPlatform !== platform) {
     redirect(mergeListQuery(ERRORS_PATH, currentParams, { platform }));
   }
@@ -323,9 +329,9 @@ export default async function ErrorsListPage({
           status={status ?? "all"}
           sort={effectiveSort}
           order={effectiveOrder}
-          environments={filterOptions.environments}
-          platforms={filterOptions.platforms}
-          releases={filterOptions.releases}
+          environments={options.environments}
+          platforms={options.platforms}
+          releases={options.releases}
         />
       </AnalyticsListShell>
     </>
