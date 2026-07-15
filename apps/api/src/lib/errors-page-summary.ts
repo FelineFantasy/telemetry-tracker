@@ -91,14 +91,14 @@ export function buildErrorGroupScopeSql(
     const pat = `%${escapeLikePattern(f.q)}%`;
     parts.push(Prisma.sql`${eg}."message" ILIKE ${pat} ESCAPE '\\'`);
   }
-  if (f.range.gte) parts.push(Prisma.sql`${eg}."last_seen" >= ${f.range.gte}`);
-  if (f.range.lte) parts.push(Prisma.sql`${eg}."last_seen" <= ${f.range.lte}`);
   if (f.status === "unresolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NOT NULL`);
   if (f.release || f.platform) {
     const scopeParts: Prisma.Sql[] = [];
     if (f.release) scopeParts.push(Prisma.sql`rel."release" = ${f.release}`);
     if (f.platform) scopeParts.push(Prisma.sql`rel."platform" = ${f.platform}`);
+    if (f.range.gte) scopeParts.push(Prisma.sql`rel."created_at" >= ${f.range.gte}`);
+    if (f.range.lte) scopeParts.push(Prisma.sql`rel."created_at" <= ${f.range.lte}`);
     parts.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "ErrorOccurrence" rel
@@ -106,6 +106,9 @@ export function buildErrorGroupScopeSql(
           AND ${Prisma.join(scopeParts, " AND ")}
       )`
     );
+  } else {
+    if (f.range.gte) parts.push(Prisma.sql`${eg}."last_seen" >= ${f.range.gte}`);
+    if (f.range.lte) parts.push(Prisma.sql`${eg}."last_seen" <= ${f.range.lte}`);
   }
   return Prisma.join(parts, " AND ");
 }
