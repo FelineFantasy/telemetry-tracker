@@ -217,6 +217,19 @@ export async function getWorkspaceBrief(
     };
   }
 
+  const completedAfterEnqueue = await findCurrentBriefCompleted(deps.prisma, identity, now);
+  if (completedAfterEnqueue) {
+    return {
+      status: "ok",
+      httpStatus: 200,
+      requestId: completedAfterEnqueue.requestId,
+      snapshotHash: completedAfterEnqueue.snapshotHash,
+      contentHash,
+      brief: completedAfterEnqueue.brief,
+      meta: { ...buildMeta, source: "ai" },
+    };
+  }
+
   return unavailableFallbackResult({
     requestId: job.requestId,
     snapshotHash,

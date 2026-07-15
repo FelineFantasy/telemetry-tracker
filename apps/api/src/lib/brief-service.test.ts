@@ -242,6 +242,35 @@ describe("getWorkspaceBrief (async read path)", () => {
     );
   });
 
+  it("serves a completed brief when one appears between lookup and enqueue", async () => {
+    const completedAfterRace = {
+      id: "completed-race",
+      organizationId: ORG_ID,
+      contentHash: "c".repeat(64),
+      presentationHash: "p".repeat(64),
+      responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
+      requestId: STORED_REQUEST_ID,
+      snapshotHash: "d".repeat(64),
+      brief: storedBrief,
+      completedAt: fixedNow,
+      expiresAt: new Date("2026-08-14T12:00:00.000Z"),
+    };
+
+    vi.spyOn(completed, "findCurrentBriefCompleted")
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedAfterRace);
+
+    const result = await getWorkspaceBrief({ prisma, now: () => fixedNow }, {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.requestId).toBe(STORED_REQUEST_ID);
+    expect(result.meta.source).toBe("ai");
+  });
+
   it("enqueues a job and returns factual fallback when no completed brief exists", async () => {
     const result = await getWorkspaceBrief({ prisma, now: () => fixedNow }, {
       userId: USER_ID,
