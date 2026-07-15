@@ -89,6 +89,9 @@ function errorGroupScopeWhere(scope: Scope): Prisma.ErrorGroupWhereInput {
   if (scope.platform || scope.release) {
     where.occurrences_list = {
       some: {
+        created_at: scope.until
+          ? { gte: scope.since, lte: scope.until }
+          : { gte: scope.since },
         ...(scope.platform ? { platform: scope.platform } : {}),
         ...(scope.release ? { release: scope.release } : {}),
       },
@@ -784,11 +787,13 @@ function relativeStarted(iso: string): string {
 
 export function errorGroupDetailHref(
   id: string,
-  scope: Pick<Scope, "app" | "environment">
+  scope: Pick<Scope, "app" | "environment" | "platform" | "release">
 ): string {
   const params = new URLSearchParams();
   if (scope.app) params.set("app", scope.app);
   if (scope.environment) params.set("environment", scope.environment);
+  if (scope.platform) params.set("platform", scope.platform);
+  if (scope.release) params.set("release", scope.release);
   const q = params.toString();
   return q ? `/dashboard/errors/${id}?${q}` : `/dashboard/errors/${id}`;
 }

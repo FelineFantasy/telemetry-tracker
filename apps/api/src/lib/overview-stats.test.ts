@@ -103,6 +103,16 @@ describe("errorGroupDetailHref", () => {
     ).toBe("/dashboard/errors/eg_1?app=web&environment=production");
   });
 
+  it("includes platform and release scope in the link", () => {
+    expect(
+      errorGroupDetailHref("eg_1", {
+        app: "mobile",
+        platform: "ios",
+        release: "1.2.0",
+      })
+    ).toBe("/dashboard/errors/eg_1?app=mobile&platform=ios&release=1.2.0");
+  });
+
   it("omits query string when no scope filters are set", () => {
     expect(errorGroupDetailHref("eg_1", {})).toBe("/dashboard/errors/eg_1");
   });

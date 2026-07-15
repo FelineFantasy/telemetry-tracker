@@ -300,6 +300,7 @@ export async function apiRoutes(
         ? {
             occurrences_list: {
               some: {
+                created_at: { gte: since, lte: until },
                 ...(platform ? { platform } : {}),
                 ...(release ? { release } : {}),
               },
@@ -453,6 +454,8 @@ export async function apiRoutes(
       until,
       app: appFilter,
       environment,
+      platform,
+      release,
       names: eventCounts.map((row) => row.name),
     });
 
