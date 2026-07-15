@@ -42,12 +42,12 @@ describe("enqueueBriefGenerationJob", () => {
     vi.restoreAllMocks();
   });
 
-  it("resets FAILED jobs to PENDING with a new requestId and requestUntil", async () => {
+  it("resets FAILED jobs to PENDING while preserving requestId", async () => {
     const update = vi.fn().mockResolvedValue(
-      existingJob({ status: BriefGenerationJobStatus.PENDING, request_id: "req-new" })
+      existingJob({ status: BriefGenerationJobStatus.PENDING, request_id: "req-existing" })
     );
     const findUniqueOrThrow = vi.fn().mockResolvedValue(
-      existingJob({ status: BriefGenerationJobStatus.FAILED })
+      existingJob({ status: BriefGenerationJobStatus.FAILED, request_id: "req-existing" })
     );
 
     const prisma = {
@@ -69,7 +69,7 @@ describe("enqueueBriefGenerationJob", () => {
       where: { id: "job-1" },
       data: {
         status: BriefGenerationJobStatus.PENDING,
-        request_id: expect.any(String),
+        request_id: "req-existing",
         request_until: REQUEST_UNTIL,
         lease_owner: null,
         lease_expires_at: null,
@@ -77,7 +77,7 @@ describe("enqueueBriefGenerationJob", () => {
       },
     });
     expect(result.status).toBe(BriefGenerationJobStatus.PENDING);
-    expect(result.requestId).toBe("req-new");
+    expect(result.requestId).toBe("req-existing");
   });
 
   it("returns in-flight jobs without resetting them", async () => {
@@ -108,10 +108,10 @@ describe("enqueueBriefGenerationJob", () => {
   it("resets COMPLETED jobs when the matching BriefCompleted row is missing", async () => {
     vi.spyOn(completed, "findCurrentBriefCompleted").mockResolvedValue(null);
     const update = vi.fn().mockResolvedValue(
-      existingJob({ status: BriefGenerationJobStatus.PENDING, request_id: "req-new" })
+      existingJob({ status: BriefGenerationJobStatus.PENDING, request_id: "req-existing" })
     );
     const findUniqueOrThrow = vi.fn().mockResolvedValue(
-      existingJob({ status: BriefGenerationJobStatus.COMPLETED })
+      existingJob({ status: BriefGenerationJobStatus.COMPLETED, request_id: "req-existing" })
     );
 
     const prisma = {

@@ -122,7 +122,7 @@ export async function enqueueBriefGenerationJob(
 
       const retried = await prisma.briefGenerationJob.update({
         where: { id: existing.id },
-        data: retryJobData(requestId, input.requestUntil),
+        data: retryJobData(existing.request_id, input.requestUntil),
       });
       return mapJob(retried);
     }
