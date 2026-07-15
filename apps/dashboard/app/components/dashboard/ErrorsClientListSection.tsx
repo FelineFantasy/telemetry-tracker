@@ -56,11 +56,13 @@ type Props = {
   defaultPageSize: number;
   q: string;
   environment: string;
+  platform: string;
   release: string;
   status: string;
   sort: string;
   order: string;
   environments: string[];
+  platforms: string[];
   releases: string[];
 };
 
@@ -80,11 +82,13 @@ export function ErrorsClientListSection({
   defaultPageSize,
   q,
   environment,
+  platform,
   release,
   status,
   sort,
   order,
   environments,
+  platforms,
   releases,
 }: Props) {
   const { data, error, isValidating, listParams, liveUrlParams, patchListQuery } =
@@ -139,11 +143,13 @@ export function ErrorsClientListSection({
         defaultPageSize={defaultPageSize}
         q={q}
         environment={environment}
+        platform={platform}
         release={release}
         status={status}
         sort={effectiveSort}
         order={effectiveOrder}
         environments={environments}
+        platforms={platforms}
         releases={releases}
         onSortApply={onSortApply}
         sortLoading={isValidating}

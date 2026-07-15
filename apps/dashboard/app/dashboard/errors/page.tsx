@@ -74,10 +74,21 @@ async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
   const res = await dashboardApiFetch(`/api/filter-options?${p.toString()}`);
-  if (!res.ok) return { environments: [] as string[], releases: [] as string[] };
-  const data = (await res.json()) as { environments?: string[]; releases?: string[] };
+  if (!res.ok) {
+    return {
+      environments: [] as string[],
+      platforms: [] as string[],
+      releases: [] as string[],
+    };
+  }
+  const data = (await res.json()) as {
+    environments?: string[];
+    platforms?: string[];
+    releases?: string[];
+  };
   return {
     environments: data.environments ?? [],
+    platforms: data.platforms ?? [],
     releases: data.releases ?? [],
   };
 }
@@ -91,6 +102,7 @@ function buildErrorsParamsRecord(sp: {
   from?: string | string[];
   to?: string | string[];
   environment?: string | string[];
+  platform?: string | string[];
   release?: string | string[];
   q?: string | string[];
   status?: string | string[];
@@ -109,6 +121,7 @@ function buildErrorsParamsRecord(sp: {
     "from",
     "to",
     "environment",
+    "platform",
     "release",
     "q",
     "status",
@@ -138,6 +151,7 @@ export default async function ErrorsListPage({
     from?: string | string[];
     to?: string | string[];
     environment?: string | string[];
+    platform?: string | string[];
     release?: string | string[];
     q?: string | string[];
     status?: string | string[];
@@ -155,6 +169,7 @@ export default async function ErrorsListPage({
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
   const rawEnv = firstQueryValue(sp.environment)?.trim() || null;
+  const rawPlatform = firstQueryValue(sp.platform)?.trim() || null;
   const rawRelease = firstQueryValue(sp.release)?.trim() || null;
 
   const page = parsePageParam(firstQueryValue(sp.page));
@@ -194,6 +209,7 @@ export default async function ErrorsListPage({
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
   if (rawEnv) apiQuery.set("environment", rawEnv);
+  if (rawPlatform) apiQuery.set("platform", rawPlatform);
   if (rawRelease) apiQuery.set("release", rawRelease);
   if (q) apiQuery.set("q", q);
   if (status) apiQuery.set("status", status);
@@ -220,7 +236,11 @@ export default async function ErrorsListPage({
   };
   let summary: ErrorsPageSummary | null = null;
   let analytics: ErrorsAnalyticsData | null = null;
-  let filterOptions = { environments: [] as string[], releases: [] as string[] };
+  let filterOptions = {
+    environments: [] as string[],
+    platforms: [] as string[],
+    releases: [] as string[],
+  };
 
   try {
     const [opts, data, summaryData, analyticsData] = await Promise.all([
@@ -255,6 +275,11 @@ export default async function ErrorsListPage({
   const release = resolveScopedQueryValue(rawRelease, filterOptions.releases);
   if (rawRelease !== release) {
     redirect(mergeListQuery(ERRORS_PATH, currentParams, { release }));
+  }
+
+  const platform = resolveScopedQueryValue(rawPlatform, filterOptions.platforms);
+  if (rawPlatform !== platform) {
+    redirect(mergeListQuery(ERRORS_PATH, currentParams, { platform }));
   }
 
   const initialListParams = Object.fromEntries(apiQuery.entries());
@@ -293,11 +318,13 @@ export default async function ErrorsListPage({
           defaultPageSize={DEFAULT_LIST_PAGE_SIZE}
           q={q ?? ""}
           environment={environment ?? ""}
+          platform={platform ?? ""}
           release={release ?? ""}
           status={status ?? "all"}
           sort={effectiveSort}
           order={effectiveOrder}
           environments={filterOptions.environments}
+          platforms={filterOptions.platforms}
           releases={filterOptions.releases}
         />
       </AnalyticsListShell>

@@ -324,6 +324,52 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
   return eventClauses;
 }
 
+/**
+ * Prefer Session.environment / Session.release; fall back to matching events for
+ * legacy rows where those columns are still null.
+ */
+function sessionEnvReleaseScopeSql(
+  projectId: string,
+  f: SessionListFilterInput,
+  eventWindow?: SessionEventWindow
+): Prisma.Sql | null {
+  const parts: Prisma.Sql[] = [];
+  if (f.environment) {
+    parts.push(
+      Prisma.sql`(
+        s."environment" = ${f.environment}
+        OR (
+          s."environment" IS NULL
+          AND ${sessionEventExistsSql(
+            projectId,
+            "s",
+            [Prisma.sql`e."environment" = ${f.environment}`],
+            resolveSessionEventWindow(f, eventWindow)
+          )}
+        )
+      )`
+    );
+  }
+  if (f.release) {
+    parts.push(
+      Prisma.sql`(
+        s."release" = ${f.release}
+        OR (
+          s."release" IS NULL
+          AND ${sessionEventExistsSql(
+            projectId,
+            "s",
+            [Prisma.sql`e."release" = ${f.release}`],
+            resolveSessionEventWindow(f, eventWindow)
+          )}
+        )
+      )`
+    );
+  }
+  if (parts.length === 0) return null;
+  return Prisma.join(parts, " AND ");
+}
+
 function sessionHasEventScope(f: SessionListFilterInput): boolean {
   return sessionEventScopeClauses(f).length > 0;
 }
@@ -391,6 +437,8 @@ export function sessionWindowWithEventScope(
   const startedAt = exclusiveUntil
     ? sessionStartedInPreviousWindow(sessionAlias, since, until)
     : sessionStartedInCurrentWindow(sessionAlias, since, until);
+  if (!f.environment && !f.release) return startedAt;
+  // Windowed KPI path still uses event matching; session columns lack started_at-aligned env for legacy.
   const eventClauses = sessionEventScopeClauses(f);
   if (eventClauses.length === 0) return startedAt;
   return Prisma.sql`(${startedAt} AND ${sessionEventExistsSql(
@@ -423,16 +471,9 @@ export function sessionFilterSql(
   if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
   if (f.platform) parts.push(Prisma.sql`s."platform" = ${f.platform}`);
   if (f.country) parts.push(Prisma.sql`s."country" = ${f.country}`);
-  const eventClauses = sessionEventScopeClauses(f);
-  if (eventClauses.length > 0 && !omitEventScope) {
-    parts.push(
-      sessionEventExistsSql(
-        projectId,
-        "s",
-        eventClauses,
-        resolveSessionEventWindow(f, eventWindow)
-      )
-    );
+  if (!omitEventScope) {
+    const envReleaseScope = sessionEnvReleaseScopeSql(projectId, f, eventWindow);
+    if (envReleaseScope) parts.push(envReleaseScope);
   }
   if (f.q?.trim()) parts.push(sessionSearchSql(f.q));
   return Prisma.join(parts, " AND ");

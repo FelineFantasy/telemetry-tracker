@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDashboardScopedListHref,
   buildErrorGroupDetailHref,
+  buildEventListHref,
   formatOverviewDeltaLine,
   resolveScopedQueryValue,
 } from "./overview-scope-url";
@@ -28,6 +30,40 @@ describe("buildErrorGroupDetailHref", () => {
     expect(
       buildErrorGroupDetailHref("eg_1", { app: "web", environment: "production" })
     ).toBe("/dashboard/errors/eg_1?app=web&environment=production");
+  });
+
+  it("includes platform and release scope", () => {
+    expect(
+      buildErrorGroupDetailHref("eg_1", {
+        app: "mobile",
+        platform: "ios",
+        release: "2.1.0",
+      })
+    ).toBe("/dashboard/errors/eg_1?app=mobile&platform=ios&release=2.1.0");
+  });
+});
+
+describe("buildDashboardScopedListHref", () => {
+  it("preserves platform and release in list links", () => {
+    expect(
+      buildDashboardScopedListHref("/dashboard/events", {
+        app: "web",
+        environment: "production",
+        platform: "web",
+        release: "1.0.0",
+      })
+    ).toBe("/dashboard/events?app=web&environment=production&platform=web&release=1.0.0");
+  });
+});
+
+describe("buildEventListHref", () => {
+  it("includes event name and scope", () => {
+    expect(
+      buildEventListHref("screen_view", {
+        app: "mobile",
+        platform: "android",
+      })
+    ).toBe("/dashboard/events?name=screen_view&app=mobile&platform=android");
   });
 });
 

@@ -46,6 +46,8 @@ const sessionSchema = z.object({
   session_id: z.string().min(1),
   app: ingestAppSchema,
   platform: z.string().optional(),
+  environment: z.string().optional(),
+  release: z.string().optional(),
   user_id: z.string().optional(),
   user_email: z.string().optional().nullable(),
   anonymous_id: z.string().optional(),
@@ -66,6 +68,8 @@ function sessionContextPatch(body: z.infer<typeof sessionSchema>): {
   device_os?: string | null;
   sdk_version?: string | null;
   platform?: string | null;
+  environment?: string | null;
+  release?: string | null;
 } {
   const patch: ReturnType<typeof sessionContextPatch> = {};
   if (body.user_id !== undefined) patch.user_id = body.user_id ?? null;
@@ -76,6 +80,8 @@ function sessionContextPatch(body: z.infer<typeof sessionSchema>): {
   if (body.device_os !== undefined) patch.device_os = body.device_os ?? null;
   if (body.sdk_version !== undefined) patch.sdk_version = body.sdk_version ?? null;
   if (body.platform !== undefined) patch.platform = body.platform ?? null;
+  if (body.environment !== undefined) patch.environment = body.environment ?? null;
+  if (body.release !== undefined) patch.release = body.release ?? null;
   return patch;
 }
 
@@ -193,6 +199,8 @@ export async function ingestRoutes(
           session_id: body.session_id,
           app,
           platform: body.platform ?? null,
+          environment: body.environment ?? null,
+          release: body.release ?? null,
           user_id: body.user_id ?? null,
           user_email: body.user_email ?? null,
           anonymous_id: body.anonymous_id ?? null,
@@ -257,6 +265,7 @@ export async function ingestRoutes(
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const fingerprint = computeFingerprint(body.message, body.stack);
+    const platform = body.platform ?? null;
     const { group: errorGroup, isNew } = await findOrCreateErrorGroup(prisma, {
       projectId,
       fingerprint,
@@ -265,12 +274,14 @@ export async function ingestRoutes(
       app,
       environment: body.environment ?? null,
       release,
+      platform,
     });
     await prisma.errorOccurrence.create({
       data: {
         error_group_id: errorGroup.id,
         stack: body.stack ?? null,
         release,
+        platform,
         context: (body.context ?? undefined) as Prisma.InputJsonValue | undefined,
         session_id: body.session_id ?? null,
         user_id: body.user_id ?? null,

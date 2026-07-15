@@ -1,4 +1,4 @@
-/** URL helpers for overview scope (app, environment, compare). */
+/** URL helpers for overview scope (app, environment, platform, release, compare). */
 
 export type OverviewCompareParam = "previous" | "week-ago";
 
@@ -26,7 +26,7 @@ export function resolveScopedQueryValue(
   return value;
 }
 
-/** Preserve app/environment scope when switching top-level dashboard tabs. */
+/** Preserve dashboard scope when switching top-level dashboard tabs. */
 export function buildDashboardNavTabHref(
   path: string,
   searchParams: URLSearchParams
@@ -34,10 +34,50 @@ export function buildDashboardNavTabHref(
   const params = new URLSearchParams();
   const app = searchParams.get("app");
   const environment = searchParams.get("environment");
+  const platform = searchParams.get("platform");
+  const release = searchParams.get("release");
   if (app) params.set("app", app);
   if (environment) params.set("environment", environment);
+  if (platform) params.set("platform", platform);
+  if (release) params.set("release", release);
   const q = params.toString();
   return q ? `${path}?${q}` : path;
+}
+
+export type DashboardListScope = {
+  app?: string | null;
+  environment?: string | null;
+  platform?: string | null;
+  release?: string | null;
+};
+
+function appendDashboardListScope(params: URLSearchParams, scope: DashboardListScope): void {
+  if (scope.app) params.set("app", scope.app);
+  if (scope.environment) params.set("environment", scope.environment);
+  if (scope.platform) params.set("platform", scope.platform);
+  if (scope.release) params.set("release", scope.release);
+}
+
+/** Preserve list filters when linking between dashboard pages. */
+export function buildDashboardScopedListHref(
+  path: string,
+  scope: DashboardListScope
+): string {
+  const params = new URLSearchParams();
+  appendDashboardListScope(params, scope);
+  const q = params.toString();
+  return q ? `${path}?${q}` : path;
+}
+
+/** Preserve event-name drill-down scope from overview. */
+export function buildEventListHref(
+  eventName: string,
+  scope: DashboardListScope
+): string {
+  const params = new URLSearchParams();
+  params.set("name", eventName);
+  appendDashboardListScope(params, scope);
+  return `/dashboard/events?${params.toString()}`;
 }
 
 export function mergeOverviewScopeQuery(
@@ -46,6 +86,8 @@ export function mergeOverviewScopeQuery(
   updates: {
     app?: string | null;
     environment?: string | null;
+    platform?: string | null;
+    release?: string | null;
     compare?: OverviewCompareParam | null;
     range?: string | null;
     errorsPage?: string | null;
@@ -78,11 +120,10 @@ export function buildDashboardHrefWithEnvironment(
 
 export function buildErrorGroupDetailHref(
   id: string,
-  scope: { app?: string | null; environment?: string | null }
+  scope: DashboardListScope
 ): string {
   const params = new URLSearchParams();
-  if (scope.app) params.set("app", scope.app);
-  if (scope.environment) params.set("environment", scope.environment);
+  appendDashboardListScope(params, scope);
   const q = params.toString();
   return q ? `/dashboard/errors/${id}?${q}` : `/dashboard/errors/${id}`;
 }

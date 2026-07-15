@@ -3,6 +3,7 @@ import { Badge, ResolvedBadge } from "@/app/components/Badge";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { TimeAgo } from "@/app/components/TimeAgo";
+import Link from "next/link";
 import { NavBack } from "@/app/components/dashboard/NavBack";
 import { AnalyticsSidebarRow } from "@/app/components/dashboard/analytics-ui";
 import { OccurrencePanel } from "@/app/components/dashboard/DetailMetaPanel";
@@ -10,6 +11,7 @@ import { IssueDetailView } from "@/app/components/dashboard/IssueDetailView";
 import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
 import { StackTracePanel } from "@/app/components/dashboard/StackTracePanel";
 import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
+import { MiniSparkline, type SparklinePoint } from "@/app/components/dashboard/MiniSparkline";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
@@ -20,9 +22,11 @@ type Occurrence = {
   symbolicated_stack?: string | null;
   symbolication_status?: "symbolicated" | "no_maps" | "no_match" | null;
   release?: string | null;
+  platform?: string | null;
   context?: unknown;
   user_id?: string | null;
   session_id?: string | null;
+  session_row_id?: string | null;
   anonymous_id?: string | null;
   sdk_version?: string | null;
 };
@@ -33,14 +37,17 @@ type ErrorGroup = {
   app: string;
   top_stack?: string | null;
   symbolicated_top_stack?: string | null;
+  fingerprint?: string | null;
   occurrences: number;
   first_seen: string;
   last_seen: string;
   environment?: string | null;
+  platform?: string | null;
   release?: string | null;
   resolved_at?: string | null;
   users_affected?: number | null;
   sessions_affected?: number | null;
+  sparkline?: SparklinePoint[];
   occurrences_list?: Occurrence[];
 };
 
@@ -130,8 +137,25 @@ export default async function ErrorDetailPage({
                 <div>
                   <dt className="text-muted-foreground">Session</dt>
                   <dd className="break-all font-mono text-xs" title={o.session_id}>
-                    {o.session_id}
+                    {o.session_row_id ? (
+                      <Link
+                        href={`/dashboard/sessions/${encodeURIComponent(o.session_row_id)}`}
+                        className="text-link hover:underline"
+                      >
+                        {o.session_id.length > 24
+                          ? o.session_id.slice(0, 24) + "\u2026"
+                          : o.session_id}
+                      </Link>
+                    ) : (
+                      o.session_id
+                    )}
                   </dd>
+                </div>
+              ) : null}
+              {o.platform != null && o.platform !== "" ? (
+                <div>
+                  <dt className="text-muted-foreground">Platform</dt>
+                  <dd>{o.platform}</dd>
                 </div>
               ) : null}
               {o.release != null && o.release !== "" ? (
@@ -176,6 +200,20 @@ export default async function ErrorDetailPage({
     />
   );
 
+  const trendMetric =
+    group.sparkline && group.sparkline.length > 0
+      ? {
+          label: "Trend",
+          value: (
+            <MiniSparkline
+              data={group.sparkline}
+              className="h-8 w-28"
+              ariaLabel="Error occurrence trend"
+            />
+          ),
+        }
+      : null;
+
   return (
     <>
       <NavBack href={`/dashboard/errors${appQuery}`}>Issues</NavBack>
@@ -187,6 +225,7 @@ export default async function ErrorDetailPage({
           <>
             <Badge>{group.app}</Badge>
             {group.environment ? <Badge>{group.environment}</Badge> : null}
+            {group.platform ? <Badge>{group.platform}</Badge> : null}
             {group.release ? <Badge>{group.release}</Badge> : null}
             {resolved ? <ResolvedBadge /> : null}
           </>
@@ -202,6 +241,14 @@ export default async function ErrorDetailPage({
                 : "—",
           },
           {
+            label: "Sessions affected",
+            value:
+              group.sessions_affected != null
+                ? group.sessions_affected.toLocaleString()
+                : "—",
+          },
+          ...(trendMetric ? [trendMetric] : []),
+          {
             label: "First seen",
             value: <TimeAgo iso={group.first_seen} />,
           },
@@ -214,6 +261,7 @@ export default async function ErrorDetailPage({
           <>
             <Badge>{group.app}</Badge>
             {group.environment ? <Badge>{group.environment}</Badge> : null}
+            {group.platform ? <Badge>{group.platform}</Badge> : null}
             {group.release ? <Badge>{group.release}</Badge> : null}
           </>
         }
@@ -225,6 +273,13 @@ export default async function ErrorDetailPage({
             <AnalyticsSidebarRow label="Last seen">
               <TimeAgo iso={group.last_seen} />
             </AnalyticsSidebarRow>
+            {group.fingerprint ? (
+              <AnalyticsSidebarRow label="Fingerprint">
+                <span className="break-all font-mono text-[11px]" title={group.fingerprint}>
+                  {group.fingerprint}
+                </span>
+              </AnalyticsSidebarRow>
+            ) : null}
             <AnalyticsSidebarRow label="Issue ID">
               <span className="font-mono text-[12px]">{group.id}</span>
             </AnalyticsSidebarRow>

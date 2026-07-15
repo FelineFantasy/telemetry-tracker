@@ -95,12 +95,15 @@ export function buildErrorGroupScopeSql(
   if (f.range.lte) parts.push(Prisma.sql`${eg}."last_seen" <= ${f.range.lte}`);
   if (f.status === "unresolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NOT NULL`);
-  if (f.release) {
+  if (f.release || f.platform) {
+    const scopeParts: Prisma.Sql[] = [];
+    if (f.release) scopeParts.push(Prisma.sql`rel."release" = ${f.release}`);
+    if (f.platform) scopeParts.push(Prisma.sql`rel."platform" = ${f.platform}`);
     parts.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "ErrorOccurrence" rel
         WHERE rel."error_group_id" = ${eg}."id"
-          AND rel."release" = ${f.release}
+          AND ${Prisma.join(scopeParts, " AND ")}
       )`
     );
   }
@@ -155,6 +158,7 @@ export function buildEventSessionScopeSql(
       INNER JOIN "ErrorGroup" seg ON seg."id" = seo."error_group_id"
       WHERE ${buildErrorGroupScopeSql(f, projectId, "seg")}
         ${f.release ? Prisma.sql`AND seo."release" = ${f.release}` : Prisma.empty}
+        ${f.platform ? Prisma.sql`AND seo."platform" = ${f.platform}` : Prisma.empty}
         AND seo."created_at" >= ${previousSince}
         AND seo."created_at" <= ${until}
         AND (
@@ -189,10 +193,19 @@ export async function fetchErrorsPageSummary(
   if (f.appId) eventParts.push(Prisma.sql`e."app" = ${f.appId}`);
   if (f.environment) eventParts.push(Prisma.sql`e."environment" = ${f.environment}`);
   if (f.release) eventParts.push(Prisma.sql`e."release" = ${f.release}`);
+  if (f.platform) eventParts.push(Prisma.sql`e."platform" = ${f.platform}`);
   const eventFilter = Prisma.join(eventParts, " AND ");
-  const occurrenceReleaseClause = f.release
-    ? Prisma.sql`AND eo."release" = ${f.release}`
-    : Prisma.empty;
+  const occurrenceScopeClause = Prisma.join(
+    [
+      ...(f.release ? [Prisma.sql`eo."release" = ${f.release}`] : []),
+      ...(f.platform ? [Prisma.sql`eo."platform" = ${f.platform}`] : []),
+    ],
+    " AND "
+  );
+  const occurrenceReleaseClause =
+    f.release || f.platform
+      ? Prisma.sql`AND ${occurrenceScopeClause}`
+      : Prisma.empty;
   const groupScopeSql = buildErrorGroupScopeSql(f, projectId, "eg");
   const eventSessionScope = buildEventSessionScopeSql(
     f,

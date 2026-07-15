@@ -43,6 +43,8 @@ type Scope = {
   until?: Date;
   app?: string;
   environment?: string;
+  platform?: string;
+  release?: string;
 };
 
 function eventCreatedAtFilter(since: Date, until?: Date): { gte: Date; lte?: Date } {
@@ -56,6 +58,8 @@ function eventScopeWhere(scope: Scope): Prisma.EventWhereInput {
   } as Prisma.EventWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
+  if (scope.platform) (where as { platform?: string }).platform = scope.platform;
+  if (scope.release) (where as { release?: string }).release = scope.release;
   return where;
 }
 
@@ -67,6 +71,9 @@ function sessionScopeWhere(scope: Scope): Prisma.SessionWhereInput {
       : { gte: scope.since },
   } as Prisma.SessionWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
+  if (scope.platform) (where as { platform?: string }).platform = scope.platform;
+  if (scope.environment) (where as { environment?: string }).environment = scope.environment;
+  if (scope.release) (where as { release?: string }).release = scope.release;
   return where;
 }
 
@@ -79,6 +86,14 @@ function errorGroupScopeWhere(scope: Scope): Prisma.ErrorGroupWhereInput {
   } as Prisma.ErrorGroupWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
+  if (scope.platform || scope.release) {
+    where.occurrences_list = {
+      some: {
+        ...(scope.platform ? { platform: scope.platform } : {}),
+        ...(scope.release ? { release: scope.release } : {}),
+      },
+    };
+  }
   return where;
 }
 
@@ -88,7 +103,9 @@ function errorOccurrenceScopeSql(
   lt: Date | undefined,
   app?: string,
   environment?: string,
-  lte?: Date
+  lte?: Date,
+  platform?: string,
+  release?: string
 ): Prisma.Sql {
   const timeClause =
     lte !== undefined
@@ -100,11 +117,17 @@ function errorOccurrenceScopeSql(
   const envClause = environment
     ? Prisma.sql`AND eg."environment" = ${environment}`
     : Prisma.empty;
+  const platformClause = platform
+    ? Prisma.sql`AND eo."platform" = ${platform}`
+    : Prisma.empty;
+  const releaseClause = release ? Prisma.sql`AND eo."release" = ${release}` : Prisma.empty;
   return Prisma.sql`
     eg."project_id" = ${projectId}
     AND ${timeClause}
     ${appClause}
     ${envClause}
+    ${platformClause}
+    ${releaseClause}
   `;
 }
 
@@ -150,10 +173,48 @@ export async function countSessions(
   scope: Scope,
   exclusiveUntil?: Date
 ): Promise<number> {
-  if (scope.environment) {
+  // Prefer Session.environment / release when set; fall back to event join for legacy nulls.
+  if (scope.environment || scope.release) {
     const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+    const platformClause = scope.platform
+      ? Prisma.sql`AND s."platform" = ${scope.platform}`
+      : Prisma.empty;
     const { session: sessionUpperClause, event: eventUpperClause } =
       overviewEnvironmentSessionCountUpperClauses(scope, exclusiveUntil);
+    const envMatch = scope.environment
+      ? Prisma.sql`(
+          s."environment" = ${scope.environment}
+          OR (
+            s."environment" IS NULL
+            AND EXISTS (
+              SELECT 1 FROM "Event" e
+              WHERE e."project_id" = s."project_id"
+                AND e."session_id" = s."session_id"
+                AND e."app" = s."app"
+                AND e."environment" = ${scope.environment}
+                AND e."created_at" >= ${scope.since}
+                ${eventUpperClause}
+            )
+          )
+        )`
+      : Prisma.empty;
+    const releaseMatch = scope.release
+      ? Prisma.sql`(
+          s."release" = ${scope.release}
+          OR (
+            s."release" IS NULL
+            AND EXISTS (
+              SELECT 1 FROM "Event" e
+              WHERE e."project_id" = s."project_id"
+                AND e."session_id" = s."session_id"
+                AND e."app" = s."app"
+                AND e."release" = ${scope.release}
+                AND e."created_at" >= ${scope.since}
+                ${eventUpperClause}
+            )
+          )
+        )`
+      : Prisma.empty;
     const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
       SELECT COUNT(*)::bigint AS c
       FROM "Session" s
@@ -161,15 +222,9 @@ export async function countSessions(
         AND s."started_at" >= ${scope.since}
         ${sessionUpperClause}
         ${appClause}
-        AND EXISTS (
-          SELECT 1 FROM "Event" e
-          WHERE e."project_id" = s."project_id"
-            AND e."session_id" = s."session_id"
-            AND e."app" = s."app"
-            AND e."environment" = ${scope.environment}
-            AND e."created_at" >= ${scope.since}
-            ${eventUpperClause}
-        )
+        ${platformClause}
+        ${envMatch ? Prisma.sql`AND ${envMatch}` : Prisma.empty}
+        ${releaseMatch ? Prisma.sql`AND ${releaseMatch}` : Prisma.empty}
     `);
     return Number(rows[0]?.c ?? 0);
   }
@@ -193,6 +248,12 @@ export async function countActiveUsers(
   const envClause = scope.environment
     ? Prisma.sql`AND e."environment" = ${scope.environment}`
     : Prisma.empty;
+  const platformClause = scope.platform
+    ? Prisma.sql`AND e."platform" = ${scope.platform}`
+    : Prisma.empty;
+  const releaseClause = scope.release
+    ? Prisma.sql`AND e."release" = ${scope.release}`
+    : Prisma.empty;
   const untilClause =
     until === undefined
       ? Prisma.empty
@@ -208,6 +269,8 @@ export async function countActiveUsers(
         AND (e."user_id" IS NOT NULL OR e."anonymous_id" IS NOT NULL)
         ${appClause}
         ${envClause}
+        ${platformClause}
+        ${releaseClause}
     ) t
   `);
   return Number(rows[0]?.c ?? 0);
@@ -307,11 +370,15 @@ export type OverviewCountPair = {
 function eventFilterSql(
   projectId: string,
   app?: string,
-  environment?: string
+  environment?: string,
+  platform?: string,
+  release?: string
 ): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`e."project_id" = ${projectId}`];
   if (app) parts.push(Prisma.sql`e."app" = ${app}`);
   if (environment) parts.push(Prisma.sql`e."environment" = ${environment}`);
+  if (platform) parts.push(Prisma.sql`e."platform" = ${platform}`);
+  if (release) parts.push(Prisma.sql`e."release" = ${release}`);
   return Prisma.join(parts, " AND ");
 }
 
@@ -326,10 +393,22 @@ export async function getOverviewEventWindowStats(
     previousUntil: Date;
     app?: string;
     environment?: string;
+    platform?: string;
+    release?: string;
   }
 ): Promise<OverviewEventWindowStats> {
-  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
-  const filters = eventFilterSql(projectId, app, environment);
+  const {
+    projectId,
+    since,
+    until,
+    previousSince,
+    previousUntil,
+    app,
+    environment,
+    platform,
+    release,
+  } = params;
+  const filters = eventFilterSql(projectId, app, environment, platform, release);
 
   const rows = await prisma.$queryRaw<
     [
@@ -387,16 +466,30 @@ export async function getOverviewErrorCountsPair(
     previousUntil: Date;
     app?: string;
     environment?: string;
+    platform?: string;
+    release?: string;
   }
 ): Promise<OverviewCountPair> {
-  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
+  const {
+    projectId,
+    since,
+    until,
+    previousSince,
+    previousUntil,
+    app,
+    environment,
+    platform,
+    release,
+  } = params;
   const whereSql = errorOccurrenceScopeSql(
     projectId,
     previousSince,
     undefined,
     app,
     environment,
-    until
+    until,
+    platform,
+    release
   );
 
   const rows = await prisma.$queryRaw<[{ errors_count: bigint; errors_previous: bigint }]>(
@@ -658,9 +751,20 @@ export async function countErrorsInWindow(
   gte: Date,
   lt: Date | undefined,
   app?: string,
-  environment?: string
+  environment?: string,
+  platform?: string,
+  release?: string
 ): Promise<number> {
-  const whereSql = errorOccurrenceScopeSql(projectId, gte, lt, app, environment);
+  const whereSql = errorOccurrenceScopeSql(
+    projectId,
+    gte,
+    lt,
+    app,
+    environment,
+    undefined,
+    platform,
+    release
+  );
   const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
     SELECT COUNT(*)::bigint AS c
     FROM "ErrorOccurrence" eo

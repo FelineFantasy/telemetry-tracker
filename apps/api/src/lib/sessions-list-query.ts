@@ -38,6 +38,8 @@ export type SessionListRow = {
   session_id: string;
   app: string;
   platform: string | null;
+  environment: string | null;
+  release: string | null;
   user_id: string | null;
   anonymous_id: string | null;
   user_email: string | null;
@@ -169,6 +171,8 @@ function mapEnrichedRow(r: Record<string, unknown>): SessionListRow {
     session_id: String(r.session_id),
     app: String(r.app),
     platform: r.platform != null ? String(r.platform) : null,
+    environment: r.environment != null ? String(r.environment) : null,
+    release: r.release != null ? String(r.release) : null,
     user_id: r.user_id != null ? String(r.user_id) : null,
     anonymous_id: r.anonymous_id != null ? String(r.anonymous_id) : null,
     user_email: r.user_email != null ? String(r.user_email) : null,
@@ -192,6 +196,8 @@ function enrichedSelectSql(projectId: string): Prisma.Sql {
       s."session_id",
       s."app",
       s."platform",
+      s."environment",
+      s."release",
       s."user_id",
       s."anonymous_id",
       s."user_email",
@@ -290,6 +296,8 @@ export function serializeSessionListItem(
     session_id: row.session_id,
     app: row.app,
     platform: row.platform,
+    environment: row.environment,
+    release: row.release,
     user_id: row.user_id,
     anonymous_id: row.anonymous_id,
     user_email: row.user_email,

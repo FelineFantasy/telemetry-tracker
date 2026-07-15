@@ -74,12 +74,16 @@ type Scope = {
   until: Date;
   app?: string;
   environment?: string;
+  platform?: string;
+  release?: string;
 };
 
 function eventScopeSql(scope: Scope): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`e."project_id" = ${scope.projectId}`];
   if (scope.app) parts.push(Prisma.sql`e."app" = ${scope.app}`);
   if (scope.environment) parts.push(Prisma.sql`e."environment" = ${scope.environment}`);
+  if (scope.platform) parts.push(Prisma.sql`e."platform" = ${scope.platform}`);
+  if (scope.release) parts.push(Prisma.sql`e."release" = ${scope.release}`);
   return Prisma.join(parts, " AND ");
 }
 
@@ -326,13 +330,19 @@ export async function fetchOverviewRequestMetrics(
 /** @internal Exported for unit tests. */
 export function overviewTopErrorGroupsInWindowSql(
   projectId: string,
-  scope: Pick<Scope, "app" | "environment">,
+  scope: Pick<Scope, "app" | "environment" | "platform" | "release">,
   window: { gte: Date; lte: Date },
   limit: number
 ): Prisma.Sql {
   const appClause = scope.app ? Prisma.sql`AND eg."app" = ${scope.app}` : Prisma.empty;
   const envClause = scope.environment
     ? Prisma.sql`AND eg."environment" = ${scope.environment}`
+    : Prisma.empty;
+  const platformClause = scope.platform
+    ? Prisma.sql`AND eo."platform" = ${scope.platform}`
+    : Prisma.empty;
+  const releaseClause = scope.release
+    ? Prisma.sql`AND eo."release" = ${scope.release}`
     : Prisma.empty;
   return Prisma.sql`
     SELECT
@@ -348,6 +358,8 @@ export function overviewTopErrorGroupsInWindowSql(
       AND eo."created_at" <= ${window.lte}
       ${appClause}
       ${envClause}
+      ${platformClause}
+      ${releaseClause}
     GROUP BY eg.id, eg.message, eg.app
     ORDER BY occurrences DESC, last_seen DESC
     LIMIT ${limit}
@@ -415,12 +427,14 @@ export async function listOverviewRecentSessions(
 }
 
 export function buildOverviewSessionFilter(
-  scope: Pick<Scope, "app" | "environment">,
+  scope: Pick<Scope, "app" | "environment" | "platform" | "release">,
   range: { gte: Date; lte: Date }
 ): SessionListFilterInput {
   return buildSessionListFilter({
     appId: scope.app,
     environment: scope.environment,
+    platform: scope.platform,
+    release: scope.release,
     range,
   });
 }

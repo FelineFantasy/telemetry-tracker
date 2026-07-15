@@ -35,14 +35,25 @@ npm install @telemetry-tracker/react-native`}
         browser, so <code>init()</code> is safe on native and enables <code>screen()</code>,{" "}
         <code>endSession()</code>, and all other APIs—you do not need to guard it for web only.
       </p>
+      <p>
+        Set <code>platform</code> from <code>Platform.OS</code> so the dashboard can filter by
+        device family. Map <code>ios</code>, <code>android</code>, and <code>web</code> (when
+        running in a browser). Set <code>release</code> to your app version (e.g. from{" "}
+        <code>expo-constants</code> or native build metadata) and <code>environment</code> to
+        distinguish production from staging or development builds.
+      </p>
       <CodeBlock
-        code={`import { init } from "@telemetry-tracker/react-native";
+        code={`import { Platform } from "react-native";
+import Constants from "expo-constants";
+import { init } from "@telemetry-tracker/react-native";
 
 init({
   ingestUrl: "https://your-api.example.com",
   app: "my-rn-app",
   apiKey: "tt_live_<publicId>_<secret>",
-  platform: "react-native",
+  platform: Platform.OS === "web" ? "web" : Platform.OS,
+  environment: __DEV__ ? "development" : "production",
+  release: Constants.expoConfig?.version ?? "1.0.0",
 });`}
       />
 

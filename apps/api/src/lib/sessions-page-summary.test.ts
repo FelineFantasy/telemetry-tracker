@@ -162,17 +162,20 @@ describe("buildSessionListFilter", () => {
 });
 
 describe("sessionFilterSql", () => {
-  it("requires one event row when both environment and release are set", () => {
+  it("prefers session columns with event fallback when environment and release are set", () => {
     const sql = sessionFilterSql("proj-1", {
       range: {},
       environment: "production",
       release: "1.2.0",
     });
     const text = prismaSqlText(sql);
+    // One EXISTS per scoped field for legacy rows where Session columns are still null.
     const existsCount = (text.match(/EXISTS/g) ?? []).length;
-    expect(existsCount).toBe(1);
-    expect(text).toContain('"environment"');
-    expect(text).toContain('"release"');
+    expect(existsCount).toBe(2);
+    expect(text).toContain('s."environment"');
+    expect(text).toContain('s."release"');
+    expect(text).toContain('e."environment"');
+    expect(text).toContain('e."release"');
   });
 
   it("bounds matching events to the metrics window when provided", () => {
