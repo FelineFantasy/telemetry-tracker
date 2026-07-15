@@ -805,6 +805,67 @@ export async function listActiveIssues(
   scope: Scope,
   limit = 5
 ): Promise<OverviewActiveIssue[]> {
+  if (scope.platform || scope.release) {
+    const appClause = scope.app ? Prisma.sql`AND eg."app" = ${scope.app}` : Prisma.empty;
+    const envClause = scope.environment
+      ? Prisma.sql`AND eg."environment" = ${scope.environment}`
+      : Prisma.empty;
+    const platformClause = scope.platform
+      ? Prisma.sql`AND eo."platform" = ${scope.platform}`
+      : Prisma.empty;
+    const releaseClause = scope.release
+      ? Prisma.sql`AND eo."release" = ${scope.release}`
+      : Prisma.empty;
+    const untilClause = scope.until
+      ? Prisma.sql`AND eo."created_at" <= ${scope.until}`
+      : Prisma.empty;
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        message: string;
+        app: string;
+        environment: string | null;
+        occurrences: bigint;
+        first_seen: Date;
+      }>
+    >(Prisma.sql`
+      SELECT
+        eg.id,
+        eg.message,
+        eg.app,
+        eg.environment,
+        COUNT(eo.id)::bigint AS occurrences,
+        MIN(eo."created_at") AS first_seen
+      FROM "ErrorGroup" eg
+      INNER JOIN "ErrorOccurrence" eo ON eo."error_group_id" = eg.id
+      WHERE eg."project_id" = ${scope.projectId}
+        AND eg."resolved_at" IS NULL
+        AND eo."created_at" >= ${scope.since}
+        ${untilClause}
+        ${appClause}
+        ${envClause}
+        ${platformClause}
+        ${releaseClause}
+      GROUP BY eg.id, eg.message, eg.app, eg.environment
+      ORDER BY occurrences DESC, first_seen DESC
+      LIMIT ${limit}
+    `);
+
+    return rows.map((g) => {
+      const occurrences = Number(g.occurrences);
+      const severity: "P1" | "P3" = occurrences >= 25 ? "P1" : "P3";
+      const envPart = g.environment ? ` · ${g.environment}` : "";
+      return {
+        id: g.id,
+        severity,
+        title: g.message,
+        meta: `${relativeStarted(g.first_seen.toISOString())} · app ${g.app}${envPart} · ${occurrences} occurrences`,
+        status: "Open",
+        href: errorGroupDetailHref(g.id, scope),
+      };
+    });
+  }
+
   const groups = await prisma.errorGroup.findMany({
     where: {
       ...errorGroupScopeWhere(scope),

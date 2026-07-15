@@ -134,20 +134,28 @@ export function buildErrorGroupWhereInput(
   if (f.appId) where.app = f.appId;
   if (f.environment) where.environment = f.environment;
   if (f.q) where.message = { contains: f.q, mode: "insensitive" };
-  if (f.range.gte || f.range.lte) {
-    where.last_seen = {};
-    if (f.range.gte) where.last_seen.gte = f.range.gte;
-    if (f.range.lte) where.last_seen.lte = f.range.lte;
-  }
   if (f.status === "unresolved") where.resolved_at = null;
   if (f.status === "resolved") where.resolved_at = { not: null };
-  if (f.release || f.platform) {
+  if (hasOccurrenceScope(f)) {
+    // Membership = in-window matching occurrences (not global last_seen).
     where.occurrences_list = {
       some: {
         ...(f.release ? { release: f.release } : {}),
         ...(f.platform ? { platform: f.platform } : {}),
+        ...(f.range.gte || f.range.lte
+          ? {
+              created_at: {
+                ...(f.range.gte ? { gte: f.range.gte } : {}),
+                ...(f.range.lte ? { lte: f.range.lte } : {}),
+              },
+            }
+          : {}),
       },
     };
+  } else if (f.range.gte || f.range.lte) {
+    where.last_seen = {};
+    if (f.range.gte) where.last_seen.gte = f.range.gte;
+    if (f.range.lte) where.last_seen.lte = f.range.lte;
   }
   return where;
 }
@@ -247,14 +255,14 @@ function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
     const pat = `%${escapeLikePattern(f.q)}%`;
     parts.push(Prisma.sql`eg.message ILIKE ${pat} ESCAPE '\\'`);
   }
-  if (f.range.gte) parts.push(Prisma.sql`eg.last_seen >= ${f.range.gte}`);
-  if (f.range.lte) parts.push(Prisma.sql`eg.last_seen <= ${f.range.lte}`);
   if (f.status === "unresolved") parts.push(Prisma.sql`eg.resolved_at IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`eg.resolved_at IS NOT NULL`);
   if (hasOccurrenceScope(f)) {
     const scopeParts: Prisma.Sql[] = [];
     if (f.release) scopeParts.push(Prisma.sql`rel.release = ${f.release}`);
     if (f.platform) scopeParts.push(Prisma.sql`rel.platform = ${f.platform}`);
+    if (f.range.gte) scopeParts.push(Prisma.sql`rel.created_at >= ${f.range.gte}`);
+    if (f.range.lte) scopeParts.push(Prisma.sql`rel.created_at <= ${f.range.lte}`);
     parts.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "ErrorOccurrence" rel
@@ -262,6 +270,9 @@ function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
           AND ${Prisma.join(scopeParts, " AND ")}
       )`
     );
+  } else {
+    if (f.range.gte) parts.push(Prisma.sql`eg.last_seen >= ${f.range.gte}`);
+    if (f.range.lte) parts.push(Prisma.sql`eg.last_seen <= ${f.range.lte}`);
   }
   return Prisma.join(parts, " AND ");
 }
