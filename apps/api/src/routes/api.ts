@@ -83,7 +83,9 @@ import {
 } from "../lib/overview-stats.js";
 import {
   buildOverviewSessionFilter,
+  countOverviewErrorGroupsInWindow,
   fetchOverviewRequestMetrics,
+  listOverviewErrorGroupsInWindow,
   listOverviewRecentSessions,
   listOverviewTopErrorGroups,
   sparklinesFromTimeSeries,
@@ -332,6 +334,7 @@ export async function apiRoutes(
       lte: until,
     });
 
+    const useScopedErrorList = Boolean(platform || release);
     const [
       errorCounts,
       eventStats,
@@ -351,19 +354,28 @@ export async function apiRoutes(
     ] = await Promise.all([
       getOverviewErrorCountsPair(prisma, windowParams),
       getOverviewEventWindowStats(prisma, windowParams),
-      prisma.errorGroup.count({ where: errorGroupWhere }),
+      useScopedErrorList
+        ? countOverviewErrorGroupsInWindow(prisma, listScope)
+        : prisma.errorGroup.count({ where: errorGroupWhere }),
       prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
         SELECT COUNT(DISTINCT e."name")::bigint AS c
         FROM "Event" e
         WHERE ${eventListWhereSql}
       `),
-      prisma.errorGroup.findMany({
-        where: errorGroupWhere,
-        skip: errorsSkip,
-        take: listPageSize,
-        orderBy: errorGroupOrderBy,
-        include: { _count: { select: { occurrences_list: true } } },
-      }),
+      useScopedErrorList
+        ? listOverviewErrorGroupsInWindow(prisma, listScope, {
+            sort: errSortParsed.sort,
+            order: errOrderParsed.order,
+            skip: errorsSkip,
+            take: listPageSize,
+          })
+        : prisma.errorGroup.findMany({
+            where: errorGroupWhere,
+            skip: errorsSkip,
+            take: listPageSize,
+            orderBy: errorGroupOrderBy,
+            include: { _count: { select: { occurrences_list: true } } },
+          }),
       prisma.event.groupBy({
         by: ["name"],
         where: eventWhere,
