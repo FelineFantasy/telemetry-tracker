@@ -593,10 +593,22 @@ export async function getOverviewActiveUsersPair(
     previousUntil: Date;
     app?: string;
     environment?: string;
+    platform?: string;
+    release?: string;
   }
 ): Promise<OverviewCountPair> {
-  const { projectId, since, until, previousSince, previousUntil, app, environment } = params;
-  const filters = eventFilterSql(projectId, app, environment);
+  const {
+    projectId,
+    since,
+    until,
+    previousSince,
+    previousUntil,
+    app,
+    environment,
+    platform,
+    release,
+  } = params;
+  const filters = eventFilterSql(projectId, app, environment, platform, release);
 
   const rows = await prisma.$queryRaw<[{ active_users: bigint; active_users_previous: bigint }]>(
     Prisma.sql`
@@ -631,7 +643,8 @@ export async function getOverviewSessionsPair(
   previousSince: Date,
   previousUntil: Date
 ): Promise<OverviewCountPair> {
-  if (scope.environment) {
+  // Env/release need event-EXISTS fallback via countSessions.
+  if (scope.environment || scope.release) {
     const [current, previous] = await Promise.all([
       countSessions(prisma, scope),
       countSessions(prisma, { ...scope, since: previousSince }, previousUntil),
@@ -640,6 +653,9 @@ export async function getOverviewSessionsPair(
   }
 
   const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+  const platformClause = scope.platform
+    ? Prisma.sql`AND s."platform" = ${scope.platform}`
+    : Prisma.empty;
   const until = scope.until ?? new Date();
   const rows = await prisma.$queryRaw<[{ sessions_count: bigint; sessions_previous: bigint }]>(
     Prisma.sql`
@@ -655,6 +671,7 @@ export async function getOverviewSessionsPair(
         AND s."started_at" >= ${previousSince}
         AND s."started_at" <= ${until}
         ${appClause}
+        ${platformClause}
     `
   );
 
