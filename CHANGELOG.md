@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.9.1] - 2026-07-14
+
+### Changed
+
+- **Release product email** — dashboard-aligned HTML template with branded header, version pill, and CTAs; resolves relative CHANGELOG links for email clients; blocks unsafe link schemes ([#437](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/437))
+
+---
+
 ## [1.9.0] - 2026-07-14
 
 ### Added
