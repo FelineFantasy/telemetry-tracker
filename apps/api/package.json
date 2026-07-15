@@ -11,6 +11,7 @@
     "test": "NODE_ENV=test vitest run",
     "test:watch": "NODE_ENV=test vitest",
     "retention": "tsx src/jobs/run-retention.ts",
+    "brief-worker": "tsx src/jobs/run-brief-worker.ts",
     "seed:dev-api-key": "tsx scripts/seed-dev-api-key.ts"
   },
   "dependencies": {
