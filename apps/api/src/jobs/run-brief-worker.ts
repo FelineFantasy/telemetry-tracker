@@ -2,11 +2,12 @@
  * CLI: `pnpm --filter api brief-worker [-- --once]`
  * Requires `DATABASE_URL` and private brief service configuration.
  */
+import { resolveWorkerPollMs } from "../lib/brief-async-config.js";
 import { prisma } from "../lib/db.js";
 import { processNextBriefGenerationJob } from "../lib/brief-worker.js";
 
 const ONCE = process.argv.includes("--once");
-const POLL_MS = Number.parseInt(process.env.BRIEF_WORKER_POLL_MS ?? "1000", 10);
+const POLL_MS = resolveWorkerPollMs(process.env);
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`Usage: pnpm --filter api brief-worker [-- --once]

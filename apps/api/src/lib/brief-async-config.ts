@@ -15,6 +15,9 @@ export const BRIEF_WORKER_ATTEMPT_TIMEOUT_MS_DEFAULT = 60_000;
 /** Worker lease duration while processing a claimed job (ms). */
 export const BRIEF_WORKER_LEASE_MS_DEFAULT = 60_000;
 
+/** Worker idle poll interval (ms). */
+export const BRIEF_WORKER_POLL_MS_DEFAULT = 1000;
+
 export type BriefAsyncConfig = {
   completedRetentionDays: number;
   staleMaxDisplayDays: number;
@@ -35,6 +38,20 @@ function parsePositiveInt(
     throw new Error(`${label} must be a positive integer`);
   }
   return parsed;
+}
+
+function parsePositiveIntWithFallback(
+  raw: string | undefined,
+  fallback: number
+): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return parsed;
+}
+
+export function resolveWorkerPollMs(env: NodeJS.ProcessEnv = process.env): number {
+  return parsePositiveIntWithFallback(env.BRIEF_WORKER_POLL_MS, BRIEF_WORKER_POLL_MS_DEFAULT);
 }
 
 export function resolveBriefAsyncConfig(env: NodeJS.ProcessEnv = process.env): BriefAsyncConfig {

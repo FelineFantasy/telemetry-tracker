@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   BRIEF_COMPLETED_RETENTION_DAYS_DEFAULT,
   BRIEF_STALE_MAX_DISPLAY_DAYS_DEFAULT,
+  BRIEF_WORKER_POLL_MS_DEFAULT,
   resolveBriefAsyncConfig,
+  resolveWorkerPollMs,
 } from "./brief-async-config.js";
 
 describe("resolveBriefAsyncConfig", () => {
@@ -25,5 +27,21 @@ describe("resolveBriefAsyncConfig", () => {
     expect(config.staleMaxDisplayDays).toBe(3);
     expect(config.workerTotalBudgetMs).toBe(45_000);
     expect(config.workerAttemptTimeoutMs).toBe(40_000);
+  });
+});
+
+describe("resolveWorkerPollMs", () => {
+  it("uses the default when the env var is missing or invalid", () => {
+    expect(resolveWorkerPollMs({})).toBe(BRIEF_WORKER_POLL_MS_DEFAULT);
+    expect(resolveWorkerPollMs({ BRIEF_WORKER_POLL_MS: "not-a-number" })).toBe(
+      BRIEF_WORKER_POLL_MS_DEFAULT
+    );
+    expect(resolveWorkerPollMs({ BRIEF_WORKER_POLL_MS: "0" })).toBe(
+      BRIEF_WORKER_POLL_MS_DEFAULT
+    );
+  });
+
+  it("parses a positive override", () => {
+    expect(resolveWorkerPollMs({ BRIEF_WORKER_POLL_MS: "2500" })).toBe(2500);
   });
 });

@@ -102,6 +102,15 @@ function briefIdentity(
   };
 }
 
+function metaFromServedBrief(brief: WorkspaceBriefResponse): BriefBuildMeta {
+  return {
+    truncated: false,
+    truncationSteps: [],
+    droppedProjectIds: [],
+    byteLength: Buffer.byteLength(JSON.stringify(brief), "utf8"),
+  };
+}
+
 export async function getWorkspaceBrief(
   deps: WorkspaceBriefServiceDeps,
   input: { userId: string; organizationId: string; timezone?: string | null }
@@ -213,7 +222,7 @@ export async function getWorkspaceBrief(
       snapshotHash: stale.snapshotHash,
       contentHash: stale.contentHash,
       brief: stale.brief,
-      meta: { ...buildMeta, source: "stale" },
+      meta: { ...metaFromServedBrief(stale.brief), source: "stale" },
     };
   }
 

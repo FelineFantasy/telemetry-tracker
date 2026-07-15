@@ -233,6 +233,9 @@ describe("getWorkspaceBrief (async read path)", () => {
     expect(result.requestId).toBe(STORED_REQUEST_ID);
     expect(result.contentHash).toBe("old".repeat(16));
     expect(result.snapshotHash).toBe("s".repeat(64));
+    expect(result.meta.byteLength).toBe(Buffer.byteLength(JSON.stringify(storedBrief), "utf8"));
+    expect(result.meta.byteLength).not.toBe(100);
+    expect(result.meta.truncated).toBe(false);
     expect(generationJob.enqueueBriefGenerationJob).toHaveBeenCalledWith(
       prisma,
       expect.objectContaining({
