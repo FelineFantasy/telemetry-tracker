@@ -13,6 +13,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.10.0] - 2026-07-15
+
+### Added
+
+- **Workspace brief (API)** — Phase Async-A: Postgres-backed `BriefCompleted` and `BriefGenerationJob` storage, organization-scoped background worker, async read path (current → stale → enqueue + factual fallback), and `meta.source: "stale"` ([#440](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/440))
+
+### Changed
+
+- **Workspace brief (API)** — synchronous AI read path and L1 cache removed from `POST /api/meta/brief/workspace`; generation is worker-driven with immutable `requestId` per job
+
+---
+
 ## [1.9.2] - 2026-07-15
 
 ### Added
