@@ -242,6 +242,47 @@ describe("getWorkspaceBrief (async read path)", () => {
     );
   });
 
+  it("serves a current brief when one appears during the stale path", async () => {
+    const completedAfterRace = {
+      id: "completed-race",
+      organizationId: ORG_ID,
+      contentHash: "c".repeat(64),
+      presentationHash: "p".repeat(64),
+      responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
+      requestId: "c0000000-0000-4000-8000-000000000088",
+      snapshotHash: "d".repeat(64),
+      brief: storedBrief,
+      completedAt: fixedNow,
+      expiresAt: new Date("2026-08-14T12:00:00.000Z"),
+    };
+
+    vi.spyOn(completed, "findStaleBriefCompleted").mockResolvedValue({
+      id: "completed-stale",
+      organizationId: ORG_ID,
+      contentHash: "old".repeat(16),
+      presentationHash: "p".repeat(64),
+      responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
+      requestId: STORED_REQUEST_ID,
+      snapshotHash: "s".repeat(64),
+      brief: storedBrief,
+      completedAt: new Date("2026-07-10T12:00:00.000Z"),
+      expiresAt: new Date("2026-08-10T12:00:00.000Z"),
+    });
+    vi.spyOn(completed, "findCurrentBriefCompleted")
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedAfterRace);
+
+    const result = await getWorkspaceBrief({ prisma, now: () => fixedNow }, {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.meta.source).toBe("ai");
+    expect(result.requestId).toBe("c0000000-0000-4000-8000-000000000088");
+  });
+
   it("serves a completed brief when one appears between lookup and enqueue", async () => {
     const completedAfterRace = {
       id: "completed-race",

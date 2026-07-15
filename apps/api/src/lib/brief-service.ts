@@ -193,6 +193,19 @@ export async function getWorkspaceBrief(
       // Non-blocking: stale display must not fail when enqueue races or errors.
     }
 
+    const currentAfterEnqueue = await findCurrentBriefCompleted(deps.prisma, identity, now);
+    if (currentAfterEnqueue) {
+      return {
+        status: "ok",
+        httpStatus: 200,
+        requestId: currentAfterEnqueue.requestId,
+        snapshotHash: currentAfterEnqueue.snapshotHash,
+        contentHash,
+        brief: currentAfterEnqueue.brief,
+        meta: { ...buildMeta, source: "ai" },
+      };
+    }
+
     return {
       status: "ok",
       httpStatus: 200,
