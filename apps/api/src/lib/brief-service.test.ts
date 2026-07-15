@@ -111,6 +111,7 @@ describe("getWorkspaceBrief (async read path)", () => {
       presentationHash: "p".repeat(64),
       responseSchemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
       requestId: "job-request",
+      requestUntil: new Date("2026-07-14T12:34:00.000Z"),
       status: "PENDING",
       attemptCount: 0,
       leaseOwner: null,
@@ -215,7 +216,13 @@ describe("getWorkspaceBrief (async read path)", () => {
     if (result.status !== "ok") return;
     expect(result.meta.source).toBe("stale");
     expect(result.requestId).toBe(STORED_REQUEST_ID);
-    expect(generationJob.enqueueBriefGenerationJob).toHaveBeenCalledTimes(1);
+    expect(generationJob.enqueueBriefGenerationJob).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        organizationId: ORG_ID,
+        requestUntil: new Date("2026-07-14T12:34:00.000Z"),
+      })
+    );
   });
 
   it("enqueues a job and returns factual fallback when no completed brief exists", async () => {
@@ -227,7 +234,12 @@ describe("getWorkspaceBrief (async read path)", () => {
     expect(result.status).toBe("unavailable");
     if (result.status !== "unavailable") return;
     expect(result.reason).toBe(BRIEF_ASYNC_PENDING_UNAVAILABLE_REASON);
-    expect(generationJob.enqueueBriefGenerationJob).toHaveBeenCalledTimes(1);
+    expect(generationJob.enqueueBriefGenerationJob).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        requestUntil: new Date("2026-07-14T12:34:00.000Z"),
+      })
+    );
     expect(result.fallback.schemaVersion).toBe("2026-07-brief-fallback-v1");
   });
 
