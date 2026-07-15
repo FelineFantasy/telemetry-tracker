@@ -31,14 +31,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  do {
+  while (true) {
     const result = await processNextBriefGenerationJob({ prisma });
     console.log(JSON.stringify({ ok: true, ...result, at: new Date().toISOString() }));
-    if (ONCE || result.status !== "idle") {
-      break;
+    if (ONCE) break;
+    if (result.status === "idle") {
+      await sleep(POLL_MS);
     }
-    await sleep(POLL_MS);
-  } while (!ONCE);
+  }
 
   await prisma.$disconnect();
 }
