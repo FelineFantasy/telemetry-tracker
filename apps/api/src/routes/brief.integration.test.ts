@@ -8,8 +8,7 @@ import { createApp } from "../app.js";
 import { hashPassword } from "../lib/password.js";
 import { prisma } from "../lib/db.js";
 import { floorToCompletedMinute } from "../lib/brief-request-until.js";
-import { resetBriefCircuitBreakers } from "../lib/brief-circuit.js";
-import { resetBriefSemanticCache } from "../lib/brief-cache.js";
+import { processNextBriefGenerationJob } from "../lib/brief-worker.js";
 
 const runBriefIntegration = process.env.RUN_BRIEF_INTEGRATION_TESTS === "true";
 const runDbIntegration = process.env.RUN_DB_INTEGRATION_TESTS === "true";
@@ -47,7 +46,6 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
     let app: FastifyInstance | undefined;
     let aiApp: FastifyInstance | undefined;
     let organizationId: string;
-    let projectId: string;
     let email: string;
     const password = "testpass12";
     const suffix = randomBytes(6).toString("hex");
@@ -73,7 +71,6 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
         include: { projects: true },
       });
       organizationId = org.id;
-      projectId = org.projects[0]!.id;
 
       await prisma.user.create({
         data: {
@@ -113,7 +110,7 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
       delete process.env.TELEMETRY_AI_BRIEF_SECRET;
     });
 
-    it("returns ok from the private stub on first request", async () => {
+    it("returns unavailable fallback before the worker completes a job", async () => {
       const res = await app!.inject({
         method: "POST",
         url: "/api/meta/brief/workspace",
@@ -128,14 +125,90 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body) as {
         status: string;
-        meta?: { source?: string; truncated?: boolean; byteLength?: number };
+        meta?: { byteLength?: number };
+        fallback?: { schemaVersion?: string };
       };
-      expect(body.status).toBe("ok");
-      expect(body.meta?.source).toBe("ai");
+      expect(body.status).toBe("unavailable");
+      expect(body.fallback?.schemaVersion).toBe("2026-07-brief-fallback-v1");
       expect(body.meta?.byteLength).toBeGreaterThan(0);
     });
 
-    it("serves a cache hit on a second request in the same bucket", async () => {
+    it("returns 409 stale_brief when acknowledging an unavailable fallback brief", async () => {
+      const brief = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/workspace",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {},
+      });
+
+      expect(brief.statusCode).toBe(200);
+      const briefBody = JSON.parse(brief.body) as {
+        status: string;
+        requestId: string;
+        snapshotHash: string;
+        fallback: {
+          projects: Array<{ projectId: string; generatedThrough: string }>;
+        };
+      };
+      expect(briefBody.status).toBe("unavailable");
+
+      const ack = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/ack",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {
+          requestId: briefBody.requestId,
+          snapshotHash: briefBody.snapshotHash,
+          projects: briefBody.fallback.projects.map((p) => ({
+            projectId: p.projectId,
+            acknowledgedThrough: p.generatedThrough,
+          })),
+        },
+      });
+
+      expect(ack.statusCode).toBe(409);
+      const ackBody = JSON.parse(ack.body) as { ok: boolean; error?: string };
+      expect(ackBody.ok).toBe(false);
+      expect(ackBody.error).toBe("stale_brief");
+    });
+
+    it("serves a completed brief from Postgres after the worker runs", async () => {
+      const workerResult = await processNextBriefGenerationJob({ prisma });
+      expect(workerResult.status).toBe("completed");
+
+      const res = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/workspace",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {},
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body) as {
+        status: string;
+        requestId?: string;
+        meta?: { source?: string };
+      };
+      expect(body.status).toBe("ok");
+      expect(body.meta?.source).toBe("ai");
+      expect(body.requestId).toBe(workerResult.requestId);
+    });
+
+    it("reuses the stored requestId across polls in the same bucket", async () => {
+      await processNextBriefGenerationJob({ prisma });
+
       const first = await app!.inject({
         method: "POST",
         url: "/api/meta/brief/workspace",
@@ -159,11 +232,13 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
 
       const firstBody = JSON.parse(first.body) as {
         status: string;
+        requestId?: string;
         contentHash?: string;
         meta?: { source?: string };
       };
       const secondBody = JSON.parse(second.body) as {
         status: string;
+        requestId?: string;
         contentHash?: string;
         meta?: { source?: string };
       };
@@ -171,7 +246,8 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
       expect(firstBody.status).toBe("ok");
       expect(secondBody.status).toBe("ok");
       expect(secondBody.contentHash).toBe(firstBody.contentHash);
-      expect(secondBody.meta?.source).toBe("cache");
+      expect(secondBody.requestId).toBe(firstBody.requestId);
+      expect(secondBody.meta?.source).toBe("ai");
     });
 
     it("uses the same contentHash within a completed-minute bucket", async () => {
@@ -203,7 +279,9 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
       expect(bucketUntil.toISOString()).toMatch(/:00\.000Z$/);
     });
 
-    it("acknowledges an AI-served brief", async () => {
+    it("returns 409 stale_brief when acknowledging a DB-served brief before Async-C served-meta", async () => {
+      await processNextBriefGenerationJob({ prisma });
+
       const brief = await app!.inject({
         method: "POST",
         url: "/api/meta/brief/workspace",
@@ -234,74 +312,6 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
           requestId: briefBody.requestId,
           snapshotHash: briefBody.snapshotHash,
           projects: briefBody.brief.projects.map((p) => ({
-            projectId: p.projectId,
-            acknowledgedThrough: p.generatedThrough,
-          })),
-        },
-      });
-
-      expect(ack.statusCode).toBe(200);
-      const ackBody = JSON.parse(ack.body) as { ok: boolean; updated?: unknown[] };
-      expect(ackBody.ok).toBe(true);
-      expect(ackBody.updated?.length).toBeGreaterThan(0);
-
-      const row = await prisma.briefAcknowledgement.findUnique({
-        where: {
-          user_id_project_id: {
-            user_id: (
-              await prisma.user.findFirstOrThrow({ where: { email } })
-            ).id,
-            project_id: projectId,
-          },
-        },
-      });
-      expect(row?.acknowledged_through.toISOString()).toBe(
-        briefBody.brief.projects[0]!.generatedThrough
-      );
-    });
-
-    it("returns 409 stale_brief when acknowledging an unavailable fallback brief", async () => {
-      resetBriefSemanticCache();
-      resetBriefCircuitBreakers();
-      const previousUrl = process.env.TELEMETRY_AI_BRIEF_URL;
-      delete process.env.TELEMETRY_AI_BRIEF_URL;
-
-      const brief = await app!.inject({
-        method: "POST",
-        url: "/api/meta/brief/workspace",
-        headers: {
-          authorization: `Bearer ${sessionId}`,
-          "x-organization-id": organizationId,
-          "content-type": "application/json",
-        },
-        payload: {},
-      });
-
-      if (previousUrl) process.env.TELEMETRY_AI_BRIEF_URL = previousUrl;
-
-      expect(brief.statusCode).toBe(200);
-      const briefBody = JSON.parse(brief.body) as {
-        status: string;
-        requestId: string;
-        snapshotHash: string;
-        fallback: {
-          projects: Array<{ projectId: string; generatedThrough: string }>;
-        };
-      };
-      expect(briefBody.status).toBe("unavailable");
-
-      const ack = await app!.inject({
-        method: "POST",
-        url: "/api/meta/brief/ack",
-        headers: {
-          authorization: `Bearer ${sessionId}`,
-          "x-organization-id": organizationId,
-          "content-type": "application/json",
-        },
-        payload: {
-          requestId: briefBody.requestId,
-          snapshotHash: briefBody.snapshotHash,
-          projects: briefBody.fallback.projects.map((p) => ({
             projectId: p.projectId,
             acknowledgedThrough: p.generatedThrough,
           })),

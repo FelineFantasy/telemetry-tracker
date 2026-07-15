@@ -12,6 +12,7 @@ import {
   parseBriefSnapshotRequest,
   parseWorkspaceBriefResponse,
   projectSnapshotSchema,
+  workspaceBriefOkResponseSchema,
   workspaceBriefResponseSchema,
 } from "./brief-contracts.js";
 
@@ -318,5 +319,38 @@ describe("acknowledgeBriefRequestSchema", () => {
       ],
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("workspaceBriefOkResponseSchema", () => {
+  it("accepts meta.source stale", () => {
+    const parsed = workspaceBriefOkResponseSchema.safeParse({
+      status: "ok",
+      requestId: REQUEST_ID,
+      snapshotHash: SNAPSHOT_HASH,
+      contentHash: SNAPSHOT_HASH,
+      brief: {
+        schemaVersion: BRIEF_RESPONSE_SCHEMA_VERSION,
+        requestId: REQUEST_ID,
+        generatedAt: "2026-07-14T12:00:00.000Z",
+        workspace: { title: "Brief" },
+        projects: [
+          {
+            projectId: PROJECT_ID,
+            generatedThrough: "2026-07-14T12:00:00.000Z",
+            significance: "none",
+            collapsedLabel: "No changes",
+          },
+        ],
+      },
+      meta: {
+        truncated: false,
+        truncationSteps: [],
+        droppedProjectIds: [],
+        byteLength: 10,
+        source: "stale",
+      },
+    });
+    expect(parsed.success).toBe(true);
   });
 });
