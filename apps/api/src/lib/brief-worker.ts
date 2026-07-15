@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { postWorkspaceBrief, resolveBriefAiClientConfigFromEnv } from "./brief-client.js";
 import { resolveBriefAsyncConfig } from "./brief-async-config.js";
-import { upsertBriefCompleted } from "./brief-completed.js";
+import { upsertBriefCompleted, findCurrentBriefCompleted } from "./brief-completed.js";
 import {
   claimNextBriefGenerationJob,
   completeBriefGenerationJob,
@@ -92,6 +92,29 @@ export async function processNextBriefGenerationJob(
   if (!hashesMatch) {
     await expireBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "expired", jobId: job.id };
+  }
+
+  const existingCompleted = await findCurrentBriefCompleted(
+    deps.prisma,
+    identityFromJob(job),
+    now
+  );
+  if (existingCompleted) {
+    const completed = await completeBriefGenerationJob(deps.prisma, {
+      jobId: job.id,
+      workerId,
+      now: nowFn(),
+    });
+    if (!completed) {
+      await expireBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
+      return { status: "expired", jobId: job.id };
+    }
+
+    return {
+      status: "completed",
+      jobId: job.id,
+      requestId: existingCompleted.requestId,
+    };
   }
 
   const aiResolved = resolveBriefAiClientConfigFromEnv(env);
