@@ -20,8 +20,6 @@ import {
 } from "./brief-generation-job.js";
 import { buildOrganizationBriefSnapshot, loadOrganizationBriefContext } from "./brief-org-snapshot.js";
 import { computePresentationHash } from "./brief-presentation-hash.js";
-import { floorToCompletedMinute } from "./brief-request-until.js";
-import { resolveRequestUntilBucketMs } from "./brief-runtime-config.js";
 import { validatePrivateBriefResponse } from "./brief-validate-response.js";
 
 export type BriefWorkerDeps = {
@@ -61,19 +59,18 @@ export async function processNextBriefGenerationJob(
 
   const context = await loadOrganizationBriefContext(deps.prisma, job.organizationId);
   if (!context.ok) {
-    await expireBriefGenerationJob(deps.prisma, job.id);
+    await expireBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "expired", jobId: job.id };
   }
 
-  const requestUntil = floorToCompletedMinute(now, resolveRequestUntilBucketMs(env));
   const built = await buildOrganizationBriefSnapshot(deps.prisma, {
     organizationId: job.organizationId,
     requestId: job.requestId,
-    requestUntil,
+    requestUntil: job.requestUntil,
   });
 
   if (!built.ok) {
-    await expireBriefGenerationJob(deps.prisma, job.id);
+    await expireBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "expired", jobId: job.id };
   }
 
@@ -93,25 +90,28 @@ export async function processNextBriefGenerationJob(
     built.snapshot.organizationId === job.organizationId;
 
   if (!hashesMatch) {
-    await expireBriefGenerationJob(deps.prisma, job.id);
+    await expireBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "expired", jobId: job.id };
   }
 
-  await renewBriefGenerationJobLease(deps.prisma, {
-    jobId: job.id,
-    workerId,
-    now,
-    env,
-  });
-
   const aiResolved = resolveBriefAiClientConfigFromEnv(env);
   if (!aiResolved.ok) {
-    await failBriefGenerationJob(deps.prisma, job.id);
+    await failBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return {
       status: "failed",
       jobId: job.id,
       reason: aiResolved.code === "misconfigured" ? "ai_misconfigured" : "ai_unreachable",
     };
+  }
+
+  const leaseHeld = await renewBriefGenerationJobLease(deps.prisma, {
+    jobId: job.id,
+    workerId,
+    now: nowFn(),
+    env,
+  });
+  if (!leaseHeld) {
+    return { status: "expired", jobId: job.id };
   }
 
   const config = resolveBriefAsyncConfig(env);
@@ -124,13 +124,13 @@ export async function processNextBriefGenerationJob(
 
   const aiResult = await postWorkspaceBrief(built.snapshot, built.contentHash, aiConfig);
   if (!aiResult.ok) {
-    await failBriefGenerationJob(deps.prisma, job.id);
+    await failBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "failed", jobId: job.id, reason: aiResult.reason };
   }
 
   const validated = validatePrivateBriefResponse(built.snapshot, aiResult.response);
   if (!validated.ok) {
-    await failBriefGenerationJob(deps.prisma, job.id);
+    await failBriefGenerationJob(deps.prisma, { jobId: job.id, workerId });
     return { status: "failed", jobId: job.id, reason: "ai_invalid_response" };
   }
 
@@ -144,11 +144,18 @@ export async function processNextBriefGenerationJob(
     requestId: job.requestId,
     snapshotHash: built.snapshotHash,
     brief,
-    now,
+    now: nowFn(),
     env,
   });
 
-  await completeBriefGenerationJob(deps.prisma, job.id, now);
+  const completed = await completeBriefGenerationJob(deps.prisma, {
+    jobId: job.id,
+    workerId,
+    now: nowFn(),
+  });
+  if (!completed) {
+    return { status: "expired", jobId: job.id };
+  }
 
   return { status: "completed", jobId: job.id, requestId: job.requestId };
 }

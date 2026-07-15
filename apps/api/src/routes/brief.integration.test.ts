@@ -46,7 +46,6 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
     let app: FastifyInstance | undefined;
     let aiApp: FastifyInstance | undefined;
     let organizationId: string;
-    let projectId: string;
     let email: string;
     const password = "testpass12";
     const suffix = randomBytes(6).toString("hex");
@@ -72,7 +71,6 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
         include: { projects: true },
       });
       organizationId = org.id;
-      projectId = org.projects[0]!.id;
 
       await prisma.user.create({
         data: {

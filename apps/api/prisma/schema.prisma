@@ -141,6 +141,8 @@ model BriefGenerationJob {
   response_schema_version String                   @map("response_schema_version")
   /// Set once at enqueue; never regenerated.
   request_id              String                   @map("request_id")
+  /// Snapshot bucket upper bound captured at enqueue for worker hash verification.
+  request_until           DateTime                 @map("request_until")
   status                  BriefGenerationJobStatus @default(PENDING)
   attempt_count           Int                      @default(0) @map("attempt_count")
   lease_owner             String?                  @map("lease_owner")

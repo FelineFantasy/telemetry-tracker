@@ -187,7 +187,7 @@ export async function getWorkspaceBrief(
   });
   if (stale) {
     try {
-      await enqueueBriefGenerationJob(deps.prisma, identity);
+      await enqueueBriefGenerationJob(deps.prisma, { ...identity, requestUntil });
     } catch {
       // Non-blocking: stale display must not fail when enqueue races or errors.
     }
@@ -204,7 +204,7 @@ export async function getWorkspaceBrief(
   }
 
   try {
-    await enqueueBriefGenerationJob(deps.prisma, identity);
+    await enqueueBriefGenerationJob(deps.prisma, { ...identity, requestUntil });
   } catch {
     return {
       status: "error",

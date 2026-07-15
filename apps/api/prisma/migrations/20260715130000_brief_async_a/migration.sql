@@ -25,6 +25,7 @@ CREATE TABLE "BriefGenerationJob" (
     "presentation_hash" TEXT NOT NULL,
     "response_schema_version" TEXT NOT NULL,
     "request_id" TEXT NOT NULL,
+    "request_until" TIMESTAMP(3) NOT NULL,
     "status" "BriefGenerationJobStatus" NOT NULL DEFAULT 'PENDING',
     "attempt_count" INTEGER NOT NULL DEFAULT 0,
     "lease_owner" TEXT,
