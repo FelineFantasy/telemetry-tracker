@@ -70,6 +70,7 @@ export type BuildOrganizationBriefSnapshotInput = {
   organizationId: string;
   requestId: string;
   requestUntil: Date;
+  viewerTimezone?: string | null;
 };
 
 /**
@@ -92,6 +93,7 @@ export async function buildOrganizationBriefSnapshot(
     organizationId: context.organizationId,
     requestId: input.requestId,
     requestUntil: input.requestUntil,
+    viewerTimezone: input.viewerTimezone,
     userId: "__organization__",
     projects: context.projects,
     skipUserAcknowledgements: true,

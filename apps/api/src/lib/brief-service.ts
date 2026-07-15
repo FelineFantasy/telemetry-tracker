@@ -125,6 +125,7 @@ export async function getWorkspaceBrief(
     organizationId: authz.organizationId,
     requestId: correlationRequestId,
     requestUntil,
+    viewerTimezone: input.timezone,
   });
 
   if (!built.ok) {

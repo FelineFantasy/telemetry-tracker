@@ -122,6 +122,21 @@ describe("getWorkspaceBrief (async read path)", () => {
     });
   });
 
+  it("forwards viewer timezone into the organization snapshot build", async () => {
+    await getWorkspaceBrief({ prisma, now: () => fixedNow }, {
+      userId: USER_ID,
+      organizationId: ORG_ID,
+      timezone: "Europe/Berlin",
+    });
+
+    expect(orgSnapshot.buildOrganizationBriefSnapshot).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        viewerTimezone: "Europe/Berlin",
+      })
+    );
+  });
+
   it("uses bucketed requestUntil when building the organization snapshot", async () => {
     await getWorkspaceBrief({ prisma, now: () => fixedNow }, {
       userId: USER_ID,
