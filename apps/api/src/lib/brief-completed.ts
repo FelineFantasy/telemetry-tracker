@@ -87,7 +87,7 @@ export async function findStaleBriefCompleted(
     input.now.getTime() - config.staleMaxDisplayDays * 24 * 60 * 60 * 1000
   );
 
-  const row = await prisma.briefCompleted.findFirst({
+  const rows = await prisma.briefCompleted.findMany({
     where: {
       organization_id: input.organizationId,
       completed_at: { gte: staleCutoff },
@@ -103,8 +103,12 @@ export async function findStaleBriefCompleted(
     orderBy: { completed_at: "desc" },
   });
 
-  if (!row) return null;
-  return mapRow(row);
+  for (const row of rows) {
+    const mapped = mapRow(row);
+    if (mapped) return mapped;
+  }
+
+  return null;
 }
 
 export async function upsertBriefCompleted(
