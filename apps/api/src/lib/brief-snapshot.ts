@@ -42,6 +42,8 @@ export type BuildWorkspaceBriefSnapshotInput = {
     slug: string;
     createdAt: Date;
   }>;
+  /** When true, windows ignore per-user acknowledgement state (organization-scoped async path). */
+  skipUserAcknowledgements?: boolean;
 };
 
 export type BuildWorkspaceBriefSnapshotSuccess = {
@@ -214,11 +216,13 @@ export async function buildWorkspaceBriefSnapshot(
     return { ok: false, code: "no_projects" };
   }
 
-  const acknowledgements = await loadBriefAcknowledgements(
-    prisma,
-    input.userId,
-    sortedProjects.map((p) => p.id)
-  );
+  const acknowledgements = input.skipUserAcknowledgements
+    ? new Map<string, Date>()
+    : await loadBriefAcknowledgements(
+        prisma,
+        input.userId,
+        sortedProjects.map((p) => p.id)
+      );
 
   const briefWindows = resolveBriefProjectWindows(
     sortedProjects.map((project) => ({
