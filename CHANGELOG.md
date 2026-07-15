@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.9.2] - 2026-07-15
+
+### Added
+
+- **Dashboard** — copy-to-clipboard button on JSON context blocks (event properties and error context) ([#232](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/232), [#439](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/439))
+
+---
+
 ## [1.9.1] - 2026-07-14
 
 ### Changed
