@@ -80,13 +80,11 @@ function sessionScopeWhere(scope: Scope): Prisma.SessionWhereInput {
 function errorGroupScopeWhere(scope: Scope): Prisma.ErrorGroupWhereInput {
   const where: Prisma.ErrorGroupWhereInput = {
     project_id: scope.projectId,
-    last_seen: scope.until
-      ? { gte: scope.since, lte: scope.until }
-      : { gte: scope.since },
   } as Prisma.ErrorGroupWhereInput;
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
   if (scope.platform || scope.release) {
+    // Membership follows in-window matching occurrences (same as scoped Overview list / KPIs).
     where.occurrences_list = {
       some: {
         created_at: scope.until
@@ -96,6 +94,10 @@ function errorGroupScopeWhere(scope: Scope): Prisma.ErrorGroupWhereInput {
         ...(scope.release ? { release: scope.release } : {}),
       },
     };
+  } else {
+    where.last_seen = scope.until
+      ? { gte: scope.since, lte: scope.until }
+      : { gte: scope.since };
   }
   return where;
 }
