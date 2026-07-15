@@ -114,7 +114,7 @@ export async function enqueueBriefGenerationJob(
       }
 
       if (existing.status === BriefGenerationJobStatus.COMPLETED) {
-        const completedBrief = await findCurrentBriefCompleted(prisma, input);
+        const completedBrief = await findCurrentBriefCompleted(prisma, input, new Date());
         if (completedBrief) {
           return mapJob(existing);
         }

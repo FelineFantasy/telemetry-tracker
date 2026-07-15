@@ -235,6 +235,7 @@ describe("getWorkspaceBrief (async read path)", () => {
 
     expect(result.status).toBe("unavailable");
     if (result.status !== "unavailable") return;
+    expect(result.requestId).toBe("job-request");
     expect(result.reason).toBe(BRIEF_ASYNC_PENDING_UNAVAILABLE_REASON);
     expect(generationJob.enqueueBriefGenerationJob).toHaveBeenCalledWith(
       prisma,

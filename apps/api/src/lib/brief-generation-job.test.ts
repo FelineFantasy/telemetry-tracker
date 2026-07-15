@@ -179,6 +179,11 @@ describe("enqueueBriefGenerationJob", () => {
 
     const result = await enqueueBriefGenerationJob(prisma, INPUT);
 
+    expect(completed.findCurrentBriefCompleted).toHaveBeenCalledWith(
+      prisma,
+      INPUT,
+      expect.any(Date)
+    );
     expect(update).not.toHaveBeenCalled();
     expect(result.status).toBe(BriefGenerationJobStatus.COMPLETED);
   });

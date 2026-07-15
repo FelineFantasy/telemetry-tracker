@@ -166,7 +166,7 @@ export async function getWorkspaceBrief(
 
   const identity = briefIdentity(authz.organizationId, contentHash, presentationHash);
 
-  const current = await findCurrentBriefCompleted(deps.prisma, identity);
+  const current = await findCurrentBriefCompleted(deps.prisma, identity, now);
   if (current) {
     return {
       status: "ok",
@@ -203,8 +203,9 @@ export async function getWorkspaceBrief(
     };
   }
 
+  let job;
   try {
-    await enqueueBriefGenerationJob(deps.prisma, { ...identity, requestUntil });
+    job = await enqueueBriefGenerationJob(deps.prisma, { ...identity, requestUntil });
   } catch {
     return {
       status: "error",
@@ -215,9 +216,8 @@ export async function getWorkspaceBrief(
     };
   }
 
-  const fallbackRequestId = randomUUID();
   return unavailableFallbackResult({
-    requestId: fallbackRequestId,
+    requestId: job.requestId,
     snapshotHash,
     contentHash,
     snapshot,

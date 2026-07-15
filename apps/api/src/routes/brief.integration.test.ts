@@ -133,6 +133,53 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
       expect(body.meta?.byteLength).toBeGreaterThan(0);
     });
 
+    it("returns 409 stale_brief when acknowledging an unavailable fallback brief", async () => {
+      const brief = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/workspace",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {},
+      });
+
+      expect(brief.statusCode).toBe(200);
+      const briefBody = JSON.parse(brief.body) as {
+        status: string;
+        requestId: string;
+        snapshotHash: string;
+        fallback: {
+          projects: Array<{ projectId: string; generatedThrough: string }>;
+        };
+      };
+      expect(briefBody.status).toBe("unavailable");
+
+      const ack = await app!.inject({
+        method: "POST",
+        url: "/api/meta/brief/ack",
+        headers: {
+          authorization: `Bearer ${sessionId}`,
+          "x-organization-id": organizationId,
+          "content-type": "application/json",
+        },
+        payload: {
+          requestId: briefBody.requestId,
+          snapshotHash: briefBody.snapshotHash,
+          projects: briefBody.fallback.projects.map((p) => ({
+            projectId: p.projectId,
+            acknowledgedThrough: p.generatedThrough,
+          })),
+        },
+      });
+
+      expect(ack.statusCode).toBe(409);
+      const ackBody = JSON.parse(ack.body) as { ok: boolean; error?: string };
+      expect(ackBody.ok).toBe(false);
+      expect(ackBody.error).toBe("stale_brief");
+    });
+
     it("serves a completed brief from Postgres after the worker runs", async () => {
       const workerResult = await processNextBriefGenerationJob({ prisma });
       expect(workerResult.status).toBe("completed");
@@ -265,53 +312,6 @@ describe.skipIf(!runBriefIntegration || !runDbIntegration)(
           requestId: briefBody.requestId,
           snapshotHash: briefBody.snapshotHash,
           projects: briefBody.brief.projects.map((p) => ({
-            projectId: p.projectId,
-            acknowledgedThrough: p.generatedThrough,
-          })),
-        },
-      });
-
-      expect(ack.statusCode).toBe(409);
-      const ackBody = JSON.parse(ack.body) as { ok: boolean; error?: string };
-      expect(ackBody.ok).toBe(false);
-      expect(ackBody.error).toBe("stale_brief");
-    });
-
-    it("returns 409 stale_brief when acknowledging an unavailable fallback brief", async () => {
-      const brief = await app!.inject({
-        method: "POST",
-        url: "/api/meta/brief/workspace",
-        headers: {
-          authorization: `Bearer ${sessionId}`,
-          "x-organization-id": organizationId,
-          "content-type": "application/json",
-        },
-        payload: {},
-      });
-
-      expect(brief.statusCode).toBe(200);
-      const briefBody = JSON.parse(brief.body) as {
-        status: string;
-        requestId: string;
-        snapshotHash: string;
-        fallback: {
-          projects: Array<{ projectId: string; generatedThrough: string }>;
-        };
-      };
-      expect(briefBody.status).toBe("unavailable");
-
-      const ack = await app!.inject({
-        method: "POST",
-        url: "/api/meta/brief/ack",
-        headers: {
-          authorization: `Bearer ${sessionId}`,
-          "x-organization-id": organizationId,
-          "content-type": "application/json",
-        },
-        payload: {
-          requestId: briefBody.requestId,
-          snapshotHash: briefBody.snapshotHash,
-          projects: briefBody.fallback.projects.map((p) => ({
             projectId: p.projectId,
             acknowledgedThrough: p.generatedThrough,
           })),

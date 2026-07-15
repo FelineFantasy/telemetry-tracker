@@ -53,7 +53,8 @@ function mapRow(row: {
 
 export async function findCurrentBriefCompleted(
   prisma: PrismaClient,
-  identity: BriefIdentity
+  identity: BriefIdentity,
+  now: Date
 ): Promise<BriefCompletedRow | null> {
   const row = await prisma.briefCompleted.findUnique({
     where: {
@@ -66,7 +67,10 @@ export async function findCurrentBriefCompleted(
     },
   });
   if (!row) return null;
-  return mapRow(row);
+  const mapped = mapRow(row);
+  if (!mapped) return null;
+  if (mapped.expiresAt <= now) return null;
+  return mapped;
 }
 
 export async function findStaleBriefCompleted(
@@ -87,6 +91,7 @@ export async function findStaleBriefCompleted(
     where: {
       organization_id: input.organizationId,
       completed_at: { gte: staleCutoff },
+      expires_at: { gt: input.now },
       NOT: {
         AND: [
           { content_hash: input.excludeIdentity.contentHash },
