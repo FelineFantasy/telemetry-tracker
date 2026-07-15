@@ -321,22 +321,71 @@ export async function getSessionDurationSeries(
   since: Date,
   until?: Date,
   app?: string,
-  environment?: string
+  environment?: string,
+  platform?: string,
+  release?: string
 ): Promise<OverviewTimeSeriesPoint[]> {
   const trunc = bucket === "week" ? "week" : bucket;
   const queryUntil = until ?? new Date();
   const querySince = overviewChartQuerySince(since, queryUntil, bucket);
   const appClause = app ? Prisma.sql`AND s."app" = ${app}` : Prisma.empty;
-  const envClause = environment
-    ? Prisma.sql`AND EXISTS (
-        SELECT 1 FROM "Event" e
-        WHERE e."project_id" = s."project_id"
-          AND e."session_id" = s."session_id"
-          AND e."environment" = ${environment}
-          AND e."created_at" >= ${querySince}
-          ${until ? Prisma.sql`AND e."created_at" <= ${until}` : Prisma.empty}
-      )`
+  const platformClause = platform ? Prisma.sql`AND s."platform" = ${platform}` : Prisma.empty;
+  const eventUntilClause = until
+    ? Prisma.sql`AND e."created_at" <= ${until}`
     : Prisma.empty;
+  const eventExists = (extra: Prisma.Sql) => Prisma.sql`EXISTS (
+    SELECT 1 FROM "Event" e
+    WHERE e."project_id" = s."project_id"
+      AND e."session_id" = s."session_id"
+      AND e."app" = s."app"
+      AND ${extra}
+      AND e."created_at" >= ${querySince}
+      ${eventUntilClause}
+  )`;
+
+  let envReleaseClause = Prisma.empty;
+  if (environment && release) {
+    envReleaseClause = Prisma.sql`AND (
+      (
+        s."environment" = ${environment}
+        AND s."release" = ${release}
+      )
+      OR (
+        s."environment" IS NULL
+        AND s."release" IS NULL
+        AND ${eventExists(
+          Prisma.sql`e."environment" = ${environment} AND e."release" = ${release}`
+        )}
+      )
+      OR (
+        s."environment" = ${environment}
+        AND s."release" IS NULL
+        AND ${eventExists(Prisma.sql`e."release" = ${release}`)}
+      )
+      OR (
+        s."environment" IS NULL
+        AND s."release" = ${release}
+        AND ${eventExists(Prisma.sql`e."environment" = ${environment}`)}
+      )
+    )`;
+  } else if (environment) {
+    envReleaseClause = Prisma.sql`AND (
+      s."environment" = ${environment}
+      OR (
+        s."environment" IS NULL
+        AND ${eventExists(Prisma.sql`e."environment" = ${environment}`)}
+      )
+    )`;
+  } else if (release) {
+    envReleaseClause = Prisma.sql`AND (
+      s."release" = ${release}
+      OR (
+        s."release" IS NULL
+        AND ${eventExists(Prisma.sql`e."release" = ${release}`)}
+      )
+    )`;
+  }
+
   const rows = await prisma.$queryRaw<{ bucket: Date; avg_sec: number | null }[]>(Prisma.sql`
     SELECT
       (date_trunc(${trunc}, s."started_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
@@ -347,7 +396,8 @@ export async function getSessionDurationSeries(
       ${until ? Prisma.sql`AND s."started_at" <= ${until}` : Prisma.empty}
       AND s."ended_at" IS NOT NULL
       ${appClause}
-      ${envClause}
+      ${platformClause}
+      ${envReleaseClause}
     GROUP BY 1
     ORDER BY 1
   `);

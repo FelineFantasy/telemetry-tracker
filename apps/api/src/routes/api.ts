@@ -204,6 +204,8 @@ export async function apiRoutes(
           until,
           app: appFilter,
           environment,
+          platform,
+          release,
         })
       : effectiveOverviewWindow(timeRange);
     const metricsBucket = chooseTimeRangeBucket(metricsWindow.durationMs);
@@ -376,7 +378,9 @@ export async function apiRoutes(
         chartUntil,
         chartBucket,
         appFilter,
-        environment
+        environment,
+        platform,
+        release
       ),
       getOverviewSessionsPair(
         prisma,
@@ -393,7 +397,9 @@ export async function apiRoutes(
         chartSince,
         chartUntil,
         appFilter,
-        environment
+        environment,
+        platform,
+        release
       ),
       listActiveIssues(prisma, listScope),
       fetchOverviewRequestMetrics(
