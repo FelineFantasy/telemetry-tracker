@@ -108,7 +108,7 @@ import { requireSessionUser } from "../lib/auth-session.js";
 import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import { effectiveOverviewWindow, isUnselectedTimeRange, parseOverviewTimeRangeQuery, chooseTimeRangeBucket } from "../lib/time-range.js";
-import { resolveUnselectedMetricsWindow } from "../lib/overview-metrics-window.js";
+import { resolveUnselectedMetricsWindow, UNSELECTED_METRICS_FALLBACK_MS } from "../lib/overview-metrics-window.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -336,6 +336,9 @@ export async function apiRoutes(
     });
 
     const useScopedErrorList = Boolean(platform || release);
+    // Platform/release lists must use metricsWindow so counts match KPIs/charts when
+    // the overview time range is unselected (epoch→now vs ~30d metrics window).
+    const scopedErrorListScope = useScopedErrorList ? metricsScope : listScope;
     const [
       errorCounts,
       eventStats,
@@ -356,7 +359,7 @@ export async function apiRoutes(
       getOverviewErrorCountsPair(prisma, windowParams),
       getOverviewEventWindowStats(prisma, windowParams),
       useScopedErrorList
-        ? countOverviewErrorGroupsInWindow(prisma, listScope)
+        ? countOverviewErrorGroupsInWindow(prisma, scopedErrorListScope)
         : prisma.errorGroup.count({ where: errorGroupWhere }),
       prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
         SELECT COUNT(DISTINCT e."name")::bigint AS c
@@ -364,7 +367,7 @@ export async function apiRoutes(
         WHERE ${eventListWhereSql}
       `),
       useScopedErrorList
-        ? listOverviewErrorGroupsInWindow(prisma, listScope, {
+        ? listOverviewErrorGroupsInWindow(prisma, scopedErrorListScope, {
             sort: errSortParsed.sort,
             order: errOrderParsed.order,
             skip: errorsSkip,
@@ -415,7 +418,10 @@ export async function apiRoutes(
         platform,
         release
       ),
-      listActiveIssues(prisma, listScope),
+      listActiveIssues(
+        prisma,
+        platform || release ? metricsScope : listScope
+      ),
       fetchOverviewRequestMetrics(
         prisma,
         metricsScope,
@@ -822,8 +828,8 @@ export async function apiRoutes(
     const rangeKey = queryString(query.range);
     const metricsUntilRaw = queryString(query.metricsUntil);
     const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
-    // Issues list passes metricsUntil and uses enrichErrorListFilterForMetrics (~7d).
-    // Overview range=none does not — keep those drills unbounded to match the list row.
+    // Issues list passes metricsUntil (~7d). Overview range=none uses the ~30d metrics
+    // window so detail matches Overview KPIs / scoped error list.
     const useIssuesMetricsWindow = Boolean(metricsUntilRaw);
     const isOverviewUnselected =
       !hasFromTo && rangeKey === "none" && !useIssuesMetricsWindow;
@@ -835,7 +841,8 @@ export async function apiRoutes(
     let windowGte: Date | undefined;
     let windowLte: Date | undefined;
     if (isOverviewUnselected) {
-      // platform/release only — no artificial metrics window
+      windowLte = metricsAnchor;
+      windowGte = new Date(windowLte.getTime() - UNSELECTED_METRICS_FALLBACK_MS);
     } else if (hasBoundedPreset) {
       windowGte = listRange.gte;
       windowLte = listRange.lte;
@@ -889,13 +896,10 @@ export async function apiRoutes(
     if (!group) return reply.status(404).send({ error: "Not found" });
     const { enrichErrorGroupWithSymbolicatedStacks } = await import("../lib/stack-symbolicate.js");
     const trendEnd = windowLte ?? new Date();
-    // Unbounded Overview drills use the same ~30d chart span as Overview "none".
     const trendDurationMs =
       windowGte != null
         ? Math.max(trendEnd.getTime() - windowGte.getTime(), 60_000)
-        : isOverviewUnselected
-          ? 30 * 24 * 60 * 60 * 1000
-          : 24 * 60 * 60 * 1000;
+        : 24 * 60 * 60 * 1000;
     const [enriched, impact, sparklineMap, scopedSummary] = await Promise.all([
       enrichErrorGroupWithSymbolicatedStacks(prisma, projectId, group),
       fetchImpactMetricsForGroupId(prisma, id, occurrenceScope),
