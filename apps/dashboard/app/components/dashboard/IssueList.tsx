@@ -103,11 +103,14 @@ type IssuesTableRow = {
   message: string;
   app: string;
   environment?: string | null;
+  release?: string | null;
   occurrences: number;
   occurrences_in_range?: number;
+  first_seen: string;
   last_seen: string;
   resolved_at?: string | null;
   users_affected?: number;
+  sessions_affected?: number;
   error_type?: string;
   sparkline?: SparklinePoint[];
 };
@@ -141,9 +144,12 @@ export function IssuesTable({
             <th className="hidden md:table-cell">Type</th>
             <th className="hidden md:table-cell">App</th>
             <th className="hidden lg:table-cell">Environment</th>
+            <th className="hidden lg:table-cell">Release</th>
             <th className="hidden sm:table-cell">Status</th>
             <th className="hidden lg:table-cell text-right">Trend</th>
             <th className="text-right">Count</th>
+            <th className="hidden md:table-cell text-right">Users</th>
+            <th className="hidden md:table-cell text-right">Sessions</th>
             <th className={tableDateColumnClass}>Last seen</th>
             <th className="hidden sm:table-cell" aria-hidden>
               View
@@ -167,6 +173,9 @@ export function IssuesTable({
               <td className="hidden lg:table-cell">
                 {row.environment ? <Badge>{row.environment}</Badge> : "—"}
               </td>
+              <td className="hidden lg:table-cell">
+                {row.release ? <Badge>{row.release}</Badge> : "—"}
+              </td>
               <td className="hidden sm:table-cell">
                 <IssueStatusBadge resolved={Boolean(row.resolved_at)} />
               </td>
@@ -181,6 +190,12 @@ export function IssuesTable({
               </td>
               <td className="text-right tabular-nums">
                 {(row.occurrences_in_range ?? 0).toLocaleString()}
+              </td>
+              <td className="hidden md:table-cell text-right tabular-nums">
+                {(row.users_affected ?? 0).toLocaleString()}
+              </td>
+              <td className="hidden md:table-cell text-right tabular-nums">
+                {(row.sessions_affected ?? 0).toLocaleString()}
               </td>
               <td className={tableDateColumnClass}>
                 <TimeAgo iso={row.last_seen} />

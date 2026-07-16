@@ -321,7 +321,7 @@ const briefBuildMetaSchema = z
     droppedProjectIds: z.array(uuidSchema),
     byteLength: z.number().int().nonnegative(),
     aiLatencyMs: z.number().int().nonnegative().optional(),
-    source: z.enum(["ai", "cache"]).optional(),
+    source: z.enum(["ai", "cache", "stale"]).optional(),
   })
   .strict();
 
@@ -338,7 +338,7 @@ export const workspaceBriefOkResponseSchema = z
     snapshotHash: snapshotHashSchema,
     contentHash: snapshotHashSchema,
     brief: workspaceBriefResponseSchema,
-    meta: briefBuildMetaSchema.extend({ source: z.enum(["ai", "cache"]) }),
+    meta: briefBuildMetaSchema.extend({ source: z.enum(["ai", "cache", "stale"]) }),
   })
   .strict();
 

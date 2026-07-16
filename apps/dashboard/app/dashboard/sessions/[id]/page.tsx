@@ -15,6 +15,8 @@ type SessionDetail = {
   session_id: string;
   app: string;
   platform?: string | null;
+  environment?: string | null;
+  release?: string | null;
   user_id?: string | null;
   anonymous_id?: string | null;
   user_email?: string | null;
@@ -89,6 +91,8 @@ export default async function SessionDetailPage({
         <DetailMetaItem label="Session ID" value={session.session_id} />
         <DetailMetaItem label="App" value={session.app} />
         <DetailMetaItem label="Platform" value={session.platform} />
+        <DetailMetaItem label="Environment" value={session.environment} />
+        <DetailMetaItem label="Release" value={session.release} />
         <DetailMetaItem label="Email" value={session.user_email} />
         <DetailMetaItem label="Identity" value={identity} />
         {identity && session.identity_first_seen_at ? (

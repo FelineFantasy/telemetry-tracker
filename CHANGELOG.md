@@ -13,6 +13,73 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.11.2] - 2026-07-16
+
+### Fixed
+
+- **Dashboard Docker build** — commit missing `@telemetry-tracker/core` `device-context` dist artifacts; rebuild workspace packages in the Dockerfile before `next build` so Railway does not fail with `Can't resolve './device-context.js'`
+
+---
+
+## [1.11.1] - 2026-07-16
+
+### Added
+
+- **Product telemetry (dogfood)** — optional `@telemetry-tracker/next` on `/dashboard` for visits, sessions, and browser errors when `NEXT_PUBLIC_TELEMETRY_INGEST_URL` + `NEXT_PUBLIC_TELEMETRY_API_KEY` are set (marketing/docs unchanged) ([#463](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/463))
+- **SDK** — `shutdown()` in `@telemetry-tracker/core` / `@telemetry-tracker/next`; `TelemetryProvider` tears down on unmount so leaving `/dashboard` stops ingest ([#463](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/463))
+- **SDK** — `TelemetryProvider` inits in `useLayoutEffect` so the first `useTrackPage` screen attaches to the new session ([#464](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/464))
+
+---
+
+## [1.11.0] - 2026-07-16
+
+### Added
+
+- **Errors platform** — persist `platform` on error groups/occurrences; Platform filter on Errors; include in filter-options ([#445](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/445))
+- **Session environment & release** — store on `Session` at ingest; SDK sends `release` on session payloads; filters prefer session columns with event fallback ([#446](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/446), [#447](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/447))
+- **Overview scope** — Platform and Release filters on Overview ([#445](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/445), [#448](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/448))
+- **List columns** — Sessions Platform; Events Release + First seen; Errors Release, Users/Sessions affected ([#449](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/449), [#450](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/450), [#451](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/451), [#456](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/456))
+- **Error detail** — Sessions affected, fingerprint, trend sparkline; clickable session links ([#451](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/451), [#454](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/454))
+
+### Changed
+
+- **Errors first/last seen** — when filtering by release or platform, timestamps reflect matching occurrences (not only fingerprint lifetime) ([#455](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/455))
+- **React Native docs** — prefer `Platform.OS` → `ios`/`android`/`web`; document `release` (app version) and `environment` ([#452](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/452), [#457](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/457))
+
+### Database
+
+- Migration `20260715220000_error_platform_session_env_release` — `ErrorGroup.platform`, `ErrorOccurrence.platform`, `Session.environment`, `Session.release`
+
+---
+
+## [1.10.0] - 2026-07-15
+
+### Added
+
+- **Workspace brief (API)** — Phase Async-A: Postgres-backed `BriefCompleted` and `BriefGenerationJob` storage, organization-scoped background worker, async read path (current → stale → enqueue + factual fallback), and `meta.source: "stale"` ([#440](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/440))
+
+### Changed
+
+- **Workspace brief (API)** — synchronous AI read path and L1 cache removed from `POST /api/meta/brief/workspace`; generation is worker-driven with immutable `requestId` per job
+
+---
+
+## [1.9.2] - 2026-07-15
+
+### Added
+
+- **Dashboard** — copy-to-clipboard button on JSON context blocks (event properties and error context) ([#232](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/232), [#439](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/439))
+
+---
+
+## [1.9.1] - 2026-07-14
+
+### Changed
+
+- **Release product email** — dashboard-aligned HTML template with branded header, version pill, and CTAs; resolves relative CHANGELOG links for email clients; blocks unsafe link schemes ([#437](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/437))
+
+---
+
 ## [1.9.0] - 2026-07-14
 
 ### Added

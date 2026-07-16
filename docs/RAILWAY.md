@@ -59,7 +59,7 @@ Optional: Resend, Stripe, registration flags — [BILLING.md](./BILLING.md) and 
 | Builder | **Dockerfile**, path `Dockerfile` |
 | Watch Paths (optional) | `apps/dashboard/**` |
 
-**Env:** `API_URL` = public API URL; `NEXT_PUBLIC_SITE_URL` = public dashboard URL (recommended). Optional: `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (same value) for error monitoring — see [MONITORING.md](./MONITORING.md#sentry-optional).
+**Env:** `API_URL` = public API URL; `NEXT_PUBLIC_SITE_URL` = public dashboard URL (recommended). Optional: `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (same value) for error monitoring — see [MONITORING.md](./MONITORING.md#sentry-optional). Optional dogfood: `NEXT_PUBLIC_TELEMETRY_INGEST_URL`, `NEXT_PUBLIC_TELEMETRY_API_KEY`, and optionally `NEXT_PUBLIC_TELEMETRY_APP` — see [MONITORING.md](./MONITORING.md#product-telemetry-dogfood-optional).
 
 If the build fails with `Unsupported URL Type "workspace:"`, Railway is using npm/Nixpacks instead of Docker — clear Root Directory to repo root and set Builder to Dockerfile on **this service only**.
 

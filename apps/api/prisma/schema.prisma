@@ -29,6 +29,8 @@ model Organization {
   memberships          OrganizationMembership[]
   invites              OrganizationInvite[]
   audit_events         OrganizationAuditEvent[]
+  brief_completed      BriefCompleted[]
+  brief_generation_jobs BriefGenerationJob[]
 
   @@index([deleted_at])
 }
@@ -99,6 +101,59 @@ model BriefAcknowledgement {
   @@index([user_id])
   @@index([project_id])
   @@index([acknowledged_through])
+}
+
+/// Durable AI workspace briefs (async generation). Retention pruned separately from stale display.
+model BriefCompleted {
+  id                      String       @id @default(uuid())
+  organization_id         String       @map("organization_id")
+  organization            Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  content_hash            String       @map("content_hash")
+  presentation_hash       String       @map("presentation_hash")
+  response_schema_version String       @map("response_schema_version")
+  /// Immutable correlation id for this generation; reused across dashboard polls until a new hash.
+  request_id              String       @map("request_id")
+  snapshot_hash           String       @map("snapshot_hash")
+  brief_json              Json         @map("brief_json")
+  completed_at            DateTime     @default(now()) @map("completed_at")
+  expires_at              DateTime     @map("expires_at")
+
+  @@unique([organization_id, content_hash, presentation_hash, response_schema_version])
+  @@index([organization_id, completed_at(sort: Desc)])
+  @@index([expires_at])
+}
+
+enum BriefGenerationJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+/// Postgres-backed brief generation queue. No snapshot_json — worker rebuilds from live telemetry.
+model BriefGenerationJob {
+  id                      String                   @id @default(uuid())
+  organization_id         String                   @map("organization_id")
+  organization            Organization             @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  content_hash            String                   @map("content_hash")
+  presentation_hash       String                   @map("presentation_hash")
+  response_schema_version String                   @map("response_schema_version")
+  /// Set once at enqueue; never regenerated.
+  request_id              String                   @map("request_id")
+  /// Snapshot bucket upper bound captured at enqueue for worker hash verification.
+  request_until           DateTime                 @map("request_until")
+  status                  BriefGenerationJobStatus @default(PENDING)
+  attempt_count           Int                      @default(0) @map("attempt_count")
+  lease_owner             String?                  @map("lease_owner")
+  lease_expires_at        DateTime?                @map("lease_expires_at")
+  created_at              DateTime                 @default(now()) @map("created_at")
+  updated_at              DateTime                 @updatedAt @map("updated_at")
+  completed_at            DateTime?                @map("completed_at")
+
+  @@unique([organization_id, content_hash, presentation_hash, response_schema_version])
+  @@index([status, lease_expires_at, created_at])
+  @@index([organization_id, created_at(sort: Desc)])
 }
 
 model NotificationEmailLog {
@@ -306,6 +361,7 @@ model ErrorGroup {
   app          String
   environment  String?
   release      String?
+  platform     String?
   occurrences  Int       @default(1)
   first_seen   DateTime  @default(now()) @map("first_seen")
   last_seen    DateTime  @default(now()) @map("last_seen")
@@ -317,6 +373,7 @@ model ErrorGroup {
   @@index([project_id, app])
   @@index([project_id, environment])
   @@index([project_id, release])
+  @@index([project_id, platform])
 }
 
 model ErrorOccurrence {
@@ -325,6 +382,7 @@ model ErrorOccurrence {
   error_group    ErrorGroup @relation(fields: [error_group_id], references: [id], onDelete: Cascade)
   stack          String?
   release        String?
+  platform       String?
   context        Json?
   session_id     String?
   user_id        String?
@@ -333,6 +391,8 @@ model ErrorOccurrence {
   created_at     DateTime   @default(now()) @map("created_at")
 
   @@index([error_group_id, created_at])
+  @@index([error_group_id, platform])
+  @@index([error_group_id, release])
 }
 
 model Session {
@@ -342,6 +402,8 @@ model Session {
   session_id     String    @map("session_id")
   app            String
   platform       String?
+  environment    String?
+  release        String?
   user_id        String?
   anonymous_id   String?
   user_email     String?   @map("user_email")
@@ -355,6 +417,8 @@ model Session {
   @@index([project_id, started_at])
   @@index([project_id, app])
   @@index([project_id, country])
+  @@index([project_id, environment])
+  @@index([project_id, release])
 }
 
 /// Release / product-update mailing list (marketing site subscribe + registration opt-in).

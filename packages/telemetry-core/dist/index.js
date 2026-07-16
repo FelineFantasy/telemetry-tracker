@@ -60,6 +60,7 @@ function buildSessionPayload(cfg, endedAt) {
         app: cfg.app,
         platform: cfg.platform ?? undefined,
         environment: cfg.environment ?? undefined,
+        release: cfg.release ?? undefined,
         user_id: userId ?? undefined,
         user_email: userEmail ?? undefined,
         anonymous_id: getAnonymousId(),
@@ -111,12 +112,12 @@ function closeSessionKeepalive(endedAt) {
     sessionStartedAt = null;
 }
 function startSession() {
+    const cfg = getConfigOrNull();
+    if (!cfg)
+        return;
     sessionId = generateUUID();
     sessionStartedAt = new Date();
-    const cfg = getConfigOrNull();
-    if (cfg) {
-        void postSession(cfg);
-    }
+    void postSession(cfg);
 }
 function installBrowserSessionLifecycle() {
     if (sessionLifecycleInstalled)
@@ -191,6 +192,10 @@ function installBrowserErrorHandlers() {
     });
 }
 export function init(c) {
+    if (flushTimer) {
+        clearInterval(flushTimer);
+        flushTimer = null;
+    }
     if (sessionId) {
         endSession();
     }
@@ -211,6 +216,20 @@ export function init(c) {
     if (c.webVitals !== false) {
         installBrowserWebVitals();
     }
+}
+/**
+ * Stop ingesting: flush/end session, clear config and batch timer.
+ * Browser error and session listeners stay installed but no-op while config is unset.
+ */
+export function shutdown() {
+    flushEvents();
+    if (flushTimer) {
+        clearInterval(flushTimer);
+        flushTimer = null;
+    }
+    endSession();
+    config = null;
+    setWebVitalsCaptureEnabled(false);
 }
 function installBrowserWebVitals() {
     installWebVitals((properties) => {

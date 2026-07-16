@@ -54,11 +54,13 @@ type Props = {
   defaultPageSize: number;
   q: string;
   environment: string;
+  platform: string;
   release: string;
   status: string;
   sort: string;
   order: string;
   environments: string[];
+  platforms: string[];
   releases: string[];
   onSortApply?: (sort: string, order: string) => void;
   sortLoading?: boolean;
@@ -78,11 +80,13 @@ export function ErrorsListToolbar({
   defaultPageSize,
   q,
   environment,
+  platform,
   release,
   status,
   sort,
   order,
   environments,
+  platforms,
   releases,
   onSortApply,
   sortLoading = false,
@@ -119,6 +123,14 @@ export function ErrorsListToolbar({
       ...environments.map((e) => ({ value: e, label: e })),
     ],
     [environments]
+  );
+
+  const platformOptions: DashboardSelectOption[] = useMemo(
+    () => [
+      { value: "", label: "Any" },
+      ...platforms.map((e) => ({ value: e, label: e })),
+    ],
+    [platforms]
   );
 
   const releaseOptions: DashboardSelectOption[] = useMemo(
@@ -196,6 +208,16 @@ export function ErrorsListToolbar({
               options={statusOptions}
               triggerId={id("status-t")}
               listLabelledBy={id("status-l")}
+            />
+          </FilterField>
+          <FilterField>
+            <FilterLabel id={id("plat-l")}>Platform</FilterLabel>
+            <DashboardCustomSelect
+              name="platform"
+              value={platform}
+              options={platformOptions}
+              triggerId={id("plat-t")}
+              listLabelledBy={id("plat-l")}
             />
           </FilterField>
           <FilterField>

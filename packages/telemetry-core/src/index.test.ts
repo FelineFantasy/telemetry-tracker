@@ -2,8 +2,11 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   buildIngestHeaders,
   init,
+  shutdown,
   trackEvent,
+  trackError,
   getConfigOrNull,
+  getSessionId,
 } from "./index.js";
 
 describe("buildIngestHeaders", () => {
@@ -35,6 +38,7 @@ describe("ingest fetch", () => {
   });
 
   afterEach(() => {
+    shutdown();
     vi.unstubAllGlobals();
   });
 
@@ -47,5 +51,16 @@ describe("ingest fetch", () => {
       Authorization: "Bearer tt_live_pub_secret",
     });
     expect(getConfigOrNull()?.apiKey).toBe("tt_live_pub_secret");
+  });
+
+  it("shutdown clears config and stops further ingest", () => {
+    expect(getSessionId()).toBeTruthy();
+    shutdown();
+    expect(getConfigOrNull()).toBeNull();
+    expect(getSessionId()).toBeNull();
+    fetchMock.mockClear();
+    trackEvent("after_shutdown");
+    trackError(new Error("after_shutdown"));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
