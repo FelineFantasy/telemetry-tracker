@@ -177,7 +177,7 @@ database → dashboard
 
 Already-stored rows are **not** rewritten by ingest scrubbing. Running this job is **completely optional** — telemetry continues to work without it. Use it when you need to redact historical data after enabling scrubbing (or after tightening deny-keys / session-email settings).
 
-**Always scope** with `--project-id` or `--org-id`. Global / unscoped runs are rejected.
+**Always scope** with exactly one of `--project-id` or `--org-id`. Providing neither or both is rejected. Global / unscoped runs are not supported. If the scope matches zero eligible projects (unknown ID, deleted project, unknown/deleted org, or org with no active projects), the job exits with an error and non-zero status — it does **not** report success.
 
 ```bash
 # Prefer dry-run first (no writes; prints scanned / would-modify / skipped)
@@ -200,7 +200,7 @@ pnpm --filter api pii-scrub-backfill -- \
 
 | Flag | Meaning |
 |------|---------|
-| `--project-id` / `--org-id` | **Required** scope (one of) |
+| `--project-id` / `--org-id` | **Required** — exactly one |
 | `--dry-run` | Calculate impact; **no rows modified** |
 | `--limit` / `--batch-size` | Cap / cursor page size (bounded memory) |
 | `--include-sessions` | Consider sessions (still requires project `scrubSessionUserEmail`) |

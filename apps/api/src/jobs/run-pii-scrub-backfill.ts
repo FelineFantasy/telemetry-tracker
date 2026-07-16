@@ -21,7 +21,7 @@ Opt-in backfill that rewrites stored telemetry using the same scrubber as ingest
 (project deny-keys included). Completely optional — ingest continues without it.
 Global / unscoped runs are not supported.
 
-Required (one of):
+Required (exactly one):
   --project-id <uuid>   Scrub one project
   --org-id <uuid>       Scrub all non-deleted projects in an organization
 

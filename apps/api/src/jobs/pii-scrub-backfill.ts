@@ -148,7 +148,15 @@ export function parsePiiScrubBackfillArgs(argv: string[]): {
     return {
       help: false,
       options: {},
-      error: "Provide --project-id <uuid> or --org-id <uuid> (global backfill is not supported)",
+      error: "Provide exactly one of --project-id <uuid> or --org-id <uuid> (global backfill is not supported)",
+    };
+  }
+
+  if (projectId && orgId) {
+    return {
+      help: false,
+      options: {},
+      error: "Provide exactly one of --project-id or --org-id (not both)",
     };
   }
 
@@ -220,6 +228,9 @@ export async function runPiiScrubBackfill(
   if (!options.projectId && !options.orgId) {
     throw new Error("projectId or orgId is required");
   }
+  if (options.projectId && options.orgId) {
+    throw new Error("Provide exactly one of projectId or orgId (not both)");
+  }
 
   const projects = await prisma.project.findMany({
     where: {
@@ -231,6 +242,17 @@ export async function runPiiScrubBackfill(
     },
     select: { id: true, pii_scrub_settings: true },
   });
+
+  if (projects.length === 0) {
+    if (options.projectId) {
+      throw new Error(
+        `No eligible project found for --project-id ${options.projectId} (unknown or deleted)`
+      );
+    }
+    throw new Error(
+      `No eligible projects found for --org-id ${options.orgId} (unknown organization, deleted organization, or no active projects)`
+    );
+  }
 
   const result = emptyResult(dryRun);
 

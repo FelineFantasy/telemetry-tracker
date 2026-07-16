@@ -8,7 +8,17 @@ import {
 describe("parsePiiScrubBackfillArgs", () => {
   it("requires project or org scope", () => {
     const parsed = parsePiiScrubBackfillArgs(["--dry-run"]);
-    expect(parsed.error).toMatch(/project-id|org-id/);
+    expect(parsed.error).toMatch(/exactly one/);
+  });
+
+  it("rejects both project-id and org-id", () => {
+    const parsed = parsePiiScrubBackfillArgs([
+      "--project-id",
+      "p1",
+      "--org-id",
+      "o1",
+    ]);
+    expect(parsed.error).toMatch(/not both/);
   });
 
   it("parses flags", () => {
@@ -74,6 +84,51 @@ describe("runPiiScrubBackfill", () => {
     await expect(
       runPiiScrubBackfill({} as never, { projectId: "p1" })
     ).rejects.toThrow(/TELEMETRY_INGEST_PII_SCRUB/);
+  });
+
+  it("fails when --project-id matches no eligible project", async () => {
+    const prisma = {
+      project: { findMany: vi.fn(async () => []) },
+    };
+    await expect(
+      runPiiScrubBackfill(prisma as never, { projectId: "missing" })
+    ).rejects.toThrow(/No eligible project found for --project-id missing/);
+  });
+
+  it("fails when --project-id points at a deleted project", async () => {
+    // Query filters deleted_at: null, so deleted projects are returned as empty.
+    const prisma = {
+      project: { findMany: vi.fn(async () => []) },
+    };
+    await expect(
+      runPiiScrubBackfill(prisma as never, { projectId: "deleted-proj" })
+    ).rejects.toThrow(/unknown or deleted/);
+  });
+
+  it("fails when --org-id matches no eligible projects", async () => {
+    const prisma = {
+      project: { findMany: vi.fn(async () => []) },
+    };
+    await expect(
+      runPiiScrubBackfill(prisma as never, { orgId: "unknown-org" })
+    ).rejects.toThrow(
+      /No eligible projects found for --org-id unknown-org/
+    );
+  });
+
+  it("fails when organization has no active projects", async () => {
+    const prisma = {
+      project: { findMany: vi.fn(async () => []) },
+    };
+    await expect(
+      runPiiScrubBackfill(prisma as never, { orgId: "empty-org" })
+    ).rejects.toThrow(/no active projects/);
+  });
+
+  it("rejects both projectId and orgId at runtime", async () => {
+    await expect(
+      runPiiScrubBackfill({} as never, { projectId: "p1", orgId: "o1" })
+    ).rejects.toThrow(/not both/);
   });
 
   it("scrubs event properties and skips unchanged rows (dry-run)", async () => {
