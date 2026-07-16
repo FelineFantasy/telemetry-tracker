@@ -164,17 +164,21 @@ export function SettingsToggle({
   onChange,
   label,
   disabled,
+  id,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   label?: string;
   disabled?: boolean;
+  id?: string;
 }) {
   return (
     <button
+      id={id}
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={`inline-flex items-center gap-2 text-[13px] ${disabled ? "cursor-not-allowed opacity-50" : ""}`}

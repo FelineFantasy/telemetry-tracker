@@ -5,6 +5,28 @@ describe("client scrubPiiText", () => {
   it("redacts emails and preserves newlines", () => {
     expect(scrubPiiText("err user@x.io\n  at f")).toBe("err [email]\n  at f");
   });
+
+  it("redacts Luhn-valid cards and formatted phones", () => {
+    expect(scrubPiiText("4111-1111-1111-1111")).toBe("[card]");
+    expect(scrubPiiText("4242 4242 4242 4242")).toBe("[card]");
+    expect(scrubPiiText("4242-4242-4242-4242")).toBe("[card]");
+    expect(scrubPiiText("call +15551234567")).toBe("call [phone]");
+    expect(scrubPiiText("+386 40 123 456")).toBe("[phone]");
+    expect(scrubPiiText("+1-202-555-0183")).toBe("[phone]");
+  });
+
+  it("leaves bare digits and invalid Luhn cards unchanged", () => {
+    expect(scrubPiiText("2025550183")).toBe("2025550183");
+    expect(scrubPiiText("1234567890")).toBe("1234567890");
+    expect(scrubPiiText("4242424242424241")).toBe("4242424242424241");
+    expect(scrubPiiText("20260716123000")).toBe("20260716123000");
+    expect(scrubPiiText("ref 123.456.7890")).toBe("ref 123.456.7890");
+  });
+
+  it("keeps phone and card placeholders stable under a second pass", () => {
+    expect(scrubPiiText("[phone]")).toBe("[phone]");
+    expect(scrubPiiText("[card]")).toBe("[card]");
+  });
 });
 
 describe("client scrubPiiRecord", () => {

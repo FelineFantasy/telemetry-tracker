@@ -62,4 +62,16 @@ describe("loadProjectPiiDenyKeys", () => {
     } as unknown as PrismaClient;
     await expect(loadProjectPiiDenyKeys(prisma, "proj-bad")).resolves.toEqual([]);
   });
+
+  it("returns scrubSessionUserEmail from cached settings", async () => {
+    const { loadProjectPiiScrubSettings } = await import(
+      "./project-pii-scrub-cache.js"
+    );
+    const findFirst = vi.fn().mockResolvedValue({
+      pii_scrub_settings: { denyKeys: [], scrubSessionUserEmail: true },
+    });
+    const prisma = { project: { findFirst } } as unknown as PrismaClient;
+    const settings = await loadProjectPiiScrubSettings(prisma, "proj-email", 1_000);
+    expect(settings.scrubSessionUserEmail).toBe(true);
+  });
 });

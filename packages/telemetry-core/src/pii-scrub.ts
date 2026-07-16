@@ -79,6 +79,8 @@ export function scrubPiiText(text: string): string {
   out = out.replace(JWT_RE, "[token]");
   out = out.replace(BEARER_RE, "[bearer-token]");
   out = out.replace(API_KEY_RE, "[api-key]");
+  out = scrubPaymentCardNumbers(out);
+  out = scrubPhoneNumbers(out);
   out = out.replace(SENSITIVE_PARAM_RE, "$1[redacted]");
   out = out.replace(
     SENSITIVE_ASSIGNMENT_RE,
@@ -86,6 +88,48 @@ export function scrubPiiText(text: string): string {
   );
   out = out.replace(COOKIE_HEADER_RE, (_, header: string) => `${header}: [cookie]`);
   out = out.replace(AUTHORIZATION_HEADER_RE, "authorization: [bearer-token]");
+  return out;
+}
+
+function passesLuhn(digits: string): boolean {
+  if (!/^\d{13,19}$/.test(digits)) return false;
+  let sum = 0;
+  let alternate = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = digits.charCodeAt(i) - 48;
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
+function scrubPaymentCardNumbers(text: string): string {
+  return text.replace(
+    /(?<![A-Za-z0-9])(?:\d[ -]*?){13,19}(?![A-Za-z0-9])/g,
+    (match) => {
+      const digits = match.replace(/\D/g, "");
+      return passesLuhn(digits) ? "[card]" : match;
+    }
+  );
+}
+
+function scrubPhoneNumbers(text: string): string {
+  let out = text;
+  // Plus-prefixed: + and 7–15 digits with optional spaces/dashes between digits
+  // Dots excluded so version-like 123.456.7890 is not treated as a phone.
+  out = out.replace(
+    /(?<![\w])\+[1-9](?:[\s-]*\d){6,14}(?![\d])/g,
+    "[phone]"
+  );
+  // North American style with separators (space/dash only; no dots)
+  out = out.replace(
+    /(?<![\w])(?:\+?1[\s-]?)?\(?\d{3}\)?[\s-]\d{3}[\s-]\d{4}(?![\d])/g,
+    "[phone]"
+  );
   return out;
 }
 

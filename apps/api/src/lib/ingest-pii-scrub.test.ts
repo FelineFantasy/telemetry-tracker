@@ -5,6 +5,7 @@ import {
   resolveIngestPiiScrubOptions,
   scrubIngestErrorFields,
   scrubIngestEventFields,
+  scrubIngestSessionUserEmail,
 } from "./ingest-pii-scrub.js";
 
 describe("isIngestPiiScrubEnabled", () => {
@@ -125,5 +126,26 @@ describe("scrubIngestEventFields", () => {
   it("leaves events without properties unchanged", () => {
     const body = { name: "checkout_started" };
     expect(scrubIngestEventFields(body, {})).toEqual(body);
+  });
+});
+
+describe("scrubIngestSessionUserEmail", () => {
+  it("is a no-op when the project flag is off", () => {
+    expect(scrubIngestSessionUserEmail("a@b.co", false, {})).toBe("a@b.co");
+  });
+
+  it("stores the stable [email] placeholder when enabled (not null)", () => {
+    expect(scrubIngestSessionUserEmail("a@b.co", true, {})).toBe("[email]");
+    expect(scrubIngestSessionUserEmail("not-an-email", true, {})).toBe("[email]");
+    expect(scrubIngestSessionUserEmail(null, true, {})).toBeNull();
+    expect(scrubIngestSessionUserEmail("", true, {})).toBe("");
+  });
+
+  it("respects the global ingest kill-switch", () => {
+    expect(
+      scrubIngestSessionUserEmail("a@b.co", true, {
+        TELEMETRY_INGEST_PII_SCRUB: "false",
+      })
+    ).toBe("a@b.co");
   });
 });

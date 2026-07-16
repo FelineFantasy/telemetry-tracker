@@ -113,6 +113,59 @@ function stripUrlQueryStrings(text: string): string {
   });
 }
 
+/** Luhn check for payment-card digit strings (13–19 digits). */
+export function passesLuhn(digits: string): boolean {
+  if (!/^\d{13,19}$/.test(digits)) return false;
+  let sum = 0;
+  let alternate = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = digits.charCodeAt(i) - 48;
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
+
+/**
+ * Redact PAN-like sequences that pass Luhn.
+ * Requires separators or a contiguous 13–19 digit run; bare short IDs are left alone.
+ */
+function scrubPaymentCardNumbers(text: string): string {
+  return text.replace(
+    /(?<![A-Za-z0-9])(?:\d[ -]*?){13,19}(?![A-Za-z0-9])/g,
+    (match) => {
+      const digits = match.replace(/\D/g, "");
+      return passesLuhn(digits) ? "[card]" : match;
+    }
+  );
+}
+
+/**
+ * Conservative phone heuristics — formatted / E.164 only.
+ * Bare digit runs (order IDs, timestamps, ZIP codes) are intentionally not matched.
+ */
+function scrubPhoneNumbers(text: string): string {
+  let out = text;
+  // Plus-prefixed: + and 7–15 digits with optional spaces/dashes between digits
+  // e.g. +15551234567, +1-202-555-0183, +386 40 123 456
+  // Dots are intentionally excluded so version-like 123.456.7890 is not treated as a phone.
+  out = out.replace(
+    /(?<![\w])\+[1-9](?:[\s-]*\d){6,14}(?![\d])/g,
+    "[phone]"
+  );
+  // North American style with separators (space/dash only; no dots):
+  // (555) 123-4567 / 555-123-4567 / 1-555-123-4567
+  out = out.replace(
+    /(?<![\w])(?:\+?1[\s-]?)?\(?\d{3}\)?[\s-]\d{3}[\s-]\d{4}(?![\d])/g,
+    "[phone]"
+  );
+  return out;
+}
+
 /**
  * Scrub PII patterns in free-form text.
  * Preserves newlines (important for stack traces). Does not collapse whitespace.
@@ -123,6 +176,8 @@ export function scrubPiiText(text: string): string {
   out = out.replace(JWT_RE, "[token]");
   out = out.replace(BEARER_RE, "[bearer-token]");
   out = out.replace(API_KEY_RE, "[api-key]");
+  out = scrubPaymentCardNumbers(out);
+  out = scrubPhoneNumbers(out);
   out = out.replace(SENSITIVE_PARAM_RE, "$1[redacted]");
   out = out.replace(
     SENSITIVE_ASSIGNMENT_RE,

@@ -33,6 +33,7 @@ import {
 } from "@/lib/alert-settings";
 import {
   formatDenyKeysInput,
+  normalizeProjectPiiScrubSettings,
   parseDenyKeysInput,
   piiScrubSettingsEqual,
   type ProjectPiiScrubSettings,
@@ -57,7 +58,12 @@ export function AlertsClient({
   const [denyKeysText, setDenyKeysText] = useState(() =>
     formatDenyKeysInput(initialPiiSettings.denyKeys)
   );
-  const [savedPii, setSavedPii] = useState(initialPiiSettings);
+  const [scrubSessionUserEmail, setScrubSessionUserEmail] = useState(
+    () => initialPiiSettings.scrubSessionUserEmail
+  );
+  const [savedPii, setSavedPii] = useState(() =>
+    normalizeProjectPiiScrubSettings(initialPiiSettings)
+  );
   const dirty = useMemo(
     () => !alertSettingsEqual(settings, initialSettings),
     [settings, initialSettings]
@@ -65,9 +71,10 @@ export function AlertsClient({
   const piiDirty = useMemo(() => {
     const next: ProjectPiiScrubSettings = {
       denyKeys: parseDenyKeysInput(denyKeysText),
+      scrubSessionUserEmail,
     };
     return !piiScrubSettingsEqual(next, savedPii);
-  }, [denyKeysText, savedPii]);
+  }, [denyKeysText, scrubSessionUserEmail, savedPii]);
 
   function save() {
     startTransition(async () => {
@@ -84,15 +91,20 @@ export function AlertsClient({
 
   function savePii() {
     startPiiTransition(async () => {
-      const next = { denyKeys: parseDenyKeysInput(denyKeysText) };
+      const next: ProjectPiiScrubSettings = {
+        denyKeys: parseDenyKeysInput(denyKeysText),
+        scrubSessionUserEmail,
+      };
       const result = await saveProjectPiiScrubSettingsAction(next);
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       toast.success("PII scrub settings saved");
-      setSavedPii(result.settings);
-      setDenyKeysText(formatDenyKeysInput(result.settings.denyKeys));
+      const normalized = normalizeProjectPiiScrubSettings(result.settings);
+      setSavedPii(normalized);
+      setDenyKeysText(formatDenyKeysInput(normalized.denyKeys));
+      setScrubSessionUserEmail(normalized.scrubSessionUserEmail);
       router.refresh();
     });
   }
@@ -231,7 +243,7 @@ export function AlertsClient({
 
         <Section
           title="PII scrubbing"
-          description="Server-side ingest already redacts common emails, tokens, and secrets. Add extra property or context field names to always redact for this project (not regex patterns)."
+          description="Default server-side ingest already redacts common emails, tokens, secrets, and conservative phone/card patterns. This section only adds project deny-keys and an optional session-email setting — it cannot weaken the defaults."
           actions={
             canEdit ? (
               <SettingsBtn
@@ -239,7 +251,7 @@ export function AlertsClient({
                 disabled={!piiDirty || piiPending}
                 onClick={savePii}
               >
-                {piiPending ? "Saving…" : "Save deny-list"}
+                {piiPending ? "Saving…" : "Save PII settings"}
               </SettingsBtn>
             ) : null
           }
@@ -247,7 +259,7 @@ export function AlertsClient({
           <FieldGroup>
             <Field
               label="Deny-listed field names"
-              hint="One field name per line (or comma-separated). Matched case-insensitively on property/context keys — for example nationalId or customer_ref. These are additive to built-in protections and cannot turn them off."
+              hint="One field name per line (or comma-separated). Matched case-insensitively on property/context keys — for example nationalId or customer_ref. Additive only; field names, not regex patterns."
             >
               <SettingsTextarea
                 id="pii-deny-keys"
@@ -261,13 +273,27 @@ export function AlertsClient({
                 aria-describedby="pii-deny-keys-help"
               />
             </Field>
+            <Field
+              label="Scrub session user email"
+              hint="When enabled, ingest stores Session.user_email as the placeholder [email] (not null) before persistence. Off by default. Enabling removes the real address from new sessions and may reduce user-level debugging and email search."
+            >
+              <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
+                <SettingsToggle
+                  id="pii-scrub-session-email"
+                  label="Scrub session user email"
+                  on={scrubSessionUserEmail}
+                  onChange={setScrubSessionUserEmail}
+                  disabled={!canEdit}
+                />
+              </div>
+            </Field>
           </FieldGroup>
           <p id="pii-deny-keys-help" className="mt-2 text-[12px] text-muted-foreground">
-            Optional client-side scrubbing is available in{" "}
-            <code className="font-mono text-[11px]">@telemetry-tracker/core</code> via{" "}
-            <code className="font-mono text-[11px]">piiScrub</code> (default off). Session identity
-            fields such as <code className="font-mono text-[11px]">user_email</code> are not
-            rewritten. See{" "}
+            Layers: (1) default server scrubbing on ingest; (2) optional SDK{" "}
+            <code className="font-mono text-[11px]">piiScrub</code> before send (does not touch
+            session identity); (3) this project’s deny-keys and session-email toggle. Phone/card
+            heuristics miss bare digit runs by design and can false-positive on Luhn-valid IDs.
+            Settings changes are recorded in the organization audit log (counts only). See{" "}
             <Link href="/docs/sdk" className="text-brand hover:underline">
               SDK docs
             </Link>
