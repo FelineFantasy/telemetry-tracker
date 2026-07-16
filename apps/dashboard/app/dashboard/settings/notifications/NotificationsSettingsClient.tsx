@@ -207,10 +207,10 @@ export function NotificationsSettingsClient({
             <Field label="Enable quiet hours">
               <SettingsToggle
                 on={prefs.quietHours.enabled}
-                onChange={(enabled) =>
+                onChange={() =>
                   setPrefs((current) => ({
                     ...current,
-                    quietHours: { ...current.quietHours, enabled },
+                    quietHours: { ...current.quietHours, enabled: !current.quietHours.enabled },
                   }))
                 }
                 label="Mute non-critical in-app alerts"
