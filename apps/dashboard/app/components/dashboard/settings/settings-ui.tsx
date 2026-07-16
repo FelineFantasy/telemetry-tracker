@@ -72,9 +72,7 @@ export function Field({
         {hint ? <p className="mt-1 text-[12px] text-muted-foreground">{hint}</p> : null}
       </div>
       <div className="min-w-0">
-        {htmlFor && React.isValidElement(children)
-          ? React.cloneElement(children as React.ReactElement<any>, { id: htmlFor })
-          : children}
+        {children}
         {error ? <p className="mt-1.5 text-[12px] text-destructive">{error}</p> : null}
       </div>
     </div>
