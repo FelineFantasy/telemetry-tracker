@@ -57,4 +57,7 @@ jobs:
         run: pnpm -r run build
 
       - name: Verify committed telemetry-core dist matches build
-        run: git diff --exit-code packages/telemetry-core/dist
+        run: |
+          git add -A packages/telemetry-core/dist packages/telemetry-next/dist
+          git diff --cached --exit-code -- packages/telemetry-core/dist packages/telemetry-next/dist
+          git diff --exit-code -- packages/telemetry-core/dist packages/telemetry-next/dist
