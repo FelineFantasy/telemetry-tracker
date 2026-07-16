@@ -120,12 +120,15 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
   const maxNodes = options?.maxNodes ?? DEFAULT_MAX_NODES;
   let nodes = 0;
 
-  function scrubShallow(node: unknown): unknown {
+  function scrubRemainder(node: unknown, hardCap: { n: number }): unknown {
+    hardCap.n += 1;
+    // Absolute ceiling so limit fallback cannot DoS the ingest process.
+    if (hardCap.n > 10_000) {
+      return typeof node === "string" ? scrubPiiText(node) : "[truncated]";
+    }
     if (typeof node === "string") return scrubPiiText(node);
     if (Array.isArray(node)) {
-      return node.map((item) =>
-        typeof item === "string" ? scrubPiiText(item) : item
-      );
+      return node.map((item) => scrubRemainder(item, hardCap));
     }
     if (node && typeof node === "object") {
       const out: Record<string, unknown> = {};
@@ -133,10 +136,8 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
         const placeholder = placeholderForKey(key);
         if (placeholder != null) {
           out[key] = placeholder;
-        } else if (typeof child === "string") {
-          out[key] = scrubPiiText(child);
         } else {
-          out[key] = child;
+          out[key] = scrubRemainder(child, hardCap);
         }
       }
       return out;
@@ -147,7 +148,8 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
   function walk(node: unknown, depth: number): unknown {
     nodes += 1;
     if (nodes > maxNodes || depth > maxDepth) {
-      return scrubShallow(node);
+      // Still redact nested strings/keys; do not throw or drop the request.
+      return scrubRemainder(node, { n: 0 });
     }
 
     if (node == null || typeof node === "boolean" || typeof node === "number") {

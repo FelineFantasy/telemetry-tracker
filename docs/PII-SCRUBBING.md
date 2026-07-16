@@ -29,7 +29,7 @@ There is no breadcrumbs ingest yet; when added, it should use the same scrubber.
 | `TELEMETRY_INGEST_PII_SCRUB_MAX_DEPTH` | `8` | Max nesting depth for JSON scrubbing |
 | `TELEMETRY_INGEST_PII_SCRUB_MAX_NODES` | `500` | Max nodes visited per payload |
 
-When depth/node limits are hit, the walker stops recursing and applies a shallow scrub — it does **not** throw or reject the ingest request.
+When depth/node limits are hit, the walker switches to a key/string remainder pass that still redacts nested PII — it does **not** throw or reject the ingest request. A hard ceiling of 10 000 remainder nodes returns `[truncated]` for further structure to bound CPU.
 
 Documented in [`apps/api/.env.example`](../apps/api/.env.example) and [DEPLOYMENT.md](../DEPLOYMENT.md).
 

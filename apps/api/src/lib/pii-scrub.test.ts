@@ -144,10 +144,18 @@ describe("scrubPiiValue / scrubPiiRecord", () => {
     expect(scrubbed.a.b.c.d).toBe("[email]");
   });
 
-  it("stops walking past maxNodes without throwing", () => {
-    const wide: Record<string, string> = {};
-    for (let i = 0; i < 20; i += 1) wide[`k${i}`] = `v${i}`;
-    expect(() => scrubPiiValue(wide, { maxNodes: 3 })).not.toThrow();
-    expect(scrubPiiValue(wide, { maxNodes: 3 })).toMatchObject({ k0: "v0" });
+  it("stops walking past maxNodes without throwing and still scrubs nested PII", () => {
+    const payload = {
+      items: Array.from({ length: 20 }, (_, i) => ({
+        id: i,
+        payload: { email: `user${i}@example.com` },
+      })),
+    };
+    expect(() => scrubPiiValue(payload, { maxNodes: 3 })).not.toThrow();
+    const scrubbed = scrubPiiValue(payload, { maxNodes: 3 }) as {
+      items: Array<{ payload: { email: string } }>;
+    };
+    expect(scrubbed.items[0]?.payload.email).toBe("[email]");
+    expect(scrubbed.items[19]?.payload.email).toBe("[email]");
   });
 });
