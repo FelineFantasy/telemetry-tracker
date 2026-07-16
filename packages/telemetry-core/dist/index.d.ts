@@ -21,6 +21,11 @@ export declare function getSessionId(): string | null;
 /** End the current session and clear the in-memory session id. */
 export declare function endSession(): void;
 export declare function init(c: TelemetryConfig): void;
+/**
+ * Stop ingesting: flush/end session, clear config and batch timer.
+ * Browser error and session listeners stay installed but no-op while config is unset.
+ */
+export declare function shutdown(): void;
 export type IdentifyTraits = {
     email?: string | null;
 };

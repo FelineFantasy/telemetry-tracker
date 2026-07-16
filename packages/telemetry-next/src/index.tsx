@@ -3,6 +3,7 @@
 import React from "react";
 import {
   init as coreInit,
+  shutdown as coreShutdown,
   identify,
   trackEvent as coreTrackEvent,
   trackError as coreTrackError,
@@ -21,6 +22,14 @@ export function init(config: TelemetryNextConfig): void {
   initialized = true;
   if (typeof window !== "undefined") {
     (window as unknown as { __telemetry_initialized?: boolean }).__telemetry_initialized = true;
+  }
+}
+
+export function shutdown(): void {
+  coreShutdown();
+  initialized = false;
+  if (typeof window !== "undefined") {
+    (window as unknown as { __telemetry_initialized?: boolean }).__telemetry_initialized = false;
   }
 }
 
@@ -76,6 +85,9 @@ export function TelemetryProvider({
 }) {
   React.useEffect(() => {
     init(config);
+    return () => {
+      shutdown();
+    };
   }, [config.ingestUrl, config.app]);
   return <>{children}</>;
 }
