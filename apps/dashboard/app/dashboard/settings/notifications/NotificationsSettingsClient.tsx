@@ -186,7 +186,7 @@ export function NotificationsSettingsClient({
                           >
                             <SettingsToggle
                               on={channelOn && routeOn}
-                              onChange={(v) => setRoute(cat.id, c.id, v)}
+                              onChange={() => setRoute(cat.id, c.id, !routeOn)}
                             />
                           </div>
                         </td>
