@@ -20,6 +20,10 @@ import {
   normalizeMapAppLabel,
   normalizeMapReleaseLabel,
 } from "../lib/source-map-artifact.js";
+import {
+  scrubIngestErrorFields,
+  scrubIngestEventFields,
+} from "../lib/ingest-pii-scrub.js";
 
 /**
  * Ingest pipeline (implement in order):
@@ -132,7 +136,7 @@ export async function ingestRoutes(
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
-    const body = parsed.data;
+    const body = scrubIngestEventFields(parsed.data);
     const app = body.app;
     if (!assertIngestAppAllowed(request, app, reply)) return;
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
@@ -230,7 +234,8 @@ export async function ingestRoutes(
     const batchApps = parsed.data.events.map((e) => e.app);
     const planOk = await assertIngestPlanOrReply(prisma, projectId, n, batchApps);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
-    for (const body of parsed.data.events) {
+    for (const raw of parsed.data.events) {
+      const body = scrubIngestEventFields(raw);
       await prisma.event.create({
         data: {
           project_id: projectId,
@@ -258,7 +263,7 @@ export async function ingestRoutes(
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
-    const body = parsed.data;
+    const body = scrubIngestErrorFields(parsed.data);
     const app = body.app;
     const release = normalizeMapReleaseLabel(body.release);
     if (!assertIngestAppAllowed(request, app, reply)) return;

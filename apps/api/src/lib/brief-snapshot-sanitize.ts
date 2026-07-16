@@ -1,65 +1,18 @@
 /**
  * Central sanitization for brief snapshot text fields.
  * Raw user/session/anonymous IDs are excluded at query level, not here.
+ * Text PII patterns reuse the shared ingest scrubber.
  */
 
 import { BRIEF_MESSAGE_MAX_CHARS } from "./brief-constants.js";
 import type { BriefSnapshotRequest, ProjectSnapshot } from "./brief-contracts.js";
+import { scrubPiiText } from "./pii-scrub.js";
 
 type ErrorGroupCandidate = ProjectSnapshot["errorGroups"]["firstSeenInWindow"][number];
 
-const EMAIL_RE =
-  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
-const JWT_RE = /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g;
-const BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]{4,}\b/gi;
-const API_KEY_RE =
-  /\b(?:tt_live_[A-Za-z0-9_]+|sk-[A-Za-z0-9]{16,}|pk-[A-Za-z0-9]{16,})\b/g;
-const SENSITIVE_PARAM_RE =
-  /([?&](?:password|token|secret|api[_-]?key|access[_-]?token|auth|session|cookie)=)[^&\s]+/gi;
-const SENSITIVE_ASSIGNMENT_RE =
-  /\b(?:password|token|secret|api[_-]?key|access[_-]?token|auth|session|cookie)\s*=\s*[^\s&]+/gi;
-const COOKIE_HEADER_RE =
-  /\b(?:cookie|set-cookie|authorization)\s*:\s*[^\n]+/gi;
-const SENSITIVE_UUID_CONTEXT_RE =
-  /\b(?:user[_-]?id|anonymous[_-]?id|session[_-]?id|customer[_-]?id|account[_-]?id)\s*[=:]\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
-
-function replaceSensitiveUuidContexts(text: string): string {
-  const uuidMap = new Map<string, string>();
-  let counter = 0;
-
-  return text.replace(SENSITIVE_UUID_CONTEXT_RE, (match) => {
-    if (!uuidMap.has(match)) {
-      counter += 1;
-      uuidMap.set(match, `[id:${counter}]`);
-    }
-    return uuidMap.get(match)!;
-  });
-}
-
-function stripUrlQueryStrings(text: string): string {
-  return text.replace(/https?:\/\/[^\s?]+(\?[^\s]+)/gi, (match, queryPart: string) => {
-    if (/[?&](?:password|token|secret|key|auth)=/i.test(queryPart)) {
-      return match.slice(0, match.length - queryPart.length);
-    }
-    return match.replace(/\?[^#\s]+/, "");
-  });
-}
-
 /** Sanitize one error message before inclusion in the snapshot. */
 export function sanitizeBriefText(text: string): string {
-  let out = text;
-  out = out.replace(EMAIL_RE, "[email]");
-  out = out.replace(JWT_RE, "[token]");
-  out = out.replace(BEARER_RE, "[token]");
-  out = out.replace(API_KEY_RE, "[apikey]");
-  out = out.replace(SENSITIVE_PARAM_RE, "$1[redacted]");
-  out = out.replace(
-    SENSITIVE_ASSIGNMENT_RE,
-    (match) => `${match.split("=")[0]!.trim()}=[redacted]`
-  );
-  out = out.replace(COOKIE_HEADER_RE, "[redacted]");
-  out = stripUrlQueryStrings(out);
-  out = replaceSensitiveUuidContexts(out);
+  let out = scrubPiiText(text);
   out = out.replace(/\s+/g, " ").trim();
   if (out.length > BRIEF_MESSAGE_MAX_CHARS) {
     out = out.slice(0, BRIEF_MESSAGE_MAX_CHARS);

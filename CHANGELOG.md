@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Ingest PII scrubbing** — default server-side redaction of emails, tokens, API keys, and sensitive keys in error messages/stacks/context and event properties before persistence; disable with `TELEMETRY_INGEST_PII_SCRUB=false` ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
+
 ---
 
 ## [1.11.3] - 2026-07-16
