@@ -22,6 +22,7 @@ import { OverviewGreeting } from "@/app/components/dashboard/overview/OverviewGr
 import { OverviewIngestSetupBanner } from "@/app/components/dashboard/overview/OverviewIngestSetupBanner";
 import { OverviewApiResponseLogger } from "@/app/components/dashboard/overview/OverviewApiResponseLogger";
 import { OverviewScopeBanner } from "@/app/components/dashboard/overview/OverviewScopeBanner";
+import { OverviewScopeFilters } from "@/app/components/dashboard/overview/OverviewScopeFilters";
 import { OverviewAppHealth } from "@/app/components/dashboard/overview/OverviewAppHealth";
 import { OverviewActiveIncidents } from "@/app/components/dashboard/overview/OverviewActiveIncidents";
 import { OverviewMetricsSection } from "@/app/components/dashboard/overview/OverviewMetricsSection";
@@ -39,7 +40,10 @@ import {
   resolveScopedQueryValue,
   compareLabelFor,
   buildErrorGroupDetailHref,
+  buildDashboardScopedListHref,
+  buildEventListHref,
   formatOverviewDeltaLine,
+  type DashboardListScope,
 } from "@/lib/overview-scope-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
 import {
@@ -75,6 +79,8 @@ async function getOverview(
   timeFromTo: { from?: string; to?: string },
   app: string | undefined,
   environment: string | undefined,
+  platform: string | undefined,
+  release: string | undefined,
   compare: string,
   list: {
     errorsPage: number;
@@ -91,6 +97,8 @@ async function getOverview(
   appendListTimeRangeToParams(params, parsedRange, timeFromTo.from, timeFromTo.to);
   if (app) params.set("app", app);
   if (environment) params.set("environment", environment);
+  if (platform) params.set("platform", platform);
+  if (release) params.set("release", release);
   if (compare === "week-ago") params.set("compare", "week-ago");
   params.set("errorsPage", String(list.errorsPage));
   params.set("eventsPage", String(list.eventsPage));
@@ -161,6 +169,8 @@ function buildOverviewParamsRecord(
     "to",
     "app",
     "environment",
+    "platform",
+    "release",
     "compare",
     "errorsPage",
     "eventsPage",
@@ -178,28 +188,36 @@ function buildOverviewParamsRecord(
   return out;
 }
 
-function eventListHref(eventName: string, app: string | null, environment: string | null): string {
-  const params = new URLSearchParams();
-  params.set("name", eventName);
-  if (app) params.set("app", app);
-  if (environment) params.set("environment", environment);
-  return `/dashboard/events?${params.toString()}`;
+function buildOverviewListScope(
+  app: string | null,
+  environment: string | null,
+  platform: string | null,
+  release: string | null,
+  timeQuery: { range?: string; from?: string; to?: string }
+): DashboardListScope {
+  return {
+    app,
+    environment,
+    platform,
+    release,
+    range: timeQuery.range ?? null,
+    from: timeQuery.from ?? null,
+    to: timeQuery.to ?? null,
+  };
 }
 
-function scopedListHref(path: string, app: string | null, environment: string | null): string {
-  const params = new URLSearchParams();
-  if (app) params.set("app", app);
-  if (environment) params.set("environment", environment);
-  const qs = params.toString();
-  return qs ? `${path}?${qs}` : path;
-}
-
-function formatDeltaLine(
-  delta: number,
-  kind: "errors" | "events",
-  compareLabel: string
-): { className: string; text: string } {
-  return formatOverviewDeltaLine(delta, kind, compareLabel);
+async function getFilterOptions(app?: string) {
+  const p = new URLSearchParams();
+  if (app) p.set("app", app);
+  const res = await dashboardApiFetch(`/api/filter-options?${p.toString()}`);
+  if (!res.ok) {
+    return { platforms: [] as string[], releases: [] as string[] };
+  }
+  const data = (await res.json()) as { platforms?: string[]; releases?: string[] };
+  return {
+    platforms: data.platforms ?? [],
+    releases: data.releases ?? [],
+  };
 }
 
 export default async function OverviewPage({
@@ -211,6 +229,8 @@ export default async function OverviewPage({
     to?: string | string[];
     app?: string | string[];
     environment?: string | string[];
+    platform?: string | string[];
+    release?: string | string[];
     compare?: string | string[];
     errorsPage?: string | string[];
     eventsPage?: string | string[];
@@ -246,6 +266,8 @@ export default async function OverviewPage({
   const parsedRange = timeParse.range;
   const rawApp = firstQueryValue(params.app)?.trim() || null;
   const rawEnvironment = firstQueryValue(params.environment)?.trim() || null;
+  const rawPlatform = firstQueryValue(params.platform)?.trim() || null;
+  const rawRelease = firstQueryValue(params.release)?.trim() || null;
   const compare = parseOverviewCompare(firstQueryValue(params.compare));
   const errorsPage = parsePageParam(firstQueryValue(params.errorsPage));
   const eventsPage = parsePageParam(firstQueryValue(params.eventsPage));
@@ -274,6 +296,8 @@ export default async function OverviewPage({
           timeQuery,
           rawApp ?? undefined,
           rawEnvironment ?? undefined,
+          rawPlatform ?? undefined,
+          rawRelease ?? undefined,
           compare,
           listParams,
           cookieScope
@@ -315,6 +339,8 @@ export default async function OverviewPage({
         timeQuery,
         rawApp ?? undefined,
         rawEnvironment ?? undefined,
+        rawPlatform ?? undefined,
+        rawRelease ?? undefined,
         compare,
         listParams,
         resolvedScope
@@ -350,6 +376,29 @@ export default async function OverviewPage({
     );
   }
 
+  const filterOptions =
+    effectiveProjectId === ""
+      ? { platforms: [] as string[], releases: [] as string[] }
+      : await getFilterOptions(app ?? undefined);
+
+  const platform = resolveScopedQueryValue(rawPlatform, filterOptions.platforms);
+  if (rawPlatform !== platform) {
+    redirect(mergeListQuery(OVERVIEW_PATH, currentOverviewParams, { platform }));
+  }
+
+  const release = resolveScopedQueryValue(rawRelease, filterOptions.releases);
+  if (rawRelease !== release) {
+    redirect(mergeListQuery(OVERVIEW_PATH, currentOverviewParams, { release }));
+  }
+
+  const listScope = buildOverviewListScope(
+    app,
+    environment,
+    platform,
+    release,
+    timeQuery
+  );
+
   const workspaceStats = buildOverviewWorkspaceStats(
     organizations,
     projects,
@@ -376,8 +425,8 @@ export default async function OverviewPage({
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
   const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
   const compareLabel = compareLabelFor(compare, displayRangeLabel);
-  const errDeltaFmt = formatDeltaLine(errorsDelta, "errors", compareLabel);
-  const evDeltaFmt = formatDeltaLine(eventsDelta, "events", compareLabel);
+  const errDeltaFmt = formatOverviewDeltaLine(errorsDelta, "errors", compareLabel);
+  const evDeltaFmt = formatOverviewDeltaLine(eventsDelta, "events", compareLabel);
 
   const health: OverviewHealth =
     overviewData.health ?? {
@@ -402,6 +451,8 @@ export default async function OverviewPage({
   const contextParts = isUnselectedTimeRange(parsedRange.key) ? [] : [displayRangeLabel];
   if (app) contextParts.push(`App: ${app}`);
   if (environment) contextParts.push(`Env: ${environment}`);
+  if (platform) contextParts.push(`Platform: ${platform}`);
+  if (release) contextParts.push(`Release: ${release}`);
 
   return (
     <>
@@ -432,6 +483,15 @@ export default async function OverviewPage({
       />
 
       <OverviewScopeBanner visible={!app && apps.length > 0} />
+
+      <OverviewScopeFilters
+        path={OVERVIEW_PATH}
+        currentParams={currentOverviewParams}
+        platform={platform ?? ""}
+        release={release ?? ""}
+        platforms={filterOptions.platforms}
+        releases={filterOptions.releases}
+      />
 
       <OverviewAppHealth health={health} />
       <OverviewActiveIncidents issues={activeIssues} />
@@ -472,15 +532,15 @@ export default async function OverviewPage({
         <OverviewTopErrorsPanel
           groups={(overviewData.metricsTopErrorGroups ?? []).map((group) => ({
             ...group,
-            href: buildErrorGroupDetailHref(group.id, { app, environment }),
+            href: buildErrorGroupDetailHref(group.id, listScope),
           }))}
           rangeLabel={displayRangeLabel}
-          errorsHref={scopedListHref("/dashboard/errors", app, environment)}
+          errorsHref={buildDashboardScopedListHref("/dashboard/errors", listScope)}
         />
         <OverviewRecentSessionsPanel
           sessions={overviewData.recentSessions ?? []}
           rangeLabel={displayRangeLabel}
-          sessionsHref={scopedListHref("/dashboard/sessions", app, environment)}
+          sessionsHref={buildDashboardScopedListHref("/dashboard/sessions", listScope)}
         />
       </section>
 
@@ -552,7 +612,7 @@ export default async function OverviewPage({
               }) => (
                 <OverviewListItem
                   key={g.id}
-                  href={buildErrorGroupDetailHref(g.id, { app, environment })}
+                  href={buildErrorGroupDetailHref(g.id, listScope)}
                   title={g.message}
                   titleClassName="font-medium text-destructive"
                   badges={<Badge>{g.app}</Badge>}
@@ -567,7 +627,7 @@ export default async function OverviewPage({
             )}
           </IssueList>
             <div className="mt-3">
-              <AnalyticsViewAllLink href={scopedListHref("/dashboard/errors", app, environment)}>
+              <AnalyticsViewAllLink href={buildDashboardScopedListHref("/dashboard/errors", listScope)}>
                 View all errors
               </AnalyticsViewAllLink>
             </div>
@@ -620,7 +680,7 @@ export default async function OverviewPage({
               }) => (
                 <OverviewListItem
                   key={e.name}
-                  href={eventListHref(e.name, app, environment)}
+                  href={buildEventListHref(e.name, listScope)}
                   title={e.name}
                   badges={e.app ? <Badge>{e.app}</Badge> : null}
                   meta={
@@ -642,7 +702,7 @@ export default async function OverviewPage({
             )}
           </IssueList>
             <div className="mt-3">
-              <AnalyticsViewAllLink href={scopedListHref("/dashboard/events", app, environment)}>
+              <AnalyticsViewAllLink href={buildDashboardScopedListHref("/dashboard/events", listScope)}>
                 View all events
               </AnalyticsViewAllLink>
             </div>

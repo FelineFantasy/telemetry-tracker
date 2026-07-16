@@ -15,9 +15,11 @@ export type EventsTableRow = {
   app: string;
   platform?: string | null;
   environment?: string | null;
+  release?: string | null;
   count_in_range: number;
   share_pct: number;
   users_affected?: number;
+  first_seen: string;
   last_seen: string;
   latest_event_id?: string | null;
   capture_kind?: "auto" | "custom";
@@ -54,10 +56,12 @@ export function EventsTable({
             <th className="hidden md:table-cell">App</th>
             <th className="hidden lg:table-cell">Environment</th>
             <th className="hidden lg:table-cell">Platform</th>
+            <th className="hidden md:table-cell">Release</th>
             <th className="hidden md:table-cell text-right">Users</th>
             <th className="hidden lg:table-cell text-right">Trend</th>
             <th className="text-right">Count</th>
             <th className="hidden sm:table-cell text-right">Share</th>
+            <th className={tableDateColumnClass}>First seen</th>
             <th className={tableDateColumnClass}>Last seen</th>
             <th className="hidden sm:table-cell" aria-hidden>
               View
@@ -93,6 +97,9 @@ export function EventsTable({
                 <td className="hidden lg:table-cell">
                   {row.platform ? <Badge>{row.platform}</Badge> : "—"}
                 </td>
+                <td className="hidden md:table-cell">
+                  {row.release ? <Badge>{row.release}</Badge> : "—"}
+                </td>
                 <td className="hidden md:table-cell text-right tabular-nums">
                   {(row.users_affected ?? 0).toLocaleString()}
                 </td>
@@ -111,6 +118,9 @@ export function EventsTable({
                 </td>
                 <td className="hidden sm:table-cell text-right tabular-nums text-muted-foreground">
                   {formatPct(row.share_pct, 1)}
+                </td>
+                <td className={tableDateColumnClass}>
+                  <TimeAgo iso={row.first_seen} />
                 </td>
                 <td className={tableDateColumnClass}>
                   <TimeAgo iso={row.last_seen} />

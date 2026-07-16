@@ -131,12 +131,20 @@ async function queryEventBuckets(
   since: Date,
   until: Date,
   appFilter: string | undefined,
-  environmentFilter: string | undefined
+  environmentFilter: string | undefined,
+  platformFilter?: string,
+  releaseFilter?: string
 ): Promise<{ bucket: Date; c: bigint }[]> {
   const envClause = environmentFilter
     ? Prisma.sql`AND e."environment" = ${environmentFilter}`
     : Prisma.empty;
   const appClause = appFilter ? Prisma.sql`AND e."app" = ${appFilter}` : Prisma.empty;
+  const platformClause = platformFilter
+    ? Prisma.sql`AND e."platform" = ${platformFilter}`
+    : Prisma.empty;
+  const releaseClause = releaseFilter
+    ? Prisma.sql`AND e."release" = ${releaseFilter}`
+    : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT
       (date_trunc(${bucket}, e."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
@@ -147,6 +155,8 @@ async function queryEventBuckets(
       AND e."created_at" <= ${until}
       ${appClause}
       ${envClause}
+      ${platformClause}
+      ${releaseClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -172,6 +182,101 @@ export function overviewSessionBucketEnvironmentExistsSql(
   )`;
 }
 
+function overviewSessionEventExistsSql(
+  projectId: string,
+  since: Date,
+  until: Date,
+  extra: Prisma.Sql,
+  sessionAlias = "s"
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`EXISTS (
+    SELECT 1 FROM "Event" e
+    WHERE e."project_id" = ${projectId}
+      AND e."session_id" = ${s}."session_id"
+      AND e."app" = ${s}."app"
+      AND ${extra}
+      AND e."created_at" >= ${since}
+      AND e."created_at" <= ${until}
+  )`;
+}
+
+function overviewSessionEnvReleaseScopeSql(
+  projectId: string,
+  since: Date,
+  until: Date,
+  environmentFilter?: string,
+  releaseFilter?: string
+): Prisma.Sql {
+  if (environmentFilter && releaseFilter) {
+    return Prisma.sql`AND (
+      (
+        s."environment" = ${environmentFilter}
+        AND s."release" = ${releaseFilter}
+      )
+      OR (
+        s."environment" IS NULL
+        AND s."release" IS NULL
+        AND ${overviewSessionEventExistsSql(
+          projectId,
+          since,
+          until,
+          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
+        )}
+      )
+      OR (
+        s."environment" = ${environmentFilter}
+        AND s."release" IS NULL
+        AND ${overviewSessionEventExistsSql(
+          projectId,
+          since,
+          until,
+          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
+        )}
+      )
+      OR (
+        s."environment" IS NULL
+        AND s."release" = ${releaseFilter}
+        AND ${overviewSessionEventExistsSql(
+          projectId,
+          since,
+          until,
+          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
+        )}
+      )
+    )`;
+  }
+  if (environmentFilter) {
+    return Prisma.sql`AND (
+      s."environment" = ${environmentFilter}
+      OR (
+        s."environment" IS NULL
+        AND ${overviewSessionBucketEnvironmentExistsSql(
+          projectId,
+          environmentFilter,
+          since,
+          until
+        )}
+      )
+    )`;
+  }
+  if (releaseFilter) {
+    return Prisma.sql`AND (
+      s."release" = ${releaseFilter}
+      OR (
+        s."release" IS NULL
+        AND ${overviewSessionEventExistsSql(
+          projectId,
+          since,
+          until,
+          Prisma.sql`e."release" = ${releaseFilter}`
+        )}
+      )
+    )`;
+  }
+  return Prisma.empty;
+}
+
 async function querySessionBuckets(
   prisma: PrismaClient,
   bucket: OverviewSeriesBucket,
@@ -179,17 +284,21 @@ async function querySessionBuckets(
   since: Date,
   until: Date,
   appFilter: string | undefined,
-  environmentFilter: string | undefined
+  environmentFilter: string | undefined,
+  platformFilter?: string,
+  releaseFilter?: string
 ): Promise<{ bucket: Date; c: bigint }[]> {
   const appClause = appFilter ? Prisma.sql`AND s."app" = ${appFilter}` : Prisma.empty;
-  const envClause = environmentFilter
-    ? Prisma.sql`AND ${overviewSessionBucketEnvironmentExistsSql(
-        projectId,
-        environmentFilter,
-        since,
-        until
-      )}`
+  const platformClause = platformFilter
+    ? Prisma.sql`AND s."platform" = ${platformFilter}`
     : Prisma.empty;
+  const envReleaseClause = overviewSessionEnvReleaseScopeSql(
+    projectId,
+    since,
+    until,
+    environmentFilter,
+    releaseFilter
+  );
   const trunc = bucket === "week" ? "week" : bucket;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT
@@ -200,7 +309,8 @@ async function querySessionBuckets(
       AND s."started_at" >= ${since}
       AND s."started_at" <= ${until}
       ${appClause}
-      ${envClause}
+      ${platformClause}
+      ${envReleaseClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -213,12 +323,20 @@ async function queryErrorBuckets(
   since: Date,
   until: Date,
   appFilter: string | undefined,
-  environmentFilter: string | undefined
+  environmentFilter: string | undefined,
+  platformFilter?: string,
+  releaseFilter?: string
 ): Promise<{ bucket: Date; c: bigint }[]> {
   const envClause = environmentFilter
     ? Prisma.sql`AND eg."environment" = ${environmentFilter}`
     : Prisma.empty;
   const appClause = appFilter ? Prisma.sql`AND eg."app" = ${appFilter}` : Prisma.empty;
+  const platformClause = platformFilter
+    ? Prisma.sql`AND eo."platform" = ${platformFilter}`
+    : Prisma.empty;
+  const releaseClause = releaseFilter
+    ? Prisma.sql`AND eo."release" = ${releaseFilter}`
+    : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT
       (date_trunc(${bucket}, eo."created_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
@@ -230,6 +348,8 @@ async function queryErrorBuckets(
       AND eo."created_at" <= ${until}
       ${appClause}
       ${envClause}
+      ${platformClause}
+      ${releaseClause}
     GROUP BY 1
     ORDER BY 1
   `);
@@ -245,7 +365,9 @@ export async function getOverviewTimeSeries(
   until: Date,
   bucket: OverviewSeriesBucket,
   appFilter: string | undefined,
-  environmentFilter?: string
+  environmentFilter?: string,
+  platformFilter?: string,
+  releaseFilter?: string
 ): Promise<OverviewTimeSeries> {
   const expected = generateBuckets(since, until, bucket);
   const querySince = overviewChartQuerySince(since, until, bucket);
@@ -258,7 +380,9 @@ export async function getOverviewTimeSeries(
       querySince,
       until,
       appFilter,
-      environmentFilter
+      environmentFilter,
+      platformFilter,
+      releaseFilter
     ),
     queryErrorBuckets(
       prisma,
@@ -267,7 +391,9 @@ export async function getOverviewTimeSeries(
       querySince,
       until,
       appFilter,
-      environmentFilter
+      environmentFilter,
+      platformFilter,
+      releaseFilter
     ),
     querySessionBuckets(
       prisma,
@@ -276,7 +402,9 @@ export async function getOverviewTimeSeries(
       querySince,
       until,
       appFilter,
-      environmentFilter
+      environmentFilter,
+      platformFilter,
+      releaseFilter
     ),
   ]);
 

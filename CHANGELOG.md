@@ -13,6 +13,27 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.11.0] - 2026-07-16
+
+### Added
+
+- **Errors platform** — persist `platform` on error groups/occurrences; Platform filter on Errors; include in filter-options ([#445](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/445))
+- **Session environment & release** — store on `Session` at ingest; SDK sends `release` on session payloads; filters prefer session columns with event fallback ([#446](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/446), [#447](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/447))
+- **Overview scope** — Platform and Release filters on Overview ([#445](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/445), [#448](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/448))
+- **List columns** — Sessions Platform; Events Release + First seen; Errors Release, Users/Sessions affected ([#449](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/449), [#450](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/450), [#451](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/451), [#456](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/456))
+- **Error detail** — Sessions affected, fingerprint, trend sparkline; clickable session links ([#451](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/451), [#454](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/454))
+
+### Changed
+
+- **Errors first/last seen** — when filtering by release or platform, timestamps reflect matching occurrences (not only fingerprint lifetime) ([#455](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/455))
+- **React Native docs** — prefer `Platform.OS` → `ios`/`android`/`web`; document `release` (app version) and `environment` ([#452](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/452), [#457](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/457))
+
+### Database
+
+- Migration `20260715220000_error_platform_session_env_release` — `ErrorGroup.platform`, `ErrorOccurrence.platform`, `Session.environment`, `Session.release`
+
+---
+
 ## [1.10.0] - 2026-07-15
 
 ### Added

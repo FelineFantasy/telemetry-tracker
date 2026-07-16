@@ -1,4 +1,5 @@
 import { TimeAgo } from "@/app/components/TimeAgo";
+import { Badge } from "@/app/components/Badge";
 import { SessionStatusBadge } from "@/app/components/dashboard/analytics-ui";
 import {
   Table,
@@ -17,6 +18,7 @@ export type SessionsTableRow = {
   anonymous_id?: string | null;
   user_email?: string | null;
   country?: string | null;
+  platform?: string | null;
   device_browser?: string | null;
   device_os?: string | null;
   started_at: string;
@@ -132,6 +134,7 @@ export function SessionsTable({
           <tr>
             <th>User</th>
             <th className="hidden md:table-cell">Country</th>
+            <th className="hidden lg:table-cell">Platform</th>
             <th className="hidden lg:table-cell">Device</th>
             <th>Duration</th>
             <th className="hidden sm:table-cell text-right">Pages / Events</th>
@@ -159,6 +162,9 @@ export function SessionsTable({
               </td>
               <td className="hidden md:table-cell">
                 <CountryCell country={row.country} />
+              </td>
+              <td className="hidden lg:table-cell">
+                {row.platform ? <Badge>{row.platform}</Badge> : <span className="text-muted-foreground">—</span>}
               </td>
               <td className="hidden lg:table-cell max-w-[9rem]">
                 <DeviceCell browser={row.device_browser} os={row.device_os} />

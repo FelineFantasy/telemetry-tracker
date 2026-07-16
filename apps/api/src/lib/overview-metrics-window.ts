@@ -62,17 +62,31 @@ export async function resolveUnselectedMetricsWindow(
     until: Date;
     app?: string;
     environment?: string;
+    platform?: string;
+    release?: string;
   }
 ): Promise<MetricsWindow> {
-  const { projectId, until, app, environment } = params;
+  const { projectId, until, app, environment, platform, release } = params;
 
   const appEventClause = app ? Prisma.sql`AND e."app" = ${app}` : Prisma.empty;
   const envEventClause = environment
     ? Prisma.sql`AND e."environment" = ${environment}`
     : Prisma.empty;
+  const platformEventClause = platform
+    ? Prisma.sql`AND e."platform" = ${platform}`
+    : Prisma.empty;
+  const releaseEventClause = release
+    ? Prisma.sql`AND e."release" = ${release}`
+    : Prisma.empty;
   const appErrorClause = app ? Prisma.sql`AND eg."app" = ${app}` : Prisma.empty;
   const envErrorClause = environment
     ? Prisma.sql`AND eg."environment" = ${environment}`
+    : Prisma.empty;
+  const platformErrorClause = platform
+    ? Prisma.sql`AND eo."platform" = ${platform}`
+    : Prisma.empty;
+  const releaseErrorClause = release
+    ? Prisma.sql`AND eo."release" = ${release}`
     : Prisma.empty;
 
   const rows = await prisma.$queryRaw<{ oldest: Date | null }[]>(Prisma.sql`
@@ -84,6 +98,8 @@ export async function resolveUnselectedMetricsWindow(
         WHERE e."project_id" = ${projectId}
           ${appEventClause}
           ${envEventClause}
+          ${platformEventClause}
+          ${releaseEventClause}
         ORDER BY e."created_at" DESC
         LIMIT ${UNSELECTED_METRICS_SAMPLE_SIZE}
       ) recent_events
@@ -95,6 +111,8 @@ export async function resolveUnselectedMetricsWindow(
         WHERE eg."project_id" = ${projectId}
           ${appErrorClause}
           ${envErrorClause}
+          ${platformErrorClause}
+          ${releaseErrorClause}
         ORDER BY eo."created_at" DESC
         LIMIT ${UNSELECTED_METRICS_SAMPLE_SIZE}
       ) recent_errors

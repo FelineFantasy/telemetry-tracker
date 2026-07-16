@@ -162,17 +162,16 @@ describe("buildSessionListFilter", () => {
 });
 
 describe("sessionFilterSql", () => {
-  it("requires one event row when both environment and release are set", () => {
+  it("prefers session columns with single-event fallback when environment and release are set", () => {
     const sql = sessionFilterSql("proj-1", {
       range: {},
       environment: "production",
       release: "1.2.0",
     });
     const text = prismaSqlText(sql);
-    const existsCount = (text.match(/EXISTS/g) ?? []).length;
-    expect(existsCount).toBe(1);
-    expect(text).toContain('"environment"');
-    expect(text).toContain('"release"');
+    expect(text).toContain('"s"."environment"');
+    expect(text).toContain('"s"."release"');
+    expect(text).toContain('e."environment" = ? AND e."release" = ?');
   });
 
   it("bounds matching events to the metrics window when provided", () => {
@@ -192,7 +191,7 @@ describe("sessionFilterSql", () => {
 });
 
 describe("sessionWindowWithEventScope", () => {
-  it("requires matching events inside the current metrics window", () => {
+  it("prefers session environment with event fallback inside the metrics window", () => {
     const since = new Date("2026-03-01T00:00:00.000Z");
     const until = new Date("2026-03-15T00:00:00.000Z");
     const text = prismaSqlText(
@@ -207,6 +206,7 @@ describe("sessionWindowWithEventScope", () => {
 
     expect(text).toContain('"started_at" >=');
     expect(text).toContain('"started_at" <=');
+    expect(text).toContain('"s"."environment"');
     expect(text).toContain('e."created_at" >=');
     expect(text).toContain('e."created_at" <=');
   });

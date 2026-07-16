@@ -43,12 +43,26 @@ export type ErrorListFilterInput = {
   appId?: string;
   environment?: string;
   release?: string;
+  platform?: string;
   q?: string;
   range: { gte?: Date; lte?: Date };
   /** When list range is all-time, counts use this window (aligned with summary KPIs). */
   occurrenceCountRange?: { gte: Date; lte: Date };
   status: "all" | "unresolved" | "resolved";
 };
+
+/** Occurrence-level filters (release / platform) used for EXISTS + aggregate scoping. */
+function occurrenceScopeSql(f: Pick<ErrorListFilterInput, "release" | "platform">): Prisma.Sql {
+  const parts: Prisma.Sql[] = [];
+  if (f.release) parts.push(Prisma.sql`o.release = ${f.release}`);
+  if (f.platform) parts.push(Prisma.sql`o.platform = ${f.platform}`);
+  if (parts.length === 0) return Prisma.empty;
+  return Prisma.sql`AND ${Prisma.join(parts, " AND ")}`;
+}
+
+function hasOccurrenceScope(f: Pick<ErrorListFilterInput, "release" | "platform">): boolean {
+  return Boolean(f.release || f.platform);
+}
 
 /** Omitted → default; invalid when present → validation fails (400). */
 export function parseErrorListSortParam(
@@ -112,6 +126,16 @@ export function parseTrendWindowParam(
   };
 }
 
+/** List range, else metrics-window bounds from enrichErrorListFilterForMetrics. */
+function occurrenceWindowBounds(
+  f: Pick<ErrorListFilterInput, "range" | "occurrenceCountRange">
+): { gte?: Date; lte?: Date } {
+  return {
+    gte: f.range.gte ?? f.occurrenceCountRange?.gte,
+    lte: f.range.lte ?? f.occurrenceCountRange?.lte,
+  };
+}
+
 export function buildErrorGroupWhereInput(
   f: ErrorListFilterInput,
   projectId: string
@@ -120,17 +144,29 @@ export function buildErrorGroupWhereInput(
   if (f.appId) where.app = f.appId;
   if (f.environment) where.environment = f.environment;
   if (f.q) where.message = { contains: f.q, mode: "insensitive" };
-  if (f.range.gte || f.range.lte) {
+  if (f.status === "unresolved") where.resolved_at = null;
+  if (f.status === "resolved") where.resolved_at = { not: null };
+  if (hasOccurrenceScope(f)) {
+    // Membership = in-window matching occurrences (list range or metrics window).
+    const bounds = occurrenceWindowBounds(f);
+    where.occurrences_list = {
+      some: {
+        ...(f.release ? { release: f.release } : {}),
+        ...(f.platform ? { platform: f.platform } : {}),
+        ...(bounds.gte || bounds.lte
+          ? {
+              created_at: {
+                ...(bounds.gte ? { gte: bounds.gte } : {}),
+                ...(bounds.lte ? { lte: bounds.lte } : {}),
+              },
+            }
+          : {}),
+      },
+    };
+  } else if (f.range.gte || f.range.lte) {
     where.last_seen = {};
     if (f.range.gte) where.last_seen.gte = f.range.gte;
     if (f.range.lte) where.last_seen.lte = f.range.lte;
-  }
-  if (f.status === "unresolved") where.resolved_at = null;
-  if (f.status === "resolved") where.resolved_at = { not: null };
-  if (f.release) {
-    where.occurrences_list = {
-      some: { release: f.release },
-    };
   }
   return where;
 }
@@ -182,6 +218,8 @@ export type ErrorGroupListRow = {
   top_stack: string | null;
   app: string;
   environment: string | null;
+  release: string | null;
+  platform: string | null;
   occurrences: number;
   occurrences_in_range?: number;
   first_seen: Date;
@@ -204,6 +242,8 @@ function mapRawRow(r: Record<string, unknown>): ErrorGroupListRow {
     top_stack: r.top_stack != null ? String(r.top_stack) : null,
     app: String(r.app),
     environment: r.environment != null ? String(r.environment) : null,
+    release: r.release != null ? String(r.release) : null,
+    platform: r.platform != null ? String(r.platform) : null,
     occurrences: Number(r.occurrences),
     occurrences_in_range:
       r.occurrences_in_range != null ? Number(r.occurrences_in_range) : undefined,
@@ -226,26 +266,32 @@ function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
     const pat = `%${escapeLikePattern(f.q)}%`;
     parts.push(Prisma.sql`eg.message ILIKE ${pat} ESCAPE '\\'`);
   }
-  if (f.range.gte) parts.push(Prisma.sql`eg.last_seen >= ${f.range.gte}`);
-  if (f.range.lte) parts.push(Prisma.sql`eg.last_seen <= ${f.range.lte}`);
   if (f.status === "unresolved") parts.push(Prisma.sql`eg.resolved_at IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`eg.resolved_at IS NOT NULL`);
-  if (f.release) {
+  if (hasOccurrenceScope(f)) {
+    const bounds = occurrenceWindowBounds(f);
+    const scopeParts: Prisma.Sql[] = [];
+    if (f.release) scopeParts.push(Prisma.sql`rel.release = ${f.release}`);
+    if (f.platform) scopeParts.push(Prisma.sql`rel.platform = ${f.platform}`);
+    if (bounds.gte) scopeParts.push(Prisma.sql`rel.created_at >= ${bounds.gte}`);
+    if (bounds.lte) scopeParts.push(Prisma.sql`rel.created_at <= ${bounds.lte}`);
     parts.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "ErrorOccurrence" rel
         WHERE rel.error_group_id = eg.id
-          AND rel.release = ${f.release}
+          AND ${Prisma.join(scopeParts, " AND ")}
       )`
     );
+  } else {
+    if (f.range.gte) parts.push(Prisma.sql`eg.last_seen >= ${f.range.gte}`);
+    if (f.range.lte) parts.push(Prisma.sql`eg.last_seen <= ${f.range.lte}`);
   }
   return Prisma.join(parts, " AND ");
 }
 
 function occurrenceInRangeExpr(f: ErrorListFilterInput, alias = "o"): Prisma.Sql {
   const a = Prisma.raw(`"${alias}"."created_at"`);
-  const gte = f.range.gte ?? f.occurrenceCountRange?.gte;
-  const lte = f.range.lte ?? f.occurrenceCountRange?.lte;
+  const { gte, lte } = occurrenceWindowBounds(f);
   const parts: Prisma.Sql[] = [];
   if (gte) parts.push(Prisma.sql`${a} >= ${gte}`);
   if (lte) parts.push(Prisma.sql`${a} <= ${lte}`);
@@ -255,16 +301,36 @@ function occurrenceInRangeExpr(f: ErrorListFilterInput, alias = "o"): Prisma.Sql
   return Prisma.sql`SUM(CASE WHEN ${Prisma.join(parts, " AND ")} THEN 1 ELSE 0 END)::bigint`;
 }
 
+/** First/last seen among platform/release matches inside the active list/metrics window. */
+function scopedSeenAggregateExprs(
+  f: Pick<ErrorListFilterInput, "range" | "occurrenceCountRange">
+): { firstSeen: Prisma.Sql; lastSeen: Prisma.Sql } {
+  const { gte, lte } = occurrenceWindowBounds(f);
+  const parts: Prisma.Sql[] = [];
+  if (gte) parts.push(Prisma.sql`o.created_at >= ${gte}`);
+  if (lte) parts.push(Prisma.sql`o.created_at <= ${lte}`);
+  if (parts.length === 0) {
+    return {
+      firstSeen: Prisma.sql`MIN(o.created_at)`,
+      lastSeen: Prisma.sql`MAX(o.created_at)`,
+    };
+  }
+  const inRange = Prisma.join(parts, " AND ");
+  return {
+    firstSeen: Prisma.sql`MIN(o.created_at) FILTER (WHERE ${inRange})`,
+    lastSeen: Prisma.sql`MAX(o.created_at) FILTER (WHERE ${inRange})`,
+  };
+}
+
 function aggregateJoinSql(
   f: ErrorListFilterInput,
   recentStart: Date,
   prevStart: Date,
   end: Date
 ): Prisma.Sql {
-  const releaseClause = f.release
-    ? Prisma.sql`AND o.release = ${f.release}`
-    : Prisma.empty;
+  const scopeClause = occurrenceScopeSql(f);
   const inRangeExpr = occurrenceInRangeExpr(f, "o");
+  const scopedSeen = scopedSeenAggregateExprs(f);
 
   return Prisma.sql`
   LEFT JOIN (
@@ -280,16 +346,19 @@ function aggregateJoinSql(
       ) AS sessions_affected,
       SUM(CASE WHEN o.created_at >= ${recentStart} AND o.created_at < ${end} THEN 1 ELSE 0 END)::bigint AS occurrences_recent,
       SUM(CASE WHEN o.created_at >= ${prevStart} AND o.created_at < ${recentStart} THEN 1 ELSE 0 END)::bigint AS occurrences_previous,
-      ${inRangeExpr} AS occurrences_in_range
+      ${inRangeExpr} AS occurrences_in_range,
+      ${scopedSeen.firstSeen} AS scoped_first_seen,
+      ${scopedSeen.lastSeen} AS scoped_last_seen
     FROM "ErrorOccurrence" o
-    WHERE TRUE ${releaseClause}
+    WHERE TRUE ${scopeClause}
     GROUP BY o.error_group_id
   ) agg ON agg.error_group_id = eg.id`;
 }
 
 function orderByAggregateSql(
   sort: ErrorListSort,
-  order: ErrorListOrder
+  order: ErrorListOrder,
+  f: ErrorListFilterInput
 ): Prisma.Sql {
   const dir = order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
   const nulls = order === "asc" ? Prisma.sql`NULLS FIRST` : Prisma.sql`NULLS LAST`;
@@ -302,8 +371,37 @@ function orderByAggregateSql(
   if (sort === "occurrences") {
     return Prisma.sql`ORDER BY COALESCE(agg.occurrences_in_range, 0) ${dir} ${nulls}, eg.last_seen DESC`;
   }
+  if (sort === "first_seen") {
+    const expr = hasOccurrenceScope(f)
+      ? Prisma.sql`agg.scoped_first_seen`
+      : Prisma.sql`eg.first_seen`;
+    return Prisma.sql`ORDER BY ${expr} ${dir} ${nulls}`;
+  }
+  if (sort === "last_seen") {
+    const expr = hasOccurrenceScope(f)
+      ? Prisma.sql`agg.scoped_last_seen`
+      : Prisma.sql`eg.last_seen`;
+    return Prisma.sql`ORDER BY ${expr} ${dir} ${nulls}`;
+  }
+  if (sort === "message") {
+    return Prisma.sql`ORDER BY eg.message ${dir} ${nulls}`;
+  }
+  if (sort === "app") {
+    return Prisma.sql`ORDER BY eg.app ${dir} ${nulls}`;
+  }
+  if (sort === "environment") {
+    return Prisma.sql`ORDER BY eg.environment ${dir} ${nulls}`;
+  }
   const trendExpr = Prisma.sql`(COALESCE(agg.occurrences_recent, 0)::float / GREATEST(COALESCE(agg.occurrences_previous, 0), 1))`;
   return Prisma.sql`ORDER BY ${trendExpr} ${dir} ${nulls}, eg.last_seen DESC`;
+}
+
+/** True when release/platform filters require SQL order by scoped occurrence times. */
+export function requiresScopedSeenAggregateSort(
+  sort: ErrorListSort,
+  f: Pick<ErrorListFilterInput, "release" | "platform">
+): boolean {
+  return hasOccurrenceScope(f) && (sort === "first_seen" || sort === "last_seen");
 }
 
 export async function listErrorGroupsAggregated(
@@ -324,12 +422,20 @@ export async function listErrorGroupsAggregated(
 
   const whereSql = buildWhereSql(f, projectId);
   const joinSql = aggregateJoinSql(f, recentStart, prevStart, end);
-  const orderSql = orderByAggregateSql(sort, order);
+  const orderSql = orderByAggregateSql(sort, order, f);
 
   const countRows = await prisma.$queryRaw<[{ c: bigint }]>(
     Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "ErrorGroup" eg WHERE ${whereSql}`
   );
   const total = Number(countRows[0]?.c ?? 0);
+
+  // Never fall back to fingerprint lifetime seen when platform/release is active.
+  const firstSeenExpr = hasOccurrenceScope(f)
+    ? Prisma.sql`agg.scoped_first_seen`
+    : Prisma.sql`eg.first_seen`;
+  const lastSeenExpr = hasOccurrenceScope(f)
+    ? Prisma.sql`agg.scoped_last_seen`
+    : Prisma.sql`eg.last_seen`;
 
   const dataRows = await prisma.$queryRaw<Record<string, unknown>[]>(
     Prisma.sql`
@@ -340,10 +446,12 @@ export async function listErrorGroupsAggregated(
       eg.top_stack,
       eg.app,
       eg.environment,
+      eg.release,
+      eg.platform,
       eg.occurrences,
       COALESCE(agg.occurrences_in_range, 0)::int AS occurrences_in_range,
-      eg.first_seen,
-      eg.last_seen,
+      ${firstSeenExpr} AS first_seen,
+      ${lastSeenExpr} AS last_seen,
       eg.resolved_at,
       COALESCE(agg.users_affected, 0)::int AS users_affected,
       COALESCE(agg.sessions_affected, 0)::int AS sessions_affected,
@@ -369,7 +477,7 @@ export async function fetchMetricsForGroupIds(
   ids: string[],
   trendDurationMs: number,
   trendEnd: Date,
-  f?: Pick<ErrorListFilterInput, "range" | "release" | "occurrenceCountRange">
+  f?: Pick<ErrorListFilterInput, "range" | "release" | "platform" | "occurrenceCountRange">
 ): Promise<
   Map<
     string,
@@ -381,7 +489,8 @@ export async function fetchMetricsForGroupIds(
       | "occurrences_previous"
       | "trend_ratio"
       | "occurrences_in_range"
-    >
+    > &
+      Partial<Pick<ErrorGroupListRow, "first_seen" | "last_seen">>
   >
 > {
   const out = new Map<
@@ -394,7 +503,8 @@ export async function fetchMetricsForGroupIds(
       | "occurrences_previous"
       | "trend_ratio"
       | "occurrences_in_range"
-    >
+    > &
+      Partial<Pick<ErrorGroupListRow, "first_seen" | "last_seen">>
   >();
   if (ids.length === 0) return out;
 
@@ -405,13 +515,14 @@ export async function fetchMetricsForGroupIds(
   const filter: ErrorListFilterInput = {
     range: f?.range ?? {},
     release: f?.release,
+    platform: f?.platform,
     occurrenceCountRange: f?.occurrenceCountRange,
     status: "all",
   };
-  const releaseClause = filter.release
-    ? Prisma.sql`AND o.release = ${filter.release}`
-    : Prisma.empty;
+  const scopeClause = occurrenceScopeSql(filter);
   const inRangeExpr = occurrenceInRangeExpr(filter, "o");
+  const scopedSeen = hasOccurrenceScope(filter);
+  const scopedSeenExprs = scopedSeenAggregateExprs(filter);
 
   const idList = ids.map((id) => Prisma.sql`${id}`);
   const rows = await prisma.$queryRaw<Record<string, unknown>[]>(
@@ -428,10 +539,12 @@ export async function fetchMetricsForGroupIds(
       )::int AS sessions_affected,
       SUM(CASE WHEN o.created_at >= ${recentStart} AND o.created_at < ${end} THEN 1 ELSE 0 END)::bigint AS occurrences_recent,
       SUM(CASE WHEN o.created_at >= ${prevStart} AND o.created_at < ${recentStart} THEN 1 ELSE 0 END)::bigint AS occurrences_previous,
-      ${inRangeExpr} AS occurrences_in_range
+      ${inRangeExpr} AS occurrences_in_range,
+      ${scopedSeenExprs.firstSeen} AS scoped_first_seen,
+      ${scopedSeenExprs.lastSeen} AS scoped_last_seen
     FROM "ErrorOccurrence" o
     WHERE o.error_group_id IN (${Prisma.join(idList)})
-      ${releaseClause}
+      ${scopeClause}
     GROUP BY o.error_group_id
   `
   );
@@ -448,6 +561,12 @@ export async function fetchMetricsForGroupIds(
       trend_ratio: occR / Math.max(occP, 1),
       occurrences_in_range:
         r.occurrences_in_range != null ? Number(r.occurrences_in_range) : undefined,
+      ...(scopedSeen && r.scoped_first_seen != null
+        ? {
+            first_seen: r.scoped_first_seen as Date,
+            last_seen: r.scoped_last_seen as Date,
+          }
+        : {}),
     });
   }
   return out;
@@ -459,7 +578,8 @@ export async function fetchSparklinesForGroupIds(
   ids: string[],
   trendDurationMs: number,
   trendEnd: Date,
-  release?: string
+  release?: string,
+  platform?: string
 ): Promise<Map<string, ErrorSparklinePoint[]>> {
   const out = new Map<string, ErrorSparklinePoint[]>();
   if (ids.length === 0) return out;
@@ -467,9 +587,7 @@ export async function fetchSparklinesForGroupIds(
   const since = new Date(trendEnd.getTime() - trendDurationMs);
   const { bucket } = chooseTimeRangeBucket(trendDurationMs);
   const expected = generateOverviewChartBuckets(since, trendEnd, bucket);
-  const releaseClause = release
-    ? Prisma.sql`AND o."release" = ${release}`
-    : Prisma.empty;
+  const scopeClause = occurrenceScopeSql({ release, platform });
   const idList = ids.map((id) => Prisma.sql`${id}`);
 
   const rows = await prisma.$queryRaw<
@@ -481,7 +599,7 @@ export async function fetchSparklinesForGroupIds(
       COUNT(*)::bigint AS c
     FROM "ErrorOccurrence" o
     WHERE o."error_group_id" IN (${Prisma.join(idList)})
-      ${releaseClause}
+      ${scopeClause}
       AND o."created_at" >= ${since}
       AND o."created_at" < ${trendEnd}
     GROUP BY 1, 2
@@ -506,11 +624,28 @@ export async function fetchSparklinesForGroupIds(
   return out;
 }
 
-/** Distinct users/sessions impacted by all occurrences in one error group. */
+function occurrenceCreatedAtBoundsSql(bounds?: {
+  gte?: Date;
+  lte?: Date;
+}): Prisma.Sql {
+  const parts: Prisma.Sql[] = [];
+  if (bounds?.gte) parts.push(Prisma.sql`o.created_at >= ${bounds.gte}`);
+  if (bounds?.lte) parts.push(Prisma.sql`o.created_at <= ${bounds.lte}`);
+  if (parts.length === 0) return Prisma.empty;
+  return Prisma.sql`AND ${Prisma.join(parts, " AND ")}`;
+}
+
+/** Distinct users/sessions impacted by occurrences in one error group (optional platform/release/window). */
 export async function fetchImpactMetricsForGroupId(
   prisma: PrismaClient,
-  errorGroupId: string
+  errorGroupId: string,
+  scope?: { release?: string; platform?: string; gte?: Date; lte?: Date }
 ): Promise<{ users_affected: number; sessions_affected: number }> {
+  const scopeClause = occurrenceScopeSql({
+    release: scope?.release,
+    platform: scope?.platform,
+  });
+  const timeClause = occurrenceCreatedAtBoundsSql(scope);
   const rows = await prisma.$queryRaw<
     [{ users_affected: number | bigint | null; sessions_affected: number | bigint | null }]
   >(Prisma.sql`
@@ -525,10 +660,45 @@ export async function fetchImpactMetricsForGroupId(
       )::int AS sessions_affected
     FROM "ErrorOccurrence" o
     WHERE o.error_group_id = ${errorGroupId}
+      ${scopeClause}
+      ${timeClause}
   `);
   return {
     users_affected: Number(rows[0]?.users_affected ?? 0),
     sessions_affected: Number(rows[0]?.sessions_affected ?? 0),
+  };
+}
+
+/** Scoped occurrence count and first/last seen for error detail drill-down. */
+export async function fetchScopedOccurrenceSummaryForGroupId(
+  prisma: PrismaClient,
+  errorGroupId: string,
+  scope: { release?: string; platform?: string; gte?: Date; lte?: Date }
+): Promise<{
+  occurrences: number;
+  first_seen: Date | null;
+  last_seen: Date | null;
+} | null> {
+  if (!hasOccurrenceScope(scope) && !scope.gte && !scope.lte) return null;
+  const scopeClause = occurrenceScopeSql(scope);
+  const timeClause = occurrenceCreatedAtBoundsSql(scope);
+  const rows = await prisma.$queryRaw<
+    [{ occurrences: bigint; first_seen: Date | null; last_seen: Date | null }]
+  >(Prisma.sql`
+    SELECT
+      COUNT(*)::bigint AS occurrences,
+      MIN(o.created_at) AS first_seen,
+      MAX(o.created_at) AS last_seen
+    FROM "ErrorOccurrence" o
+    WHERE o.error_group_id = ${errorGroupId}
+      ${scopeClause}
+      ${timeClause}
+  `);
+  const row = rows[0];
+  return {
+    occurrences: Number(row?.occurrences ?? 0),
+    first_seen: row?.first_seen ?? null,
+    last_seen: row?.last_seen ?? null,
   };
 }
 
@@ -571,6 +741,8 @@ export function serializeErrorGroupListItem(
     top_stack: row.top_stack,
     app: row.app,
     environment: row.environment,
+    release: row.release,
+    platform: row.platform,
     occurrences: row.occurrences,
     occurrences_in_range: row.occurrences_in_range ?? 0,
     first_seen: row.first_seen.toISOString(),

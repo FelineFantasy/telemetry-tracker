@@ -160,9 +160,13 @@ export async function fetchErrorsAnalytics(
 
   const occurrenceFilter = buildErrorOccurrenceFilterSql(f, projectId);
   const typeExpr = errorTypeSqlExpression("eg");
-  const releaseClause = f.release
-    ? Prisma.sql`AND eo."release" = ${f.release}`
-    : Prisma.empty;
+  const occurrenceScopeParts: Prisma.Sql[] = [];
+  if (f.release) occurrenceScopeParts.push(Prisma.sql`eo."release" = ${f.release}`);
+  if (f.platform) occurrenceScopeParts.push(Prisma.sql`eo."platform" = ${f.platform}`);
+  const releaseClause =
+    occurrenceScopeParts.length > 0
+      ? Prisma.sql`AND ${Prisma.join(occurrenceScopeParts, " AND ")}`
+      : Prisma.empty;
 
   const [bucketRows, totalRows] = await Promise.all([
     prisma.$queryRaw<BucketTypeRow[]>(Prisma.sql`
