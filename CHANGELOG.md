@@ -13,6 +13,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Rename workspace** — owners can update the organization name from Settings → Organization; org switcher “Rename your workspace” links to the edit form ([#482](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/482))
+
 ### Fixed
 
 ### Changed

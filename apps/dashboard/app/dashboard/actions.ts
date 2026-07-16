@@ -280,6 +280,43 @@ export async function setDashboardOrganizationId(
   return { ok: true };
 }
 
+export async function renameOrganizationAction(
+  organizationId: string,
+  name: string
+): Promise<
+  | { ok: true; organization: { id: string; name: string } }
+  | { ok: false; error: string }
+> {
+  const oid = organizationId.trim().toLowerCase();
+  const trimmed = name.trim().slice(0, 120);
+  if (!/^[0-9a-f-]{36}$/.test(oid)) {
+    return { ok: false, error: "Invalid organization id" };
+  }
+  if (!trimmed) {
+    return { ok: false, error: "name cannot be empty" };
+  }
+  const res = await dashboardApiFetch(`/api/meta/organizations/${oid}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: trimmed }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    let message = t.slice(0, 400) || res.statusText;
+    try {
+      const parsed = JSON.parse(t) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      /* keep text */
+    }
+    return { ok: false, error: message };
+  }
+  const data = (await res.json()) as { id: string; name: string };
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/settings/organization");
+  return { ok: true, organization: { id: data.id, name: data.name } };
+}
+
 export async function createOrganizationAction(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
