@@ -131,6 +131,41 @@ describe("runPiiScrubBackfill", () => {
     ).rejects.toThrow(/not both/);
   });
 
+  it("applies --limit across the whole run, not per project", async () => {
+    const eventFindMany = vi
+      .fn()
+      .mockImplementation(async (args: { take?: number; where: { project_id: string } }) => {
+        if (args.where.project_id === "p1") {
+          return [{ id: "e1", properties: { email: "a@b.co" } }];
+        }
+        // Second project must not be scanned once the run-wide limit is exhausted.
+        throw new Error("should not query events for p2 after limit");
+      });
+    const prisma = {
+      project: {
+        findMany: vi.fn(async () => [
+          { id: "p1", pii_scrub_settings: null },
+          { id: "p2", pii_scrub_settings: null },
+        ]),
+      },
+      event: { findMany: eventFindMany, update: vi.fn() },
+      errorOccurrence: { findMany: vi.fn(async () => []) },
+      errorGroup: { findMany: vi.fn(async () => []) },
+      session: { findMany: vi.fn(async () => []) },
+    };
+
+    const result = await runPiiScrubBackfill(prisma as never, {
+      orgId: "org-1",
+      dryRun: true,
+      limit: 1,
+      batchSize: 10,
+    });
+
+    expect(result.projectsProcessed).toBe(2);
+    expect(result.scanned.events).toBe(1);
+    expect(eventFindMany).toHaveBeenCalledTimes(1);
+  });
+
   it("scrubs event properties and skips unchanged rows (dry-run)", async () => {
     const eventFindMany = vi
       .fn()

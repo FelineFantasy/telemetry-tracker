@@ -202,7 +202,7 @@ pnpm --filter api pii-scrub-backfill -- \
 |------|---------|
 | `--project-id` / `--org-id` | **Required** — exactly one |
 | `--dry-run` | Calculate impact; **no rows modified** |
-| `--limit` / `--batch-size` | Cap / cursor page size (bounded memory) |
+| `--limit` / `--batch-size` | Cap per table for the **entire run** (shared across projects) / cursor page size |
 | `--include-sessions` | Consider sessions (still requires project `scrubSessionUserEmail`) |
 | `--scrub-fingerprints` | Opt-in fingerprint rewrite; default leaves fingerprints unchanged |
 | `--fail-fast` | Abort on first DB error (default: count and continue) |

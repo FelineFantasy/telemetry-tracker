@@ -27,7 +27,7 @@ Required (exactly one):
 
 Options:
   --dry-run             Calculate scanned/modified/skipped without writing
-  --limit <n>           Cap rows examined per table
+  --limit <n>           Cap rows examined per table for the entire run (shared across projects)
   --batch-size <n>      Cursor page size (default 200, max 2000)
   --include-sessions    Also scrub Session.user_email when scrubSessionUserEmail is enabled
   --scrub-fingerprints  Also scrub ErrorGroup.fingerprint (skips on unique conflicts)

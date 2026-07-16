@@ -21,7 +21,7 @@ export type PiiScrubBackfillOptions = {
   projectId?: string;
   /** All non-deleted projects in this organization. */
   orgId?: string;
-  /** Max rows to examine per table (events / occurrences / groups / sessions). */
+  /** Max rows to examine per table for the entire run (shared across projects). */
   limit?: number;
   /** Cursor page size (default 200). */
   batchSize?: number;
@@ -339,12 +339,12 @@ async function scrubEventsForProject(
   ctx: MutateCounters
 ): Promise<void> {
   let cursor: string | undefined;
-  let processed = 0;
   for (;;) {
-    if (ctx.limit !== undefined && processed >= ctx.limit) break;
+    const scanned = ctx.result.scanned.events;
+    if (ctx.limit !== undefined && scanned >= ctx.limit) break;
     const take = Math.min(
       ctx.batchSize,
-      ctx.limit !== undefined ? ctx.limit - processed : ctx.batchSize
+      ctx.limit !== undefined ? ctx.limit - scanned : ctx.batchSize
     );
     const rows = await prisma.event.findMany({
       where: { project_id: projectId },
@@ -355,7 +355,6 @@ async function scrubEventsForProject(
     });
     if (rows.length === 0) break;
     cursor = rows[rows.length - 1]!.id;
-    processed += rows.length;
     ctx.result.scanned.events += rows.length;
 
     for (const row of rows) {
@@ -399,12 +398,12 @@ async function scrubOccurrencesForProject(
   ctx: MutateCounters
 ): Promise<void> {
   let cursor: string | undefined;
-  let processed = 0;
   for (;;) {
-    if (ctx.limit !== undefined && processed >= ctx.limit) break;
+    const scanned = ctx.result.scanned.occurrences;
+    if (ctx.limit !== undefined && scanned >= ctx.limit) break;
     const take = Math.min(
       ctx.batchSize,
-      ctx.limit !== undefined ? ctx.limit - processed : ctx.batchSize
+      ctx.limit !== undefined ? ctx.limit - scanned : ctx.batchSize
     );
     const rows = await prisma.errorOccurrence.findMany({
       where: { error_group: { project_id: projectId } },
@@ -415,7 +414,6 @@ async function scrubOccurrencesForProject(
     });
     if (rows.length === 0) break;
     cursor = rows[rows.length - 1]!.id;
-    processed += rows.length;
     ctx.result.scanned.occurrences += rows.length;
 
     for (const row of rows) {
@@ -463,12 +461,12 @@ async function scrubErrorGroupsForProject(
   ctx: MutateCounters & { scrubFingerprints: boolean }
 ): Promise<void> {
   let cursor: string | undefined;
-  let processed = 0;
   for (;;) {
-    if (ctx.limit !== undefined && processed >= ctx.limit) break;
+    const scanned = ctx.result.scanned.groups;
+    if (ctx.limit !== undefined && scanned >= ctx.limit) break;
     const take = Math.min(
       ctx.batchSize,
-      ctx.limit !== undefined ? ctx.limit - processed : ctx.batchSize
+      ctx.limit !== undefined ? ctx.limit - scanned : ctx.batchSize
     );
     const rows = await prisma.errorGroup.findMany({
       where: { project_id: projectId },
@@ -479,7 +477,6 @@ async function scrubErrorGroupsForProject(
     });
     if (rows.length === 0) break;
     cursor = rows[rows.length - 1]!.id;
-    processed += rows.length;
     ctx.result.scanned.groups += rows.length;
 
     for (const row of rows) {
@@ -567,12 +564,12 @@ async function scrubSessionsForProject(
   }
 
   let cursor: string | undefined;
-  let processed = 0;
   for (;;) {
-    if (ctx.limit !== undefined && processed >= ctx.limit) break;
+    const scanned = ctx.result.scanned.sessions;
+    if (ctx.limit !== undefined && scanned >= ctx.limit) break;
     const take = Math.min(
       ctx.batchSize,
-      ctx.limit !== undefined ? ctx.limit - processed : ctx.batchSize
+      ctx.limit !== undefined ? ctx.limit - scanned : ctx.batchSize
     );
     const rows = await prisma.session.findMany({
       where: {
@@ -586,7 +583,6 @@ async function scrubSessionsForProject(
     });
     if (rows.length === 0) break;
     cursor = rows[rows.length - 1]!.id;
-    processed += rows.length;
     ctx.result.scanned.sessions += rows.length;
 
     for (const row of rows) {
