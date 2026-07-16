@@ -17,6 +17,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
+- Dashboard: errors, events, and sessions list pages load filters, summary, and the table first; analytics panels fetch after paint so above-the-fold content is not blocked ([#486](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/486)).
+
 ### Database
 
 ---
