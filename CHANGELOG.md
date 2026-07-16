@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.11.3] - 2026-07-16
+
+### Fixed
+
+- **Errors summary** — avoid `Prisma.join([])` crash on `GET /api/errors/summary` when no release/platform filter is set ([#468](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/468))
+
+---
+
 ## [1.11.2] - 2026-07-16
 
 ### Fixed
