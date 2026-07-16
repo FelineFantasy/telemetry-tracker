@@ -819,29 +819,38 @@ export async function apiRoutes(
     };
     const platform = queryString(query.platform);
     const release = queryString(query.release);
-    const hasExplicitRange = Boolean(
-      queryString(query.range) || queryString(query.from) || queryString(query.to)
-    );
+    const rangeKey = queryString(query.range);
+    const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
+    // Overview uses range=none (epoch→now). Issues uses range=all + ~7d metrics window.
+    // Keep Overview "none" unbounded so detail matches the Overview list row.
+    const isOverviewUnselected = !hasFromTo && rangeKey === "none";
+    const hasBoundedPreset =
+      hasFromTo || Boolean(rangeKey && rangeKey !== "all" && rangeKey !== "none");
     const listRange = parseCreatedRange(query, "all");
     const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
-    // Match Issues list: platform/release with unbounded range uses the metrics window.
-    const metricsFilter =
-      hasExplicitRange || platform || release
-        ? enrichErrorListFilterForMetrics(
-            {
-              range: listRange,
-              status: "all",
-              ...(platform ? { platform } : {}),
-              ...(release ? { release } : {}),
-            },
-            listRange,
-            metricsAnchor
-          )
-        : null;
-    const windowGte =
-      metricsFilter?.range.gte ?? metricsFilter?.occurrenceCountRange?.gte;
-    const windowLte =
-      metricsFilter?.range.lte ?? metricsFilter?.occurrenceCountRange?.lte;
+
+    let windowGte: Date | undefined;
+    let windowLte: Date | undefined;
+    if (isOverviewUnselected) {
+      // platform/release only — no artificial metrics window
+    } else if (hasBoundedPreset) {
+      windowGte = listRange.gte;
+      windowLte = listRange.lte;
+    } else if (platform || release) {
+      // Issues-style all-time list: match enrichErrorListFilterForMetrics (~7d).
+      const enriched = enrichErrorListFilterForMetrics(
+        {
+          range: listRange,
+          status: "all",
+          ...(platform ? { platform } : {}),
+          ...(release ? { release } : {}),
+        },
+        listRange,
+        metricsAnchor
+      );
+      windowGte = enriched.range.gte ?? enriched.occurrenceCountRange?.gte;
+      windowLte = enriched.range.lte ?? enriched.occurrenceCountRange?.lte;
+    }
     const occurrenceScope = {
       ...(platform ? { platform } : {}),
       ...(release ? { release } : {}),
