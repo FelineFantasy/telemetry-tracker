@@ -1,23 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { usePathname } from "next/navigation";
-import {
-  TelemetryProvider,
-  useTrackPage,
-} from "@telemetry-tracker/next";
-import {
-  COOKIE_CONSENT_CHANGED_EVENT,
-  type CookieConsentChoice,
-} from "@/lib/cookie-consent";
+import { TelemetryProvider, useTrackPage } from "@telemetry-tracker/next";
 import {
   getProductTelemetryConfig,
   shouldTrackProductTelemetry,
 } from "@/lib/product-telemetry";
-
-type ProductTelemetryProps = {
-  serverChoice: CookieConsentChoice | null;
-};
 
 function TrackPage() {
   const pathname = usePathname();
@@ -25,26 +14,14 @@ function TrackPage() {
   return null;
 }
 
-/** Dogfoods @telemetry-tracker/next for visits, sessions, and browser errors when env is set. */
-export function ProductTelemetry({ serverChoice }: ProductTelemetryProps) {
+/**
+ * Dogfoods @telemetry-tracker/next on `/dashboard/*` for visits, sessions, and browser errors
+ * when env is set. Marketing/docs are not instrumented (use Google Analytics + consent instead).
+ */
+export function ProductTelemetry() {
   const pathname = usePathname();
-  const [consentAccepted, setConsentAccepted] = useState(serverChoice === "accepted");
   const config = useMemo(() => getProductTelemetryConfig(), []);
-  const shouldTrack = Boolean(
-    config && shouldTrackProductTelemetry(pathname, consentAccepted)
-  );
-
-  useEffect(() => {
-    setConsentAccepted(serverChoice === "accepted");
-
-    function onConsentChanged(event: Event) {
-      const detail = (event as CustomEvent<CookieConsentChoice>).detail;
-      setConsentAccepted(detail === "accepted");
-    }
-
-    window.addEventListener(COOKIE_CONSENT_CHANGED_EVENT, onConsentChanged);
-    return () => window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, onConsentChanged);
-  }, [serverChoice]);
+  const shouldTrack = Boolean(config && shouldTrackProductTelemetry(pathname));
 
   if (!shouldTrack || !config) return null;
 

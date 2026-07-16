@@ -3,6 +3,7 @@ import {
   DEFAULT_PRODUCT_TELEMETRY_APP,
   getProductTelemetryConfig,
   isProductTelemetryEnabled,
+  isProductTelemetryPath,
   shouldTrackProductTelemetry,
 } from "./product-telemetry";
 
@@ -39,15 +40,18 @@ describe("product telemetry env gating", () => {
     expect(getProductTelemetryConfig()).toBeNull();
   });
 
-  it("requires consent on marketing paths and always tracks dashboard when enabled", () => {
+  it("only tracks dashboard paths when enabled", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_TELEMETRY_INGEST_URL", "https://api.telemetry-tracker.com");
     vi.stubEnv("NEXT_PUBLIC_TELEMETRY_API_KEY", "tt_live_test");
 
-    expect(shouldTrackProductTelemetry("/", false)).toBe(false);
-    expect(shouldTrackProductTelemetry("/", true)).toBe(true);
-    expect(shouldTrackProductTelemetry("/docs/nextjs", false)).toBe(false);
-    expect(shouldTrackProductTelemetry("/dashboard", false)).toBe(true);
-    expect(shouldTrackProductTelemetry("/dashboard/overview", true)).toBe(true);
+    expect(isProductTelemetryPath(null)).toBe(false);
+    expect(isProductTelemetryPath("/")).toBe(false);
+    expect(isProductTelemetryPath("/docs/nextjs")).toBe(false);
+    expect(isProductTelemetryPath("/dashboard")).toBe(true);
+    expect(isProductTelemetryPath("/dashboard/overview")).toBe(true);
+
+    expect(shouldTrackProductTelemetry("/")).toBe(false);
+    expect(shouldTrackProductTelemetry("/dashboard")).toBe(true);
   });
 });

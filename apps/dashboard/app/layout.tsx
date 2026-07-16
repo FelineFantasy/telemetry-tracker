@@ -96,7 +96,7 @@ export default async function RootLayout({
             <NavigationProgress />
           </Suspense>
           {children}
-          <ProductTelemetry serverChoice={serverChoice} />
+          <ProductTelemetry />
           <GoogleAnalytics measurementId={measurementId} serverChoice={serverChoice} />
           <CookieConsent serverChoice={serverChoice} />
         </ThemeProvider>

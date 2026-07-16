@@ -1,5 +1,4 @@
 import type { TelemetryConfig } from "@telemetry-tracker/core";
-import { isMarketingAnalyticsPath } from "@/lib/google-analytics";
 
 export const DEFAULT_PRODUCT_TELEMETRY_APP = "telemetry-tracker-dashboard";
 
@@ -26,15 +25,11 @@ export function isProductTelemetryEnabled(): boolean {
   return getProductTelemetryConfig() !== null;
 }
 
-/**
- * Product pages always track when configured; marketing/docs require cookie consent
- * (same split as Google Analytics).
- */
-export function shouldTrackProductTelemetry(
-  pathname: string | null | undefined,
-  consentAccepted: boolean
-): boolean {
-  if (!isProductTelemetryEnabled()) return false;
-  if (!isMarketingAnalyticsPath(pathname)) return true;
-  return consentAccepted;
+/** Product telemetry is limited to authenticated app routes (not marketing/docs). */
+export function isProductTelemetryPath(pathname: string | null | undefined): boolean {
+  return Boolean(pathname?.startsWith("/dashboard"));
+}
+
+export function shouldTrackProductTelemetry(pathname: string | null | undefined): boolean {
+  return isProductTelemetryEnabled() && isProductTelemetryPath(pathname);
 }

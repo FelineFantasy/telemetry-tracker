@@ -35,8 +35,8 @@ export function captureClientException(error: unknown): void {
     void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
   }
   if (typeof window === "undefined") return;
-  void import("@/lib/product-telemetry").then(({ isProductTelemetryEnabled }) => {
-    if (!isProductTelemetryEnabled()) return;
+  void import("@/lib/product-telemetry").then(({ shouldTrackProductTelemetry }) => {
+    if (!shouldTrackProductTelemetry(window.location.pathname)) return;
     void import("@telemetry-tracker/next").then(({ trackError }) => {
       const err = error instanceof Error ? error : new Error(String(error));
       trackError(err, { source: "next-error-boundary" });
