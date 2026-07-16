@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+---
+
+## [1.11.0] - 2026-07-16
+
 ### Added
 
 - **Errors platform** — persist `platform` on error groups/occurrences; Platform filter on Errors; include in filter-options ([#445](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/445))
