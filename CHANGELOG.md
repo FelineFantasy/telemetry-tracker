@@ -11,6 +11,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ## [Unreleased]
 
+### Added
+
+- **Product telemetry (dogfood)** — optional `@telemetry-tracker/next` on the dashboard for visits, sessions, and browser errors when `NEXT_PUBLIC_TELEMETRY_INGEST_URL` + `NEXT_PUBLIC_TELEMETRY_API_KEY` are set; marketing/docs require cookie consent
+
 ---
 
 ## [1.11.0] - 2026-07-16
