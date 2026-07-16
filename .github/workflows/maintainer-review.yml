@@ -29,6 +29,8 @@ jobs:
         env:
           MAINTAINER: unjica
         with:
+          # GitHub occasionally returns HTML 5xx ("Unicorn") instead of JSON; retry those.
+          retries: 5
           script: |
             const maintainer = process.env.MAINTAINER.toLowerCase();
             const { owner, repo } = context.repo;
