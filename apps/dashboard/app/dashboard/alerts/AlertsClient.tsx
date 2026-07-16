@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   saveProjectAlertSettingsAction,
@@ -44,11 +44,14 @@ export function AlertsClient({
   initialSettings,
   initialEvents,
   initialPiiSettings,
+  piiSettingsLoadError = null,
   canEdit,
 }: {
   initialSettings: ProjectAlertSettings;
   initialEvents: AlertEventRow[];
   initialPiiSettings: ProjectPiiScrubSettings;
+  /** When set, PII section is read-only — do not save (avoids wiping deny-keys). */
+  piiSettingsLoadError?: string | null;
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -64,17 +67,38 @@ export function AlertsClient({
   const [savedPii, setSavedPii] = useState(() =>
     normalizeProjectPiiScrubSettings(initialPiiSettings)
   );
+  const piiEditable = canEdit && !piiSettingsLoadError;
+
+  // After router.refresh(), props can recover from a failed load while useState
+  // still holds fallback defaults — resync so a later save cannot wipe real keys.
+  // Key on values (not object identity) so alert-settings refresh does not discard
+  // unsaved PII edits when the server returns a new props object with the same data.
+  const piiPropsSyncKey = piiSettingsLoadError
+    ? `error:${piiSettingsLoadError}`
+    : `ok:${initialPiiSettings.scrubSessionUserEmail}:${initialPiiSettings.denyKeys.join("\0")}`;
+  const lastSyncedPiiKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (piiSettingsLoadError) return;
+    if (lastSyncedPiiKeyRef.current === piiPropsSyncKey) return;
+    lastSyncedPiiKeyRef.current = piiPropsSyncKey;
+    const normalized = normalizeProjectPiiScrubSettings(initialPiiSettings);
+    setSavedPii(normalized);
+    setDenyKeysText(formatDenyKeysInput(normalized.denyKeys));
+    setScrubSessionUserEmail(normalized.scrubSessionUserEmail);
+  }, [piiPropsSyncKey, piiSettingsLoadError, initialPiiSettings]);
+
   const dirty = useMemo(
     () => !alertSettingsEqual(settings, initialSettings),
     [settings, initialSettings]
   );
   const piiDirty = useMemo(() => {
+    if (piiSettingsLoadError) return false;
     const next: ProjectPiiScrubSettings = {
       denyKeys: parseDenyKeysInput(denyKeysText),
       scrubSessionUserEmail,
     };
     return !piiScrubSettingsEqual(next, savedPii);
-  }, [denyKeysText, scrubSessionUserEmail, savedPii]);
+  }, [denyKeysText, scrubSessionUserEmail, savedPii, piiSettingsLoadError]);
 
   function save() {
     startTransition(async () => {
@@ -90,12 +114,23 @@ export function AlertsClient({
   }
 
   function savePii() {
+    if (piiSettingsLoadError) {
+      toast.error(piiSettingsLoadError);
+      return;
+    }
     startPiiTransition(async () => {
-      const next: ProjectPiiScrubSettings = {
-        denyKeys: parseDenyKeysInput(denyKeysText),
-        scrubSessionUserEmail,
-      };
-      const result = await saveProjectPiiScrubSettingsAction(next);
+      const nextDeny = parseDenyKeysInput(denyKeysText);
+      const patch: Partial<ProjectPiiScrubSettings> = {};
+      if (
+        nextDeny.length !== savedPii.denyKeys.length ||
+        nextDeny.some((k, i) => k !== savedPii.denyKeys[i])
+      ) {
+        patch.denyKeys = nextDeny;
+      }
+      if (scrubSessionUserEmail !== savedPii.scrubSessionUserEmail) {
+        patch.scrubSessionUserEmail = scrubSessionUserEmail;
+      }
+      const result = await saveProjectPiiScrubSettingsAction(patch);
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -105,6 +140,12 @@ export function AlertsClient({
       setSavedPii(normalized);
       setDenyKeysText(formatDenyKeysInput(normalized.denyKeys));
       setScrubSessionUserEmail(normalized.scrubSessionUserEmail);
+      router.refresh();
+    });
+  }
+
+  function reloadPiiSettings() {
+    startPiiTransition(() => {
       router.refresh();
     });
   }
@@ -250,7 +291,7 @@ export function AlertsClient({
           title="PII scrubbing"
           description="Default server-side ingest already redacts common emails, tokens, secrets, and conservative phone/card patterns. This section only adds project deny-keys and an optional session-email setting — it cannot weaken the defaults."
           actions={
-            canEdit ? (
+            piiEditable ? (
               <SettingsBtn
                 variant="primary"
                 disabled={!piiDirty || piiPending}
@@ -261,6 +302,21 @@ export function AlertsClient({
             ) : null
           }
         >
+          {piiSettingsLoadError ? (
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3" role="alert">
+              <p className="text-[13px] text-destructive">
+                {piiSettingsLoadError}. Saving is disabled so existing deny-keys are not
+                overwritten.
+              </p>
+              <SettingsBtn
+                variant="outline"
+                disabled={piiPending}
+                onClick={reloadPiiSettings}
+              >
+                {piiPending ? "Reloading…" : "Reload settings"}
+              </SettingsBtn>
+            </div>
+          ) : null}
           <FieldGroup>
             <Field
               label="Deny-listed field names"
@@ -269,7 +325,7 @@ export function AlertsClient({
               <SettingsTextarea
                 id="pii-deny-keys"
                 rows={5}
-                disabled={!canEdit}
+                disabled={!piiEditable}
                 value={denyKeysText}
                 onChange={(e) => setDenyKeysText(e.target.value)}
                 placeholder={"nationalId\ncustomerRef"}
@@ -282,13 +338,13 @@ export function AlertsClient({
               label="Scrub session user email"
               hint="When enabled, ingest stores Session.user_email as the placeholder [email] (not null) before persistence. Off by default. Enabling removes the real address from new sessions and may reduce user-level debugging and email search."
             >
-              <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
+              <div className={piiEditable ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
                   id="pii-scrub-session-email"
                   label="Scrub session user email"
                   on={scrubSessionUserEmail}
                   onChange={setScrubSessionUserEmail}
-                  disabled={!canEdit}
+                  disabled={!piiEditable}
                 />
               </div>
             </Field>
