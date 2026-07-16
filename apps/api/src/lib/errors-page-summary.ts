@@ -200,16 +200,13 @@ export async function fetchErrorsPageSummary(
   if (f.release) eventParts.push(Prisma.sql`e."release" = ${f.release}`);
   if (f.platform) eventParts.push(Prisma.sql`e."platform" = ${f.platform}`);
   const eventFilter = Prisma.join(eventParts, " AND ");
-  const occurrenceScopeClause = Prisma.join(
-    [
-      ...(f.release ? [Prisma.sql`eo."release" = ${f.release}`] : []),
-      ...(f.platform ? [Prisma.sql`eo."platform" = ${f.platform}`] : []),
-    ],
-    " AND "
-  );
+  const occurrenceScopeParts: Prisma.Sql[] = [];
+  if (f.release) occurrenceScopeParts.push(Prisma.sql`eo."release" = ${f.release}`);
+  if (f.platform) occurrenceScopeParts.push(Prisma.sql`eo."platform" = ${f.platform}`);
+  // Prisma.join throws on an empty array — only join when release/platform filters exist.
   const occurrenceReleaseClause =
-    f.release || f.platform
-      ? Prisma.sql`AND ${occurrenceScopeClause}`
+    occurrenceScopeParts.length > 0
+      ? Prisma.sql`AND ${Prisma.join(occurrenceScopeParts, " AND ")}`
       : Prisma.empty;
   const groupScopeSql = buildErrorGroupScopeSql(f, projectId, "eg");
   const eventSessionScope = buildEventSessionScopeSql(

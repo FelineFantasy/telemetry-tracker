@@ -5,6 +5,7 @@ import {
   encodeAuditLogCursor,
   listOrganizationAuditEvents,
   parseAuditLogQuery,
+  recordOrganizationAuditEvent,
   recordUserAuditEvents,
 } from "./audit-log.js";
 
@@ -90,6 +91,59 @@ describe("audit-log", () => {
     );
 
     expect(createManyCalled).toBe(false);
+  });
+
+  it("records a single-organization audit event", async () => {
+    let created: unknown;
+    const prisma = {
+      user: {
+        findUnique: async () => ({ email: "actor@example.com" }),
+      },
+      organizationAuditEvent: {
+        create: async (args: { data: unknown }) => {
+          created = args.data;
+        },
+      },
+    };
+
+    await recordOrganizationAuditEvent(
+      prisma as never,
+      "org-1",
+      "user-1",
+      AUDIT_ACTIONS.PROJECT_PII_SCRUB_UPDATE,
+      "project:p1 denyKeys=1 scrubSessionUserEmail=false"
+    );
+
+    expect(created).toEqual({
+      organization_id: "org-1",
+      actor_user_id: "user-1",
+      actor_email: "actor@example.com",
+      action: AUDIT_ACTIONS.PROJECT_PII_SCRUB_UPDATE,
+      target: "project:p1 denyKeys=1 scrubSessionUserEmail=false",
+    });
+  });
+
+  it("swallows audit write failures so settings updates are not blocked", async () => {
+    const prisma = {
+      user: {
+        findUnique: async () => ({ email: "actor@example.com" }),
+      },
+      organizationAuditEvent: {
+        create: async () => {
+          throw new Error("db down");
+        },
+      },
+    };
+
+    await expect(
+      recordOrganizationAuditEvent(
+        prisma as never,
+        "org-1",
+        "user-1",
+        AUDIT_ACTIONS.PROJECT_PII_SCRUB_UPDATE,
+        "project:p1 denyKeys=0 scrubSessionUserEmail=true"
+      )
+    ).resolves.toBeUndefined();
   });
 
   it("lists audit events with null actorUserId after user deletion", async () => {

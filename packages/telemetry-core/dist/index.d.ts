@@ -1,7 +1,12 @@
 import { SDK_VERSION } from "./version.js";
 export { SDK_VERSION };
+export { scrubPiiText, scrubPiiRecord } from "./pii-scrub.js";
 export { WEB_VITAL_EVENT_NAME, installWebVitals, rateWebVital, buildWebVitalProperties, setWebVitalsCaptureEnabled, isWebVitalsCaptureEnabled, type WebVitalEventProperties, type WebVitalMetricName, type WebVitalRating, } from "./web-vitals.js";
 export declare function getAnonymousId(): string;
+export type TelemetryPiiScrubConfig = boolean | {
+    /** Extra property/context keys to redact (case-insensitive). */
+    denyKeys?: string[];
+};
 export type TelemetryConfig = {
     ingestUrl: string;
     app: string;
@@ -16,6 +21,12 @@ export type TelemetryConfig = {
     batchSize?: number;
     /** Capture Core Web Vitals (LCP, INP, CLS, TTFB) in browser. Default true. */
     webVitals?: boolean;
+    /**
+     * Optional client-side PII scrubbing before send (default off).
+     * Complements server ingest scrubbing — never rely on this alone.
+     * See https://github.com/Telemetry-Tracker/telemetry-tracker/blob/develop/docs/PII-SCRUBBING.md
+     */
+    piiScrub?: TelemetryPiiScrubConfig;
 };
 export declare function getSessionId(): string | null;
 /** End the current session and clear the in-memory session id. */
@@ -32,6 +43,11 @@ export type IdentifyTraits = {
 export declare function identify(id: string | null, traits?: IdentifyTraits): void;
 /** Headers for ingest POST requests (Authorization + Content-Type). */
 export declare function buildIngestHeaders(cfg: Pick<TelemetryConfig, "apiKey">): Record<string, string>;
+declare function resolveClientPiiScrub(cfg: TelemetryConfig | null): {
+    denyKeys?: string[];
+} | null;
+/** @internal exported for tests */
+export { resolveClientPiiScrub };
 export declare function trackEvent(name: string, properties?: Record<string, unknown>): void;
 export declare function trackError(error: Error | {
     message: string;

@@ -167,15 +167,18 @@ export function SettingsToggle({
   onChange,
   label,
   disabled,
+  id,
   ...rest
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   label?: string;
   disabled?: boolean;
+  id?: string;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
+      id={id}
       type="button"
       role="switch"
       aria-checked={on}

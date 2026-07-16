@@ -54,8 +54,10 @@ import {
 } from "../lib/source-map-upload-auth.js";
 import { avatarUrlFromUser } from "../lib/user-avatar.js";
 import {
+  AUDIT_ACTIONS,
   listOrganizationAuditEvents,
   parseAuditLogQuery,
+  recordOrganizationAuditEvent,
 } from "../lib/audit-log.js";
 import { listOrganizationIntegrations } from "../lib/organization-integrations.js";
 
@@ -1030,6 +1032,65 @@ export async function projectDashboardRoutes(
       where: { id: projectId },
       data: { alert_settings: validated.settings as object },
     });
+    return reply.send({ settings: validated.settings });
+  });
+
+  app.get("/project/pii-scrub-settings", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const row = await prisma.project.findFirst({
+      where: { id: projectId, deleted_at: null },
+      select: { pii_scrub_settings: true },
+    });
+    const { parseProjectPiiScrubSettings } = await import(
+      "../lib/project-pii-scrub-settings.js"
+    );
+    return reply.send({
+      settings: parseProjectPiiScrubSettings(row?.pii_scrub_settings ?? null),
+    });
+  });
+
+  app.patch("/project/pii-scrub-settings", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const {
+      parseProjectPiiScrubSettings,
+      validateProjectPiiScrubSettingsPatch,
+      formatPiiScrubSettingsAuditTarget,
+    } = await import("../lib/project-pii-scrub-settings.js");
+    const existingRow = await prisma.project.findFirst({
+      where: { id: projectId, deleted_at: null },
+      select: { pii_scrub_settings: true, organization_id: true },
+    });
+    if (!existingRow) {
+      return reply.status(404).send({ error: "Project not found" });
+    }
+    const previous = parseProjectPiiScrubSettings(existingRow.pii_scrub_settings);
+    const validated = validateProjectPiiScrubSettingsPatch(request.body, previous);
+    if (!validated.ok) {
+      return reply.status(400).send({ error: validated.error });
+    }
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { pii_scrub_settings: validated.settings as object },
+    });
+    const { clearProjectPiiScrubSettingsCache } = await import(
+      "../lib/project-pii-scrub-cache.js"
+    );
+    clearProjectPiiScrubSettingsCache(projectId);
+    void recordOrganizationAuditEvent(
+      prisma,
+      existingRow.organization_id,
+      session.userId,
+      AUDIT_ACTIONS.PROJECT_PII_SCRUB_UPDATE,
+      formatPiiScrubSettingsAuditTarget(projectId, validated.settings)
+    );
     return reply.send({ settings: validated.settings });
   });
 

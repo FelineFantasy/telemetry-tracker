@@ -38,7 +38,18 @@ export default function DocsSdkPage() {
         <p>
           Required: <code>ingestUrl</code> (your API base URL), <code>app</code> (a string that
           groups data in the dashboard). Optional: <code>platform</code>, <code>environment</code>,{" "}
-          <code>release</code>, <code>batchInterval</code>, <code>batchSize</code>.
+          <code>release</code>, <code>batchInterval</code>, <code>batchSize</code>,{" "}
+          <code>piiScrub</code>.
+        </p>
+        <p>
+          Set <code>piiScrub: true</code> or pass{" "}
+          <code>{`{ denyKeys: ["nationalId"] }`}</code> to redact common PII in event properties
+          and error payloads <strong>before</strong> send. Client scrubbing is optional and does
+          not replace server-side ingest scrubbing. See the{" "}
+          <a href="https://github.com/Telemetry-Tracker/telemetry-tracker/blob/develop/docs/PII-SCRUBBING.md">
+            PII scrubbing guide
+          </a>
+          .
         </p>
         <CodeBlock
           caption="Full example (after init)"
