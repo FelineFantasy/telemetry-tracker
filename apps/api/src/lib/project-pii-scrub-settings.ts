@@ -8,7 +8,8 @@ export type ProjectPiiScrubSettings = {
    */
   denyKeys: string[];
   /**
-   * When true, scrub `Session.user_email` on ingest (store `[email]` placeholders).
+   * When true, scrub `Session.user_email` on ingest.
+   * Non-empty values are stored as the placeholder `[email]` (not null).
    * Default false — session identity remains searchable until explicitly enabled.
    */
   scrubSessionUserEmail: boolean;

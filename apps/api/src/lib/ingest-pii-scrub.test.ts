@@ -134,8 +134,11 @@ describe("scrubIngestSessionUserEmail", () => {
     expect(scrubIngestSessionUserEmail("a@b.co", false, {})).toBe("a@b.co");
   });
 
-  it("redacts when the project flag is on", () => {
+  it("stores the stable [email] placeholder when enabled (not null)", () => {
     expect(scrubIngestSessionUserEmail("a@b.co", true, {})).toBe("[email]");
+    expect(scrubIngestSessionUserEmail("not-an-email", true, {})).toBe("[email]");
+    expect(scrubIngestSessionUserEmail(null, true, {})).toBeNull();
+    expect(scrubIngestSessionUserEmail("", true, {})).toBe("");
   });
 
   it("respects the global ingest kill-switch", () => {

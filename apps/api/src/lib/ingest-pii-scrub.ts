@@ -92,6 +92,8 @@ export function scrubIngestEventFields<T extends IngestEventFields>(
 /**
  * Apply project opt-in session email scrubbing.
  * When disabled (default), returns the value unchanged.
+ * When enabled, non-empty values are stored as the stable placeholder `[email]`
+ * (not null) so the column remains present for debugging without retaining PII.
  */
 export function scrubIngestSessionUserEmail(
   userEmail: string | null | undefined,
@@ -105,5 +107,5 @@ export function scrubIngestSessionUserEmail(
   }
   const trimmed = userEmail.trim();
   if (!trimmed) return userEmail;
-  return scrubPiiText(trimmed);
+  return "[email]";
 }

@@ -41,13 +41,13 @@ Per-project settings (`Project.pii_scrub_settings`) add **extra property/context
 
 Deny-keys are **additive** — they cannot disable mandatory default pattern/key protections. An empty or missing list behaves exactly like Phase 1 defaults.
 
-Optional flag `scrubSessionUserEmail` (default **false**): when enabled, ingest redacts `Session.user_email` with the same email scrubber (`[email]`). Leave off if you still need session search/filter by email.
+Optional flag `scrubSessionUserEmail` (default **false**): when enabled, ingest stores `Session.user_email` as the stable placeholder **`[email]`** (not `null`) for any non-empty value before persistence. `null` / empty inputs stay as-is. Leave the flag off if you still need session search/filter by real email. Existing projects without this property parse as `false` (behavior unchanged). No new migration is required — the flag lives in the existing nullable `pii_scrub_settings` JSON.
 
 - Dashboard: **Alerts → PII scrubbing** (editors/owners; same gate as alert settings)
-- API: `GET` / `PATCH /api/project/pii-scrub-settings`
-- Successful `PATCH` writes an organization audit event (`project.pii_scrub.update`) with deny-key **counts** only (not key names)
+- API: `GET` / `PATCH /api/project/pii-scrub-settings` (partial PATCH merges with previous settings)
+- Successful `PATCH` writes an organization audit event (`project.pii_scrub.update`) with deny-key **counts** and the session-email flag — **not** deny-key names. Failed validation / auth does not write an audit event. Audit write failures are swallowed (settings update still succeeds), matching other audit calls in this codebase.
 - Ingest loads settings with a **per-project** 60s TTL cache; a successful `PATCH` clears that project’s cache entry immediately
-- If loading settings fails, ingest logs a warning and continues with **default scrubbing only** (never stores unsanitized data because of a settings outage; session email scrub stays off)
+- If loading settings fails, ingest logs a warning and continues with **default scrubbing only** (never stores unsanitized event/error data because of a settings outage; session email scrub stays off)
 
 ### Phone and payment-card heuristics (Phase 3)
 
@@ -113,7 +113,7 @@ init({
 | SDK `piiScrub` | Off | Scrubs event `properties` and error `message` / `stack` / `context` before the network request; does **not** mutate caller objects; does **not** touch session identity (`user_id`, `user_email`, …) |
 | Server ingest | On | Authoritative redaction before fingerprint + storage; merges project deny-keys; optional `scrubSessionUserEmail` |
 
-Running both is safe: placeholders such as `[email]`, `[token]`, and `[redacted]` are stable under a second pass.
+Running both is safe: placeholders such as `[email]`, `[token]`, `[phone]`, `[card]`, and `[redacted]` are stable under a second pass.
 
 Upgrade: bump `@telemetry-tracker/core` to `^1.4.0` when you want the opt-in client API. Hosted/self-host API gains project deny-keys via the migration `20260716200000_project_pii_scrub_settings` (nullable JSON — existing projects unchanged until configured).
 

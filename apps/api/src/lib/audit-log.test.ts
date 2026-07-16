@@ -123,6 +123,29 @@ describe("audit-log", () => {
     });
   });
 
+  it("swallows audit write failures so settings updates are not blocked", async () => {
+    const prisma = {
+      user: {
+        findUnique: async () => ({ email: "actor@example.com" }),
+      },
+      organizationAuditEvent: {
+        create: async () => {
+          throw new Error("db down");
+        },
+      },
+    };
+
+    await expect(
+      recordOrganizationAuditEvent(
+        prisma as never,
+        "org-1",
+        "user-1",
+        AUDIT_ACTIONS.PROJECT_PII_SCRUB_UPDATE,
+        "project:p1 denyKeys=0 scrubSessionUserEmail=true"
+      )
+    ).resolves.toBeUndefined();
+  });
+
   it("lists audit events with null actorUserId after user deletion", async () => {
     const createdAt = new Date("2026-07-12T12:00:00.000Z");
     const prisma = {
