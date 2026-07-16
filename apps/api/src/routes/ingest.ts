@@ -24,6 +24,7 @@ import {
   scrubIngestErrorFields,
   scrubIngestEventFields,
 } from "../lib/ingest-pii-scrub.js";
+import { loadProjectPiiDenyKeys } from "../lib/project-pii-scrub-cache.js";
 
 /**
  * Ingest pipeline (implement in order):
@@ -136,7 +137,8 @@ export async function ingestRoutes(
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
-    const body = scrubIngestEventFields(parsed.data);
+    const denyKeys = await loadProjectPiiDenyKeys(prisma, projectId);
+    const body = scrubIngestEventFields(parsed.data, process.env, { denyKeys });
     const app = body.app;
     if (!assertIngestAppAllowed(request, app, reply)) return;
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
@@ -234,8 +236,9 @@ export async function ingestRoutes(
     const batchApps = parsed.data.events.map((e) => e.app);
     const planOk = await assertIngestPlanOrReply(prisma, projectId, n, batchApps);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
+    const denyKeys = await loadProjectPiiDenyKeys(prisma, projectId);
     for (const raw of parsed.data.events) {
-      const body = scrubIngestEventFields(raw);
+      const body = scrubIngestEventFields(raw, process.env, { denyKeys });
       await prisma.event.create({
         data: {
           project_id: projectId,
@@ -263,7 +266,8 @@ export async function ingestRoutes(
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
-    const body = scrubIngestErrorFields(parsed.data);
+    const denyKeys = await loadProjectPiiDenyKeys(prisma, projectId);
+    const body = scrubIngestErrorFields(parsed.data, process.env, { denyKeys });
     const app = body.app;
     const release = normalizeMapReleaseLabel(body.release);
     if (!assertIngestAppAllowed(request, app, reply)) return;

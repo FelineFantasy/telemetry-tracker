@@ -1,9 +1,10 @@
 /**
- * Shared PII scrubbing for ingest (write path) and brief snapshots (read path).
- * Prefer stable placeholders over a generic [REDACTED] so debugging context remains useful.
+ * Optional client-side PII scrubbing for @telemetry-tracker/core.
+ * Complements server ingest scrubbing; never replaces it.
  */
 
-export type PiiScrubOptions = {
+export type ClientPiiScrubOptions = {
+  denyKeys?: string[];
   /** Max object/array nesting depth (default 8). */
   maxDepth?: number;
   /**
@@ -11,11 +12,6 @@ export type PiiScrubOptions = {
    * (still redacts nested keys/strings). Default 500.
    */
   maxNodes?: number;
-  /**
-   * Extra property keys to redact (case-insensitive; `_`/`-` ignored).
-   * Values become `[redacted]` unless the key already has a built-in placeholder.
-   */
-  denyKeys?: string[];
 };
 
 const DEFAULT_MAX_DEPTH = 8;
@@ -32,10 +28,7 @@ const SENSITIVE_ASSIGNMENT_RE =
   /\b(?:password|token|secret|api[_-]?key|access[_-]?token|auth|session|cookie)\s*=\s*[^\s&]+/gi;
 const COOKIE_HEADER_RE = /\b(cookie|set-cookie)\s*:\s*[^\n]+/gi;
 const AUTHORIZATION_HEADER_RE = /\bauthorization\s*:\s*[^\n]+/gi;
-const SENSITIVE_UUID_CONTEXT_RE =
-  /\b(?:user[_-]?id|anonymous[_-]?id|session[_-]?id|customer[_-]?id|account[_-]?id)\s*[=:]\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
-/** Normalized key (lowercase, non-alphanumerics stripped) → placeholder. */
 const SENSITIVE_KEY_PLACEHOLDERS: Readonly<Record<string, string>> = {
   email: "[email]",
   useremail: "[email]",
@@ -43,44 +36,24 @@ const SENSITIVE_KEY_PLACEHOLDERS: Readonly<Record<string, string>> = {
   phone: "[phone]",
   phonenumber: "[phone]",
   mobile: "[phone]",
-  cellphone: "[phone]",
   ssn: "[ssn]",
   password: "[password]",
-  passwd: "[password]",
   secret: "[secret]",
   token: "[token]",
   accesstoken: "[token]",
   refreshtoken: "[token]",
-  idtoken: "[token]",
   apikey: "[api-key]",
-  apisecret: "[api-key]",
   authorization: "[bearer-token]",
-  auth: "[token]",
   cookie: "[cookie]",
   setcookie: "[cookie]",
-  creditcard: "[card]",
-  cardnumber: "[card]",
-  cvv: "[card]",
-  cvc: "[card]",
 };
 
 function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function resolvePlaceholder(
-  key: string,
-  denyNormalized: ReadonlySet<string>
-): string | null {
-  const n = normalizeKey(key);
-  const mapped = SENSITIVE_KEY_PLACEHOLDERS[n];
-  if (mapped) return mapped;
-  if (denyNormalized.has(n)) return "[redacted]";
-  return null;
-}
-
 function denyKeySet(denyKeys: string[] | undefined): ReadonlySet<string> {
-  if (!denyKeys || denyKeys.length === 0) return EMPTY_DENY;
+  if (!denyKeys?.length) return EMPTY;
   const set = new Set<string>();
   for (const key of denyKeys) {
     const n = normalizeKey(key);
@@ -89,34 +62,17 @@ function denyKeySet(denyKeys: string[] | undefined): ReadonlySet<string> {
   return set;
 }
 
-const EMPTY_DENY: ReadonlySet<string> = new Set();
+const EMPTY: ReadonlySet<string> = new Set();
 
-function replaceSensitiveUuidContexts(text: string): string {
-  const uuidMap = new Map<string, string>();
-  let counter = 0;
-
-  return text.replace(SENSITIVE_UUID_CONTEXT_RE, (match) => {
-    if (!uuidMap.has(match)) {
-      counter += 1;
-      uuidMap.set(match, `[id:${counter}]`);
-    }
-    return uuidMap.get(match)!;
-  });
+function resolvePlaceholder(
+  key: string,
+  denyNormalized: ReadonlySet<string>
+): string | null {
+  const n = normalizeKey(key);
+  return SENSITIVE_KEY_PLACEHOLDERS[n] ?? (denyNormalized.has(n) ? "[redacted]" : null);
 }
 
-function stripUrlQueryStrings(text: string): string {
-  return text.replace(/https?:\/\/[^\s?]+(\?[^\s]+)/gi, (match, queryPart: string) => {
-    if (/[?&](?:password|token|secret|key|auth)=/i.test(queryPart)) {
-      return match.slice(0, match.length - queryPart.length);
-    }
-    return match.replace(/\?[^#\s]+/, "");
-  });
-}
-
-/**
- * Scrub PII patterns in free-form text.
- * Preserves newlines (important for stack traces). Does not collapse whitespace.
- */
+/** Scrub PII patterns in free-form text. Preserves newlines. */
 export function scrubPiiText(text: string): string {
   let out = text;
   out = out.replace(EMAIL_RE, "[email]");
@@ -129,28 +85,23 @@ export function scrubPiiText(text: string): string {
     (match) => `${match.split("=")[0]!.trim()}=[redacted]`
   );
   out = out.replace(COOKIE_HEADER_RE, (_, header: string) => `${header}: [cookie]`);
-  out = out.replace(
-    AUTHORIZATION_HEADER_RE,
-    "authorization: [bearer-token]"
-  );
-  out = stripUrlQueryStrings(out);
-  out = replaceSensitiveUuidContexts(out);
+  out = out.replace(AUTHORIZATION_HEADER_RE, "authorization: [bearer-token]");
   return out;
 }
 
-/**
- * Recursively scrub JSON-like values: sensitive keys → placeholders;
- * other strings run through {@link scrubPiiText}.
- */
-export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknown {
+export function scrubPiiValue(
+  value: unknown,
+  options?: ClientPiiScrubOptions
+): unknown {
   const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = options?.maxNodes ?? DEFAULT_MAX_NODES;
   const denyNormalized = denyKeySet(options?.denyKeys);
   let nodes = 0;
 
+  /** Bounded recursive pass after soft limits — never returns nested structures unchanged. */
   function scrubRemainder(node: unknown, hardCap: { n: number }): unknown {
     hardCap.n += 1;
-    // Absolute ceiling so limit fallback cannot DoS the ingest process.
+    // Absolute ceiling so limit fallback cannot hang the client.
     if (hardCap.n > 10_000) {
       return typeof node === "string" ? scrubPiiText(node) : "[truncated]";
     }
@@ -162,11 +113,8 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
       const out: Record<string, unknown> = {};
       for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
         const placeholder = resolvePlaceholder(key, denyNormalized);
-        if (placeholder != null) {
-          out[key] = placeholder;
-        } else {
-          out[key] = scrubRemainder(child, hardCap);
-        }
+        out[key] =
+          placeholder != null ? placeholder : scrubRemainder(child, hardCap);
       }
       return out;
     }
@@ -176,35 +124,22 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
   function walk(node: unknown, depth: number): unknown {
     nodes += 1;
     if (nodes > maxNodes || depth > maxDepth) {
-      // Still redact nested strings/keys; do not throw or drop the request.
       return scrubRemainder(node, { n: 0 });
     }
-
     if (node == null || typeof node === "boolean" || typeof node === "number") {
       return node;
     }
-
-    if (typeof node === "string") {
-      return scrubPiiText(node);
-    }
-
-    if (Array.isArray(node)) {
-      return node.map((item) => walk(item, depth + 1));
-    }
-
+    if (typeof node === "string") return scrubPiiText(node);
+    if (Array.isArray(node)) return node.map((item) => walk(item, depth + 1));
     if (typeof node === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
         const placeholder = resolvePlaceholder(key, denyNormalized);
-        if (placeholder != null) {
-          out[key] = placeholder;
-          continue;
-        }
-        out[key] = walk(child, depth + 1);
+        out[key] =
+          placeholder != null ? placeholder : walk(child, depth + 1);
       }
       return out;
     }
-
     return node;
   }
 
@@ -212,8 +147,8 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
 }
 
 export function scrubPiiRecord(
-  record: Record<string, unknown> | undefined | null,
-  options?: PiiScrubOptions
+  record: Record<string, unknown> | undefined,
+  options?: ClientPiiScrubOptions
 ): Record<string, unknown> | undefined {
   if (record == null) return undefined;
   return scrubPiiValue(record, options) as Record<string, unknown>;
