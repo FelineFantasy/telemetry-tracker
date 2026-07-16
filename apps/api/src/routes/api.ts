@@ -820,14 +820,17 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const rangeKey = queryString(query.range);
+    const metricsUntilRaw = queryString(query.metricsUntil);
     const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
-    // Overview uses range=none (epoch→now). Issues uses range=all + ~7d metrics window.
-    // Keep Overview "none" unbounded so detail matches the Overview list row.
-    const isOverviewUnselected = !hasFromTo && rangeKey === "none";
+    // Issues list passes metricsUntil and uses enrichErrorListFilterForMetrics (~7d).
+    // Overview range=none does not — keep those drills unbounded to match the list row.
+    const useIssuesMetricsWindow = Boolean(metricsUntilRaw);
+    const isOverviewUnselected =
+      !hasFromTo && rangeKey === "none" && !useIssuesMetricsWindow;
     const hasBoundedPreset =
       hasFromTo || Boolean(rangeKey && rangeKey !== "all" && rangeKey !== "none");
     const listRange = parseCreatedRange(query, "all");
-    const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
+    const metricsAnchor = parseErrorsMetricsAnchor(metricsUntilRaw);
 
     let windowGte: Date | undefined;
     let windowLte: Date | undefined;
@@ -836,8 +839,7 @@ export async function apiRoutes(
     } else if (hasBoundedPreset) {
       windowGte = listRange.gte;
       windowLte = listRange.lte;
-    } else if (platform || release) {
-      // Issues-style all-time list: match enrichErrorListFilterForMetrics (~7d).
+    } else if (platform || release || useIssuesMetricsWindow) {
       const enriched = enrichErrorListFilterForMetrics(
         {
           range: listRange,

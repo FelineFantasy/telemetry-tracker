@@ -52,6 +52,8 @@ export type DashboardListScope = {
   range?: string | null;
   from?: string | null;
   to?: string | null;
+  /** When set, error detail applies the Issues ~7d metrics window for unbounded ranges. */
+  metricsUntil?: string | null;
 };
 
 function appendDashboardListScope(params: URLSearchParams, scope: DashboardListScope): void {
@@ -62,6 +64,7 @@ function appendDashboardListScope(params: URLSearchParams, scope: DashboardListS
   if (scope.range) params.set("range", scope.range);
   if (scope.from) params.set("from", scope.from);
   if (scope.to) params.set("to", scope.to);
+  if (scope.metricsUntil) params.set("metricsUntil", scope.metricsUntil);
 }
 
 /** Preserve list filters when linking between dashboard pages. */

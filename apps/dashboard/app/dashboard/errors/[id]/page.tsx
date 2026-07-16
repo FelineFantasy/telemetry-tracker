@@ -60,6 +60,7 @@ async function getErrorGroup(
     range?: string;
     from?: string;
     to?: string;
+    metricsUntil?: string;
   }
 ): Promise<ErrorGroup | null> {
   const qs = new URLSearchParams();
@@ -68,6 +69,7 @@ async function getErrorGroup(
   if (scope.range) qs.set("range", scope.range);
   if (scope.from) qs.set("from", scope.from);
   if (scope.to) qs.set("to", scope.to);
+  if (scope.metricsUntil) qs.set("metricsUntil", scope.metricsUntil);
   const q = qs.toString();
   const res = await dashboardApiFetch(`/api/errors/${id}${q ? `?${q}` : ""}`);
   if (res.status === 404) return null;
@@ -91,6 +93,7 @@ export default async function ErrorDetailPage({
     range?: string;
     from?: string;
     to?: string;
+    metricsUntil?: string;
   }>;
 }) {
   const { id } = await params;
@@ -102,6 +105,7 @@ export default async function ErrorDetailPage({
   const range = sp.range?.trim() || undefined;
   const from = sp.from?.trim() || undefined;
   const to = sp.to?.trim() || undefined;
+  const metricsUntil = sp.metricsUntil?.trim() || undefined;
   const listHref = buildDashboardScopedListHref("/dashboard/errors", {
     app,
     environment,
@@ -114,7 +118,14 @@ export default async function ErrorDetailPage({
 
   let group: ErrorGroup | null;
   try {
-    group = await getErrorGroup(id, { platform, release, range, from, to });
+    group = await getErrorGroup(id, {
+      platform,
+      release,
+      range,
+      from,
+      to,
+      metricsUntil,
+    });
   } catch (e) {
     return (
       <>
