@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   saveProjectAlertSettingsAction,
@@ -71,11 +71,16 @@ export function AlertsClient({
 
   // After router.refresh(), props can recover from a failed load while useState
   // still holds fallback defaults — resync so a later save cannot wipe real keys.
+  // Key on values (not object identity) so alert-settings refresh does not discard
+  // unsaved PII edits when the server returns a new props object with the same data.
   const piiPropsSyncKey = piiSettingsLoadError
     ? `error:${piiSettingsLoadError}`
     : `ok:${initialPiiSettings.scrubSessionUserEmail}:${initialPiiSettings.denyKeys.join("\0")}`;
+  const lastSyncedPiiKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (piiSettingsLoadError) return;
+    if (lastSyncedPiiKeyRef.current === piiPropsSyncKey) return;
+    lastSyncedPiiKeyRef.current = piiPropsSyncKey;
     const normalized = normalizeProjectPiiScrubSettings(initialPiiSettings);
     setSavedPii(normalized);
     setDenyKeysText(formatDenyKeysInput(normalized.denyKeys));
