@@ -35,6 +35,9 @@ Copy `apps/api/.env.example` and `apps/dashboard/.env.example` for local dev.
 | `TELEMETRY_API_VERSION` | Optional override for `/health` `version`; normally set automatically at build from [CHANGELOG.md](../CHANGELOG.md) |
 | `TELEMETRY_ALLOW_REGISTRATION` | `true` for open signups; omit or `false` for invite-only after bootstrap — see [docs/REGISTRATION-POLICY.md](docs/REGISTRATION-POLICY.md) |
 | `SENTRY_DSN` | Optional uncaught-error reporting |
+| `TELEMETRY_INGEST_PII_SCRUB` | Ingest PII scrubbing — **enabled when unset**. Self-host override: set `false` / `off` to store payloads as sent. See [docs/PII-SCRUBBING.md](docs/PII-SCRUBBING.md) |
+| `TELEMETRY_INGEST_PII_SCRUB_MAX_DEPTH` | Max JSON nesting depth for property/context scrubbing (default `8`) |
+| `TELEMETRY_INGEST_PII_SCRUB_MAX_NODES` | Max JSON nodes visited per payload (default `500`) |
 
 ### API — never in production
 

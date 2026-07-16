@@ -262,6 +262,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | RBAC & org model | [docs/RBAC.md](docs/RBAC.md) |
 | Plans & ingest auth | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) |
+| Ingest PII scrubbing | [docs/PII-SCRUBBING.md](docs/PII-SCRUBBING.md) |
 | SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-nestjs.md](docs/sdk-nestjs.md), [docs/sdk-vue.md](docs/sdk-vue.md), [docs/sdk-nuxt.md](docs/sdk-nuxt.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
 | Source maps | [docs/source-maps.md](docs/source-maps.md) |
 
