@@ -108,7 +108,7 @@ import { requireSessionUser } from "../lib/auth-session.js";
 import { canResolveErrors, getMembershipRoleForProject } from "../lib/org-permissions.js";
 import { readOrganizationIdHeader } from "../lib/http-headers.js";
 import { effectiveOverviewWindow, isUnselectedTimeRange, parseOverviewTimeRangeQuery, chooseTimeRangeBucket } from "../lib/time-range.js";
-import { resolveUnselectedMetricsWindow, UNSELECTED_METRICS_FALLBACK_MS } from "../lib/overview-metrics-window.js";
+import { resolveUnselectedMetricsWindow } from "../lib/overview-metrics-window.js";
 import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
@@ -816,6 +816,8 @@ export async function apiRoutes(
     if (projectId === null) return;
     const { id } = request.params;
     const query = request.query as {
+      app?: string;
+      environment?: string;
       platform?: string;
       release?: string;
       range?: string;
@@ -823,16 +825,20 @@ export async function apiRoutes(
       to?: string;
       metricsUntil?: string;
     };
+    const appFilter = queryApp(query.app);
+    const environment = queryString(query.environment);
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const rangeKey = queryString(query.range);
     const metricsUntilRaw = queryString(query.metricsUntil);
     const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
-    // Issues list passes metricsUntil (~7d). Overview range=none uses the ~30d metrics
-    // window so detail matches Overview KPIs / scoped error list.
+    // Issues list passes metricsUntil (~7d). Overview range=none/all uses the same
+    // resolveUnselectedMetricsWindow as Overview KPIs / scoped error list.
     const useIssuesMetricsWindow = Boolean(metricsUntilRaw);
     const isOverviewUnselected =
-      !hasFromTo && rangeKey === "none" && !useIssuesMetricsWindow;
+      !hasFromTo &&
+      (rangeKey === "none" || rangeKey === "all") &&
+      !useIssuesMetricsWindow;
     const hasBoundedPreset =
       hasFromTo || Boolean(rangeKey && rangeKey !== "all" && rangeKey !== "none");
     const listRange = parseCreatedRange(query, "all");
@@ -841,8 +847,16 @@ export async function apiRoutes(
     let windowGte: Date | undefined;
     let windowLte: Date | undefined;
     if (isOverviewUnselected) {
-      windowLte = metricsAnchor;
-      windowGte = new Date(windowLte.getTime() - UNSELECTED_METRICS_FALLBACK_MS);
+      const metricsWindow = await resolveUnselectedMetricsWindow(prisma, {
+        projectId,
+        until: metricsAnchor,
+        app: appFilter,
+        environment,
+        platform,
+        release,
+      });
+      windowGte = metricsWindow.gte;
+      windowLte = metricsWindow.lte;
     } else if (hasBoundedPreset) {
       windowGte = listRange.gte;
       windowLte = listRange.lte;

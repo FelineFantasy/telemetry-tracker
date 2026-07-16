@@ -55,6 +55,8 @@ type ErrorGroup = {
 async function getErrorGroup(
   id: string,
   scope: {
+    app?: string;
+    environment?: string;
     platform?: string;
     release?: string;
     range?: string;
@@ -64,6 +66,8 @@ async function getErrorGroup(
   }
 ): Promise<ErrorGroup | null> {
   const qs = new URLSearchParams();
+  if (scope.app) qs.set("app", scope.app);
+  if (scope.environment) qs.set("environment", scope.environment);
   if (scope.platform) qs.set("platform", scope.platform);
   if (scope.release) qs.set("release", scope.release);
   if (scope.range) qs.set("range", scope.range);
@@ -119,6 +123,8 @@ export default async function ErrorDetailPage({
   let group: ErrorGroup | null;
   try {
     group = await getErrorGroup(id, {
+      app,
+      environment,
       platform,
       release,
       range,
