@@ -13,6 +13,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Database
+
+---
+
+## [1.12.0] - 2026-07-16
+
+### Added
+
 - **Ingest PII scrubbing** — default server-side redaction of emails, tokens, API keys, and sensitive keys in error messages/stacks/context and event properties before persistence; disable with `TELEMETRY_INGEST_PII_SCRUB=false` ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
 - **PII scrubbing (Phase 2)** — optional SDK `piiScrub` in `@telemetry-tracker/core` 1.4.0; project deny-list keys (`pii_scrub_settings`) on Alerts; ingest merges deny-keys with server defaults ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
 - **PII scrubbing (Phase 3a)** — phone / payment-card text heuristics; opt-in `scrubSessionUserEmail`; organization audit events on PII settings changes ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
