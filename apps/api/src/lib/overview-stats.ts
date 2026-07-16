@@ -213,12 +213,16 @@ export async function countSessions(
         OR (
           s."environment" = ${scope.environment}
           AND s."release" IS NULL
-          AND ${eventExists(Prisma.sql`e."release" = ${scope.release}`)}
+          AND ${eventExists(
+            Prisma.sql`e."environment" = ${scope.environment} AND e."release" = ${scope.release}`
+          )}
         )
         OR (
           s."environment" IS NULL
           AND s."release" = ${scope.release}
-          AND ${eventExists(Prisma.sql`e."environment" = ${scope.environment}`)}
+          AND ${eventExists(
+            Prisma.sql`e."environment" = ${scope.environment} AND e."release" = ${scope.release}`
+          )}
         )
       )`;
     } else if (scope.environment) {
@@ -365,12 +369,16 @@ export async function getSessionDurationSeries(
       OR (
         s."environment" = ${environment}
         AND s."release" IS NULL
-        AND ${eventExists(Prisma.sql`e."release" = ${release}`)}
+        AND ${eventExists(
+          Prisma.sql`e."environment" = ${environment} AND e."release" = ${release}`
+        )}
       )
       OR (
         s."environment" IS NULL
         AND s."release" = ${release}
-        AND ${eventExists(Prisma.sql`e."environment" = ${environment}`)}
+        AND ${eventExists(
+          Prisma.sql`e."environment" = ${environment} AND e."release" = ${release}`
+        )}
       )
     )`;
   } else if (environment) {

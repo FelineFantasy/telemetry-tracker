@@ -231,7 +231,7 @@ function overviewSessionEnvReleaseScopeSql(
           projectId,
           since,
           until,
-          Prisma.sql`e."release" = ${releaseFilter}`
+          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
         )}
       )
       OR (
@@ -241,7 +241,7 @@ function overviewSessionEnvReleaseScopeSql(
           projectId,
           since,
           until,
-          Prisma.sql`e."environment" = ${environmentFilter}`
+          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
         )}
       )
     )`;

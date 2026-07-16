@@ -348,18 +348,6 @@ function sessionEnvReleaseMatchSql(
       ],
       eventWindow
     );
-    const envOnEvent = sessionEventExistsSql(
-      projectId,
-      sessionAlias,
-      [Prisma.sql`e."environment" = ${f.environment}`],
-      eventWindow
-    );
-    const releaseOnEvent = sessionEventExistsSql(
-      projectId,
-      sessionAlias,
-      [Prisma.sql`e."release" = ${f.release}`],
-      eventWindow
-    );
     return Prisma.sql`(
       (
         ${s}."environment" = ${f.environment}
@@ -373,12 +361,12 @@ function sessionEnvReleaseMatchSql(
       OR (
         ${s}."environment" = ${f.environment}
         AND ${s}."release" IS NULL
-        AND ${releaseOnEvent}
+        AND ${bothOnEvent}
       )
       OR (
         ${s}."environment" IS NULL
         AND ${s}."release" = ${f.release}
-        AND ${envOnEvent}
+        AND ${bothOnEvent}
       )
     )`;
   }
