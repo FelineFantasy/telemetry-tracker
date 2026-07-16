@@ -156,7 +156,6 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
             <form action={logoutAction}>
               <button
                 type="submit"
-                onClick={close}
                 className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-surface"
               >
                 <LogOut className="h-3.5 w-3.5" />
