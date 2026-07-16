@@ -87,6 +87,7 @@ export function AlertsClient({
             <Field label="Enable error spike alerts" htmlFor="error-spike-toggle">
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
+                  id="error-spike-toggle"
                   on={settings.errorSpike.enabled}
                   onChange={() =>
                     setSettings((s) => ({
@@ -148,6 +149,7 @@ export function AlertsClient({
             <Field label="Enable quota warnings" htmlFor="quota-toggle">
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
+                  id="quota-toggle"
                   on={settings.quota.enabled}
                   onChange={() =>
                     setSettings((s) => ({
