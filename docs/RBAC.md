@@ -16,6 +16,7 @@ Ingest remains authenticated with **project API keys**, not user sessions.
 | List organizations (`GET /api/meta/organizations`) | Yes | Yes | Yes |
 | Create organization (`POST /api/meta/organizations`; you become owner of the new org) | Yes | Yes | Yes |
 | Create project (`POST /api/meta/projects`) | No | No | Yes |
+| Rename project (`PATCH /api/meta/projects/:projectId`) | No | No | Yes |
 | Add member / email invite (`POST /api/meta/organizations/:orgId/members`) | No | No | Yes |
 | Change member role (`PATCH /api/meta/organizations/:orgId/members/:userId`) | No | No | Yes |
 

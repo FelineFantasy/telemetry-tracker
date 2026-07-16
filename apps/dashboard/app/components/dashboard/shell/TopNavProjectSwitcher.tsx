@@ -13,10 +13,7 @@ import {
   recordRecentProject,
   togglePinnedProject,
 } from "@/lib/project-picker-prefs";
-import {
-  formatProjectRailName,
-  LEGACY_SEEDED_PROJECT_NAME,
-} from "@/lib/workspace-placeholders";
+import { formatProjectRailName } from "@/lib/workspace-placeholders";
 import type { ProjectOption } from "@/lib/dashboard-workspace-types";
 import { searchInputClassName } from "@/lib/input-classes";
 import { cn } from "@/lib/utils";
@@ -224,17 +221,15 @@ export function TopNavProjectSwitcher({
               </p>
             ) : null}
 
-            {current.name === LEGACY_SEEDED_PROJECT_NAME && current.slug === "default" ? (
-              <p className="px-4 pb-2 text-[12px] text-muted-foreground">
-                <Link
-                  href="/dashboard/settings/organization"
-                  onClick={close}
-                  className="text-brand hover:underline"
-                >
-                  Rename this project
-                </Link>
-              </p>
-            ) : null}
+            <p className="px-4 pb-2 text-[12px] text-muted-foreground">
+              <Link
+                href={`/dashboard/settings/organization#rename-project-${current.id}`}
+                onClick={close}
+                className="text-brand hover:underline"
+              >
+                Rename this project
+              </Link>
+            </p>
           </div>
 
           <div className="border-t border-border p-1.5">

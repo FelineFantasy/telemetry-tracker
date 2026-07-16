@@ -470,6 +470,60 @@ export async function createFirstDashboardApiKey(): Promise<CreateApiKeyResult> 
   return createDashboardApiKey(null, formData);
 }
 
+export async function renameProjectAction(
+  projectId: string,
+  patch: { name?: string; slug?: string }
+): Promise<
+  | { ok: true; project: { id: string; name: string; slug: string } }
+  | { ok: false; error: string }
+> {
+  const id = projectId.trim().toLowerCase();
+  if (!/^[0-9a-f-]{36}$/.test(id)) {
+    return { ok: false, error: "Invalid project id" };
+  }
+  const body: { name?: string; slug?: string } = {};
+  if (typeof patch.name === "string") {
+    const name = patch.name.trim().slice(0, 120);
+    if (!name) return { ok: false, error: "name cannot be empty" };
+    body.name = name;
+  }
+  if (typeof patch.slug === "string") {
+    const slug = patch.slug.trim().slice(0, 120);
+    if (!slug) return { ok: false, error: "slug cannot be empty" };
+    body.slug = slug;
+  }
+  if (body.name === undefined && body.slug === undefined) {
+    return { ok: false, error: "name or slug is required" };
+  }
+  const res = await dashboardApiFetch(`/api/meta/projects/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    let message = t.slice(0, 400) || res.statusText;
+    try {
+      const parsed = JSON.parse(t) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      /* keep text */
+    }
+    return { ok: false, error: message };
+  }
+  const data = (await res.json()) as {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/settings/organization");
+  return {
+    ok: true,
+    project: { id: data.id, name: data.name, slug: data.slug },
+  };
+}
+
 export async function archiveProjectAction(
   projectId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {

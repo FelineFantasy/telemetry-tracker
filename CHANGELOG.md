@@ -13,6 +13,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Rename project** — owners can update project name and slug from Settings → Organization; project switcher “Rename this project” links to the edit form ([#480](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/480))
+
 ### Fixed
 
 ### Changed
