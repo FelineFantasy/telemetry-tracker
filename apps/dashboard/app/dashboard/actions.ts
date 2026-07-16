@@ -756,11 +756,17 @@ export async function saveProjectAlertSettingsAction(
 }
 
 export async function saveProjectPiiScrubSettingsAction(
-  settings: ProjectPiiScrubSettings
+  settings: Partial<ProjectPiiScrubSettings>
 ): Promise<
   | { ok: true; settings: ProjectPiiScrubSettings }
   | { ok: false; error: string }
 > {
+  if (
+    settings.denyKeys === undefined &&
+    settings.scrubSessionUserEmail === undefined
+  ) {
+    return { ok: false, error: "No PII scrub settings changes to save" };
+  }
   const res = await dashboardApiFetch("/api/project/pii-scrub-settings", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

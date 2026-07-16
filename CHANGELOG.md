@@ -34,6 +34,10 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 - Migration `20260716200000_project_pii_scrub_settings` — `Project.pii_scrub_settings` JSON
 
+### Fixed
+
+- **Alerts PII settings** — failed or invalid settings responses no longer crash the page or allow saving empty deny-keys that would wipe stored project keys
+
 ---
 
 ## [1.11.3] - 2026-07-16
