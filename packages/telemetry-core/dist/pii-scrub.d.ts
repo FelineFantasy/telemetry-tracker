@@ -4,7 +4,12 @@
  */
 export type ClientPiiScrubOptions = {
     denyKeys?: string[];
+    /** Max object/array nesting depth (default 8). */
     maxDepth?: number;
+    /**
+     * Soft threshold: when exceeded, switch to the bounded remainder pass
+     * (still redacts nested keys/strings). Default 500.
+     */
     maxNodes?: number;
 };
 /** Scrub PII patterns in free-form text. Preserves newlines. */

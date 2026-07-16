@@ -67,22 +67,33 @@ export function scrubPiiValue(value, options) {
     const maxNodes = options?.maxNodes ?? DEFAULT_MAX_NODES;
     const denyNormalized = denyKeySet(options?.denyKeys);
     let nodes = 0;
+    /** Bounded recursive pass after soft limits — never returns nested structures unchanged. */
+    function scrubRemainder(node, hardCap) {
+        hardCap.n += 1;
+        // Absolute ceiling so limit fallback cannot hang the client.
+        if (hardCap.n > 10000) {
+            return typeof node === "string" ? scrubPiiText(node) : "[truncated]";
+        }
+        if (typeof node === "string")
+            return scrubPiiText(node);
+        if (Array.isArray(node)) {
+            return node.map((item) => scrubRemainder(item, hardCap));
+        }
+        if (node && typeof node === "object") {
+            const out = {};
+            for (const [key, child] of Object.entries(node)) {
+                const placeholder = resolvePlaceholder(key, denyNormalized);
+                out[key] =
+                    placeholder != null ? placeholder : scrubRemainder(child, hardCap);
+            }
+            return out;
+        }
+        return node;
+    }
     function walk(node, depth) {
         nodes += 1;
         if (nodes > maxNodes || depth > maxDepth) {
-            if (typeof node === "string")
-                return scrubPiiText(node);
-            if (node && typeof node === "object" && !Array.isArray(node)) {
-                const out = {};
-                for (const [key, child] of Object.entries(node)) {
-                    const placeholder = resolvePlaceholder(key, denyNormalized);
-                    out[key] =
-                        placeholder ??
-                            (typeof child === "string" ? scrubPiiText(child) : child);
-                }
-                return out;
-            }
-            return node;
+            return scrubRemainder(node, { n: 0 });
         }
         if (node == null || typeof node === "boolean" || typeof node === "number") {
             return node;
@@ -95,7 +106,8 @@ export function scrubPiiValue(value, options) {
             const out = {};
             for (const [key, child] of Object.entries(node)) {
                 const placeholder = resolvePlaceholder(key, denyNormalized);
-                out[key] = placeholder ?? walk(child, depth + 1);
+                out[key] =
+                    placeholder != null ? placeholder : walk(child, depth + 1);
             }
             return out;
         }
