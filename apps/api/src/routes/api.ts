@@ -889,10 +889,13 @@ export async function apiRoutes(
     if (!group) return reply.status(404).send({ error: "Not found" });
     const { enrichErrorGroupWithSymbolicatedStacks } = await import("../lib/stack-symbolicate.js");
     const trendEnd = windowLte ?? new Date();
+    // Unbounded Overview drills use the same ~30d chart span as Overview "none".
     const trendDurationMs =
       windowGte != null
         ? Math.max(trendEnd.getTime() - windowGte.getTime(), 60_000)
-        : 24 * 60 * 60 * 1000;
+        : isOverviewUnselected
+          ? 30 * 24 * 60 * 60 * 1000
+          : 24 * 60 * 60 * 1000;
     const [enriched, impact, sparklineMap, scopedSummary] = await Promise.all([
       enrichErrorGroupWithSymbolicatedStacks(prisma, projectId, group),
       fetchImpactMetricsForGroupId(prisma, id, occurrenceScope),
