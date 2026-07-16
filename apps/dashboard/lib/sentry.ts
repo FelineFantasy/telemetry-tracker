@@ -31,6 +31,15 @@ export function sentryInitOptions(dsn: string) {
 
 /** Client-side capture from error boundaries; no-op when DSN is unset. */
 export function captureClientException(error: unknown): void {
-  if (!isClientSentryEnabled()) return;
-  void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
+  if (isClientSentryEnabled()) {
+    void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
+  }
+  if (typeof window === "undefined") return;
+  void import("@/lib/product-telemetry").then(({ shouldTrackProductTelemetry }) => {
+    if (!shouldTrackProductTelemetry(window.location.pathname)) return;
+    void import("@telemetry-tracker/next").then(({ trackError }) => {
+      const err = error instanceof Error ? error : new Error(String(error));
+      trackError(err, { source: "next-error-boundary" });
+    });
+  });
 }

@@ -157,12 +157,11 @@ function closeSessionKeepalive(endedAt: Date): void {
 }
 
 function startSession(): void {
+  const cfg = getConfigOrNull();
+  if (!cfg) return;
   sessionId = generateUUID();
   sessionStartedAt = new Date();
-  const cfg = getConfigOrNull();
-  if (cfg) {
-    void postSession(cfg);
-  }
+  void postSession(cfg);
 }
 
 function installBrowserSessionLifecycle(): void {
@@ -252,6 +251,10 @@ function installBrowserErrorHandlers(): void {
 }
 
 export function init(c: TelemetryConfig): void {
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
   if (sessionId) {
     endSession();
   }
@@ -271,6 +274,21 @@ export function init(c: TelemetryConfig): void {
   if (c.webVitals !== false) {
     installBrowserWebVitals();
   }
+}
+
+/**
+ * Stop ingesting: flush/end session, clear config and batch timer.
+ * Browser error and session listeners stay installed but no-op while config is unset.
+ */
+export function shutdown(): void {
+  flushEvents();
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
+  endSession();
+  config = null;
+  setWebVitalsCaptureEnabled(false);
 }
 
 function installBrowserWebVitals(): void {

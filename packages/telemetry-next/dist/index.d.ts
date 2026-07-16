@@ -2,6 +2,7 @@ import React from "react";
 import { identify, trackEvent as coreTrackEvent, screen as coreScreen, getSessionId, endSession, type TelemetryConfig } from "@telemetry-tracker/core";
 export type TelemetryNextConfig = TelemetryConfig;
 export declare function init(config: TelemetryNextConfig): void;
+export declare function shutdown(): void;
 export { identify, coreTrackEvent as trackEvent, coreScreen as screen, getSessionId, endSession, };
 export declare function trackError(error: Error, context?: Record<string, unknown>): void;
 export declare function useTelemetryRouter(pathname: string): void;
