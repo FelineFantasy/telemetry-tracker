@@ -1,14 +1,18 @@
 /**
- * Cached load of project PII scrub deny-keys for the ingest hot path.
- * Failures never block ingest: return [] and keep default scrubbing.
+ * Cached load of project PII scrub settings for the ingest hot path.
+ * Failures never block ingest: return defaults and keep default scrubbing.
  */
 
 import type { PrismaClient } from "@prisma/client";
-import { parseProjectPiiScrubSettings } from "./project-pii-scrub-settings.js";
+import {
+  DEFAULT_PROJECT_PII_SCRUB_SETTINGS,
+  parseProjectPiiScrubSettings,
+  type ProjectPiiScrubSettings,
+} from "./project-pii-scrub-settings.js";
 
 const CACHE_TTL_MS = 60_000;
 
-type CacheEntry = { at: number; denyKeys: string[] };
+type CacheEntry = { at: number; settings: ProjectPiiScrubSettings };
 
 const cache = new Map<string, CacheEntry>();
 
@@ -22,14 +26,14 @@ export function projectPiiScrubCacheHas(projectId: string): boolean {
   return cache.has(projectId);
 }
 
-export async function loadProjectPiiDenyKeys(
+export async function loadProjectPiiScrubSettings(
   prisma: PrismaClient,
   projectId: string,
   now = Date.now()
-): Promise<string[]> {
+): Promise<ProjectPiiScrubSettings> {
   const hit = cache.get(projectId);
   if (hit && now - hit.at < CACHE_TTL_MS) {
-    return hit.denyKeys;
+    return hit.settings;
   }
   try {
     const row = await prisma.project.findFirst({
@@ -37,14 +41,24 @@ export async function loadProjectPiiDenyKeys(
       select: { pii_scrub_settings: true },
     });
     const settings = parseProjectPiiScrubSettings(row?.pii_scrub_settings ?? null);
-    cache.set(projectId, { at: now, denyKeys: settings.denyKeys });
-    return settings.denyKeys;
+    cache.set(projectId, { at: now, settings });
+    return settings;
   } catch (err) {
     console.warn(
       "[ingest] failed to load project PII scrub settings; using default scrubber only",
       { projectId, err }
     );
     // Do not cache failures — next request can retry. Keep ingest scrubbing defaults.
-    return [];
+    return DEFAULT_PROJECT_PII_SCRUB_SETTINGS;
   }
+}
+
+/** Deny-keys only (event/error ingest). */
+export async function loadProjectPiiDenyKeys(
+  prisma: PrismaClient,
+  projectId: string,
+  now = Date.now()
+): Promise<string[]> {
+  const settings = await loadProjectPiiScrubSettings(prisma, projectId, now);
+  return settings.denyKeys;
 }

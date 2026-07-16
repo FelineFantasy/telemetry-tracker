@@ -17,7 +17,7 @@ On `POST /ingest/error`, `POST /ingest/event`, and `POST /ingest/batch` (batch i
 
 Scrubbing runs **after** Zod parse and **before** `computeFingerprint` / Prisma writes so redacted values are what get stored and grouped.
 
-Session identity fields (`user_id`, `user_email`, `session_id`, …) are **not** rewritten by default scrubbing.
+Session identity fields (`user_id`, `user_email`, `session_id`, …) are **not** rewritten by default scrubbing. Projects may opt in to scrubbing `Session.user_email` (see below).
 
 There is no breadcrumbs ingest yet; when added, it should use the same scrubber.
 
@@ -35,16 +35,45 @@ When depth/node limits are hit, the walker switches to a key/string remainder pa
 
 Documented in [`apps/api/.env.example`](../apps/api/.env.example) and [DEPLOYMENT.md](../DEPLOYMENT.md).
 
-### Project deny-list (Phase 2)
+### Project deny-list (Phase 2+)
 
 Per-project settings (`Project.pii_scrub_settings`) add **extra property/context field names** to redact (case-insensitive). Values become `[redacted]` unless the key already has a built-in placeholder.
 
 Deny-keys are **additive** — they cannot disable mandatory default pattern/key protections. An empty or missing list behaves exactly like Phase 1 defaults.
 
+Optional flag `scrubSessionUserEmail` (default **false**): when enabled, ingest redacts `Session.user_email` with the same email scrubber (`[email]`). Leave off if you still need session search/filter by email.
+
 - Dashboard: **Alerts → PII scrubbing** (editors/owners; same gate as alert settings)
 - API: `GET` / `PATCH /api/project/pii-scrub-settings`
-- Ingest loads deny-keys with a **per-project** 60s TTL cache; a successful `PATCH` clears that project’s cache entry immediately
-- If loading settings fails, ingest logs a warning and continues with **default scrubbing only** (never stores unsanitized data because of a settings outage)
+- Successful `PATCH` writes an organization audit event (`project.pii_scrub.update`) with deny-key **counts** only (not key names)
+- Ingest loads settings with a **per-project** 60s TTL cache; a successful `PATCH` clears that project’s cache entry immediately
+- If loading settings fails, ingest logs a warning and continues with **default scrubbing only** (never stores unsanitized data because of a settings outage; session email scrub stays off)
+
+### Phone and payment-card heuristics (Phase 3)
+
+Default text scrubbing also redacts:
+
+| Pattern | Placeholder | Notes |
+|---------|-------------|--------|
+| Luhn-valid 13–19 digit PANs (optional spaces/dashes) | `[card]` | Digit runs that fail Luhn (and many timestamps) are left unchanged |
+| E.164 / plus-prefixed with optional spaces or dashes, and formatted North American phones | `[phone]` | Bare digit runs and dotted numeric groups (e.g. `123.456.7890`) are **not** matched |
+
+Examples:
+
+| Input | Result |
+|-------|--------|
+| `+386 40 123 456` | `[phone]` |
+| `+1-202-555-0183` | `[phone]` |
+| `2025550183` | unchanged |
+| `1234567890` | unchanged |
+| `4242 4242 4242 4242` | `[card]` |
+| `4242-4242-4242-4242` | `[card]` |
+| `4242424242424241` | unchanged (fails Luhn) |
+| `20260716123000` | unchanged |
+
+False positives are possible for Luhn-valid numeric IDs that look like cards. Prefer deny-listed keys for known sensitive fields when heuristics are too aggressive or too weak.
+
+Property keys such as `phone`, `creditCard`, `cardNumber`, `cvv` already map to `[phone]` / `[card]` regardless of value shape.
 
 ### SDK client scrub (Phase 2, optional)
 
@@ -82,7 +111,7 @@ init({
 | Layer | Default | What it does |
 |-------|---------|----------------|
 | SDK `piiScrub` | Off | Scrubs event `properties` and error `message` / `stack` / `context` before the network request; does **not** mutate caller objects; does **not** touch session identity (`user_id`, `user_email`, …) |
-| Server ingest | On | Authoritative redaction before fingerprint + storage; merges project deny-keys |
+| Server ingest | On | Authoritative redaction before fingerprint + storage; merges project deny-keys; optional `scrubSessionUserEmail` |
 
 Running both is safe: placeholders such as `[email]`, `[token]`, and `[redacted]` are stable under a second pass.
 
@@ -100,6 +129,8 @@ Stable placeholders keep debugging useful:
 | API key (`tt_live_…`, `sk-…`, `pk-…`) | `[api-key]` |
 | Cookie header / `cookie` key | `[cookie]` |
 | Authorization header / `authorization` key | `[bearer-token]` |
+| Phone (formatted / E.164; `phone` keys) | `[phone]` |
+| Payment card (Luhn; `creditCard` / `cvv` keys) | `[card]` |
 | Sensitive query/assignment values | `[redacted]` |
 | Project deny-list keys | `[redacted]` |
 | Sensitive UUID contexts (`user_id=…`) | `[id:N]` |
@@ -135,3 +166,9 @@ database → dashboard
 ```
 
 \*Unless `TELEMETRY_INGEST_PII_SCRUB=false`.
+
+## Still deferred
+
+- Custom regex controls in project/org settings
+- Organization-level PII defaults inherited by projects
+- Opt-in backfill / one-off scrub job for existing rows

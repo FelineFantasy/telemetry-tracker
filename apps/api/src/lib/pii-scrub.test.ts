@@ -76,6 +76,42 @@ describe("scrubPiiText", () => {
     );
   });
 
+  it("redacts Luhn-valid payment card numbers", () => {
+    expect(scrubPiiText("card 4111 1111 1111 1111 charged")).toBe(
+      "card [card] charged"
+    );
+    expect(scrubPiiText("pan=4111111111111111")).toContain("[card]");
+    expect(scrubPiiText("4242 4242 4242 4242")).toBe("[card]");
+    expect(scrubPiiText("4242-4242-4242-4242")).toBe("[card]");
+  });
+
+  it("does not redact digit runs that fail Luhn or look like timestamps/IDs", () => {
+    expect(scrubPiiText("id 4111111111111112")).toBe("id 4111111111111112");
+    expect(scrubPiiText("4242424242424241")).toBe("4242424242424241");
+    expect(scrubPiiText("20260716123000")).toBe("20260716123000");
+  });
+
+  it("redacts formatted and E.164 phone numbers including separators", () => {
+    expect(scrubPiiText("call +15551234567")).toBe("call [phone]");
+    expect(scrubPiiText("call (555) 123-4567")).toBe("call [phone]");
+    expect(scrubPiiText("+386 40 123 456")).toBe("[phone]");
+    expect(scrubPiiText("+1-202-555-0183")).toBe("[phone]");
+  });
+
+  it("does not redact bare digit runs as phone numbers", () => {
+    expect(scrubPiiText("order 5551234567")).toBe("order 5551234567");
+    expect(scrubPiiText("2025550183")).toBe("2025550183");
+    expect(scrubPiiText("1234567890")).toBe("1234567890");
+    expect(scrubPiiText("ref 123.456.7890")).toBe("ref 123.456.7890");
+  });
+
+  it("keeps phone and card placeholders stable under a second pass", () => {
+    expect(scrubPiiText("[phone]")).toBe("[phone]");
+    expect(scrubPiiText("[card]")).toBe("[card]");
+    expect(scrubPiiText(scrubPiiText("+1-202-555-0183"))).toBe("[phone]");
+    expect(scrubPiiText(scrubPiiText("4242 4242 4242 4242"))).toBe("[card]");
+  });
+
   it("redacts emails embedded in stack frames", () => {
     const stack = "Error: mail user@example.com\n    at run (entry.js:10:2)";
     expect(scrubPiiText(stack)).toBe(

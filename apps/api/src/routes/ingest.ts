@@ -23,8 +23,12 @@ import {
 import {
   scrubIngestErrorFields,
   scrubIngestEventFields,
+  scrubIngestSessionUserEmail,
 } from "../lib/ingest-pii-scrub.js";
-import { loadProjectPiiDenyKeys } from "../lib/project-pii-scrub-cache.js";
+import {
+  loadProjectPiiDenyKeys,
+  loadProjectPiiScrubSettings,
+} from "../lib/project-pii-scrub-cache.js";
 
 /**
  * Ingest pipeline (implement in order):
@@ -64,7 +68,10 @@ const sessionSchema = z.object({
   ended_at: z.string().datetime().optional().nullable(),
 });
 
-function sessionContextPatch(body: z.infer<typeof sessionSchema>): {
+function sessionContextPatch(
+  body: z.infer<typeof sessionSchema>,
+  scrubSessionUserEmail = false
+): {
   user_id?: string | null;
   user_email?: string | null;
   anonymous_id?: string | null;
@@ -78,7 +85,13 @@ function sessionContextPatch(body: z.infer<typeof sessionSchema>): {
 } {
   const patch: ReturnType<typeof sessionContextPatch> = {};
   if (body.user_id !== undefined) patch.user_id = body.user_id ?? null;
-  if (body.user_email !== undefined) patch.user_email = body.user_email ?? null;
+  if (body.user_email !== undefined) {
+    const scrubbed = scrubIngestSessionUserEmail(
+      body.user_email ?? null,
+      scrubSessionUserEmail
+    );
+    patch.user_email = scrubbed === undefined ? null : scrubbed;
+  }
   if (body.anonymous_id !== undefined) patch.anonymous_id = body.anonymous_id ?? null;
   if (body.country !== undefined) patch.country = body.country ?? null;
   if (body.device_browser !== undefined) patch.device_browser = body.device_browser ?? null;
@@ -172,6 +185,8 @@ export async function ingestRoutes(
     const body = parsed.data;
     const app = body.app;
     if (!assertIngestAppAllowed(request, app, reply)) return;
+    const piiSettings = await loadProjectPiiScrubSettings(prisma, projectId);
+    const scrubSessionEmail = piiSettings.scrubSessionUserEmail;
     const existing = await findIngestSession(prisma, projectId, body.session_id, app);
     // Closing a session only sets `ended_at` — no new telemetry; must not be blocked by quota.
     if (existing && body.ended_at) {
@@ -180,14 +195,14 @@ export async function ingestRoutes(
         data: {
           ended_at: new Date(body.ended_at),
           ...(existing.app !== app ? { app } : {}),
-          ...sessionContextPatch(body),
+          ...sessionContextPatch(body, scrubSessionEmail),
         },
       });
       return reply.status(204).send();
     }
     // Same session already recorded, no end time — update identity/context fields on retry.
     if (existing && body.ended_at == null) {
-      const patch = sessionContextPatch(body);
+      const patch = sessionContextPatch(body, scrubSessionEmail);
       if (Object.keys(patch).length > 0) {
         await prisma.session.update({
           where: { id: existing.id },
@@ -199,6 +214,10 @@ export async function ingestRoutes(
     const planOk = await assertIngestPlanOrReply(prisma, projectId, 1, [app]);
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     if (!existing) {
+      const scrubbedEmail = scrubIngestSessionUserEmail(
+        body.user_email ?? null,
+        scrubSessionEmail
+      );
       await prisma.session.create({
         data: {
           project_id: projectId,
@@ -208,7 +227,7 @@ export async function ingestRoutes(
           environment: body.environment ?? null,
           release: body.release ?? null,
           user_id: body.user_id ?? null,
-          user_email: body.user_email ?? null,
+          user_email: scrubbedEmail === undefined ? null : scrubbedEmail,
           anonymous_id: body.anonymous_id ?? null,
           country: body.country ?? null,
           device_browser: body.device_browser ?? null,

@@ -26,7 +26,10 @@ import {
   parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
-import type { ProjectPiiScrubSettings } from "@/lib/pii-scrub-settings";
+import {
+  normalizeProjectPiiScrubSettings,
+  type ProjectPiiScrubSettings,
+} from "@/lib/pii-scrub-settings";
 import {
   fetchAuthSessions,
   type FetchAuthSessionsResult,
@@ -770,9 +773,10 @@ export async function saveProjectPiiScrubSettingsAction(
   try {
     const data = (await res.json()) as { settings?: ProjectPiiScrubSettings };
     revalidatePath("/dashboard/alerts");
+    revalidatePath("/dashboard/settings/audit");
     return {
       ok: true,
-      settings: data.settings ?? { denyKeys: [] },
+      settings: normalizeProjectPiiScrubSettings(data.settings),
     };
   } catch {
     return { ok: false, error: "Invalid response from server" };

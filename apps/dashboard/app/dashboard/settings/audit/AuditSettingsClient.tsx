@@ -49,7 +49,7 @@ export function AuditSettingsClient({
           {events.length === 0 ? (
             <EmptyState
               title="No activity yet"
-              message="Security and profile changes by organization members will appear here."
+              message="Security, profile, and project PII scrubbing changes by organization members will appear here."
             />
           ) : (
             <>

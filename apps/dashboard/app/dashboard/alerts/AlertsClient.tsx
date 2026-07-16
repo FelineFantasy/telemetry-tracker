@@ -33,6 +33,7 @@ import {
 } from "@/lib/alert-settings";
 import {
   formatDenyKeysInput,
+  normalizeProjectPiiScrubSettings,
   parseDenyKeysInput,
   piiScrubSettingsEqual,
   type ProjectPiiScrubSettings,
@@ -57,7 +58,12 @@ export function AlertsClient({
   const [denyKeysText, setDenyKeysText] = useState(() =>
     formatDenyKeysInput(initialPiiSettings.denyKeys)
   );
-  const [savedPii, setSavedPii] = useState(initialPiiSettings);
+  const [scrubSessionUserEmail, setScrubSessionUserEmail] = useState(
+    () => initialPiiSettings.scrubSessionUserEmail
+  );
+  const [savedPii, setSavedPii] = useState(() =>
+    normalizeProjectPiiScrubSettings(initialPiiSettings)
+  );
   const dirty = useMemo(
     () => !alertSettingsEqual(settings, initialSettings),
     [settings, initialSettings]
@@ -65,9 +71,10 @@ export function AlertsClient({
   const piiDirty = useMemo(() => {
     const next: ProjectPiiScrubSettings = {
       denyKeys: parseDenyKeysInput(denyKeysText),
+      scrubSessionUserEmail,
     };
     return !piiScrubSettingsEqual(next, savedPii);
-  }, [denyKeysText, savedPii]);
+  }, [denyKeysText, scrubSessionUserEmail, savedPii]);
 
   function save() {
     startTransition(async () => {
@@ -84,15 +91,20 @@ export function AlertsClient({
 
   function savePii() {
     startPiiTransition(async () => {
-      const next = { denyKeys: parseDenyKeysInput(denyKeysText) };
+      const next: ProjectPiiScrubSettings = {
+        denyKeys: parseDenyKeysInput(denyKeysText),
+        scrubSessionUserEmail,
+      };
       const result = await saveProjectPiiScrubSettingsAction(next);
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       toast.success("PII scrub settings saved");
-      setSavedPii(result.settings);
-      setDenyKeysText(formatDenyKeysInput(result.settings.denyKeys));
+      const normalized = normalizeProjectPiiScrubSettings(result.settings);
+      setSavedPii(normalized);
+      setDenyKeysText(formatDenyKeysInput(normalized.denyKeys));
+      setScrubSessionUserEmail(normalized.scrubSessionUserEmail);
       router.refresh();
     });
   }
@@ -247,7 +259,7 @@ export function AlertsClient({
           <FieldGroup>
             <Field
               label="Deny-listed field names"
-              hint="One field name per line (or comma-separated). Matched case-insensitively on property/context keys — for example nationalId or customer_ref. These are additive to built-in protections and cannot turn them off."
+              hint="One field name per line (or comma-separated). Matched case-insensitively on property/context keys — for example nationalId or customer_ref. These are additive to built-in protections and cannot turn them off. Field names only — not regex patterns."
             >
               <SettingsTextarea
                 id="pii-deny-keys"
@@ -261,13 +273,25 @@ export function AlertsClient({
                 aria-describedby="pii-deny-keys-help"
               />
             </Field>
+            <Field
+              label="Scrub session user email"
+              hint="When enabled, Session.user_email is redacted to [email] on ingest. Off by default so session search by email keeps working until you opt in."
+            >
+              <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
+                <SettingsToggle
+                  label="Scrub session user email"
+                  on={scrubSessionUserEmail}
+                  onChange={setScrubSessionUserEmail}
+                  disabled={!canEdit}
+                />
+              </div>
+            </Field>
           </FieldGroup>
           <p id="pii-deny-keys-help" className="mt-2 text-[12px] text-muted-foreground">
             Optional client-side scrubbing is available in{" "}
             <code className="font-mono text-[11px]">@telemetry-tracker/core</code> via{" "}
-            <code className="font-mono text-[11px]">piiScrub</code> (default off). Session identity
-            fields such as <code className="font-mono text-[11px]">user_email</code> are not
-            rewritten. See{" "}
+            <code className="font-mono text-[11px]">piiScrub</code> (default off). Changes are
+            recorded in the organization audit log. See{" "}
             <Link href="/docs/sdk" className="text-brand hover:underline">
               SDK docs
             </Link>
