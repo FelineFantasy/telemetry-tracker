@@ -88,7 +88,7 @@ export function AlertsClient({
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
                   on={settings.errorSpike.enabled}
-                  onChange={(enabled) =>
+                  onChange={(enabled: boolean) =>
                     setSettings((s) => ({
                       ...s,
                       errorSpike: { ...s.errorSpike, enabled },
@@ -149,7 +149,7 @@ export function AlertsClient({
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
                   on={settings.quota.enabled}
-                  onChange={(enabled) =>
+                  onChange={(enabled: boolean) =>
                     setSettings((s) => ({
                       ...s,
                       quota: { ...s.quota, enabled },
