@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.12.1] - 2026-07-17
+
+### Fixed
+
+- **Logout** — Log out no longer closes the user menu before the server action runs (which aborted logout and left the session cookie intact)
+
+---
+
 ## [1.12.0] - 2026-07-16
 
 ### Added
