@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { OrgRole, Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
