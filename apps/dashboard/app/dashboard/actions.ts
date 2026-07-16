@@ -27,6 +27,10 @@ import {
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
+  normalizeProjectPiiScrubSettings,
+  type ProjectPiiScrubSettings,
+} from "@/lib/pii-scrub-settings";
+import {
   fetchAuthSessions,
   type FetchAuthSessionsResult,
 } from "@/lib/security-settings";
@@ -746,6 +750,40 @@ export async function saveProjectAlertSettingsAction(
     revalidatePath("/dashboard/alerts");
     revalidatePath("/dashboard", "layout");
     return { ok: true, settings: parseProjectAlertSettings(data.settings) };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function saveProjectPiiScrubSettingsAction(
+  settings: Partial<ProjectPiiScrubSettings>
+): Promise<
+  | { ok: true; settings: ProjectPiiScrubSettings }
+  | { ok: false; error: string }
+> {
+  if (
+    settings.denyKeys === undefined &&
+    settings.scrubSessionUserEmail === undefined
+  ) {
+    return { ok: false, error: "No PII scrub settings changes to save" };
+  }
+  const res = await dashboardApiFetch("/api/project/pii-scrub-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { settings?: ProjectPiiScrubSettings };
+    revalidatePath("/dashboard/alerts");
+    revalidatePath("/dashboard/settings/audit");
+    return {
+      ok: true,
+      settings: normalizeProjectPiiScrubSettings(data.settings),
+    };
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }

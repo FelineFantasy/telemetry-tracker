@@ -255,6 +255,25 @@ export function PrivacyPageContent() {
                     and user ids when you attach them. Avoid sending secrets, payment data, or
                     unnecessary personal data in events and breadcrumbs.
                   </p>
+                  <p className="mt-4">
+                    On ingest, Telemetry Tracker redacts <em>common</em> PII and secret patterns
+                    (emails, tokens, API keys, known sensitive property keys, and conservative
+                    phone/card heuristics) before storage. This is best-effort protection — it does
+                    not guarantee detection of every possible personal identifier. You can add
+                    project-specific deny-listed keys, optionally scrub{" "}
+                    <code className="font-mono text-[12px]">session.user_email</code> to{" "}
+                    <code className="font-mono text-[12px]">[email]</code>, and optionally enable
+                    client-side scrubbing in the SDK (
+                    <code className="font-mono text-[12px]">piiScrub</code>
+                    ). Operators remain responsible for what their applications send. See{" "}
+                    <a
+                      href="https://github.com/Telemetry-Tracker/telemetry-tracker/blob/develop/docs/PII-SCRUBBING.md"
+                      className="text-foreground underline underline-offset-2"
+                    >
+                      PII scrubbing docs
+                    </a>
+                    .
+                  </p>
                 </Section>
 
                 <Section id="legal" title="3. Legal basis">
@@ -350,6 +369,13 @@ export function PrivacyPageContent() {
                   <ul className="mt-2 list-disc space-y-1.5 pl-5">
                     <li>Terminate TLS at your reverse proxy or load balancer.</li>
                     <li>Dashboard passwords are stored hashed; ingest requires project API keys.</li>
+                    <li>
+                      Ingest redacts common PII and secret patterns before storage (best-effort;
+                      not a guarantee of complete detection). Configure project deny-listed keys,
+                      optional session email scrubbing, and optional SDK{" "}
+                      <code className="font-mono text-[12px]">piiScrub</code> for additional
+                      protection.
+                    </li>
                     <li>
                       Disable unauthenticated ingest and open registration in production when
                       appropriate.

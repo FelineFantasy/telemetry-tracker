@@ -252,6 +252,8 @@ model Project {
   sessions        Session[]
   error_groups    ErrorGroup[]
   alert_settings  Json?          @map("alert_settings")
+  /// Project deny-list keys for ingest PII scrubbing (see docs/PII-SCRUBBING.md).
+  pii_scrub_settings Json?       @map("pii_scrub_settings")
   alert_events    AlertEvent[]
   source_map_artifacts SourceMapArtifact[]
   brief_acknowledgements BriefAcknowledgement[]
