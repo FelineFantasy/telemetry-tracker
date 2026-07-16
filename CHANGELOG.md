@@ -13,6 +13,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.11.2] - 2026-07-16
+
+### Fixed
+
+- **Dashboard Docker build** — commit missing `@telemetry-tracker/core` `device-context` dist artifacts; rebuild workspace packages in the Dockerfile before `next build` so Railway does not fail with `Can't resolve './device-context.js'`
+
+---
+
 ## [1.11.1] - 2026-07-16
 
 ### Added
