@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   saveProjectAlertSettingsAction,
@@ -68,6 +68,20 @@ export function AlertsClient({
     normalizeProjectPiiScrubSettings(initialPiiSettings)
   );
   const piiEditable = canEdit && !piiSettingsLoadError;
+
+  // After router.refresh(), props can recover from a failed load while useState
+  // still holds fallback defaults — resync so a later save cannot wipe real keys.
+  const piiPropsSyncKey = piiSettingsLoadError
+    ? `error:${piiSettingsLoadError}`
+    : `ok:${initialPiiSettings.scrubSessionUserEmail}:${initialPiiSettings.denyKeys.join("\0")}`;
+  useEffect(() => {
+    if (piiSettingsLoadError) return;
+    const normalized = normalizeProjectPiiScrubSettings(initialPiiSettings);
+    setSavedPii(normalized);
+    setDenyKeysText(formatDenyKeysInput(normalized.denyKeys));
+    setScrubSessionUserEmail(normalized.scrubSessionUserEmail);
+  }, [piiPropsSyncKey, piiSettingsLoadError, initialPiiSettings]);
+
   const dirty = useMemo(
     () => !alertSettingsEqual(settings, initialSettings),
     [settings, initialSettings]
@@ -121,6 +135,12 @@ export function AlertsClient({
       setSavedPii(normalized);
       setDenyKeysText(formatDenyKeysInput(normalized.denyKeys));
       setScrubSessionUserEmail(normalized.scrubSessionUserEmail);
+      router.refresh();
+    });
+  }
+
+  function reloadPiiSettings() {
+    startPiiTransition(() => {
       router.refresh();
     });
   }
@@ -273,10 +293,19 @@ export function AlertsClient({
           }
         >
           {piiSettingsLoadError ? (
-            <p className="mb-3 text-[13px] text-destructive" role="alert">
-              {piiSettingsLoadError}. Refresh the page to try again — saving is
-              disabled so existing deny-keys are not overwritten.
-            </p>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3" role="alert">
+              <p className="text-[13px] text-destructive">
+                {piiSettingsLoadError}. Saving is disabled so existing deny-keys are not
+                overwritten.
+              </p>
+              <SettingsBtn
+                variant="outline"
+                disabled={piiPending}
+                onClick={reloadPiiSettings}
+              >
+                {piiPending ? "Reloading…" : "Reload settings"}
+              </SettingsBtn>
+            </div>
           ) : null}
           <FieldGroup>
             <Field
