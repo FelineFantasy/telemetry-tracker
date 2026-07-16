@@ -787,15 +787,27 @@ function relativeStarted(iso: string): string {
   return `started ${Math.floor(ms / 86_400_000)}d ago`;
 }
 
+export type ErrorDetailLinkScope = Pick<
+  Scope,
+  "app" | "environment" | "platform" | "release"
+> & {
+  range?: string;
+  from?: string;
+  to?: string;
+};
+
 export function errorGroupDetailHref(
   id: string,
-  scope: Pick<Scope, "app" | "environment" | "platform" | "release">
+  scope: ErrorDetailLinkScope
 ): string {
   const params = new URLSearchParams();
   if (scope.app) params.set("app", scope.app);
   if (scope.environment) params.set("environment", scope.environment);
   if (scope.platform) params.set("platform", scope.platform);
   if (scope.release) params.set("release", scope.release);
+  if (scope.range) params.set("range", scope.range);
+  if (scope.from) params.set("from", scope.from);
+  if (scope.to) params.set("to", scope.to);
   const q = params.toString();
   return q ? `/dashboard/errors/${id}?${q}` : `/dashboard/errors/${id}`;
 }
@@ -803,8 +815,15 @@ export function errorGroupDetailHref(
 export async function listActiveIssues(
   prisma: PrismaClient,
   scope: Scope,
-  limit = 5
+  limit = 5,
+  linkScope?: ErrorDetailLinkScope
 ): Promise<OverviewActiveIssue[]> {
+  const hrefScope: ErrorDetailLinkScope = linkScope ?? {
+    app: scope.app,
+    environment: scope.environment,
+    platform: scope.platform,
+    release: scope.release,
+  };
   if (scope.platform || scope.release) {
     const appClause = scope.app ? Prisma.sql`AND eg."app" = ${scope.app}` : Prisma.empty;
     const envClause = scope.environment
@@ -861,7 +880,7 @@ export async function listActiveIssues(
         title: g.message,
         meta: `${relativeStarted(g.first_seen.toISOString())} · app ${g.app}${envPart} · ${occurrences} occurrences`,
         status: "Open",
-        href: errorGroupDetailHref(g.id, scope),
+        href: errorGroupDetailHref(g.id, hrefScope),
       };
     });
   }
@@ -893,7 +912,7 @@ export async function listActiveIssues(
       title: g.message,
       meta: `${relativeStarted(g.first_seen.toISOString())} · app ${g.app}${envPart} · ${g.occurrences} occurrences`,
       status: "Open",
-      href: errorGroupDetailHref(g.id, scope),
+      href: errorGroupDetailHref(g.id, hrefScope),
     };
   });
 }

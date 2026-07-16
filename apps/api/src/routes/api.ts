@@ -283,9 +283,16 @@ export async function apiRoutes(
         ? { _count: { name: topEvOrderParsed.order } }
         : { name: topEvOrderParsed.order };
 
+    const useScopedErrorList = Boolean(platform || release);
+    // Platform/release lists must use metricsWindow so counts match KPIs/charts when
+    // the overview time range is unselected (epoch→now vs ~30d metrics window).
+    const scopedErrorListScope = useScopedErrorList ? metricsScope : listScope;
+    const eventListSince = useScopedErrorList ? metricsWindow.gte : since;
+    const eventListUntil = useScopedErrorList ? metricsWindow.lte : until;
+
     const baseWhere = {
       ...whereEventProject(projectId),
-      created_at: { gte: since, lte: until },
+      created_at: { gte: eventListSince, lte: eventListUntil },
     };
     const eventWhere = {
       ...baseWhere,
@@ -331,14 +338,23 @@ export async function apiRoutes(
       environment,
       platform,
       release,
-      gte: since,
-      lte: until,
+      gte: eventListSince,
+      lte: eventListUntil,
     });
 
-    const useScopedErrorList = Boolean(platform || release);
-    // Platform/release lists must use metricsWindow so counts match KPIs/charts when
-    // the overview time range is unselected (epoch→now vs ~30d metrics window).
-    const scopedErrorListScope = useScopedErrorList ? metricsScope : listScope;
+    const activeIssueLinkScope = {
+      app: appFilter,
+      environment,
+      platform,
+      release,
+      ...(timeRange.key === "absolute"
+        ? {
+            from: queryString(query.from),
+            to: queryString(query.to),
+          }
+        : { range: timeRange.key }),
+    };
+
     const [
       errorCounts,
       eventStats,
@@ -420,7 +436,9 @@ export async function apiRoutes(
       ),
       listActiveIssues(
         prisma,
-        platform || release ? metricsScope : listScope
+        platform || release ? metricsScope : listScope,
+        5,
+        activeIssueLinkScope
       ),
       fetchOverviewRequestMetrics(
         prisma,
@@ -469,8 +487,8 @@ export async function apiRoutes(
 
     const latestByName = await fetchLatestEventsByName(prisma, {
       projectId,
-      since,
-      until,
+      since: eventListSince,
+      until: eventListUntil,
       app: appFilter,
       environment,
       platform,
