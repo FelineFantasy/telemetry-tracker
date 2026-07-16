@@ -59,23 +59,23 @@ export function Field({
   htmlFor?: string;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-2 py-3 sm:grid-cols-[200px_1fr] sm:items-start sm:gap-6">
+    <label htmlFor={htmlFor} className="grid grid-cols-1 gap-2 py-3 sm:grid-cols-[200px_1fr] sm:items-start sm:gap-6">
       <div className="pt-1.5">
-        <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-[13px]">
+        <span className="flex items-center gap-1.5 text-[13px]">
           <span>{label}</span>
           {optional ? (
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Optional
             </span>
           ) : null}
-        </label>
+        </span>
         {hint ? <p className="mt-1 text-[12px] text-muted-foreground">{hint}</p> : null}
       </div>
       <div className="min-w-0">
         {children}
         {error ? <p className="mt-1.5 text-[12px] text-destructive">{error}</p> : null}
       </div>
-    </div>
+    </label>
   );
 }
 
