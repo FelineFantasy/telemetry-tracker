@@ -208,18 +208,29 @@ export async function register(
   return { ok: true };
 }
 
+function clearCookie(
+  c: Awaited<ReturnType<typeof cookies>>,
+  name: string
+): void {
+  c.set(name, "", { ...cookieBase(), maxAge: 0, expires: new Date(0) });
+}
+
 export async function logout(): Promise<void> {
   const sid = await getDashboardSessionId();
   if (sid) {
-    await fetch(`${API_BASE_URL}/api/auth/logout`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${sid}` },
-    });
+    try {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sid}` },
+      });
+    } catch {
+      // Still clear local cookies if the API is unreachable.
+    }
   }
   const c = await cookies();
-  c.set(TELEMETRY_SESSION_COOKIE, "", { ...cookieBase(), maxAge: 0 });
-  c.set(TELEMETRY_ORG_COOKIE, "", { ...cookieBase(), maxAge: 0 });
-  c.set(TELEMETRY_PROJECT_COOKIE, "", { ...cookieBase(), maxAge: 0 });
+  clearCookie(c, TELEMETRY_SESSION_COOKIE);
+  clearCookie(c, TELEMETRY_ORG_COOKIE);
+  clearCookie(c, TELEMETRY_PROJECT_COOKIE);
 }
 
 export async function logoutAction(): Promise<void> {
