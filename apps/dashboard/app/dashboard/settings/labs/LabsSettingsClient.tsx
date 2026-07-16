@@ -49,7 +49,8 @@ export function LabsSettingsClient({
   const [pending, startTransition] = useTransition();
   const [prefs, setPrefs] = useState(initialPreferences);
 
-  function toggleCommandPalette(enabled: boolean) {
+  function toggleCommandPalette() {
+    const enabled = !prefs.commandPalette;
     const previous = prefs;
     const next = { ...prefs, commandPalette: enabled };
     setPrefs(next);
@@ -100,11 +101,7 @@ export function LabsSettingsClient({
                   <SettingsToggle
                     on={enabled}
                     disabled={!flag.available || pending}
-                    onChange={
-                      isCommandPalette
-                        ? toggleCommandPalette
-                        : () => {}
-                    }
+                    onClick={isCommandPalette ? toggleCommandPalette : undefined}
                   />
                 </li>
               );
