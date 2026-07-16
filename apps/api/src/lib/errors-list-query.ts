@@ -126,6 +126,16 @@ export function parseTrendWindowParam(
   };
 }
 
+/** List range, else metrics-window bounds from enrichErrorListFilterForMetrics. */
+function occurrenceWindowBounds(
+  f: Pick<ErrorListFilterInput, "range" | "occurrenceCountRange">
+): { gte?: Date; lte?: Date } {
+  return {
+    gte: f.range.gte ?? f.occurrenceCountRange?.gte,
+    lte: f.range.lte ?? f.occurrenceCountRange?.lte,
+  };
+}
+
 export function buildErrorGroupWhereInput(
   f: ErrorListFilterInput,
   projectId: string
@@ -137,16 +147,17 @@ export function buildErrorGroupWhereInput(
   if (f.status === "unresolved") where.resolved_at = null;
   if (f.status === "resolved") where.resolved_at = { not: null };
   if (hasOccurrenceScope(f)) {
-    // Membership = in-window matching occurrences (not global last_seen).
+    // Membership = in-window matching occurrences (list range or metrics window).
+    const bounds = occurrenceWindowBounds(f);
     where.occurrences_list = {
       some: {
         ...(f.release ? { release: f.release } : {}),
         ...(f.platform ? { platform: f.platform } : {}),
-        ...(f.range.gte || f.range.lte
+        ...(bounds.gte || bounds.lte
           ? {
               created_at: {
-                ...(f.range.gte ? { gte: f.range.gte } : {}),
-                ...(f.range.lte ? { lte: f.range.lte } : {}),
+                ...(bounds.gte ? { gte: bounds.gte } : {}),
+                ...(bounds.lte ? { lte: bounds.lte } : {}),
               },
             }
           : {}),
@@ -258,11 +269,12 @@ function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
   if (f.status === "unresolved") parts.push(Prisma.sql`eg.resolved_at IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`eg.resolved_at IS NOT NULL`);
   if (hasOccurrenceScope(f)) {
+    const bounds = occurrenceWindowBounds(f);
     const scopeParts: Prisma.Sql[] = [];
     if (f.release) scopeParts.push(Prisma.sql`rel.release = ${f.release}`);
     if (f.platform) scopeParts.push(Prisma.sql`rel.platform = ${f.platform}`);
-    if (f.range.gte) scopeParts.push(Prisma.sql`rel.created_at >= ${f.range.gte}`);
-    if (f.range.lte) scopeParts.push(Prisma.sql`rel.created_at <= ${f.range.lte}`);
+    if (bounds.gte) scopeParts.push(Prisma.sql`rel.created_at >= ${bounds.gte}`);
+    if (bounds.lte) scopeParts.push(Prisma.sql`rel.created_at <= ${bounds.lte}`);
     parts.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "ErrorOccurrence" rel
@@ -279,8 +291,7 @@ function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
 
 function occurrenceInRangeExpr(f: ErrorListFilterInput, alias = "o"): Prisma.Sql {
   const a = Prisma.raw(`"${alias}"."created_at"`);
-  const gte = f.range.gte ?? f.occurrenceCountRange?.gte;
-  const lte = f.range.lte ?? f.occurrenceCountRange?.lte;
+  const { gte, lte } = occurrenceWindowBounds(f);
   const parts: Prisma.Sql[] = [];
   if (gte) parts.push(Prisma.sql`${a} >= ${gte}`);
   if (lte) parts.push(Prisma.sql`${a} <= ${lte}`);
@@ -290,12 +301,11 @@ function occurrenceInRangeExpr(f: ErrorListFilterInput, alias = "o"): Prisma.Sql
   return Prisma.sql`SUM(CASE WHEN ${Prisma.join(parts, " AND ")} THEN 1 ELSE 0 END)::bigint`;
 }
 
-/** First/last seen among platform/release matches inside the active list range. */
+/** First/last seen among platform/release matches inside the active list/metrics window. */
 function scopedSeenAggregateExprs(
   f: Pick<ErrorListFilterInput, "range" | "occurrenceCountRange">
 ): { firstSeen: Prisma.Sql; lastSeen: Prisma.Sql } {
-  const gte = f.range.gte ?? f.occurrenceCountRange?.gte;
-  const lte = f.range.lte ?? f.occurrenceCountRange?.lte;
+  const { gte, lte } = occurrenceWindowBounds(f);
   const parts: Prisma.Sql[] = [];
   if (gte) parts.push(Prisma.sql`o.created_at >= ${gte}`);
   if (lte) parts.push(Prisma.sql`o.created_at <= ${lte}`);
@@ -363,13 +373,13 @@ function orderByAggregateSql(
   }
   if (sort === "first_seen") {
     const expr = hasOccurrenceScope(f)
-      ? Prisma.sql`COALESCE(agg.scoped_first_seen, eg.first_seen)`
+      ? Prisma.sql`agg.scoped_first_seen`
       : Prisma.sql`eg.first_seen`;
     return Prisma.sql`ORDER BY ${expr} ${dir} ${nulls}`;
   }
   if (sort === "last_seen") {
     const expr = hasOccurrenceScope(f)
-      ? Prisma.sql`COALESCE(agg.scoped_last_seen, eg.last_seen)`
+      ? Prisma.sql`agg.scoped_last_seen`
       : Prisma.sql`eg.last_seen`;
     return Prisma.sql`ORDER BY ${expr} ${dir} ${nulls}`;
   }
@@ -419,11 +429,12 @@ export async function listErrorGroupsAggregated(
   );
   const total = Number(countRows[0]?.c ?? 0);
 
+  // Never fall back to fingerprint lifetime seen when platform/release is active.
   const firstSeenExpr = hasOccurrenceScope(f)
-    ? Prisma.sql`COALESCE(agg.scoped_first_seen, eg.first_seen)`
+    ? Prisma.sql`agg.scoped_first_seen`
     : Prisma.sql`eg.first_seen`;
   const lastSeenExpr = hasOccurrenceScope(f)
-    ? Prisma.sql`COALESCE(agg.scoped_last_seen, eg.last_seen)`
+    ? Prisma.sql`agg.scoped_last_seen`
     : Prisma.sql`eg.last_seen`;
 
   const dataRows = await prisma.$queryRaw<Record<string, unknown>[]>(

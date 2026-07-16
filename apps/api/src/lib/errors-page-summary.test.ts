@@ -113,6 +113,24 @@ describe("buildErrorGroupScopeSql", () => {
     expect(text).toContain('rel."created_at" <= ?');
   });
 
+  it("uses occurrenceCountRange when list range is unbounded", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const sql = buildErrorGroupScopeSql(
+      {
+        range: {},
+        occurrenceCountRange: { gte: since, lte: until },
+        status: "all",
+        platform: "ios",
+      },
+      "proj-1"
+    );
+    const text = prismaSqlText(sql);
+    expect(text).not.toContain('"last_seen"');
+    expect(text).toContain('rel."created_at" >= ?');
+    expect(text).toContain('rel."created_at" <= ?');
+  });
+
   it("applies message search on error groups", () => {
     const sql = buildErrorGroupScopeSql(
       { range: {}, q: "timeout", status: "all" },

@@ -94,11 +94,13 @@ export function buildErrorGroupScopeSql(
   if (f.status === "unresolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NOT NULL`);
   if (f.release || f.platform) {
+    const gte = f.range.gte ?? f.occurrenceCountRange?.gte;
+    const lte = f.range.lte ?? f.occurrenceCountRange?.lte;
     const scopeParts: Prisma.Sql[] = [];
     if (f.release) scopeParts.push(Prisma.sql`rel."release" = ${f.release}`);
     if (f.platform) scopeParts.push(Prisma.sql`rel."platform" = ${f.platform}`);
-    if (f.range.gte) scopeParts.push(Prisma.sql`rel."created_at" >= ${f.range.gte}`);
-    if (f.range.lte) scopeParts.push(Prisma.sql`rel."created_at" <= ${f.range.lte}`);
+    if (gte) scopeParts.push(Prisma.sql`rel."created_at" >= ${gte}`);
+    if (lte) scopeParts.push(Prisma.sql`rel."created_at" <= ${lte}`);
     parts.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "ErrorOccurrence" rel

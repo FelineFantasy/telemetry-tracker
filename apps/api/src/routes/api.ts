@@ -683,9 +683,12 @@ export async function apiRoutes(
     };
     const metricsFilter = enrichErrorListFilterForMetrics(filter, range, metricsAnchor);
 
+    // Platform/release always use the aggregate path so membership, counts, and
+    // first/last seen stay inside the list/metrics window (no lifetime fallbacks).
     if (
       isAggregateSort(sortParsed.sort) ||
-      requiresScopedSeenAggregateSort(sortParsed.sort, metricsFilter)
+      requiresScopedSeenAggregateSort(sortParsed.sort, metricsFilter) ||
+      Boolean(metricsFilter.platform || metricsFilter.release)
     ) {
       const { total, rows } = await listErrorGroupsAggregated(
         prisma,
