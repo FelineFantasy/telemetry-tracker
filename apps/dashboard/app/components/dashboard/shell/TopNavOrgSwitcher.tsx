@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus, Users } from "lucide-react";
 import { setDashboardOrganizationId } from "@/app/dashboard/actions";
@@ -22,10 +22,9 @@ export function TopNavOrgSwitcher({
   organizations: OrgOption[];
   currentOrganizationId: string | null;
 }) {
-  const router = useRouter();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const { replace, runPending, isPending: pending } = useDashboardNavigation();
+  const { replaceAndRefresh, runPending, isPending: pending } = useDashboardNavigation();
   const [value, setValue] = useState(currentOrganizationId ?? "");
 
   useEffect(() => {
@@ -87,8 +86,9 @@ export function TopNavOrgSwitcher({
                   void runPending(async () => {
                     const r = await setDashboardOrganizationId(o.id);
                     if (r.ok) {
-                      replace(hrefWithoutAppSearchParam(pathname, searchParams));
-                      router.refresh();
+                      replaceAndRefresh(
+                        hrefWithoutAppSearchParam(pathname, searchParams)
+                      );
                       close();
                     } else {
                       setValue(currentOrganizationId ?? "");

@@ -11,10 +11,15 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useBodyScrollLock } from "@/lib/body-scroll-lock";
 
 type DashboardNavigationValue = {
   push: (href: string) => void;
   replace: (href: string) => void;
+  /** URL cleanup that must not show the full-screen overlay (e.g. invalid query sanitization). */
+  replaceSilent: (href: string) => void;
+  /** Scope cookie change: replace URL and refresh RSC tree in one pending transition. */
+  replaceAndRefresh: (href: string) => void;
   /** Wrap async scope switches (org/project) so the overlay stays up through the server action. */
   runPending: (fn: () => Promise<void>) => Promise<void>;
   isPending: boolean;
@@ -23,10 +28,11 @@ type DashboardNavigationValue = {
 const DashboardNavigationContext = createContext<DashboardNavigationValue | null>(null);
 
 function DashboardNavigationOverlay({ active }: { active: boolean }) {
+  useBodyScrollLock(active);
   if (!active) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/55 backdrop-blur-md backdrop-saturate-150 supports-[backdrop-filter]:bg-background/40 motion-reduce:backdrop-blur-none motion-reduce:bg-background/80"
+      className="fixed inset-0 z-[10050] flex items-center justify-center bg-background/55 backdrop-blur-md backdrop-saturate-150 supports-[backdrop-filter]:bg-background/40 motion-reduce:backdrop-blur-none motion-reduce:bg-background/80"
       aria-busy="true"
       aria-live="polite"
       role="status"
@@ -63,6 +69,23 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
     [router]
   );
 
+  const replaceSilent = useCallback(
+    (href: string) => {
+      router.replace(href);
+    },
+    [router]
+  );
+
+  const replaceAndRefresh = useCallback(
+    (href: string) => {
+      startTransition(() => {
+        router.replace(href);
+        router.refresh();
+      });
+    },
+    [router]
+  );
+
   const runPending = useCallback(async (fn: () => Promise<void>) => {
     setAsyncPendingCount((n) => n + 1);
     try {
@@ -75,13 +98,26 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
   const isPending = transitionPending || asyncPendingCount > 0;
 
   const value = useMemo(
-    () => ({ push, replace, runPending, isPending }),
-    [push, replace, runPending, isPending]
+    () => ({
+      push,
+      replace,
+      replaceSilent,
+      replaceAndRefresh,
+      runPending,
+      isPending,
+    }),
+    [push, replace, replaceSilent, replaceAndRefresh, runPending, isPending]
   );
 
   return (
     <DashboardNavigationContext.Provider value={value}>
-      {children}
+      <div
+        inert={isPending ? true : undefined}
+        aria-hidden={isPending ? true : undefined}
+        className={isPending ? "pointer-events-none" : undefined}
+      >
+        {children}
+      </div>
       <DashboardNavigationOverlay active={isPending} />
     </DashboardNavigationContext.Provider>
   );

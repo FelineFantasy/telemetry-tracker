@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Pin, Plus, Search } from "lucide-react";
 import { setDashboardProjectId } from "@/app/dashboard/actions";
@@ -42,10 +42,10 @@ export function TopNavProjectSwitcher({
   currentProjectId: string;
   projectNavSummaries: Record<string, ProjectNavSummary>;
 }) {
-  const router = useRouter();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const { replace, runPending, isPending: pending } = useDashboardNavigation();
+  const { replaceAndRefresh, runPending, isPending: pending } =
+    useDashboardNavigation();
   const [value, setValue] = useState(currentProjectId);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -98,15 +98,22 @@ export function TopNavProjectSwitcher({
         const r = await setDashboardProjectId(projectId);
         if (r.ok) {
           setPrefs({ ...prefs, recent: recordRecentProject(projectId) });
-          replace(hrefWithoutAppSearchParam(pathname, searchParams));
-          router.refresh();
+          replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams));
           close();
         } else {
           setValue(currentProjectId);
         }
       });
     },
-    [currentProjectId, pathname, prefs, replace, router, runPending, searchParams, value]
+    [
+      currentProjectId,
+      pathname,
+      prefs,
+      replaceAndRefresh,
+      runPending,
+      searchParams,
+      value,
+    ]
   );
 
   const onTogglePin = useCallback(
