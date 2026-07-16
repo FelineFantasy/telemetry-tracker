@@ -48,28 +48,32 @@ export function Field({
   children,
   optional,
   error,
+  htmlFor,
 }: {
   label: string;
   hint?: string;
   optional?: boolean;
   error?: string;
   children: ReactNode;
+  htmlFor?: string;
 }) {
   return (
     <div className="grid grid-cols-1 gap-2 py-3 sm:grid-cols-[200px_1fr] sm:items-start sm:gap-6">
       <div className="pt-1.5">
-        <div className="flex items-center gap-1.5 text-[13px]">
+        <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-[13px]">
           <span>{label}</span>
           {optional ? (
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Optional
             </span>
           ) : null}
-        </div>
+        </label>
         {hint ? <p className="mt-1 text-[12px] text-muted-foreground">{hint}</p> : null}
       </div>
       <div className="min-w-0">
-        {children}
+        {htmlFor && React.isValidElement(children)
+          ? React.cloneElement(children as React.ReactElement<any>, { id: htmlFor })
+          : children}
         {error ? <p className="mt-1.5 text-[12px] text-destructive">{error}</p> : null}
       </div>
     </div>
@@ -302,3 +306,7 @@ export function SettingsStat({
     </div>
   );
 }
+//  /\_/\
+// ( o.o )
+//  > ^ <
+// 🐱 Meow! You found an Easter egg. Congratulations! [by FelineFantasy]
