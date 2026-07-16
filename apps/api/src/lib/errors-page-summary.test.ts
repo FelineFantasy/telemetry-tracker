@@ -1,9 +1,10 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   buildErrorGroupScopeSql,
   buildEventSessionScopeSql,
   enrichErrorListFilterForMetrics,
+  fetchErrorsPageSummary,
   parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
   shouldScopeEventsToFilteredErrors,
@@ -197,5 +198,74 @@ describe("enrichErrorListFilterForMetrics", () => {
     const since = new Date("2026-06-01T00:00:00.000Z");
     const filter = { range: { gte: since }, status: "all" as const };
     expect(enrichErrorListFilterForMetrics(filter, filter.range, anchor)).toEqual(filter);
+  });
+});
+
+describe("fetchErrorsPageSummary", () => {
+  it("does not call Prisma.join with an empty array when release/platform are unset", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([
+      {
+        total_occurrences: 0n,
+        total_occurrences_previous: 0n,
+        affected_users: 0n,
+        affected_users_previous: 0n,
+        unique_groups: 0n,
+        unique_groups_previous: 0n,
+        resolved_groups: 0n,
+        resolved_groups_previous: 0n,
+        events_count: 0n,
+        events_count_previous: 0n,
+      },
+    ]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+    const since = new Date("2026-07-15T00:00:00.000Z");
+    const until = new Date("2026-07-16T00:00:00.000Z");
+    const window = resolveErrorsSummaryWindow({ gte: since, lte: until });
+
+    await expect(
+      fetchErrorsPageSummary(prisma, { range: { gte: since, lte: until }, status: "all" }, "proj-1", window)
+    ).resolves.toMatchObject({
+      totalOccurrences: 0,
+      eventsCount: 0,
+    });
+    expect(queryRaw).toHaveBeenCalledOnce();
+  });
+
+  it("scopes occurrences by release and platform when both filters are set", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([
+      {
+        total_occurrences: 1n,
+        total_occurrences_previous: 0n,
+        affected_users: 1n,
+        affected_users_previous: 0n,
+        unique_groups: 1n,
+        unique_groups_previous: 0n,
+        resolved_groups: 0n,
+        resolved_groups_previous: 0n,
+        events_count: 2n,
+        events_count_previous: 0n,
+      },
+    ]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+    const since = new Date("2026-07-15T00:00:00.000Z");
+    const until = new Date("2026-07-16T00:00:00.000Z");
+    const window = resolveErrorsSummaryWindow({ gte: since, lte: until });
+
+    await fetchErrorsPageSummary(
+      prisma,
+      {
+        range: { gte: since, lte: until },
+        status: "all",
+        release: "1.5.0",
+        platform: "web",
+      },
+      "proj-1",
+      window
+    );
+
+    const sql = queryRaw.mock.calls[0]?.[0] as Prisma.Sql;
+    const text = prismaSqlText(sql);
+    expect(text).toContain('eo."release" = ?');
+    expect(text).toContain('eo."platform" = ?');
   });
 });
