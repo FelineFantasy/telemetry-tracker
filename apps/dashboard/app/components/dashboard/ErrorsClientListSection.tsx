@@ -9,6 +9,7 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
+import { buildErrorGroupDetailHref } from "@/lib/overview-scope-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
 import { resolveApiListTotal } from "@/lib/pagination";
 import { useAnalyticsList } from "@/lib/use-analytics-list";
@@ -165,9 +166,15 @@ export function ErrorsClientListSection({
           <IssuesTable
             rows={items}
             hrefForRow={(g) =>
-              appFilter
-                ? `/dashboard/errors/${g.id}?app=${encodeURIComponent(appFilter)}`
-                : `/dashboard/errors/${g.id}`
+              buildErrorGroupDetailHref(g.id, {
+                app: appFilter || null,
+                environment: environment || null,
+                platform: platform || null,
+                release: release || null,
+                range: urlParams.range || null,
+                from: urlParams.from || null,
+                to: urlParams.to || null,
+              })
             }
           />
         ) : error ? (

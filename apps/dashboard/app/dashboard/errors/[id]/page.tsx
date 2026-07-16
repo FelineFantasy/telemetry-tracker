@@ -14,6 +14,7 @@ import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { MiniSparkline, type SparklinePoint } from "@/app/components/dashboard/MiniSparkline";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { buildDashboardScopedListHref } from "@/lib/overview-scope-url";
 
 type Occurrence = {
   id: string;
@@ -39,8 +40,8 @@ type ErrorGroup = {
   symbolicated_top_stack?: string | null;
   fingerprint?: string | null;
   occurrences: number;
-  first_seen: string;
-  last_seen: string;
+  first_seen: string | null;
+  last_seen: string | null;
   environment?: string | null;
   platform?: string | null;
   release?: string | null;
@@ -51,8 +52,24 @@ type ErrorGroup = {
   occurrences_list?: Occurrence[];
 };
 
-async function getErrorGroup(id: string): Promise<ErrorGroup | null> {
-  const res = await dashboardApiFetch(`/api/errors/${id}`);
+async function getErrorGroup(
+  id: string,
+  scope: {
+    platform?: string;
+    release?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+  }
+): Promise<ErrorGroup | null> {
+  const qs = new URLSearchParams();
+  if (scope.platform) qs.set("platform", scope.platform);
+  if (scope.release) qs.set("release", scope.release);
+  if (scope.range) qs.set("range", scope.range);
+  if (scope.from) qs.set("from", scope.from);
+  if (scope.to) qs.set("to", scope.to);
+  const q = qs.toString();
+  const res = await dashboardApiFetch(`/api/errors/${id}${q ? `?${q}` : ""}`);
   if (res.status === 404) return null;
   if (!res.ok) {
     const text = await res.text();
@@ -66,15 +83,38 @@ export default async function ErrorDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ app?: string }>;
+  searchParams: Promise<{
+    app?: string;
+    environment?: string;
+    platform?: string;
+    release?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
   const { id } = await params;
-  const { app } = await searchParams;
-  const appQuery = app?.trim() ? `?app=${encodeURIComponent(app)}` : "";
+  const sp = await searchParams;
+  const app = sp.app?.trim() || undefined;
+  const environment = sp.environment?.trim() || undefined;
+  const platform = sp.platform?.trim() || undefined;
+  const release = sp.release?.trim() || undefined;
+  const range = sp.range?.trim() || undefined;
+  const from = sp.from?.trim() || undefined;
+  const to = sp.to?.trim() || undefined;
+  const listHref = buildDashboardScopedListHref("/dashboard/errors", {
+    app,
+    environment,
+    platform,
+    release,
+    range,
+    from,
+    to,
+  });
 
   let group: ErrorGroup | null;
   try {
-    group = await getErrorGroup(id);
+    group = await getErrorGroup(id, { platform, release, range, from, to });
   } catch (e) {
     return (
       <>
@@ -216,7 +256,7 @@ export default async function ErrorDetailPage({
 
   return (
     <>
-      <NavBack href={`/dashboard/errors${appQuery}`}>Issues</NavBack>
+      <NavBack href={listHref}>Issues</NavBack>
       <IssueDetailView
         issueId={group.id}
         title={group.message}
@@ -250,11 +290,11 @@ export default async function ErrorDetailPage({
           ...(trendMetric ? [trendMetric] : []),
           {
             label: "First seen",
-            value: <TimeAgo iso={group.first_seen} />,
+            value: group.first_seen ? <TimeAgo iso={group.first_seen} /> : "—",
           },
           {
             label: "Last seen",
-            value: <TimeAgo iso={group.last_seen} />,
+            value: group.last_seen ? <TimeAgo iso={group.last_seen} /> : "—",
           },
         ]}
         sidebarTags={
@@ -268,10 +308,10 @@ export default async function ErrorDetailPage({
         sidebarTimestamps={
           <>
             <AnalyticsSidebarRow label="First seen">
-              <TimeAgo iso={group.first_seen} />
+              {group.first_seen ? <TimeAgo iso={group.first_seen} /> : "—"}
             </AnalyticsSidebarRow>
             <AnalyticsSidebarRow label="Last seen">
-              <TimeAgo iso={group.last_seen} />
+              {group.last_seen ? <TimeAgo iso={group.last_seen} /> : "—"}
             </AnalyticsSidebarRow>
             {group.fingerprint ? (
               <AnalyticsSidebarRow label="Fingerprint">

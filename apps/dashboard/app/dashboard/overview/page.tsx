@@ -192,9 +192,18 @@ function buildOverviewListScope(
   app: string | null,
   environment: string | null,
   platform: string | null,
-  release: string | null
+  release: string | null,
+  timeQuery: { range?: string; from?: string; to?: string }
 ): DashboardListScope {
-  return { app, environment, platform, release };
+  return {
+    app,
+    environment,
+    platform,
+    release,
+    range: timeQuery.range ?? null,
+    from: timeQuery.from ?? null,
+    to: timeQuery.to ?? null,
+  };
 }
 
 async function getFilterOptions(app?: string) {
@@ -382,7 +391,13 @@ export default async function OverviewPage({
     redirect(mergeListQuery(OVERVIEW_PATH, currentOverviewParams, { release }));
   }
 
-  const listScope = buildOverviewListScope(app, environment, platform, release);
+  const listScope = buildOverviewListScope(
+    app,
+    environment,
+    platform,
+    release,
+    timeQuery
+  );
 
   const workspaceStats = buildOverviewWorkspaceStats(
     organizations,

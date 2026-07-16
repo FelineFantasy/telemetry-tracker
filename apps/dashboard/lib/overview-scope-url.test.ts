@@ -41,6 +41,16 @@ describe("buildErrorGroupDetailHref", () => {
       })
     ).toBe("/dashboard/errors/eg_1?app=mobile&platform=ios&release=2.1.0");
   });
+
+  it("includes time range for detail drill-down", () => {
+    expect(
+      buildErrorGroupDetailHref("eg_1", {
+        app: "web",
+        platform: "ios",
+        range: "7d",
+      })
+    ).toBe("/dashboard/errors/eg_1?app=web&platform=ios&range=7d");
+  });
 });
 
 describe("buildDashboardScopedListHref", () => {

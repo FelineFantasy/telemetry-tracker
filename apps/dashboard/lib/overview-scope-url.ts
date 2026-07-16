@@ -49,6 +49,9 @@ export type DashboardListScope = {
   environment?: string | null;
   platform?: string | null;
   release?: string | null;
+  range?: string | null;
+  from?: string | null;
+  to?: string | null;
 };
 
 function appendDashboardListScope(params: URLSearchParams, scope: DashboardListScope): void {
@@ -56,6 +59,9 @@ function appendDashboardListScope(params: URLSearchParams, scope: DashboardListS
   if (scope.environment) params.set("environment", scope.environment);
   if (scope.platform) params.set("platform", scope.platform);
   if (scope.release) params.set("release", scope.release);
+  if (scope.range) params.set("range", scope.range);
+  if (scope.from) params.set("from", scope.from);
+  if (scope.to) params.set("to", scope.to);
 }
 
 /** Preserve list filters when linking between dashboard pages. */

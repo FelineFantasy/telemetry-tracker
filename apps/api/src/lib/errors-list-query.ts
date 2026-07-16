@@ -624,11 +624,28 @@ export async function fetchSparklinesForGroupIds(
   return out;
 }
 
-/** Distinct users/sessions impacted by all occurrences in one error group. */
+function occurrenceCreatedAtBoundsSql(bounds?: {
+  gte?: Date;
+  lte?: Date;
+}): Prisma.Sql {
+  const parts: Prisma.Sql[] = [];
+  if (bounds?.gte) parts.push(Prisma.sql`o.created_at >= ${bounds.gte}`);
+  if (bounds?.lte) parts.push(Prisma.sql`o.created_at <= ${bounds.lte}`);
+  if (parts.length === 0) return Prisma.empty;
+  return Prisma.sql`AND ${Prisma.join(parts, " AND ")}`;
+}
+
+/** Distinct users/sessions impacted by occurrences in one error group (optional platform/release/window). */
 export async function fetchImpactMetricsForGroupId(
   prisma: PrismaClient,
-  errorGroupId: string
+  errorGroupId: string,
+  scope?: { release?: string; platform?: string; gte?: Date; lte?: Date }
 ): Promise<{ users_affected: number; sessions_affected: number }> {
+  const scopeClause = occurrenceScopeSql({
+    release: scope?.release,
+    platform: scope?.platform,
+  });
+  const timeClause = occurrenceCreatedAtBoundsSql(scope);
   const rows = await prisma.$queryRaw<
     [{ users_affected: number | bigint | null; sessions_affected: number | bigint | null }]
   >(Prisma.sql`
@@ -643,10 +660,45 @@ export async function fetchImpactMetricsForGroupId(
       )::int AS sessions_affected
     FROM "ErrorOccurrence" o
     WHERE o.error_group_id = ${errorGroupId}
+      ${scopeClause}
+      ${timeClause}
   `);
   return {
     users_affected: Number(rows[0]?.users_affected ?? 0),
     sessions_affected: Number(rows[0]?.sessions_affected ?? 0),
+  };
+}
+
+/** Scoped occurrence count and first/last seen for error detail drill-down. */
+export async function fetchScopedOccurrenceSummaryForGroupId(
+  prisma: PrismaClient,
+  errorGroupId: string,
+  scope: { release?: string; platform?: string; gte?: Date; lte?: Date }
+): Promise<{
+  occurrences: number;
+  first_seen: Date | null;
+  last_seen: Date | null;
+} | null> {
+  if (!hasOccurrenceScope(scope) && !scope.gte && !scope.lte) return null;
+  const scopeClause = occurrenceScopeSql(scope);
+  const timeClause = occurrenceCreatedAtBoundsSql(scope);
+  const rows = await prisma.$queryRaw<
+    [{ occurrences: bigint; first_seen: Date | null; last_seen: Date | null }]
+  >(Prisma.sql`
+    SELECT
+      COUNT(*)::bigint AS occurrences,
+      MIN(o.created_at) AS first_seen,
+      MAX(o.created_at) AS last_seen
+    FROM "ErrorOccurrence" o
+    WHERE o.error_group_id = ${errorGroupId}
+      ${scopeClause}
+      ${timeClause}
+  `);
+  const row = rows[0];
+  return {
+    occurrences: Number(row?.occurrences ?? 0),
+    first_seen: row?.first_seen ?? null,
+    last_seen: row?.last_seen ?? null,
   };
 }
 

@@ -4,6 +4,7 @@ import { prisma } from "../lib/db.js";
 import {
   fetchImpactMetricsForGroupId,
   fetchMetricsForGroupIds,
+  fetchScopedOccurrenceSummaryForGroupId,
   fetchSparklinesForGroupIds,
   isAggregateSort,
   listErrorGroupsAggregated,
@@ -808,10 +809,67 @@ export async function apiRoutes(
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
     const { id } = request.params;
+    const query = request.query as {
+      platform?: string;
+      release?: string;
+      range?: string;
+      from?: string;
+      to?: string;
+      metricsUntil?: string;
+    };
+    const platform = queryString(query.platform);
+    const release = queryString(query.release);
+    const hasExplicitRange = Boolean(
+      queryString(query.range) || queryString(query.from) || queryString(query.to)
+    );
+    const listRange = parseCreatedRange(query, "all");
+    const metricsAnchor = parseErrorsMetricsAnchor(queryString(query.metricsUntil));
+    // Match Issues list: platform/release with unbounded range uses the metrics window.
+    const metricsFilter =
+      hasExplicitRange || platform || release
+        ? enrichErrorListFilterForMetrics(
+            {
+              range: listRange,
+              status: "all",
+              ...(platform ? { platform } : {}),
+              ...(release ? { release } : {}),
+            },
+            listRange,
+            metricsAnchor
+          )
+        : null;
+    const windowGte =
+      metricsFilter?.range.gte ?? metricsFilter?.occurrenceCountRange?.gte;
+    const windowLte =
+      metricsFilter?.range.lte ?? metricsFilter?.occurrenceCountRange?.lte;
+    const occurrenceScope = {
+      ...(platform ? { platform } : {}),
+      ...(release ? { release } : {}),
+      ...(windowGte ? { gte: windowGte } : {}),
+      ...(windowLte ? { lte: windowLte } : {}),
+    };
+    const applyScopedMetrics = Boolean(
+      platform || release || windowGte || windowLte
+    );
+    const occurrenceWhere = {
+      ...(platform ? { platform } : {}),
+      ...(release ? { release } : {}),
+      ...(windowGte || windowLte
+        ? {
+            created_at: {
+              ...(windowGte ? { gte: windowGte } : {}),
+              ...(windowLte ? { lte: windowLte } : {}),
+            },
+          }
+        : {}),
+    };
+
     const group = await prisma.errorGroup.findFirst({
       where: whereErrorGroupById(id, projectId),
       include: {
         occurrences_list: {
+          where:
+            Object.keys(occurrenceWhere).length > 0 ? occurrenceWhere : undefined,
           orderBy: { created_at: "desc" },
           take: 50,
         },
@@ -819,12 +877,25 @@ export async function apiRoutes(
     });
     if (!group) return reply.status(404).send({ error: "Not found" });
     const { enrichErrorGroupWithSymbolicatedStacks } = await import("../lib/stack-symbolicate.js");
-    const trendEnd = new Date();
-    const trendDurationMs = 24 * 60 * 60 * 1000;
-    const [enriched, impact, sparklineMap] = await Promise.all([
+    const trendEnd = windowLte ?? new Date();
+    const trendDurationMs =
+      windowGte != null
+        ? Math.max(trendEnd.getTime() - windowGte.getTime(), 60_000)
+        : 24 * 60 * 60 * 1000;
+    const [enriched, impact, sparklineMap, scopedSummary] = await Promise.all([
       enrichErrorGroupWithSymbolicatedStacks(prisma, projectId, group),
-      fetchImpactMetricsForGroupId(prisma, id),
-      fetchSparklinesForGroupIds(prisma, [id], trendDurationMs, trendEnd),
+      fetchImpactMetricsForGroupId(prisma, id, occurrenceScope),
+      fetchSparklinesForGroupIds(
+        prisma,
+        [id],
+        trendDurationMs,
+        trendEnd,
+        release,
+        platform
+      ),
+      applyScopedMetrics
+        ? fetchScopedOccurrenceSummaryForGroupId(prisma, id, occurrenceScope)
+        : Promise.resolve(null),
     ]);
 
     const sessionClientIds = [
@@ -854,6 +925,14 @@ export async function apiRoutes(
     return reply.send({
       ...enriched,
       ...impact,
+      ...(scopedSummary
+        ? {
+            occurrences: scopedSummary.occurrences,
+            // Never fall back to fingerprint lifetime when a scope/window is active.
+            first_seen: scopedSummary.first_seen,
+            last_seen: scopedSummary.last_seen,
+          }
+        : {}),
       occurrences_list,
       sparkline: sparklineMap.get(id) ?? [],
     });
