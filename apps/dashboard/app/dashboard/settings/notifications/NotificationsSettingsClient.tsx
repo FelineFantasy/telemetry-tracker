@@ -143,7 +143,7 @@ export function NotificationsSettingsClient({
                 </div>
                 <SettingsToggle
                   on={prefs.channels[c.id]}
-                  onChange={(v) => setChannel(c.id, v)}
+                  onChange={() => setChannel(c.id, !prefs.channels[c.id])}
                 />
               </div>
             ))}
