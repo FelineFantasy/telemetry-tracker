@@ -101,7 +101,7 @@ export function LabsSettingsClient({
                   <SettingsToggle
                     on={enabled}
                     disabled={!flag.available || pending}
-                    onClick={isCommandPalette ? toggleCommandPalette : undefined}
+                    onChange={isCommandPalette ? toggleCommandPalette : undefined}
                   />
                 </li>
               );
