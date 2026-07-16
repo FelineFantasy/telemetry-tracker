@@ -74,12 +74,16 @@ type Scope = {
   until: Date;
   app?: string;
   environment?: string;
+  platform?: string;
+  release?: string;
 };
 
 function eventScopeSql(scope: Scope): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`e."project_id" = ${scope.projectId}`];
   if (scope.app) parts.push(Prisma.sql`e."app" = ${scope.app}`);
   if (scope.environment) parts.push(Prisma.sql`e."environment" = ${scope.environment}`);
+  if (scope.platform) parts.push(Prisma.sql`e."platform" = ${scope.platform}`);
+  if (scope.release) parts.push(Prisma.sql`e."release" = ${scope.release}`);
   return Prisma.join(parts, " AND ");
 }
 
@@ -323,17 +327,59 @@ export async function fetchOverviewRequestMetrics(
   };
 }
 
-/** @internal Exported for unit tests. */
-export function overviewTopErrorGroupsInWindowSql(
+function overviewErrorGroupsWindowClauses(
   projectId: string,
-  scope: Pick<Scope, "app" | "environment">,
-  window: { gte: Date; lte: Date },
-  limit: number
+  scope: Pick<Scope, "app" | "environment" | "platform" | "release">,
+  window: { gte: Date; lte: Date }
 ): Prisma.Sql {
   const appClause = scope.app ? Prisma.sql`AND eg."app" = ${scope.app}` : Prisma.empty;
   const envClause = scope.environment
     ? Prisma.sql`AND eg."environment" = ${scope.environment}`
     : Prisma.empty;
+  const platformClause = scope.platform
+    ? Prisma.sql`AND eo."platform" = ${scope.platform}`
+    : Prisma.empty;
+  const releaseClause = scope.release
+    ? Prisma.sql`AND eo."release" = ${scope.release}`
+    : Prisma.empty;
+  return Prisma.sql`
+    eg."project_id" = ${projectId}
+      AND eo."created_at" >= ${window.gte}
+      AND eo."created_at" <= ${window.lte}
+      ${appClause}
+      ${envClause}
+      ${platformClause}
+      ${releaseClause}
+  `;
+}
+
+function overviewErrorGroupsWindowOrderSql(
+  sort: "occurrences" | "last_seen" | "first_seen" | "message" | "app",
+  order: "asc" | "desc"
+): Prisma.Sql {
+  const dir = order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  if (sort === "occurrences") {
+    return Prisma.sql`ORDER BY occurrences ${dir}, last_seen DESC`;
+  }
+  if (sort === "last_seen") {
+    return Prisma.sql`ORDER BY last_seen ${dir}, occurrences DESC`;
+  }
+  if (sort === "first_seen") {
+    return Prisma.sql`ORDER BY first_seen ${dir}, occurrences DESC`;
+  }
+  if (sort === "message") {
+    return Prisma.sql`ORDER BY eg.message ${dir}, occurrences DESC`;
+  }
+  return Prisma.sql`ORDER BY eg.app ${dir}, occurrences DESC`;
+}
+
+/** @internal Exported for unit tests. */
+export function overviewTopErrorGroupsInWindowSql(
+  projectId: string,
+  scope: Pick<Scope, "app" | "environment" | "platform" | "release">,
+  window: { gte: Date; lte: Date },
+  limit: number
+): Prisma.Sql {
   return Prisma.sql`
     SELECT
       eg.id,
@@ -343,11 +389,7 @@ export function overviewTopErrorGroupsInWindowSql(
       MAX(eo."created_at") AS last_seen
     FROM "ErrorGroup" eg
     INNER JOIN "ErrorOccurrence" eo ON eo."error_group_id" = eg.id
-    WHERE eg."project_id" = ${projectId}
-      AND eo."created_at" >= ${window.gte}
-      AND eo."created_at" <= ${window.lte}
-      ${appClause}
-      ${envClause}
+    WHERE ${overviewErrorGroupsWindowClauses(projectId, scope, window)}
     GROUP BY eg.id, eg.message, eg.app
     ORDER BY occurrences DESC, last_seen DESC
     LIMIT ${limit}
@@ -377,6 +419,71 @@ export async function listOverviewTopErrorGroups(
     occurrences: Number(row.occurrences),
     last_seen: row.last_seen.toISOString(),
   }));
+}
+
+/** Paginated error groups with in-window scoped occurrence counts (platform/release). */
+export async function listOverviewErrorGroupsInWindow(
+  prisma: PrismaClient,
+  scope: Scope,
+  opts: {
+    sort: "occurrences" | "last_seen" | "first_seen" | "message" | "app";
+    order: "asc" | "desc";
+    skip: number;
+    take: number;
+  }
+): Promise<OverviewTopErrorGroup[]> {
+  const window = { gte: scope.since, lte: scope.until };
+  const orderSql = overviewErrorGroupsWindowOrderSql(opts.sort, opts.order);
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      message: string;
+      app: string;
+      occurrences: bigint;
+      last_seen: Date;
+    }>
+  >(Prisma.sql`
+    SELECT
+      eg.id,
+      eg.message,
+      eg.app,
+      COUNT(eo.id)::bigint AS occurrences,
+      MIN(eo."created_at") AS first_seen,
+      MAX(eo."created_at") AS last_seen
+    FROM "ErrorGroup" eg
+    INNER JOIN "ErrorOccurrence" eo ON eo."error_group_id" = eg.id
+    WHERE ${overviewErrorGroupsWindowClauses(scope.projectId, scope, window)}
+    GROUP BY eg.id, eg.message, eg.app
+    ${orderSql}
+    OFFSET ${opts.skip}
+    LIMIT ${opts.take}
+  `);
+
+  return rows.map((row) => ({
+    id: row.id,
+    message: row.message,
+    app: row.app,
+    occurrences: Number(row.occurrences),
+    last_seen: row.last_seen.toISOString(),
+  }));
+}
+
+export async function countOverviewErrorGroupsInWindow(
+  prisma: PrismaClient,
+  scope: Scope
+): Promise<number> {
+  const window = { gte: scope.since, lte: scope.until };
+  const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
+    SELECT COUNT(*)::bigint AS c
+    FROM (
+      SELECT eg.id
+      FROM "ErrorGroup" eg
+      INNER JOIN "ErrorOccurrence" eo ON eo."error_group_id" = eg.id
+      WHERE ${overviewErrorGroupsWindowClauses(scope.projectId, scope, window)}
+      GROUP BY eg.id
+    ) grouped
+  `);
+  return Number(rows[0]?.c ?? 0);
 }
 
 export async function listOverviewRecentSessions(
@@ -415,12 +522,14 @@ export async function listOverviewRecentSessions(
 }
 
 export function buildOverviewSessionFilter(
-  scope: Pick<Scope, "app" | "environment">,
+  scope: Pick<Scope, "app" | "environment" | "platform" | "release">,
   range: { gte: Date; lte: Date }
 ): SessionListFilterInput {
   return buildSessionListFilter({
     appId: scope.app,
     environment: scope.environment,
+    platform: scope.platform,
+    release: scope.release,
     range,
   });
 }

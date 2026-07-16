@@ -4,6 +4,7 @@ import { prisma } from "../lib/db.js";
 import {
   fetchImpactMetricsForGroupId,
   fetchMetricsForGroupIds,
+  fetchScopedOccurrenceSummaryForGroupId,
   fetchSparklinesForGroupIds,
   isAggregateSort,
   listErrorGroupsAggregated,
@@ -11,6 +12,7 @@ import {
   parseErrorListOrderParam,
   parseErrorListSortParam,
   parseTrendWindowParam,
+  requiresScopedSeenAggregateSort,
   serializeErrorGroupListItem,
   type ErrorGroupListRow,
   type ErrorListFilterInput,
@@ -82,7 +84,9 @@ import {
 } from "../lib/overview-stats.js";
 import {
   buildOverviewSessionFilter,
+  countOverviewErrorGroupsInWindow,
   fetchOverviewRequestMetrics,
+  listOverviewErrorGroupsInWindow,
   listOverviewRecentSessions,
   listOverviewTopErrorGroups,
   sparklinesFromTimeSeries,
@@ -168,6 +172,8 @@ export async function apiRoutes(
       to?: string;
       app?: string | string[];
       environment?: string;
+      platform?: string;
+      release?: string;
       compare?: string;
       errorsPage?: string;
       eventsPage?: string;
@@ -193,12 +199,16 @@ export async function apiRoutes(
     const until = timeRange.lte;
     const appFilter = queryApp(query.app);
     const environment = queryString(query.environment);
+    const platform = queryString(query.platform);
+    const release = queryString(query.release);
     const metricsWindow = isUnselectedTimeRange(timeRange.key)
       ? await resolveUnselectedMetricsWindow(prisma, {
           projectId,
           until,
           app: appFilter,
           environment,
+          platform,
+          release,
         })
       : effectiveOverviewWindow(timeRange);
     const metricsBucket = chooseTimeRangeBucket(metricsWindow.durationMs);
@@ -240,8 +250,18 @@ export async function apiRoutes(
       until: metricsWindow.lte,
       app: appFilter,
       environment,
+      platform,
+      release,
     };
-    const listScope = { projectId, since, until, app: appFilter, environment };
+    const listScope = {
+      projectId,
+      since,
+      until,
+      app: appFilter,
+      environment,
+      platform,
+      release,
+    };
     const listPageSize = Math.min(
       MAX_OVERVIEW_LIST_PAGE_SIZE,
       Math.max(
@@ -263,20 +283,40 @@ export async function apiRoutes(
         ? { _count: { name: topEvOrderParsed.order } }
         : { name: topEvOrderParsed.order };
 
+    const useScopedErrorList = Boolean(platform || release);
+    // Platform/release lists must use metricsWindow so counts match KPIs/charts when
+    // the overview time range is unselected (epoch→now vs ~30d metrics window).
+    const scopedErrorListScope = useScopedErrorList ? metricsScope : listScope;
+    const eventListSince = useScopedErrorList ? metricsWindow.gte : since;
+    const eventListUntil = useScopedErrorList ? metricsWindow.lte : until;
+
     const baseWhere = {
       ...whereEventProject(projectId),
-      created_at: { gte: since, lte: until },
+      created_at: { gte: eventListSince, lte: eventListUntil },
     };
     const eventWhere = {
       ...baseWhere,
       ...(appFilter ? { app: appFilter } : {}),
       ...(environment ? { environment } : {}),
+      ...(platform ? { platform } : {}),
+      ...(release ? { release } : {}),
     };
     const errorGroupWhere = {
       ...whereErrorGroupProject(projectId),
       last_seen: { gte: since, lte: until },
       ...(appFilter ? { app: appFilter } : {}),
       ...(environment ? { environment } : {}),
+      ...((platform || release)
+        ? {
+            occurrences_list: {
+              some: {
+                created_at: { gte: since, lte: until },
+                ...(platform ? { platform } : {}),
+                ...(release ? { release } : {}),
+              },
+            },
+          }
+        : {}),
     };
 
     const previousUntil = compareWindow.previousUntil ?? metricsWindow.gte;
@@ -288,15 +328,32 @@ export async function apiRoutes(
       previousUntil,
       app: appFilter,
       environment,
+      platform,
+      release,
     };
 
     const eventListWhereSql = buildEventWhereSql({
       projectId,
       appId: appFilter,
       environment,
-      gte: since,
-      lte: until,
+      platform,
+      release,
+      gte: eventListSince,
+      lte: eventListUntil,
     });
+
+    const activeIssueLinkScope = {
+      app: appFilter,
+      environment,
+      platform,
+      release,
+      ...(timeRange.key === "absolute"
+        ? {
+            from: queryString(query.from),
+            to: queryString(query.to),
+          }
+        : { range: timeRange.key }),
+    };
 
     const [
       errorCounts,
@@ -317,19 +374,28 @@ export async function apiRoutes(
     ] = await Promise.all([
       getOverviewErrorCountsPair(prisma, windowParams),
       getOverviewEventWindowStats(prisma, windowParams),
-      prisma.errorGroup.count({ where: errorGroupWhere }),
+      useScopedErrorList
+        ? countOverviewErrorGroupsInWindow(prisma, scopedErrorListScope)
+        : prisma.errorGroup.count({ where: errorGroupWhere }),
       prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
         SELECT COUNT(DISTINCT e."name")::bigint AS c
         FROM "Event" e
         WHERE ${eventListWhereSql}
       `),
-      prisma.errorGroup.findMany({
-        where: errorGroupWhere,
-        skip: errorsSkip,
-        take: listPageSize,
-        orderBy: errorGroupOrderBy,
-        include: { _count: { select: { occurrences_list: true } } },
-      }),
+      useScopedErrorList
+        ? listOverviewErrorGroupsInWindow(prisma, scopedErrorListScope, {
+            sort: errSortParsed.sort,
+            order: errOrderParsed.order,
+            skip: errorsSkip,
+            take: listPageSize,
+          })
+        : prisma.errorGroup.findMany({
+            where: errorGroupWhere,
+            skip: errorsSkip,
+            take: listPageSize,
+            orderBy: errorGroupOrderBy,
+            include: { _count: { select: { occurrences_list: true } } },
+          }),
       prisma.event.groupBy({
         by: ["name"],
         where: eventWhere,
@@ -345,7 +411,9 @@ export async function apiRoutes(
         chartUntil,
         chartBucket,
         appFilter,
-        environment
+        environment,
+        platform,
+        release
       ),
       getOverviewSessionsPair(
         prisma,
@@ -362,9 +430,16 @@ export async function apiRoutes(
         chartSince,
         chartUntil,
         appFilter,
-        environment
+        environment,
+        platform,
+        release
       ),
-      listActiveIssues(prisma, listScope),
+      listActiveIssues(
+        prisma,
+        platform || release ? metricsScope : listScope,
+        5,
+        activeIssueLinkScope
+      ),
       fetchOverviewRequestMetrics(
         prisma,
         metricsScope,
@@ -412,10 +487,12 @@ export async function apiRoutes(
 
     const latestByName = await fetchLatestEventsByName(prisma, {
       projectId,
-      since,
-      until,
+      since: eventListSince,
+      until: eventListUntil,
       app: appFilter,
       environment,
+      platform,
+      release,
       names: eventCounts.map((row) => row.name),
     });
 
@@ -480,6 +557,7 @@ export async function apiRoutes(
       to?: string;
       environment?: string;
       release?: string;
+      platform?: string;
       q?: string;
       status?: string;
       metricsUntil?: string;
@@ -487,6 +565,7 @@ export async function apiRoutes(
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
     const release = queryString(query.release);
+    const platform = queryString(query.platform);
     const q = queryString(query.q);
     const status = queryString(query.status) ?? "all";
     const range = parseCreatedRange(query, "all");
@@ -496,6 +575,7 @@ export async function apiRoutes(
       appId,
       environment,
       release,
+      platform,
       q,
       range,
       status:
@@ -521,6 +601,7 @@ export async function apiRoutes(
       to?: string;
       environment?: string;
       release?: string;
+      platform?: string;
       q?: string;
       status?: string;
       metricsUntil?: string;
@@ -528,6 +609,7 @@ export async function apiRoutes(
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
     const release = queryString(query.release);
+    const platform = queryString(query.platform);
     const q = queryString(query.q);
     const status = queryString(query.status) ?? "all";
     const range = parseCreatedRange(query, "all");
@@ -537,6 +619,7 @@ export async function apiRoutes(
       appId,
       environment,
       release,
+      platform,
       q,
       range,
       status:
@@ -565,6 +648,7 @@ export async function apiRoutes(
       to?: string;
       environment?: string;
       release?: string;
+      platform?: string;
       q?: string;
       status?: string;
       sort?: string;
@@ -580,6 +664,7 @@ export async function apiRoutes(
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
     const release = queryString(query.release);
+    const platform = queryString(query.platform);
     const q = queryString(query.q);
     const status = queryString(query.status) ?? "all";
     const range = parseCreatedRange(query, "all");
@@ -611,6 +696,7 @@ export async function apiRoutes(
       appId,
       environment,
       release,
+      platform,
       q,
       range,
       status:
@@ -622,7 +708,13 @@ export async function apiRoutes(
     };
     const metricsFilter = enrichErrorListFilterForMetrics(filter, range, metricsAnchor);
 
-    if (isAggregateSort(sortParsed.sort)) {
+    // Platform/release always use the aggregate path so membership, counts, and
+    // first/last seen stay inside the list/metrics window (no lifetime fallbacks).
+    if (
+      isAggregateSort(sortParsed.sort) ||
+      requiresScopedSeenAggregateSort(sortParsed.sort, metricsFilter) ||
+      Boolean(metricsFilter.platform || metricsFilter.release)
+    ) {
       const { total, rows } = await listErrorGroupsAggregated(
         prisma,
         metricsFilter,
@@ -639,7 +731,8 @@ export async function apiRoutes(
         rows.map((r) => r.id),
         trend.durationMs,
         trend.end,
-        metricsFilter.release
+        metricsFilter.release,
+        metricsFilter.platform
       );
       const items = rows.map((r) =>
         serializeErrorGroupListItem({
@@ -668,6 +761,7 @@ export async function apiRoutes(
       {
         range: metricsFilter.range,
         release: metricsFilter.release,
+        platform: metricsFilter.platform,
         occurrenceCountRange: metricsFilter.occurrenceCountRange,
       }
     );
@@ -676,7 +770,8 @@ export async function apiRoutes(
       groups.map((g) => g.id),
       trend.durationMs,
       trend.end,
-      metricsFilter.release
+      metricsFilter.release,
+      metricsFilter.platform
     );
     const items = groups.map((g) => {
       const m = metrics.get(g.id);
@@ -687,9 +782,11 @@ export async function apiRoutes(
         top_stack: g.top_stack,
         app: g.app,
         environment: g.environment,
+        release: g.release,
+        platform: g.platform,
         occurrences: g.occurrences,
-        first_seen: g.first_seen,
-        last_seen: g.last_seen,
+        first_seen: m?.first_seen ?? g.first_seen,
+        last_seen: m?.last_seen ?? g.last_seen,
         resolved_at: g.resolved_at,
         users_affected: m?.users_affected ?? 0,
         sessions_affected: m?.sessions_affected ?? 0,
@@ -736,10 +833,93 @@ export async function apiRoutes(
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;
     const { id } = request.params;
+    const query = request.query as {
+      app?: string;
+      environment?: string;
+      platform?: string;
+      release?: string;
+      range?: string;
+      from?: string;
+      to?: string;
+      metricsUntil?: string;
+    };
+    const appFilter = queryApp(query.app);
+    const environment = queryString(query.environment);
+    const platform = queryString(query.platform);
+    const release = queryString(query.release);
+    const rangeKey = queryString(query.range);
+    const metricsUntilRaw = queryString(query.metricsUntil);
+    const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
+    // Issues list passes metricsUntil (~7d). Overview range=none/all uses the same
+    // resolveUnselectedMetricsWindow as Overview KPIs / scoped error list.
+    const useIssuesMetricsWindow = Boolean(metricsUntilRaw);
+    const isOverviewUnselected =
+      !hasFromTo &&
+      (rangeKey === "none" || rangeKey === "all") &&
+      !useIssuesMetricsWindow;
+    const hasBoundedPreset =
+      hasFromTo || Boolean(rangeKey && rangeKey !== "all" && rangeKey !== "none");
+    const listRange = parseCreatedRange(query, "all");
+    const metricsAnchor = parseErrorsMetricsAnchor(metricsUntilRaw);
+
+    let windowGte: Date | undefined;
+    let windowLte: Date | undefined;
+    if (isOverviewUnselected) {
+      const metricsWindow = await resolveUnselectedMetricsWindow(prisma, {
+        projectId,
+        until: metricsAnchor,
+        app: appFilter,
+        environment,
+        platform,
+        release,
+      });
+      windowGte = metricsWindow.gte;
+      windowLte = metricsWindow.lte;
+    } else if (hasBoundedPreset) {
+      windowGte = listRange.gte;
+      windowLte = listRange.lte;
+    } else if (platform || release || useIssuesMetricsWindow) {
+      const enriched = enrichErrorListFilterForMetrics(
+        {
+          range: listRange,
+          status: "all",
+          ...(platform ? { platform } : {}),
+          ...(release ? { release } : {}),
+        },
+        listRange,
+        metricsAnchor
+      );
+      windowGte = enriched.range.gte ?? enriched.occurrenceCountRange?.gte;
+      windowLte = enriched.range.lte ?? enriched.occurrenceCountRange?.lte;
+    }
+    const occurrenceScope = {
+      ...(platform ? { platform } : {}),
+      ...(release ? { release } : {}),
+      ...(windowGte ? { gte: windowGte } : {}),
+      ...(windowLte ? { lte: windowLte } : {}),
+    };
+    const applyScopedMetrics = Boolean(
+      platform || release || windowGte || windowLte
+    );
+    const occurrenceWhere = {
+      ...(platform ? { platform } : {}),
+      ...(release ? { release } : {}),
+      ...(windowGte || windowLte
+        ? {
+            created_at: {
+              ...(windowGte ? { gte: windowGte } : {}),
+              ...(windowLte ? { lte: windowLte } : {}),
+            },
+          }
+        : {}),
+    };
+
     const group = await prisma.errorGroup.findFirst({
       where: whereErrorGroupById(id, projectId),
       include: {
         occurrences_list: {
+          where:
+            Object.keys(occurrenceWhere).length > 0 ? occurrenceWhere : undefined,
           orderBy: { created_at: "desc" },
           take: 50,
         },
@@ -747,11 +927,65 @@ export async function apiRoutes(
     });
     if (!group) return reply.status(404).send({ error: "Not found" });
     const { enrichErrorGroupWithSymbolicatedStacks } = await import("../lib/stack-symbolicate.js");
-    const [enriched, impact] = await Promise.all([
+    const trendEnd = windowLte ?? new Date();
+    const trendDurationMs =
+      windowGte != null
+        ? Math.max(trendEnd.getTime() - windowGte.getTime(), 60_000)
+        : 24 * 60 * 60 * 1000;
+    const [enriched, impact, sparklineMap, scopedSummary] = await Promise.all([
       enrichErrorGroupWithSymbolicatedStacks(prisma, projectId, group),
-      fetchImpactMetricsForGroupId(prisma, id),
+      fetchImpactMetricsForGroupId(prisma, id, occurrenceScope),
+      fetchSparklinesForGroupIds(
+        prisma,
+        [id],
+        trendDurationMs,
+        trendEnd,
+        release,
+        platform
+      ),
+      applyScopedMetrics
+        ? fetchScopedOccurrenceSummaryForGroupId(prisma, id, occurrenceScope)
+        : Promise.resolve(null),
     ]);
-    return reply.send({ ...enriched, ...impact });
+
+    const sessionClientIds = [
+      ...new Set(
+        enriched.occurrences_list
+          .map((o) => o.session_id)
+          .filter((s): s is string => typeof s === "string" && s.trim() !== "")
+      ),
+    ];
+    const sessionRows =
+      sessionClientIds.length > 0
+        ? await prisma.session.findMany({
+            where: {
+              project_id: projectId,
+              app: group.app,
+              session_id: { in: sessionClientIds },
+            },
+            select: { id: true, session_id: true },
+          })
+        : [];
+    const sessionRowByClientId = new Map(sessionRows.map((s) => [s.session_id, s.id]));
+    const occurrences_list = enriched.occurrences_list.map((o) => ({
+      ...o,
+      session_row_id: o.session_id ? sessionRowByClientId.get(o.session_id) ?? null : null,
+    }));
+
+    return reply.send({
+      ...enriched,
+      ...impact,
+      ...(scopedSummary
+        ? {
+            occurrences: scopedSummary.occurrences,
+            // Never fall back to fingerprint lifetime when a scope/window is active.
+            first_seen: scopedSummary.first_seen,
+            last_seen: scopedSummary.last_seen,
+          }
+        : {}),
+      occurrences_list,
+      sparkline: sparklineMap.get(id) ?? [],
+    });
   });
 
   app.get("/events/summary", async (request, reply) => {
@@ -1203,8 +1437,20 @@ export async function apiRoutes(
       ? { ...whereSessionProject(projectId), app: appFilter }
       : whereSessionProject(projectId);
 
-    const [environments, platEvents, platSessions, relEvents, relErrors, countrySessions] =
-      await Promise.all([
+    const errorGroupWhere = appFilter
+      ? { project_id: projectId, app: appFilter }
+      : { project_id: projectId };
+
+    const [
+      environments,
+      platEvents,
+      platSessions,
+      platErrors,
+      relEvents,
+      relSessions,
+      relErrors,
+      countrySessions,
+    ] = await Promise.all([
       distinctEnvironmentsForProject(prisma, projectId, appFilter),
       prisma.event.groupBy({
         by: ["platform"],
@@ -1214,17 +1460,26 @@ export async function apiRoutes(
         by: ["platform"],
         where: { ...baseSession, platform: { not: null } },
       }),
+      prisma.errorOccurrence.groupBy({
+        by: ["platform"],
+        where: {
+          platform: { not: null },
+          error_group: errorGroupWhere,
+        },
+      }),
       prisma.event.groupBy({
         by: ["release"],
         where: { ...baseEvent, release: { not: null } },
+      }),
+      prisma.session.groupBy({
+        by: ["release"],
+        where: { ...baseSession, release: { not: null } },
       }),
       prisma.errorOccurrence.groupBy({
         by: ["release"],
         where: {
           release: { not: null },
-          error_group: appFilter
-            ? { project_id: projectId, app: appFilter }
-            : { project_id: projectId },
+          error_group: errorGroupWhere,
         },
       }),
       prisma.session.groupBy({
@@ -1237,11 +1492,13 @@ export async function apiRoutes(
       ...new Set([
         ...platEvents.map((r) => r.platform).filter(Boolean) as string[],
         ...platSessions.map((r) => r.platform).filter(Boolean) as string[],
+        ...platErrors.map((r) => r.platform).filter(Boolean) as string[],
       ]),
     ].sort();
     const releases = [
       ...new Set([
         ...relEvents.map((r) => r.release).filter(Boolean) as string[],
+        ...relSessions.map((r) => r.release).filter(Boolean) as string[],
         ...relErrors.map((r) => r.release).filter(Boolean) as string[],
       ]),
     ].sort();

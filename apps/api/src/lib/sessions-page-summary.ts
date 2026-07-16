@@ -324,6 +324,107 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
   return eventClauses;
 }
 
+/**
+ * Prefer Session.environment / Session.release; fall back to matching events for
+ * legacy null columns. When both filters are set, a single event must satisfy both
+ * (or session columns must both match) — never different events per field.
+ */
+function sessionEnvReleaseMatchSql(
+  projectId: string,
+  sessionAlias: string,
+  f: Pick<SessionListFilterInput, "environment" | "release">,
+  eventWindow?: SessionEventWindow
+): Prisma.Sql | null {
+  if (!f.environment && !f.release) return null;
+  const s = Prisma.raw(`"${sessionAlias}"`);
+
+  if (f.environment && f.release) {
+    const bothOnEvent = sessionEventExistsSql(
+      projectId,
+      sessionAlias,
+      [
+        Prisma.sql`e."environment" = ${f.environment}`,
+        Prisma.sql`e."release" = ${f.release}`,
+      ],
+      eventWindow
+    );
+    const envOnEvent = sessionEventExistsSql(
+      projectId,
+      sessionAlias,
+      [Prisma.sql`e."environment" = ${f.environment}`],
+      eventWindow
+    );
+    const releaseOnEvent = sessionEventExistsSql(
+      projectId,
+      sessionAlias,
+      [Prisma.sql`e."release" = ${f.release}`],
+      eventWindow
+    );
+    return Prisma.sql`(
+      (
+        ${s}."environment" = ${f.environment}
+        AND ${s}."release" = ${f.release}
+      )
+      OR (
+        ${s}."environment" IS NULL
+        AND ${s}."release" IS NULL
+        AND ${bothOnEvent}
+      )
+      OR (
+        ${s}."environment" = ${f.environment}
+        AND ${s}."release" IS NULL
+        AND ${releaseOnEvent}
+      )
+      OR (
+        ${s}."environment" IS NULL
+        AND ${s}."release" = ${f.release}
+        AND ${envOnEvent}
+      )
+    )`;
+  }
+
+  if (f.environment) {
+    return Prisma.sql`(
+      ${s}."environment" = ${f.environment}
+      OR (
+        ${s}."environment" IS NULL
+        AND ${sessionEventExistsSql(
+          projectId,
+          sessionAlias,
+          [Prisma.sql`e."environment" = ${f.environment}`],
+          eventWindow
+        )}
+      )
+    )`;
+  }
+
+  return Prisma.sql`(
+    ${s}."release" = ${f.release}
+    OR (
+      ${s}."release" IS NULL
+      AND ${sessionEventExistsSql(
+        projectId,
+        sessionAlias,
+        [Prisma.sql`e."release" = ${f.release}`],
+        eventWindow
+      )}
+    )
+  )`;
+}
+
+function sessionEnvReleaseScopeSql(
+  projectId: string,
+  f: SessionListFilterInput,
+  eventWindow?: SessionEventWindow
+): Prisma.Sql | null {
+  return sessionEnvReleaseMatchSql(
+    projectId,
+    "s",
+    f,
+    resolveSessionEventWindow(f, eventWindow)
+  );
+}
+
 function sessionHasEventScope(f: SessionListFilterInput): boolean {
   return sessionEventScopeClauses(f).length > 0;
 }
@@ -391,14 +492,15 @@ export function sessionWindowWithEventScope(
   const startedAt = exclusiveUntil
     ? sessionStartedInPreviousWindow(sessionAlias, since, until)
     : sessionStartedInCurrentWindow(sessionAlias, since, until);
-  const eventClauses = sessionEventScopeClauses(f);
-  if (eventClauses.length === 0) return startedAt;
-  return Prisma.sql`(${startedAt} AND ${sessionEventExistsSql(
-    projectId,
-    sessionAlias,
-    eventClauses,
-    { gte: since, lte: until, exclusiveLte: exclusiveUntil }
-  )})`;
+  if (!f.environment && !f.release) return startedAt;
+
+  const match = sessionEnvReleaseMatchSql(projectId, sessionAlias, f, {
+    gte: since,
+    lte: until,
+    exclusiveLte: exclusiveUntil,
+  });
+  if (!match) return startedAt;
+  return Prisma.sql`(${startedAt} AND ${match})`;
 }
 
 function sessionSearchSql(q: string): Prisma.Sql {
@@ -423,16 +525,9 @@ export function sessionFilterSql(
   if (f.appId) parts.push(Prisma.sql`s."app" = ${f.appId}`);
   if (f.platform) parts.push(Prisma.sql`s."platform" = ${f.platform}`);
   if (f.country) parts.push(Prisma.sql`s."country" = ${f.country}`);
-  const eventClauses = sessionEventScopeClauses(f);
-  if (eventClauses.length > 0 && !omitEventScope) {
-    parts.push(
-      sessionEventExistsSql(
-        projectId,
-        "s",
-        eventClauses,
-        resolveSessionEventWindow(f, eventWindow)
-      )
-    );
+  if (!omitEventScope) {
+    const envReleaseScope = sessionEnvReleaseScopeSql(projectId, f, eventWindow);
+    if (envReleaseScope) parts.push(envReleaseScope);
   }
   if (f.q?.trim()) parts.push(sessionSearchSql(f.q));
   return Prisma.join(parts, " AND ");
