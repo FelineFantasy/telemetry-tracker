@@ -144,7 +144,8 @@ Sensitive **keys** are matched case-insensitively (`email`, `Email`, `API_KEY`, 
 | `apps/api/src/lib/pii-scrub.ts` | Shared text + JSON scrubber |
 | `apps/api/src/lib/ingest-pii-scrub.ts` | Env config + ingest payload helpers |
 | `apps/api/src/lib/project-pii-scrub-settings.ts` | Project deny-list parse/validate |
-| `apps/api/src/lib/project-pii-scrub-cache.ts` | Short-TTL deny-key cache for ingest |
+| `apps/api/src/lib/project-pii-scrub-cache.ts` | Short-TTL settings cache for ingest |
+| `apps/api/src/jobs/pii-scrub-backfill.ts` | Opt-in historical scrub CLI |
 | `apps/api/src/routes/ingest.ts` | Applies scrubbing after Zod parse, **before** fingerprint and Prisma writes |
 | `packages/telemetry-core/src/pii-scrub.ts` | Optional client scrubber |
 | `apps/api/src/lib/brief-snapshot-sanitize.ts` | Reuses `scrubPiiText` for workspace brief messages |
@@ -171,4 +172,72 @@ database → dashboard
 
 - Custom regex controls in project/org settings
 - Organization-level PII defaults inherited by projects
-- Opt-in backfill / one-off scrub job for existing rows
+
+## Opt-in historical backfill (Phase 3b)
+
+Already-stored rows are **not** rewritten by ingest scrubbing. Running this job is **completely optional** — telemetry continues to work without it. Use it when you need to redact historical data after enabling scrubbing (or after tightening deny-keys / session-email settings).
+
+**Always scope** with exactly one of `--project-id` or `--org-id`. Providing neither or both is rejected. Global / unscoped runs are not supported. If the scope matches zero eligible projects (unknown ID, deleted project, unknown/deleted org, or org with no active projects), the job exits with an error and non-zero status — it does **not** report success.
+
+```bash
+# Prefer dry-run first (no writes; prints scanned / would-modify / skipped)
+pnpm --filter api pii-scrub-backfill -- --project-id <uuid> --dry-run
+
+# Apply (events, error occurrences, error group message/top_stack)
+pnpm --filter api pii-scrub-backfill -- --project-id <uuid>
+
+# Also rewrite Session.user_email → [email] when scrubSessionUserEmail is enabled
+pnpm --filter api pii-scrub-backfill -- \
+  --project-id <uuid> \
+  --dry-run \
+  --include-sessions
+
+# Optionally scrub ErrorGroup.fingerprint (skips on unique conflicts)
+pnpm --filter api pii-scrub-backfill -- \
+  --project-id <uuid> \
+  --scrub-fingerprints
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--project-id` / `--org-id` | **Required** — exactly one |
+| `--dry-run` | Calculate impact; **no rows modified** |
+| `--limit` / `--batch-size` | Cap per table for the **entire run** (shared across projects) / cursor page size |
+| `--include-sessions` | Consider sessions (still requires project `scrubSessionUserEmail`) |
+| `--scrub-fingerprints` | Opt-in fingerprint rewrite; default leaves fingerprints unchanged |
+| `--fail-fast` | Abort on first DB error (default: count and continue) |
+
+**Sessions:** both `--include-sessions` **and** project `scrubSessionUserEmail=true` are required. Otherwise session emails are never touched.
+
+**Fingerprints:** left unchanged by default so grouping identity stays stable. With `--scrub-fingerprints`, unique conflicts are skipped (display fields may still update); conflict counts appear in the summary. Re-runs do not keep regenerating already-scrubbed fingerprints.
+
+**Operational notes:** per-row updates in cursor batches (interrupt-safe for already-committed rows); progress on stderr; human summary + JSON on stdout; non-zero exit on fatal errors or counted database failures. Idempotent — already-scrubbed placeholders (`[email]`, `[token]`, `[phone]`, `[card]`, …) are skipped.
+
+Example summary:
+
+```text
+Scanned:
+- Events: 15000
+- Occurrences: 3500
+- Groups: 180
+- Sessions: 42
+
+Modified:
+- Events: 812
+- Occurrences: 114
+- Groups: 12
+- Sessions: 6
+
+Skipped:
+- Already scrubbed: 917
+- Fingerprint conflicts: 2
+
+Failures:
+- Database errors: 0
+
+Completed successfully.
+```
+
+Uses the same scrubber + project deny-keys as ingest. Requires `TELEMETRY_INGEST_PII_SCRUB` enabled. After build: `node dist/jobs/run-pii-scrub-backfill.js …`.
+
+**Risks:** rewriting `ErrorGroup.message` / `fingerprint` can affect how future occurrences group; prefer dry-run and small `--limit` samples first.
