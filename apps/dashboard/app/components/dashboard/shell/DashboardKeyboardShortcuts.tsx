@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DASHBOARD_GOTO_MAP, DASHBOARD_SHORTCUTS } from "@/lib/dashboard-shortcuts";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import { ShellKbd } from "./DashboardPopover";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -14,7 +14,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function DashboardKeyboardShortcuts() {
-  const router = useRouter();
+  const { push } = useDashboardNavigation();
   const [open, setOpen] = useState(false);
   const [awaitingGoto, setAwaitingGoto] = useState(false);
 
@@ -54,7 +54,7 @@ export function DashboardKeyboardShortcuts() {
           e.preventDefault();
           setAwaitingGoto(false);
           if (gotoTimer) clearTimeout(gotoTimer);
-          router.push(href);
+          push(href);
         }
         return;
       }
@@ -72,7 +72,7 @@ export function DashboardKeyboardShortcuts() {
       window.removeEventListener("keydown", onKey);
       if (gotoTimer) clearTimeout(gotoTimer);
     };
-  }, [awaitingGoto, close, open, router]);
+  }, [awaitingGoto, close, open, push]);
 
   return (
     <>

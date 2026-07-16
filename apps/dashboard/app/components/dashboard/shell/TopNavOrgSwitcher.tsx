@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus, Users } from "lucide-react";
 import { setDashboardOrganizationId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import {
   formatOrganizationRailName,
   LEGACY_SEEDED_ORG_NAME,
@@ -24,7 +25,7 @@ export function TopNavOrgSwitcher({
   const router = useRouter();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const [pending, startTransition] = useTransition();
+  const { replace, runPending, isPending: pending } = useDashboardNavigation();
   const [value, setValue] = useState(currentOrganizationId ?? "");
 
   useEffect(() => {
@@ -83,10 +84,10 @@ export function TopNavOrgSwitcher({
                     return;
                   }
                   setValue(o.id);
-                  startTransition(async () => {
+                  void runPending(async () => {
                     const r = await setDashboardOrganizationId(o.id);
                     if (r.ok) {
-                      router.replace(hrefWithoutAppSearchParam(pathname, searchParams));
+                      replace(hrefWithoutAppSearchParam(pathname, searchParams));
                       router.refresh();
                       close();
                     } else {

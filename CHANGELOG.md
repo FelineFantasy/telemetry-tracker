@@ -13,6 +13,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- Dashboard: full-screen loading overlay while switching app, environment, workspace, project, section tabs, settings pages, time range, and command-palette / keyboard navigation ([#484](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/484)).
+
 ### Fixed
 
 ### Changed
