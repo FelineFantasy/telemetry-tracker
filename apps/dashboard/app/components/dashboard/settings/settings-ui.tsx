@@ -167,12 +167,13 @@ export function SettingsToggle({
   onChange,
   label,
   disabled,
+  ...rest
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   label?: string;
   disabled?: boolean;
-}) {
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       type="button"
@@ -181,6 +182,7 @@ export function SettingsToggle({
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={`inline-flex items-center gap-2 text-[13px] ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+      {...rest}
     >
       <span
         className={`relative h-[18px] w-[30px] rounded-full transition-colors ${on ? "bg-brand" : "bg-surface-elevated"}`}
@@ -305,7 +307,3 @@ export function SettingsStat({
     </div>
   );
 }
-//  /\_/\
-// ( o.o )
-//  > ^ <
-// 🐱 Meow! You found an Easter egg. Congratulations! [by FelineFantasy]
