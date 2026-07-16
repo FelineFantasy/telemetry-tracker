@@ -84,9 +84,10 @@ export function AlertsClient({
           description="Fire when error occurrences in a rolling window exceed your threshold."
         >
           <FieldGroup>
-            <Field label="Enable error spike alerts">
+            <Field label="Enable error spike alerts" htmlFor="error-spike-toggle">
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
+                  id="error-spike-toggle"
                   on={settings.errorSpike.enabled}
                   onChange={(enabled) =>
                     setSettings((s) => ({
@@ -97,8 +98,9 @@ export function AlertsClient({
                 />
               </div>
             </Field>
-            <Field label="Threshold (errors per window)">
+            <Field label="Threshold (errors per window)" htmlFor="error-threshold">
               <input
+                id="error-threshold"
                 type="number"
                 min={1}
                 max={10000}
@@ -116,8 +118,9 @@ export function AlertsClient({
                 className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"
               />
             </Field>
-            <Field label="Window (minutes)">
+            <Field label="Window (minutes)" htmlFor="error-window">
               <input
+                id="error-window"
                 type="number"
                 min={5}
                 max={1440}
@@ -143,9 +146,10 @@ export function AlertsClient({
           description="Warn before monthly ingest limits are reached. Exceeded alerts always fire when ingest is rejected."
         >
           <FieldGroup>
-            <Field label="Enable quota warnings">
+            <Field label="Enable quota warnings" htmlFor="quota-toggle">
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
+                  id="quota-toggle"
                   on={settings.quota.enabled}
                   onChange={(enabled) =>
                     setSettings((s) => ({
@@ -156,8 +160,9 @@ export function AlertsClient({
                 />
               </div>
             </Field>
-            <Field label="Warning threshold (%)">
+            <Field label="Warning threshold (%)" htmlFor="quota-threshold">
               <input
+                id="quota-threshold"
                 type="number"
                 min={50}
                 max={99}
