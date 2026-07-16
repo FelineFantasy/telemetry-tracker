@@ -366,12 +366,23 @@ export async function projectDashboardRoutes(
         if (!raw) {
           return reply.status(400).send({ error: "slug cannot be empty" });
         }
-        nextSlug = await ensureUniqueProjectSlug(
-          prisma,
-          existing.organization_id,
-          slugifyProjectName(raw),
-          projectId
-        );
+        const desired = slugifyProjectName(raw);
+        if (desired !== existing.slug) {
+          const clash = await prisma.project.findFirst({
+            where: {
+              organization_id: existing.organization_id,
+              slug: desired,
+              id: { not: projectId },
+            },
+            select: { id: true },
+          });
+          if (clash) {
+            return reply
+              .status(409)
+              .send({ error: "slug already in use in this organization" });
+          }
+          nextSlug = desired;
+        }
       }
 
       if (nextName === existing.name && nextSlug === existing.slug) {
