@@ -26,6 +26,7 @@ import {
   parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
+import type { ProjectPiiScrubSettings } from "@/lib/pii-scrub-settings";
 import {
   fetchAuthSessions,
   type FetchAuthSessionsResult,
@@ -746,6 +747,33 @@ export async function saveProjectAlertSettingsAction(
     revalidatePath("/dashboard/alerts");
     revalidatePath("/dashboard", "layout");
     return { ok: true, settings: parseProjectAlertSettings(data.settings) };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function saveProjectPiiScrubSettingsAction(
+  settings: ProjectPiiScrubSettings
+): Promise<
+  | { ok: true; settings: ProjectPiiScrubSettings }
+  | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch("/api/project/pii-scrub-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { settings?: ProjectPiiScrubSettings };
+    revalidatePath("/dashboard/alerts");
+    return {
+      ok: true,
+      settings: data.settings ?? { denyKeys: [] },
+    };
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }

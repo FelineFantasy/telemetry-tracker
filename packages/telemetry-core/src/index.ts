@@ -5,10 +5,12 @@ import {
   WEB_VITAL_EVENT_NAME,
   type WebVitalEventProperties,
 } from "./web-vitals.js";
+import { scrubPiiRecord, scrubPiiText } from "./pii-scrub.js";
 
 import { SDK_VERSION } from "./version.js";
 
 export { SDK_VERSION };
+export { scrubPiiText, scrubPiiRecord } from "./pii-scrub.js";
 export {
   WEB_VITAL_EVENT_NAME,
   installWebVitals,
@@ -58,6 +60,13 @@ export function getAnonymousId(): string {
   return anonymousId;
 }
 
+export type TelemetryPiiScrubConfig =
+  | boolean
+  | {
+      /** Extra property/context keys to redact (case-insensitive). */
+      denyKeys?: string[];
+    };
+
 export type TelemetryConfig = {
   ingestUrl: string;
   app: string;
@@ -72,6 +81,12 @@ export type TelemetryConfig = {
   batchSize?: number;
   /** Capture Core Web Vitals (LCP, INP, CLS, TTFB) in browser. Default true. */
   webVitals?: boolean;
+  /**
+   * Optional client-side PII scrubbing before send (default off).
+   * Complements server ingest scrubbing — never rely on this alone.
+   * See https://github.com/Telemetry-Tracker/telemetry-tracker/blob/develop/docs/PII-SCRUBBING.md
+   */
+  piiScrub?: TelemetryPiiScrubConfig;
 };
 
 let config: TelemetryConfig | null = null;
@@ -407,6 +422,35 @@ function sendEventBatch(cfg: TelemetryConfig, batch: QueuedEvent[], keepalive: b
   }
 }
 
+function resolveClientPiiScrub(
+  cfg: TelemetryConfig | null
+): { denyKeys?: string[] } | null {
+  // Opt-in only: omitted / false / null → no client scrubbing.
+  if (cfg?.piiScrub == null || cfg.piiScrub === false) return null;
+  if (cfg.piiScrub === true) return {};
+  if (typeof cfg.piiScrub === "object") {
+    // `{ denyKeys: [] }` still enables default pattern/key scrubbing (no extra keys).
+    return {
+      ...(cfg.piiScrub.denyKeys && cfg.piiScrub.denyKeys.length > 0
+        ? { denyKeys: cfg.piiScrub.denyKeys }
+        : {}),
+    };
+  }
+  return null;
+}
+
+/** @internal exported for tests */
+export { resolveClientPiiScrub };
+
+function scrubEventProperties(
+  cfg: TelemetryConfig | null,
+  properties: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  const opts = resolveClientPiiScrub(cfg);
+  if (!opts || properties === undefined) return properties;
+  return scrubPiiRecord(properties, opts);
+}
+
 export function trackEvent(
   name: string,
   properties?: Record<string, unknown>
@@ -414,11 +458,12 @@ export function trackEvent(
   const cfg = getConfigOrNull();
   const interval = cfg?.batchInterval ?? DEFAULT_BATCH_INTERVAL;
   const batchSize = cfg?.batchSize ?? DEFAULT_BATCH_SIZE;
+  const scrubbedProperties = scrubEventProperties(cfg, properties ?? undefined);
   const item: QueuedEvent = {
     name,
     user_id: userId,
     session_id: sessionId ?? undefined,
-    properties: properties ?? undefined,
+    properties: scrubbedProperties,
   };
   if (interval > 0 && typeof setInterval !== "undefined") {
     eventQueue.push(item);
@@ -437,16 +482,26 @@ export function trackError(
   error: Error | { message: string; stack?: string },
   context?: Record<string, unknown>
 ): void {
-  if (!getConfigOrNull()) return;
+  const cfg = getConfigOrNull();
+  if (!cfg) return;
   const err = error instanceof Error ? error : { message: error.message, stack: error.stack };
   if (err && typeof err === "object" && (err as unknown as Record<symbol, boolean>)[REPORTED]) return;
-  const message = err instanceof Error ? err.message : err.message;
-  const stack = err instanceof Error ? err.stack : err.stack;
+  let message = err instanceof Error ? err.message : err.message;
+  let stack = err instanceof Error ? err.stack : err.stack;
+  let scrubbedContext = context ?? undefined;
+  const scrubOpts = resolveClientPiiScrub(cfg);
+  if (scrubOpts) {
+    message = scrubPiiText(message);
+    if (stack != null) stack = scrubPiiText(stack);
+    if (scrubbedContext != null) {
+      scrubbedContext = scrubPiiRecord(scrubbedContext, scrubOpts);
+    }
+  }
   if (err instanceof Error) (err as unknown as Record<symbol, boolean>)[REPORTED] = true;
   send("/ingest/error", {
     message,
     stack: stack ?? undefined,
-    context: context ?? undefined,
+    context: scrubbedContext,
     user_id: userId ?? undefined,
     session_id: sessionId ?? undefined,
   }).catch(() => {});

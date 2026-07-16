@@ -1033,6 +1033,48 @@ export async function projectDashboardRoutes(
     return reply.send({ settings: validated.settings });
   });
 
+  app.get("/project/pii-scrub-settings", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const row = await prisma.project.findFirst({
+      where: { id: projectId, deleted_at: null },
+      select: { pii_scrub_settings: true },
+    });
+    const { parseProjectPiiScrubSettings } = await import(
+      "../lib/project-pii-scrub-settings.js"
+    );
+    return reply.send({
+      settings: parseProjectPiiScrubSettings(row?.pii_scrub_settings ?? null),
+    });
+  });
+
+  app.patch("/project/pii-scrub-settings", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { validateProjectPiiScrubSettingsPatch } = await import(
+      "../lib/project-pii-scrub-settings.js"
+    );
+    const validated = validateProjectPiiScrubSettingsPatch(request.body);
+    if (!validated.ok) {
+      return reply.status(400).send({ error: validated.error });
+    }
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { pii_scrub_settings: validated.settings as object },
+    });
+    const { clearProjectPiiScrubSettingsCache } = await import(
+      "../lib/project-pii-scrub-cache.js"
+    );
+    clearProjectPiiScrubSettingsCache(projectId);
+    return reply.send({ settings: validated.settings });
+  });
+
   app.get("/project/alert-events", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;

@@ -6,8 +6,16 @@
 export type PiiScrubOptions = {
   /** Max object/array nesting depth (default 8). */
   maxDepth?: number;
-  /** Max nodes visited while walking JSON (default 500). */
+  /**
+   * Soft threshold: when exceeded, switch to the bounded remainder pass
+   * (still redacts nested keys/strings). Default 500.
+   */
   maxNodes?: number;
+  /**
+   * Extra property keys to redact (case-insensitive; `_`/`-` ignored).
+   * Values become `[redacted]` unless the key already has a built-in placeholder.
+   */
+  denyKeys?: string[];
 };
 
 const DEFAULT_MAX_DEPTH = 8;
@@ -60,9 +68,28 @@ function normalizeKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function placeholderForKey(key: string): string | null {
-  return SENSITIVE_KEY_PLACEHOLDERS[normalizeKey(key)] ?? null;
+function resolvePlaceholder(
+  key: string,
+  denyNormalized: ReadonlySet<string>
+): string | null {
+  const n = normalizeKey(key);
+  const mapped = SENSITIVE_KEY_PLACEHOLDERS[n];
+  if (mapped) return mapped;
+  if (denyNormalized.has(n)) return "[redacted]";
+  return null;
 }
+
+function denyKeySet(denyKeys: string[] | undefined): ReadonlySet<string> {
+  if (!denyKeys || denyKeys.length === 0) return EMPTY_DENY;
+  const set = new Set<string>();
+  for (const key of denyKeys) {
+    const n = normalizeKey(key);
+    if (n) set.add(n);
+  }
+  return set;
+}
+
+const EMPTY_DENY: ReadonlySet<string> = new Set();
 
 function replaceSensitiveUuidContexts(text: string): string {
   const uuidMap = new Map<string, string>();
@@ -118,6 +145,7 @@ export function scrubPiiText(text: string): string {
 export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknown {
   const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH;
   const maxNodes = options?.maxNodes ?? DEFAULT_MAX_NODES;
+  const denyNormalized = denyKeySet(options?.denyKeys);
   let nodes = 0;
 
   function scrubRemainder(node: unknown, hardCap: { n: number }): unknown {
@@ -133,7 +161,7 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
     if (node && typeof node === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
-        const placeholder = placeholderForKey(key);
+        const placeholder = resolvePlaceholder(key, denyNormalized);
         if (placeholder != null) {
           out[key] = placeholder;
         } else {
@@ -167,7 +195,7 @@ export function scrubPiiValue(value: unknown, options?: PiiScrubOptions): unknow
     if (typeof node === "object") {
       const out: Record<string, unknown> = {};
       for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
-        const placeholder = placeholderForKey(key);
+        const placeholder = resolvePlaceholder(key, denyNormalized);
         if (placeholder != null) {
           out[key] = placeholder;
           continue;

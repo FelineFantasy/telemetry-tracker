@@ -82,6 +82,15 @@ describe("scrubPiiText", () => {
       "Error: mail [email]\n    at run (entry.js:10:2)"
     );
   });
+
+  it("leaves already-scrubbed placeholders intact when applied twice", () => {
+    const once = scrubPiiText("Failed for user@example.com");
+    expect(once).toBe("Failed for [email]");
+    expect(scrubPiiText(once)).toBe(once);
+    expect(
+      scrubPiiRecord({ email: "[email]", token: "[token]", x: "[redacted]" })
+    ).toEqual({ email: "[email]", token: "[token]", x: "[redacted]" });
+  });
 });
 
 describe("scrubPiiValue / scrubPiiRecord", () => {
@@ -157,5 +166,20 @@ describe("scrubPiiValue / scrubPiiRecord", () => {
     };
     expect(scrubbed.items[0]?.payload.email).toBe("[email]");
     expect(scrubbed.items[19]?.payload.email).toBe("[email]");
+  });
+
+  it("applies denyKeys as [redacted] for unknown sensitive fields", () => {
+    expect(
+      scrubPiiRecord(
+        { customerId: "cust_123", note: "ok" },
+        { denyKeys: ["customer_id"] }
+      )
+    ).toEqual({ customerId: "[redacted]", note: "ok" });
+  });
+
+  it("keeps built-in placeholders when denyKeys overlap", () => {
+    expect(
+      scrubPiiRecord({ Email: "a@b.co" }, { denyKeys: ["email"] })
+    ).toEqual({ Email: "[email]" });
   });
 });

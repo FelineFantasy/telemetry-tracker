@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { saveProjectAlertSettingsAction } from "@/app/dashboard/actions";
+import {
+  saveProjectAlertSettingsAction,
+  saveProjectPiiScrubSettingsAction,
+} from "@/app/dashboard/actions";
 import {
   AnalyticsPanel,
   AnalyticsPanelHeader,
@@ -19,6 +22,7 @@ import {
   FieldGroup,
   Section,
   SettingsBtn,
+  SettingsTextarea,
   SettingsToggle,
 } from "@/app/components/dashboard/settings/settings-ui";
 import {
@@ -27,24 +31,43 @@ import {
   type AlertEventRow,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
+import {
+  formatDenyKeysInput,
+  parseDenyKeysInput,
+  piiScrubSettingsEqual,
+  type ProjectPiiScrubSettings,
+} from "@/lib/pii-scrub-settings";
 import { formatRelativeTime } from "@/lib/format-time";
 
 export function AlertsClient({
   initialSettings,
   initialEvents,
+  initialPiiSettings,
   canEdit,
 }: {
   initialSettings: ProjectAlertSettings;
   initialEvents: AlertEventRow[];
+  initialPiiSettings: ProjectPiiScrubSettings;
   canEdit: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [piiPending, startPiiTransition] = useTransition();
   const [settings, setSettings] = useState(initialSettings);
+  const [denyKeysText, setDenyKeysText] = useState(() =>
+    formatDenyKeysInput(initialPiiSettings.denyKeys)
+  );
+  const [savedPii, setSavedPii] = useState(initialPiiSettings);
   const dirty = useMemo(
     () => !alertSettingsEqual(settings, initialSettings),
     [settings, initialSettings]
   );
+  const piiDirty = useMemo(() => {
+    const next: ProjectPiiScrubSettings = {
+      denyKeys: parseDenyKeysInput(denyKeysText),
+    };
+    return !piiScrubSettingsEqual(next, savedPii);
+  }, [denyKeysText, savedPii]);
 
   function save() {
     startTransition(async () => {
@@ -55,6 +78,21 @@ export function AlertsClient({
       }
       toast.success("Alert settings saved");
       setSettings(result.settings);
+      router.refresh();
+    });
+  }
+
+  function savePii() {
+    startPiiTransition(async () => {
+      const next = { denyKeys: parseDenyKeysInput(denyKeysText) };
+      const result = await saveProjectPiiScrubSettingsAction(next);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("PII scrub settings saved");
+      setSavedPii(result.settings);
+      setDenyKeysText(formatDenyKeysInput(result.settings.denyKeys));
       router.refresh();
     });
   }
@@ -188,6 +226,52 @@ export function AlertsClient({
               Notification settings
             </Link>
             . Alert notifications use the Alerts category.
+          </p>
+        </Section>
+
+        <Section
+          title="PII scrubbing"
+          description="Server-side ingest already redacts common emails, tokens, and secrets. Add extra property or context field names to always redact for this project (not regex patterns)."
+          actions={
+            canEdit ? (
+              <SettingsBtn
+                variant="primary"
+                disabled={!piiDirty || piiPending}
+                onClick={savePii}
+              >
+                {piiPending ? "Saving…" : "Save deny-list"}
+              </SettingsBtn>
+            ) : null
+          }
+        >
+          <FieldGroup>
+            <Field
+              label="Deny-listed field names"
+              hint="One field name per line (or comma-separated). Matched case-insensitively on property/context keys — for example nationalId or customer_ref. These are additive to built-in protections and cannot turn them off."
+            >
+              <SettingsTextarea
+                id="pii-deny-keys"
+                rows={5}
+                disabled={!canEdit}
+                value={denyKeysText}
+                onChange={(e) => setDenyKeysText(e.target.value)}
+                placeholder={"nationalId\ncustomerRef"}
+                className="font-mono text-[12px]"
+                aria-label="Deny-listed field names"
+                aria-describedby="pii-deny-keys-help"
+              />
+            </Field>
+          </FieldGroup>
+          <p id="pii-deny-keys-help" className="mt-2 text-[12px] text-muted-foreground">
+            Optional client-side scrubbing is available in{" "}
+            <code className="font-mono text-[11px]">@telemetry-tracker/core</code> via{" "}
+            <code className="font-mono text-[11px]">piiScrub</code> (default off). Session identity
+            fields such as <code className="font-mono text-[11px]">user_email</code> are not
+            rewritten. See{" "}
+            <Link href="/docs/sdk" className="text-brand hover:underline">
+              SDK docs
+            </Link>
+            .
           </p>
         </Section>
 

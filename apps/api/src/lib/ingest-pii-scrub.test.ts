@@ -110,6 +110,18 @@ describe("scrubIngestEventFields", () => {
     });
   });
 
+  it("merges project denyKeys into property scrubbing", () => {
+    expect(
+      scrubIngestEventFields(
+        { properties: { nationalId: "X-99", path: "/ok" } },
+        {},
+        { denyKeys: ["nationalId"] }
+      )
+    ).toEqual({
+      properties: { nationalId: "[redacted]", path: "/ok" },
+    });
+  });
+
   it("leaves events without properties unchanged", () => {
     const body = { name: "checkout_started" };
     expect(scrubIngestEventFields(body, {})).toEqual(body);
