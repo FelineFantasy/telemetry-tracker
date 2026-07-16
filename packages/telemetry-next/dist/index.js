@@ -49,7 +49,8 @@ export class TelemetryErrorBoundary extends React.Component {
     }
 }
 export function TelemetryProvider({ config, children, }) {
-    React.useEffect(() => {
+    // Layout effect so init/session exist before child useEffects (e.g. useTrackPage).
+    React.useLayoutEffect(() => {
         init(config);
         return () => {
             shutdown();
@@ -59,7 +60,7 @@ export function TelemetryProvider({ config, children, }) {
 }
 export function useTrackPage(pathname) {
     React.useEffect(() => {
-        if (typeof window === "undefined")
+        if (typeof window === "undefined" || !initialized)
             return;
         coreScreen(pathname || "/");
     }, [pathname]);

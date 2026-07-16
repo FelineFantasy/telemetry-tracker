@@ -19,6 +19,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 - **Product telemetry (dogfood)** — optional `@telemetry-tracker/next` on `/dashboard` for visits, sessions, and browser errors when `NEXT_PUBLIC_TELEMETRY_INGEST_URL` + `NEXT_PUBLIC_TELEMETRY_API_KEY` are set (marketing/docs unchanged) ([#463](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/463))
 - **SDK** — `shutdown()` in `@telemetry-tracker/core` / `@telemetry-tracker/next`; `TelemetryProvider` tears down on unmount so leaving `/dashboard` stops ingest ([#463](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/463))
+- **SDK** — `TelemetryProvider` inits in `useLayoutEffect` so the first `useTrackPage` screen attaches to the new session ([#464](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/464))
 
 ---
 

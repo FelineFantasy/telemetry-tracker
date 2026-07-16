@@ -83,7 +83,8 @@ export function TelemetryProvider({
   config: TelemetryNextConfig;
   children: React.ReactNode;
 }) {
-  React.useEffect(() => {
+  // Layout effect so init/session exist before child useEffects (e.g. useTrackPage).
+  React.useLayoutEffect(() => {
     init(config);
     return () => {
       shutdown();
@@ -94,7 +95,7 @@ export function TelemetryProvider({
 
 export function useTrackPage(pathname: string): void {
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !initialized) return;
     coreScreen(pathname || "/");
   }, [pathname]);
 }
