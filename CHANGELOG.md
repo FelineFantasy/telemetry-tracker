@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.1] - 2026-07-17
+
+### Fixed
+
+- **Marketing reserved email domains** — reject RFC/example reserved domains (e.g. `example.com`, `*.test`) on marketing subscribe, and skip those addresses when sending product update emails so Resend 422s no longer abort release broadcasts ([#539](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/539))
+
+---
+
 ## [1.15.0] - 2026-07-17
 
 ### Added

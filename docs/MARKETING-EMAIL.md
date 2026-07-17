@@ -51,6 +51,8 @@ Align semver bumps with [RELEASE.md](./RELEASE.md#semver-guidance). If a release
 
 Delivery is recorded in `MarketingReleaseEmailSend` (one row per subscriber per release version). Workflow re-runs and manual retries skip already-sent recipients, deliver to subscribers who joined after the first broadcast, and do not rotate unsubscribe tokens again for completed sends. GitHub Actions logs and a note in the GitHub Release are the operator-facing records.
 
+Reserved / documentation domains (`example.com`, `example.org`, `example.net`, and similar RFC special-use hosts) are rejected on subscribe and skipped at send time — Resend returns 422 for those addresses and would otherwise leave the broadcast incomplete.
+
 ### Automated send (MINOR / MAJOR tags)
 
 Pushing a semver tag `vX.Y.Z` to GitHub triggers **Release product email** when **X** (major) or **Y** (minor) increases vs the previous tag; **Z**-only (patch/hotfix) tags are skipped:
