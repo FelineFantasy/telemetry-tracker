@@ -799,10 +799,102 @@ export async function enqueueAlertWebhookDeliveries(
   return webhooks.length;
 }
 
+/** Cap Telegram Bot API response body reads (ok/description JSON is small). */
+const TELEGRAM_RESPONSE_BODY_MAX_BYTES = 8_192;
+
+/**
+ * Telegram Bot API often returns HTTP 200 with `{ "ok": false, … }` for delivery
+ * failures (bad chat id, bot blocked, etc.). Treat only `ok: true` as success.
+ */
+export function interpretTelegramBotApiResponse(
+  httpStatus: number,
+  bodyText: string
+): WebhookSendResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyText);
+  } catch {
+    return {
+      ok: false,
+      httpStatus,
+      error: "Telegram API response was not valid JSON",
+    };
+  }
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    !("ok" in parsed) ||
+    typeof (parsed as { ok: unknown }).ok !== "boolean"
+  ) {
+    return {
+      ok: false,
+      httpStatus,
+      error: "Telegram API response missing boolean ok field",
+    };
+  }
+  if ((parsed as { ok: boolean }).ok === true) {
+    return { ok: true, httpStatus };
+  }
+  const description =
+    "description" in parsed && typeof (parsed as { description: unknown }).description === "string"
+      ? (parsed as { description: string }).description.trim()
+      : "";
+  const errorCode =
+    "error_code" in parsed && typeof (parsed as { error_code: unknown }).error_code === "number"
+      ? (parsed as { error_code: number }).error_code
+      : null;
+  const detail = description
+    ? errorCode != null
+      ? `Telegram API error ${errorCode}: ${description}`
+      : `Telegram API error: ${description}`
+    : "Telegram API returned ok: false";
+  return { ok: false, httpStatus, error: detail.slice(0, 400) };
+}
+
+function readResponseBodyLimited(
+  res: NodeJS.ReadableStream,
+  maxBytes: number
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let settled = false;
+
+    const finish = (result: { ok: true; text: string } | { ok: false; error: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    res.on("data", (chunk: Buffer | string) => {
+      if (settled) return;
+      const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+      size += buf.length;
+      if (size > maxBytes) {
+        res.removeAllListeners("data");
+        res.resume();
+        finish({ ok: false, error: "Telegram API response body too large" });
+        return;
+      }
+      chunks.push(buf);
+    });
+    res.on("end", () => {
+      finish({ ok: true, text: Buffer.concat(chunks).toString("utf8") });
+    });
+    res.on("error", (e: unknown) => {
+      finish({
+        ok: false,
+        error: e instanceof Error ? e.message : "Failed to read response body",
+      });
+    });
+  });
+}
+
 /**
  * POST over HTTPS while pinning the TCP connect to a pre-validated IP.
  * Uses custom `lookup` so Node never re-resolves (closes DNS rebinding TOCTOU).
  * Redirects are not followed (`https.request` does not auto-follow).
+ * Telegram (`api.telegram.org`) responses are parsed for Bot API `{ ok }` JSON.
  */
 export async function postWebhookOnce(
   url: string,
@@ -829,6 +921,7 @@ export async function postWebhookOnce(
     return { ok: false, httpStatus: null, error: resolved.error };
   }
   const pinned = pickPinnedWebhookAddress(resolved.addresses);
+  const isTelegramHost = parsed.hostname.toLowerCase() === "api.telegram.org";
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -860,9 +953,9 @@ export async function postWebhookOnce(
         },
       },
       (res) => {
-        res.resume();
         const status = res.statusCode ?? 0;
         if (status >= 300 && status < 400) {
+          res.resume();
           resolve({
             ok: false,
             httpStatus: status,
@@ -871,9 +964,21 @@ export async function postWebhookOnce(
           return;
         }
         if (status >= 200 && status < 300) {
-          resolve({ ok: true, httpStatus: status });
+          if (!isTelegramHost) {
+            res.resume();
+            resolve({ ok: true, httpStatus: status });
+            return;
+          }
+          void readResponseBodyLimited(res, TELEGRAM_RESPONSE_BODY_MAX_BYTES).then((read) => {
+            if (!read.ok) {
+              resolve({ ok: false, httpStatus: status, error: read.error.slice(0, 400) });
+              return;
+            }
+            resolve(interpretTelegramBotApiResponse(status, read.text));
+          });
           return;
         }
+        res.resume();
         resolve({
           ok: false,
           httpStatus: status || null,

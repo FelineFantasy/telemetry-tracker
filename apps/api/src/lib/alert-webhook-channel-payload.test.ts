@@ -46,13 +46,37 @@ describe("validateProviderWebhookUrl", () => {
     ).toEqual({ ok: true });
   });
 
-  it("accepts Teams office webhook hosts", () => {
+  it("accepts Teams Incoming Webhook and Power Automate hosts", () => {
     expect(
       validateProviderWebhookUrl(
         "MICROSOFT_TEAMS",
         "https://contoso.webhook.office.com/webhookb2/abc"
       )
     ).toEqual({ ok: true });
+    expect(
+      validateProviderWebhookUrl(
+        "MICROSOFT_TEAMS",
+        "https://outlook.office.com/webhook/abc"
+      )
+    ).toEqual({ ok: true });
+    expect(
+      validateProviderWebhookUrl(
+        "MICROSOFT_TEAMS",
+        "https://prod-12.westus.logic.azure.com:443/workflows/abc"
+      )
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects non-webhook Office hosts for MICROSOFT_TEAMS", () => {
+    expect(
+      validateProviderWebhookUrl(
+        "MICROSOFT_TEAMS",
+        "https://forms.office.com/Pages/ResponsePage.aspx"
+      ).ok
+    ).toBe(false);
+    expect(
+      validateProviderWebhookUrl("MICROSOFT_TEAMS", "https://www.office.com/").ok
+    ).toBe(false);
   });
 
   it("accepts Telegram sendMessage bot URLs", () => {

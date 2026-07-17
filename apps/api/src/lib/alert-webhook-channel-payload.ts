@@ -118,9 +118,11 @@ export function validateProviderWebhookUrl(
       }
       return { ok: true };
     case "MICROSOFT_TEAMS":
+      // Incoming Webhook hosts only — not arbitrary *.office.com (forms, sharepoint, etc.).
       if (
+        host === "outlook.office.com" ||
+        host === "webhook.office.com" ||
         host.endsWith(".webhook.office.com") ||
-        host.endsWith(".office.com") ||
         host.endsWith(".logic.azure.com") ||
         host.endsWith(".environment.api.powerplatform.com")
       ) {
@@ -129,7 +131,7 @@ export function validateProviderWebhookUrl(
       return {
         ok: false,
         error:
-          "Microsoft Teams webhook URL must be an Office 365 or Power Automate HTTPS endpoint",
+          "Microsoft Teams webhook URL must be an Office 365 Incoming Webhook or Power Automate HTTPS endpoint",
       };
     case "TELEGRAM":
       if (host !== "api.telegram.org") {
