@@ -14,7 +14,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function DashboardKeyboardShortcuts() {
-  const { push } = useDashboardNavigation();
+  const { push, isPending } = useDashboardNavigation();
   const [open, setOpen] = useState(false);
   const [awaitingGoto, setAwaitingGoto] = useState(false);
 
@@ -31,9 +31,16 @@ export function DashboardKeyboardShortcuts() {
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
+    if (!isPending) return;
+    if (open) close();
+    if (awaitingGoto) setAwaitingGoto(false);
+  }, [awaitingGoto, close, isPending, open]);
+
+  useEffect(() => {
     let gotoTimer: ReturnType<typeof setTimeout> | undefined;
 
     const onKey = (e: KeyboardEvent) => {
+      if (isPending) return;
       if (isTypingTarget(e.target)) return;
 
       if (e.key === "Escape" && open) {
@@ -72,7 +79,7 @@ export function DashboardKeyboardShortcuts() {
       window.removeEventListener("keydown", onKey);
       if (gotoTimer) clearTimeout(gotoTimer);
     };
-  }, [awaitingGoto, close, open, push]);
+  }, [awaitingGoto, close, isPending, open, push]);
 
   return (
     <>
