@@ -16,12 +16,13 @@ Fastify + Prisma + PostgreSQL. Ingest uses **API keys**; dashboard uses **sessio
 
 ## Notifications and alerts
 
-Files: `dashboard-notifications.ts`, `notification-preferences.ts`, `notification-email-dispatch.ts`, `alert-dispatch.ts`, `quota-alert.ts`, `error-spike-alert.ts`, `project-alert-settings.ts`.
+Files: `dashboard-notifications.ts`, `notification-preferences.ts`, `notification-email-dispatch.ts`, `alert-dispatch.ts`, `alert-webhook-dispatch.ts`, `quota-alert.ts`, `error-spike-alert.ts`, `project-alert-settings.ts`.
 
 - **Category mapping**: `categoryForNotificationType` — never route `alert` items to billing or vice versa without updating both build and filter paths.
 - **Dedupe by id**: `quota:near:{projectId}:{YYYY-MM}` and `quota:exceeded:…` keys are shared between session items and `AlertEvent.dedupe_key`. Collisions must use routing-aware dedupe (pass `preferences` into `dedupeNotificationItems`).
 - **Email vs in-app**: `shouldShowInAppNotification` and `shouldSendEmailForCategory` must stay aligned when adding new notification types.
-- **fireProjectAlert**: unique constraint on `dedupe_key` is intentional — do not swallow non-P2002 errors.
+- **fireProjectAlert**: unique constraint on `dedupe_key` is intentional — do not swallow non-P2002 errors. After a successful insert, fan out to email (best-effort) and **await** `enqueueAlertWebhookDeliveries` so PENDING rows exist before return; delivery is performed by `alert-webhook-worker` (claim/lease), not in-process fire-and-forget.
+- **Webhooks**: only `https:` URLs; never return raw URL or signing secret on list/GET (mask URL; secret only on create/rotate). Soft-delete with `deleted_at`. Cap destinations per project (`MAX_PROJECT_WEBHOOKS`) with an atomic count+insert (serializable tx). Resolve DNS and reject private/loopback/link-local addresses before each delivery POST, and **pin the TCP connect** to a validated IP (do not `fetch(url)` after a separate lookup). Worker must renew the lease before POST; lease duration must be ≥ HTTPS POST timeout; if renew misses, best-effort `releaseAlertWebhookDeliveryClaim` (clear PROCESSING, undo attempt increment, retry immediately) so a still-owned row is not stuck until lease expiry; after a successful POST, finalize `SUCCESS` even if the lease-scoped complete misses (do not leave `PROCESSING`). Persist test delivery rows before POST; always finalize test rows to `SUCCESS`/`FAILED` (retry + last-resort FAILED — never leave `PROCESSING`, since the worker will not reclaim `webhook:test:%`). Worker claim must exclude `webhook:test:%` dedupe keys (test rows use PROCESSING + lease but are single-shot — never reclaim/re-POST). Do not POST a generic payload when `alert_event_id` is null — fail the delivery. `DEAD` is only for exhausted retries; single-shot test deliveries use `FAILED`.
 - **Alert settings defaults**: changes to `DEFAULT_PROJECT_ALERT_SETTINGS` affect all projects with null/invalid JSON — treat as user-facing.
 
 ## Routes (`src/routes/`)

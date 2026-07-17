@@ -64,4 +64,4 @@ Manually verify: login, overview loads, ingest with API key returns 200. Full E2
 
 - Per-project ingest RPS bucket is **in-memory** (single API process). Horizontal scaling needs a shared rate limiter later.
 - Password reset in production requires **`RESEND_API_KEY`** and **`TELEMETRY_EMAIL_FROM`** on the API (see [BILLING.md](./BILLING.md)); without them, admins must share reset links manually. Setup runbook: [BILLING.md → Production setup](./BILLING.md#production-setup-hosted-cloud).
-- No built-in error spike alerts or Slack webhooks.
+- Project alert webhooks (HTTPS) for spike/quota events — see [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md). Slack/Discord first-party UIs still planned.
