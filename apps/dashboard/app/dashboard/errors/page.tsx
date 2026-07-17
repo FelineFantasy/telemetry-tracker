@@ -2,10 +2,7 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { ErrorsClientListSection } from "@/app/components/dashboard/ErrorsClientListSection";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
-import {
-  ErrorsAnalyticsPanels,
-  type ErrorsAnalyticsData,
-} from "@/app/components/dashboard/ErrorsAnalyticsPanels";
+import { DeferredErrorsAnalytics } from "@/app/components/dashboard/DeferredErrorsAnalytics";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
@@ -60,12 +57,6 @@ async function getErrors(
 
 async function getErrorsSummary(search: URLSearchParams): Promise<ErrorsPageSummary | null> {
   const res = await dashboardApiFetch(`/api/errors/summary?${search.toString()}`);
-  if (!res.ok) return null;
-  return res.json();
-}
-
-async function getErrorsAnalytics(search: URLSearchParams): Promise<ErrorsAnalyticsData | null> {
-  const res = await dashboardApiFetch(`/api/errors/analytics?${search.toString()}`);
   if (!res.ok) return null;
   return res.json();
 }
@@ -235,7 +226,6 @@ export default async function ErrorsListPage({
     pageSize: number;
   };
   let summary: ErrorsPageSummary | null = null;
-  let analytics: ErrorsAnalyticsData | null = null;
   let filterOptions: {
     environments: string[];
     platforms: string[];
@@ -243,11 +233,10 @@ export default async function ErrorsListPage({
   } | null = null;
 
   try {
-    const [opts, data, summaryData, analyticsData] = await Promise.all([
+    const [opts, data, summaryData] = await Promise.all([
       getFilterOptions(appFilter || undefined),
       getErrors(apiQuery),
       getErrorsSummary(summaryQuery),
-      getErrorsAnalytics(summaryQuery),
     ]);
     filterOptions = opts;
     initialListData = {
@@ -257,7 +246,6 @@ export default async function ErrorsListPage({
       pageSize: data.pageSize ?? pageSize,
     };
     summary = summaryData;
-    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -306,8 +294,6 @@ export default async function ErrorsListPage({
       <AnalyticsListShell>
         {summary ? <ErrorsSummaryMetrics summary={summary} /> : null}
 
-        {analytics ? <ErrorsAnalyticsPanels analytics={analytics} /> : null}
-
         <ErrorsClientListSection
           path={ERRORS_PATH}
           urlParams={currentParams}
@@ -333,6 +319,8 @@ export default async function ErrorsListPage({
           platforms={options.platforms}
           releases={options.releases}
         />
+
+        <DeferredErrorsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );

@@ -6,7 +6,6 @@ import {
   type SessionsPageSummary,
 } from "@/app/components/dashboard/SessionsSummaryMetrics";
 import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
-import type { SessionsAnalyticsData } from "@/app/components/dashboard/SessionsAnalyticsPanels";
 import { type SessionsTableRow } from "@/app/components/dashboard/SessionsTable";
 import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
@@ -40,12 +39,6 @@ async function getSessions(search: URLSearchParams) {
 
 async function getSessionsSummary(search: URLSearchParams): Promise<SessionsPageSummary | null> {
   const res = await dashboardApiFetch(`/api/sessions/summary?${search.toString()}`);
-  if (!res.ok) return null;
-  return res.json();
-}
-
-async function getSessionsAnalytics(search: URLSearchParams): Promise<SessionsAnalyticsData | null> {
-  const res = await dashboardApiFetch(`/api/sessions/analytics?${search.toString()}`);
   if (!res.ok) return null;
   return res.json();
 }
@@ -169,17 +162,15 @@ export default async function SessionsPage({
     max_duration_sec: number;
   };
   let summary: SessionsPageSummary | null = null;
-  let analytics: SessionsAnalyticsData | null = null;
   let platforms: string[] = [];
   let environments: string[] = [];
   let releases: string[] = [];
   let countries: string[] = [];
   try {
-    const [data, opts, summaryData, analyticsData] = await Promise.all([
+    const [data, opts, summaryData] = await Promise.all([
       getSessions(apiQuery),
       getFilterOptions(appFilter || undefined),
       getSessionsSummary(summaryQuery),
-      getSessionsAnalytics(summaryQuery),
     ]);
     initialListData = {
       items: data.items ?? [],
@@ -193,7 +184,6 @@ export default async function SessionsPage({
     releases = opts.releases;
     countries = opts.countries;
     summary = summaryData;
-    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -228,7 +218,7 @@ export default async function SessionsPage({
           urlParams={currentParams}
           initialListParams={initialListParams}
           initialData={initialListData}
-          analytics={analytics}
+          analyticsQueryString={summaryQuery.toString()}
           timeRange={timeRange}
           fromParam={from}
           toParam={to}

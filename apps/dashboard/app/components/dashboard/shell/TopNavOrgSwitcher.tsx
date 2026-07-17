@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus, Users } from "lucide-react";
 import { setDashboardOrganizationId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
-import {
-  formatOrganizationRailName,
-  LEGACY_SEEDED_ORG_NAME,
-} from "@/lib/workspace-placeholders";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
+import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
 import type { OrgOption } from "@/lib/dashboard-workspace-types";
+import {
+  ORGANIZATION_SETTINGS_PATH,
+} from "@/app/components/OrganizationSettingsNewProjectParam";
+import { scrollToSectionId } from "@/app/components/ScrollToHash";
 import { DashboardPopover } from "./DashboardPopover";
 import { NavPickerTrigger } from "./shell-primitives";
 
@@ -21,10 +23,9 @@ export function TopNavOrgSwitcher({
   organizations: OrgOption[];
   currentOrganizationId: string | null;
 }) {
-  const router = useRouter();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const [pending, startTransition] = useTransition();
+  const { replaceAndRefresh, runPending, isPending: pending } = useDashboardNavigation();
   const [value, setValue] = useState(currentOrganizationId ?? "");
 
   useEffect(() => {
@@ -83,11 +84,12 @@ export function TopNavOrgSwitcher({
                     return;
                   }
                   setValue(o.id);
-                  startTransition(async () => {
+                  void runPending(async () => {
                     const r = await setDashboardOrganizationId(o.id);
                     if (r.ok) {
-                      router.replace(hrefWithoutAppSearchParam(pathname, searchParams));
-                      router.refresh();
+                      await replaceAndRefresh(
+                        hrefWithoutAppSearchParam(pathname, searchParams)
+                      );
                       close();
                     } else {
                       setValue(currentOrganizationId ?? "");
@@ -104,17 +106,20 @@ export function TopNavOrgSwitcher({
               </button>
             );
           })}
-          {current.name === LEGACY_SEEDED_ORG_NAME ? (
-            <p className="px-2 py-2 text-[12px] text-muted-foreground">
-              <Link
-                href="/dashboard/settings/organization"
-                onClick={close}
-                className="text-brand hover:underline"
-              >
-                Rename your workspace
-              </Link>
-            </p>
-          ) : null}
+          <p className="px-2 py-2 text-[12px] text-muted-foreground">
+            <Link
+              href={`${ORGANIZATION_SETTINGS_PATH}#rename-workspace`}
+              onClick={() => {
+                close();
+                if (pathname === ORGANIZATION_SETTINGS_PATH) {
+                  scrollToSectionId("rename-workspace");
+                }
+              }}
+              className="text-brand hover:underline"
+            >
+              Rename your workspace
+            </Link>
+          </p>
           <div className="my-1 h-px bg-border" />
           <Link
             href="/dashboard/settings/organization"
