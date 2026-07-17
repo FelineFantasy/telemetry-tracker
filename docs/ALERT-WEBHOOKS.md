@@ -12,7 +12,7 @@ channels). Choose a channel when adding:
 | **GENERIC** (`#225`) | Signed `alert.fired` JSON below | Optional HMAC signing secret |
 | **SLACK** (`#223`) | Slack Incoming Webhook (`text` + Block Kit) | URL must be `hooks.slack.com/services/…` |
 | **DISCORD** (`#224`) | Discord webhook embeds | URL must be `discord.com` / `discordapp.com` `/api/webhooks/{id}/{token}` |
-| **MICROSOFT_TEAMS** / **TELEGRAM** (`#500`) | Teams MessageCard / Bot `sendMessage` | First-party UI shipping separately |
+| **MICROSOFT_TEAMS** / **TELEGRAM** (`#500`) | Teams MessageCard / Bot `sendMessage` | Teams: Office 365 / Power Automate HTTPS; Telegram: `api.telegram.org/bot…/sendMessage` + `chatId` |
 
 - URLs must be `https:` and must not target loopback, private, or link-local hosts
   (create/update string checks).
@@ -56,6 +56,19 @@ Slack destinations POST JSON shaped for [Incoming Webhooks](https://api.slack.co
 Discord destinations POST JSON with a single embed (`title`, `description`, rule field,
 optional `url` back to the dashboard). Create a channel webhook in Discord
 (Channel settings → Integrations → Webhooks) and paste it on Alerts → Delivery → Discord.
+
+## Microsoft Teams payload
+
+Teams destinations POST an Office 365 [MessageCard](https://learn.microsoft.com/en-us/outlook/actionable-messages/message-card-reference)
+(`title`, `text`, optional OpenUri action). Paste a Teams Incoming Webhook or Power Automate
+HTTP URL on Alerts → Delivery → Microsoft Teams.
+
+## Telegram payload
+
+Telegram destinations POST Bot API [`sendMessage`](https://core.telegram.org/bots/api#sendmessage)
+JSON (`chat_id`, HTML `text`). Store the URL as
+`https://api.telegram.org/bot<token>/sendMessage` and set the chat id in the form
+(numeric id or `@username`). The bot must be able to message that chat.
 
 ## Headers
 
