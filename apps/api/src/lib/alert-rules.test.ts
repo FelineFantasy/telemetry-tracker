@@ -4,6 +4,7 @@ import {
   createAlertRule,
   MAX_ALERT_RULES,
   maybeEvaluateAlertRules,
+  pruneWebhookIdFromAlertRules,
   softDeleteAlertRule,
   updateAlertRule,
 } from "./alert-rules.js";
@@ -157,6 +158,49 @@ describe("updateAlertRule / softDeleteAlertRule", () => {
       },
     } as never;
     expect(await softDeleteAlertRule(prisma, "p1", "rule-1")).toEqual({ ok: true });
+  });
+});
+
+describe("pruneWebhookIdFromAlertRules", () => {
+  it("removes the webhook id from destinations", async () => {
+    const update = vi.fn(async () => ({}));
+    const prisma = {
+      alertRule: {
+        findMany: async () => [
+          {
+            id: "rule-1",
+            destinations: {
+              email: true,
+              webhookIds: [
+                "22222222-2222-2222-2222-222222222222",
+                "33333333-3333-3333-3333-333333333333",
+              ],
+            },
+          },
+          {
+            id: "rule-2",
+            destinations: { email: false, webhookIds: [] },
+          },
+        ],
+        update,
+      },
+    } as never;
+
+    const n = await pruneWebhookIdFromAlertRules(
+      prisma,
+      "p1",
+      "22222222-2222-2222-2222-222222222222"
+    );
+    expect(n).toBe(1);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "rule-1" },
+      data: {
+        destinations: {
+          email: true,
+          webhookIds: ["33333333-3333-3333-3333-333333333333"],
+        },
+      },
+    });
   });
 });
 

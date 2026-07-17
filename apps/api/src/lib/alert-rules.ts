@@ -302,6 +302,38 @@ export async function softDeleteAlertRule(
   return { ok: true };
 }
 
+/**
+ * Drop a deleted webhook id from every live rule's destinations so UI bindings stay honest.
+ */
+export async function pruneWebhookIdFromAlertRules(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  projectId: string,
+  webhookId: string
+): Promise<number> {
+  const rules = await prisma.alertRule.findMany({
+    where: { project_id: projectId, deleted_at: null },
+    select: { id: true, destinations: true },
+  });
+  let updated = 0;
+  for (const rule of rules) {
+    const parsed = destinationsSchema.safeParse(rule.destinations);
+    if (!parsed.success) continue;
+    if (!parsed.data.webhookIds.includes(webhookId)) continue;
+    const webhookIds = parsed.data.webhookIds.filter((id) => id !== webhookId);
+    await prisma.alertRule.update({
+      where: { id: rule.id },
+      data: {
+        destinations: {
+          email: parsed.data.email,
+          webhookIds,
+        },
+      },
+    });
+    updated += 1;
+  }
+  return updated;
+}
+
 /** Bucket key so the same rule fires at most once per cooldown window. */
 export function alertRuleDedupeKey(
   ruleId: string,

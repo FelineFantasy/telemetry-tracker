@@ -447,16 +447,24 @@ export function AlertsClient({
                       {conditionTypeLabel(rule.conditionType)} ·{" "}
                       {formatAlertRuleSummary(rule)} · cooldown{" "}
                       {rule.cooldownMinutes}m ·{" "}
-                      {[
-                        rule.destinations.email ? "email" : null,
-                        rule.destinations.webhookIds.length > 0
-                          ? `${rule.destinations.webhookIds.length} channel${
-                              rule.destinations.webhookIds.length === 1 ? "" : "s"
-                            }`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "no destinations"}
+                      {(() => {
+                        const liveChannels = rule.destinations.webhookIds.filter((id) =>
+                          webhooks.some((w) => w.id === id && w.enabled)
+                        ).length;
+                        const bound = rule.destinations.webhookIds.length;
+                        const parts = [
+                          rule.destinations.email ? "email" : null,
+                          liveChannels > 0
+                            ? `${liveChannels} channel${liveChannels === 1 ? "" : "s"}`
+                            : null,
+                          bound > liveChannels
+                            ? `${bound - liveChannels} inactive binding${
+                                bound - liveChannels === 1 ? "" : "s"
+                              }`
+                            : null,
+                        ].filter(Boolean);
+                        return parts.length > 0 ? parts.join(" · ") : "no destinations";
+                      })()}
                     </p>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-2">
