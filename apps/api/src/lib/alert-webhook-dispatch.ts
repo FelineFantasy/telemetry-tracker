@@ -134,19 +134,95 @@ export function isBlockedIpv4Address(ip: string): boolean {
   return false;
 }
 
-/** True for loopback / link-local / ULA / multicast / unspecified IPv6 (and IPv4-mapped privates). */
-export function isBlockedIpv6Address(ip: string): boolean {
+/** Expand a valid IPv6 literal into eight 16-bit hextets (handles dotted-decimal tails). */
+function parseIpv6Hextets(ip: string): Uint16Array | null {
   const host = ip.toLowerCase().trim();
-  if (host === "::" || host === "::1") return true;
+  if (isIP(host) !== 6) return null;
 
-  const v4Mapped = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-  if (v4Mapped?.[1]) {
-    return isBlockedIpv4Address(v4Mapped[1]);
+  let normalized = host;
+  const dotted = normalized.match(/^(.+):(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (dotted) {
+    const octets = [Number(dotted[2]), Number(dotted[3]), Number(dotted[4]), Number(dotted[5])];
+    if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+    const hi = ((octets[0]! << 8) | octets[1]!) >>> 0;
+    const lo = ((octets[2]! << 8) | octets[3]!) >>> 0;
+    normalized = `${dotted[1]}:${hi.toString(16)}:${lo.toString(16)}`;
   }
 
-  if (/^fe[89ab][0-9a-f]:/i.test(host)) return true; // link-local fe80::/10
-  if (/^f[cd][0-9a-f]{2}:/i.test(host)) return true; // ULA fc00::/7
-  if (/^ff[0-9a-f]{2}:/i.test(host)) return true; // multicast
+  const halves = normalized.split("::");
+  if (halves.length > 2) return null;
+
+  const parsePart = (part: string): number[] | null => {
+    if (part === "") return [];
+    const out: number[] = [];
+    for (const hextet of part.split(":")) {
+      if (!/^[0-9a-f]{1,4}$/i.test(hextet)) return null;
+      out.push(Number.parseInt(hextet, 16));
+    }
+    return out;
+  };
+
+  let hextets: number[];
+  if (halves.length === 1) {
+    const parts = parsePart(halves[0]!);
+    if (!parts || parts.length !== 8) return null;
+    hextets = parts;
+  } else {
+    const left = parsePart(halves[0]!);
+    const right = parsePart(halves[1]!);
+    if (!left || !right) return null;
+    const fill = 8 - left.length - right.length;
+    if (fill < 0) return null;
+    hextets = [...left, ...Array.from({ length: fill }, () => 0), ...right];
+    if (hextets.length !== 8) return null;
+  }
+
+  return Uint16Array.from(hextets);
+}
+
+function ipv4DottedFromHextets(hi: number, lo: number): string {
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+}
+
+/**
+ * True for loopback / link-local / ULA / multicast / unspecified IPv6,
+ * plus IPv4-mapped (`::ffff:…`) and IPv4-compatible (`::x.x.x.x`) embeddings
+ * in any valid encoding (compressed, expanded, hex-mapped).
+ */
+export function isBlockedIpv6Address(ip: string): boolean {
+  const hextets = parseIpv6Hextets(ip);
+  if (!hextets) return true;
+
+  const h0 = hextets[0]!;
+  const h1 = hextets[1]!;
+  const h2 = hextets[2]!;
+  const h3 = hextets[3]!;
+  const h4 = hextets[4]!;
+  const h5 = hextets[5]!;
+  const h6 = hextets[6]!;
+  const h7 = hextets[7]!;
+
+  // Unspecified ::
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0 && h6 === 0 && h7 === 0) {
+    return true;
+  }
+  // Loopback ::1
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0 && h6 === 0 && h7 === 1) {
+    return true;
+  }
+
+  // IPv4-mapped ::ffff:0:0/96 (dotted or hex-mapped encodings)
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0xffff) {
+    return isBlockedIpv4Address(ipv4DottedFromHextets(h6, h7));
+  }
+  // Deprecated IPv4-compatible ::/96 (e.g. ::127.0.0.1)
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) {
+    return isBlockedIpv4Address(ipv4DottedFromHextets(h6, h7));
+  }
+
+  if ((h0 & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
+  if ((h0 & 0xfe00) === 0xfc00) return true; // ULA fc00::/7
+  if ((h0 & 0xff00) === 0xff00) return true; // multicast ff00::/8
   return false;
 }
 

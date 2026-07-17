@@ -36,6 +36,27 @@ describe("webhook URL validation", () => {
     }
     expect(isBlockedIpAddress("203.0.113.10")).toBe(false);
   });
+
+  it("blocks IPv4-mapped and IPv4-compatible embeddings in any encoding", () => {
+    for (const ip of [
+      "::ffff:127.0.0.1",
+      "0:0:0:0:0:ffff:127.0.0.1",
+      "::ffff:7f00:1",
+      "0:0:0:0:0:ffff:7f00:1",
+      "::127.0.0.1",
+      "0:0:0:0:0:0:127.0.0.1",
+      "0:0:0:0:0:0:0:1",
+      "::ffff:10.0.0.1",
+      "::ffff:a00:1",
+      "::ffff:169.254.169.254",
+      "::ffff:a9fe:a9fe",
+    ]) {
+      expect(isBlockedIpAddress(ip), ip).toBe(true);
+    }
+    for (const ip of ["::ffff:8.8.8.8", "::ffff:808:808", "2001:db8::1"]) {
+      expect(isBlockedIpAddress(ip), ip).toBe(false);
+    }
+  });
 });
 
 describe("delivery-time DNS protections", () => {
@@ -50,7 +71,15 @@ describe("delivery-time DNS protections", () => {
   });
 
   it("rejects hostnames that resolve to blocked IPv6 ranges", async () => {
-    for (const address of ["::1", "fe80::1", "fd00::1"]) {
+    for (const address of [
+      "::1",
+      "fe80::1",
+      "fd00::1",
+      "::ffff:127.0.0.1",
+      "::ffff:7f00:1",
+      "0:0:0:0:0:ffff:127.0.0.1",
+      "::127.0.0.1",
+    ]) {
       const lookupFn: WebhookDnsLookup = async () => [{ address, family: 6 }];
       await expect(
         resolveWebhookHostForDelivery("evil6.example", lookupFn),
