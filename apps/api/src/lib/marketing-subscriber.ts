@@ -34,7 +34,10 @@ export function isReservedMarketingEmailDomain(email: string): boolean {
   const at = email.lastIndexOf("@");
   if (at < 0) return false;
   const domain = email.slice(at + 1).toLowerCase();
-  if (RESERVED_MARKETING_EMAIL_DOMAINS.has(domain)) return true;
+  for (const reserved of RESERVED_MARKETING_EMAIL_DOMAINS) {
+    // Exact match and subdomains (e.g. mail.example.com) — Resend rejects both.
+    if (domain === reserved || domain.endsWith(`.${reserved}`)) return true;
+  }
   // RFC 2606 / 6761 special-use TLDs
   return /\.(example|invalid|localhost|test)$/i.test(domain);
 }
