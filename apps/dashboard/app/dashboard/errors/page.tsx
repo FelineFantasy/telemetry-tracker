@@ -2,11 +2,7 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { ErrorsClientListSection } from "@/app/components/dashboard/ErrorsClientListSection";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
-import {
-  ErrorsAnalyticsPanels,
-  type ErrorsAnalyticsData,
-} from "@/app/components/dashboard/ErrorsAnalyticsPanels";
-import { DeferredAnalyticsSlot } from "@/app/components/dashboard/DeferredAnalyticsSlot";
+import { DeferredErrorsAnalytics } from "@/app/components/dashboard/DeferredErrorsAnalytics";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
@@ -324,12 +320,7 @@ export default async function ErrorsListPage({
           releases={options.releases}
         />
 
-        <DeferredAnalyticsSlot<ErrorsAnalyticsData>
-          apiPath="/api/errors/analytics"
-          queryString={summaryQuery.toString()}
-        >
-          {(analytics) => <ErrorsAnalyticsPanels analytics={analytics} />}
-        </DeferredAnalyticsSlot>
+        <DeferredErrorsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );

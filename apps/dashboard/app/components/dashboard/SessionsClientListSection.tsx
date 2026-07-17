@@ -11,11 +11,7 @@ import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import {
-  SessionsAnalyticsPanels,
-  type SessionsAnalyticsData,
-} from "@/app/components/dashboard/SessionsAnalyticsPanels";
-import { DeferredAnalyticsSlot } from "@/app/components/dashboard/DeferredAnalyticsSlot";
+import { DeferredSessionsAnalytics } from "@/app/components/dashboard/DeferredSessionsAnalytics";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
 import { resolveApiListTotal } from "@/lib/pagination";
@@ -194,18 +190,11 @@ export function SessionsClientListSection({
         onPageChange={onPageChange}
       />
 
-      <DeferredAnalyticsSlot<SessionsAnalyticsData>
-        apiPath="/api/sessions/analytics"
+      <DeferredSessionsAnalytics
         queryString={analyticsQueryString}
-      >
-        {(analytics) => (
-          <SessionsAnalyticsPanels
-            analytics={analytics}
-            path={path}
-            currentParams={liveUrlParams}
-          />
-        )}
-      </DeferredAnalyticsSlot>
+        path={path}
+        currentParams={liveUrlParams}
+      />
     </>
   );
 }

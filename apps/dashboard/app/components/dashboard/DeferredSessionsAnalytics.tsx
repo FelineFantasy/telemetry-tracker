@@ -1,6 +1,9 @@
 "use client";
 
-import type { ComponentType } from "react";
+import {
+  SessionsAnalyticsPanels,
+  type SessionsAnalyticsData,
+} from "@/app/components/dashboard/SessionsAnalyticsPanels";
 import { useDeferredAnalytics } from "@/lib/use-deferred-analytics";
 
 function AnalyticsPanelsSkeleton() {
@@ -17,19 +20,27 @@ function AnalyticsPanelsSkeleton() {
   );
 }
 
-/** Client-fetches analytics after paint; shows a compact skeleton while loading. */
-export function DeferredAnalyticsSlot<T>({
-  apiPath,
+export function DeferredSessionsAnalytics({
   queryString,
-  Panel,
+  path,
+  currentParams,
 }: {
-  apiPath: string;
   queryString: string;
-  Panel: ComponentType<{ analytics: T }>;
+  path: string;
+  currentParams: Record<string, string>;
 }) {
-  const { data, loading } = useDeferredAnalytics<T>(apiPath, queryString);
+  const { data, loading } = useDeferredAnalytics<SessionsAnalyticsData>(
+    "/api/sessions/analytics",
+    queryString
+  );
 
   if (loading) return <AnalyticsPanelsSkeleton />;
   if (!data) return null;
-  return <Panel analytics={data} />;
+  return (
+    <SessionsAnalyticsPanels
+      analytics={data}
+      path={path}
+      currentParams={currentParams}
+    />
+  );
 }

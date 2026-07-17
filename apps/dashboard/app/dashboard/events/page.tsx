@@ -2,11 +2,7 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { EventsClientListSection } from "@/app/components/dashboard/EventsClientListSection";
 import { EventsSummaryMetrics, type EventsPageSummary } from "@/app/components/dashboard/EventsSummaryMetrics";
-import {
-  EventsAnalyticsPanels,
-  type EventsAnalyticsData,
-} from "@/app/components/dashboard/EventsAnalyticsPanels";
-import { DeferredAnalyticsSlot } from "@/app/components/dashboard/DeferredAnalyticsSlot";
+import { DeferredEventsAnalytics } from "@/app/components/dashboard/DeferredEventsAnalytics";
 import { type EventsTableRow } from "@/app/components/dashboard/EventsTable";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
@@ -235,12 +231,7 @@ export default async function EventsPage({
           releases={filterOptions.releases}
         />
 
-        <DeferredAnalyticsSlot<EventsAnalyticsData>
-          apiPath="/api/events/analytics"
-          queryString={summaryQuery.toString()}
-        >
-          {(analytics) => <EventsAnalyticsPanels analytics={analytics} />}
-        </DeferredAnalyticsSlot>
+        <DeferredEventsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );
