@@ -174,16 +174,16 @@ export async function projectDashboardRoutes(
       if (!UUID_RE.test(orgId)) {
         return reply.status(400).send({ error: "Invalid organization id" });
       }
-      const role = await getMembershipRoleForOrganization(session.userId, orgId);
-      if (!canArchiveOrganization(role)) {
-        return reply.status(403).send({ error: "Forbidden" });
-      }
       const existing = await prisma.organization.findFirst({
         where: { id: orgId, deleted_at: null },
         select: { id: true, name: true },
       });
       if (!existing) {
         return reply.status(404).send({ error: "Organization not found" });
+      }
+      const role = await getMembershipRoleForOrganization(session.userId, orgId);
+      if (!canArchiveOrganization(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
       }
       const body = (request.body ?? {}) as { name?: string };
       if (typeof body.name !== "string") {
