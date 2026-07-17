@@ -9,6 +9,7 @@ import {
   parseNotificationPreferences,
   shouldSendEmailForItem,
   shouldShowInAppNotification,
+  validateNotificationPreferencesPatch,
 } from "./notification-preferences.js";
 
 const issue: DashboardNotificationItem = {
@@ -54,6 +55,51 @@ describe("notification-preferences", () => {
     });
     expect(prefs.mutedUntil).toBe("2026-07-17T18:00:00.000Z");
     expect(prefs.digest).toBe("daily");
+  });
+
+  it("preserves mutedUntil and digest when patch omits them", () => {
+    const previous = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      mutedUntil: "2026-07-17T20:00:00.000Z",
+      digest: "weekly" as const,
+    };
+    const result = validateNotificationPreferencesPatch(
+      {
+        channels: { inapp: true, email: true },
+        routing: DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        quietHours: DEFAULT_NOTIFICATION_PREFERENCES.quietHours,
+      },
+      previous
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.preferences.mutedUntil).toBe(previous.mutedUntil);
+      expect(result.preferences.digest).toBe("weekly");
+      expect(result.preferences.channels.email).toBe(true);
+    }
+  });
+
+  it("clears mute and updates digest when patch sets them explicitly", () => {
+    const previous = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      mutedUntil: "2026-07-17T20:00:00.000Z",
+      digest: "daily" as const,
+    };
+    const result = validateNotificationPreferencesPatch(
+      {
+        channels: DEFAULT_NOTIFICATION_PREFERENCES.channels,
+        routing: DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        quietHours: DEFAULT_NOTIFICATION_PREFERENCES.quietHours,
+        mutedUntil: null,
+        digest: "off",
+      },
+      previous
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.preferences.mutedUntil).toBeNull();
+      expect(result.preferences.digest).toBe("off");
+    }
   });
 
   it("filters issues when in-app routing is disabled", () => {

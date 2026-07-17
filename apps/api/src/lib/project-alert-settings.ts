@@ -114,7 +114,8 @@ export function parseProjectAlertSettings(raw: unknown): ProjectAlertSettings {
 }
 
 export function validateProjectAlertSettingsPatch(
-  body: unknown
+  body: unknown,
+  previous: ProjectAlertSettings = DEFAULT_PROJECT_ALERT_SETTINGS
 ): { ok: true; settings: ProjectAlertSettings } | { ok: false; error: string } {
   const parsed = settingsSchema.safeParse(body);
   if (!parsed.success) {
@@ -125,7 +126,11 @@ export function validateProjectAlertSettingsPatch(
     settings: {
       errorSpike: parsed.data.errorSpike,
       quota: parsed.data.quota,
-      email: normalizeEmailSettings(parsed.data.email),
+      // Omitting `email` preserves stored recipients (do not reset to defaults).
+      email:
+        parsed.data.email !== undefined
+          ? normalizeEmailSettings(parsed.data.email)
+          : previous.email,
     },
   };
 }

@@ -82,18 +82,30 @@ function normalizeMutedUntil(raw: string | null | undefined): string | null {
 }
 
 function normalizeNotificationPreferences(
-  data: z.infer<typeof preferencesSchema>
+  data: z.infer<typeof preferencesSchema>,
+  previous?: NotificationPreferences
 ): NotificationPreferences {
   return {
     channels: data.channels,
     routing: {
       ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
       ...data.routing,
-      alerts: data.routing.alerts ?? DEFAULT_NOTIFICATION_PREFERENCES.routing.alerts,
+      alerts:
+        data.routing.alerts ??
+        previous?.routing.alerts ??
+        DEFAULT_NOTIFICATION_PREFERENCES.routing.alerts,
     },
     quietHours: data.quietHours,
-    mutedUntil: normalizeMutedUntil(data.mutedUntil ?? null),
-    digest: data.digest ?? DEFAULT_NOTIFICATION_PREFERENCES.digest,
+    // Omitting optional fields preserves stored values on PATCH; parse (no
+    // previous) still falls back to defaults for legacy JSON.
+    mutedUntil:
+      data.mutedUntil !== undefined
+        ? normalizeMutedUntil(data.mutedUntil)
+        : (previous?.mutedUntil ?? null),
+    digest:
+      data.digest !== undefined
+        ? data.digest
+        : (previous?.digest ?? DEFAULT_NOTIFICATION_PREFERENCES.digest),
   };
 }
 
@@ -108,13 +120,17 @@ export function parseNotificationPreferences(
 }
 
 export function validateNotificationPreferencesPatch(
-  body: unknown
+  body: unknown,
+  previous: NotificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES
 ): { ok: true; preferences: NotificationPreferences } | { ok: false; error: string } {
   const parsed = preferencesSchema.safeParse(body);
   if (!parsed.success) {
     return { ok: false, error: "Invalid notification preferences payload" };
   }
-  return { ok: true, preferences: normalizeNotificationPreferences(parsed.data) };
+  return {
+    ok: true,
+    preferences: normalizeNotificationPreferences(parsed.data, previous),
+  };
 }
 
 export function categoryForNotificationType(
