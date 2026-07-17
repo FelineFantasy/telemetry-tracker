@@ -371,7 +371,11 @@ export async function projectDashboardRoutes(
         return reply.status(400).send({ error: "Invalid project id" });
       }
       const existing = await prisma.project.findFirst({
-        where: { id: projectId, deleted_at: null },
+        where: {
+          id: projectId,
+          deleted_at: null,
+          organization: { deleted_at: null },
+        },
         select: {
           id: true,
           name: true,

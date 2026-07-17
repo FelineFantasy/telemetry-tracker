@@ -215,6 +215,47 @@ describe.skipIf(!runDbIntegration)("Project rename (integration)", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("returns 404 when the parent organization is archived", async () => {
+    const archivedSuffix = randomBytes(4).toString("hex");
+    const archivedOrg = await prisma.organization.create({
+      data: {
+        name: `Archived rename org ${archivedSuffix}`,
+        deleted_at: new Date(),
+        projects: {
+          create: {
+            name: `Live project in archived org ${archivedSuffix}`,
+            slug: `live-in-archived-${archivedSuffix}`,
+          },
+        },
+        memberships: {
+          create: {
+            user_id: (
+              await prisma.user.findUniqueOrThrow({
+                where: { email: ownerEmail },
+                select: { id: true },
+              })
+            ).id,
+            role: OrgRole.OWNER,
+          },
+        },
+      },
+      include: { projects: true },
+    });
+    const liveProjectId = archivedOrg.projects[0]!.id;
+
+    try {
+      const sessionId = await loginSessionId(ownerEmail);
+      const res = await patchProject(sessionId, liveProjectId, {
+        name: "Should not apply",
+      });
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await prisma.organization
+        .delete({ where: { id: archivedOrg.id } })
+        .catch(() => {});
+    }
+  });
+
   it("returns 409 when the slug is already taken in the organization", async () => {
     const sessionId = await loginSessionId(ownerEmail);
     const other = await prisma.project.findUniqueOrThrow({
