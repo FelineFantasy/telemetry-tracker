@@ -48,8 +48,61 @@ import {
 import { formatRelativeTime } from "@/lib/format-time";
 import type {
   AlertWebhookDeliveryRow,
+  AlertWebhookProvider,
   ProjectWebhookRow,
 } from "@/lib/project-webhooks";
+
+function providerLabel(provider: AlertWebhookProvider): string {
+  switch (provider) {
+    case "GENERIC":
+      return "Webhook";
+    case "SLACK":
+      return "Slack";
+    case "DISCORD":
+      return "Discord";
+    case "MICROSOFT_TEAMS":
+      return "Microsoft Teams";
+    case "TELEGRAM":
+      return "Telegram";
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Channels exposed in Alerts → Delivery for this milestone PR. */
+const DELIVERY_PROVIDER_OPTIONS: {
+  value: AlertWebhookProvider;
+  label: string;
+  urlPlaceholder: string;
+}[] = [
+  {
+    value: "GENERIC",
+    label: "HTTPS webhook",
+    urlPlaceholder: "https://hooks.example.com/alerts",
+  },
+  {
+    value: "SLACK",
+    label: "Slack",
+    urlPlaceholder: "https://hooks.slack.com/services/T…/B…/…",
+  },
+  {
+    value: "DISCORD",
+    label: "Discord",
+    urlPlaceholder: "https://discord.com/api/webhooks/…/…",
+  },
+  {
+    value: "MICROSOFT_TEAMS",
+    label: "Microsoft Teams",
+    urlPlaceholder: "https://….webhook.office.com/webhookb2/…",
+  },
+  {
+    value: "TELEGRAM",
+    label: "Telegram",
+    urlPlaceholder: "https://api.telegram.org/bot<token>/sendMessage",
+  },
+];
 
 function deliveryStatusLabel(status: AlertWebhookDeliveryRow["status"]): string {
   switch (status) {
@@ -92,8 +145,11 @@ export function AlertsClient({
   const [webhookPending, startWebhookTransition] = useTransition();
   const [settings, setSettings] = useState(initialSettings);
   const [webhooks, setWebhooks] = useState(initialWebhooks);
+  const [webhookProvider, setWebhookProvider] =
+    useState<AlertWebhookProvider>("GENERIC");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookLabel, setWebhookLabel] = useState("");
+  const [telegramChatId, setTelegramChatId] = useState("");
   const [lastSigningSecret, setLastSigningSecret] = useState<{
     webhookId: string;
     secret: string;
@@ -202,7 +258,12 @@ export function AlertsClient({
       const result = await createProjectWebhookAction({
         url: webhookUrl,
         label: webhookLabel.trim() || undefined,
-        withSigningSecret: true,
+        provider: webhookProvider,
+        withSigningSecret: webhookProvider === "GENERIC" ? true : false,
+        config:
+          webhookProvider === "TELEGRAM"
+            ? { chatId: telegramChatId.trim() }
+            : undefined,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -211,12 +272,13 @@ export function AlertsClient({
       setWebhooks((prev) => [...prev, result.webhook]);
       setWebhookUrl("");
       setWebhookLabel("");
+      setTelegramChatId("");
       setLastSigningSecret(
         result.signingSecret
           ? { webhookId: result.webhook.id, secret: result.signingSecret }
           : null
       );
-      toast.success("Webhook added");
+      toast.success(`${providerLabel(webhookProvider)} destination added`);
       router.refresh();
     });
   }
@@ -474,11 +536,12 @@ export function AlertsClient({
 
         <Section
           title="Delivery"
-          description="HTTPS webhooks receive JSON when an alert fires (error spike or quota)."
+          description="HTTPS webhooks and chat destinations (Slack, Discord, Teams, Telegram) receive a message when an alert fires."
         >
           <p className="mb-3 text-[13px] text-muted-foreground">
-            Payload schema lives in{" "}
+            Generic webhook payload schema lives in{" "}
             <code className="font-mono text-[11px]">docs/ALERT-WEBHOOKS.md</code>.
+            Chat channels use provider-native payloads (Incoming Webhooks or Telegram Bot API).
           </p>
 
           {lastSigningSecret ? (
@@ -511,11 +574,17 @@ export function AlertsClient({
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-medium">
-                      {wh.label?.trim() || "Webhook"}
+                      {wh.label?.trim() || providerLabel(wh.provider)}
+                      <span className="ml-2 rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] font-normal text-muted-foreground">
+                        {providerLabel(wh.provider)}
+                      </span>
                     </p>
                     <p className="truncate font-mono text-[11px] text-muted-foreground">
                       {wh.urlMasked}
                       {wh.hasSigningSecret ? " · signed" : ""}
+                      {wh.provider === "TELEGRAM" && wh.config?.chatId
+                        ? ` · chat ${wh.config.chatId}`
+                        : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -550,28 +619,81 @@ export function AlertsClient({
             </ul>
           ) : (
             <p className="mb-3 text-[13px] text-muted-foreground">
-              No webhooks configured for this project yet.
+              No delivery destinations configured for this project yet.
             </p>
           )}
 
           {canEdit ? (
             <FieldGroup>
-              <Field label="HTTPS URL">
+              <Field label="Channel">
+                <select
+                  value={webhookProvider}
+                  onChange={(e) =>
+                    setWebhookProvider(e.target.value as AlertWebhookProvider)
+                  }
+                  disabled={webhookPending}
+                  className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"
+                >
+                  {DELIVERY_PROVIDER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field
+                label={
+                  webhookProvider === "SLACK"
+                    ? "Slack Incoming Webhook URL"
+                    : webhookProvider === "DISCORD"
+                      ? "Discord webhook URL"
+                      : webhookProvider === "MICROSOFT_TEAMS"
+                        ? "Teams Incoming Webhook URL"
+                        : webhookProvider === "TELEGRAM"
+                          ? "Telegram Bot API sendMessage URL"
+                          : "HTTPS URL"
+                }
+              >
                 <input
                   type="url"
                   value={webhookUrl}
                   onChange={(e) => setWebhookUrl(e.target.value)}
-                  placeholder="https://hooks.example.com/alerts"
+                  placeholder={
+                    DELIVERY_PROVIDER_OPTIONS.find((o) => o.value === webhookProvider)
+                      ?.urlPlaceholder ?? "https://…"
+                  }
                   disabled={webhookPending}
                   className="w-full max-w-xl rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] disabled:opacity-50"
                 />
               </Field>
+              {webhookProvider === "TELEGRAM" ? (
+                <Field label="Chat id">
+                  <input
+                    type="text"
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="-100… or @channel"
+                    disabled={webhookPending}
+                    className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] disabled:opacity-50"
+                  />
+                </Field>
+              ) : null}
               <Field label="Label (optional)">
                 <input
                   type="text"
                   value={webhookLabel}
                   onChange={(e) => setWebhookLabel(e.target.value)}
-                  placeholder="Ops channel"
+                  placeholder={
+                    webhookProvider === "SLACK"
+                      ? "#alerts"
+                      : webhookProvider === "DISCORD"
+                        ? "#ops"
+                        : webhookProvider === "MICROSOFT_TEAMS"
+                          ? "Ops channel"
+                          : webhookProvider === "TELEGRAM"
+                            ? "Ops chat"
+                            : "Ops channel"
+                  }
                   disabled={webhookPending}
                   className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"
                 />
@@ -579,10 +701,17 @@ export function AlertsClient({
               <div>
                 <SettingsBtn
                   variant="primary"
-                  disabled={webhookPending || webhookUrl.trim().length === 0}
+                  disabled={
+                    webhookPending ||
+                    webhookUrl.trim().length === 0 ||
+                    (webhookProvider === "TELEGRAM" &&
+                      telegramChatId.trim().length === 0)
+                  }
                   onClick={addWebhook}
                 >
-                  {webhookPending ? "Saving…" : "Add webhook"}
+                  {webhookPending
+                    ? "Saving…"
+                    : `Add ${providerLabel(webhookProvider).toLowerCase()}`}
                 </SettingsBtn>
               </div>
             </FieldGroup>
@@ -590,18 +719,18 @@ export function AlertsClient({
 
           <div className="mt-6">
             <p className="mb-2 text-[13px] font-medium text-foreground">
-              Recent webhook deliveries
+              Recent deliveries
             </p>
             <p className="mb-3 text-[12px] text-muted-foreground">
               Last 25 attempts (including tests). Failed retries are recorded before a final dead
               letter.
             </p>
             {initialDeliveries.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground">No webhook deliveries yet.</p>
+              <p className="text-[13px] text-muted-foreground">No deliveries yet.</p>
             ) : (
               <AnalyticsPanel>
                 <AnalyticsPanelHeader
-                  title="Webhook deliveries"
+                  title="Deliveries"
                   description="Newest first"
                 />
                 <AnalyticsPanelList>
@@ -610,7 +739,7 @@ export function AlertsClient({
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-medium">
-                            {d.webhookLabel?.trim() || "Webhook"}
+                            {d.webhookLabel?.trim() || "Destination"}
                           </p>
                           <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
                             {d.webhookUrlMasked}
