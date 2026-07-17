@@ -179,6 +179,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.8.11] - 2026-07-14
+
 ### Added
 
 - **Team settings** — copy invite link button on Settings → Team members ([#367](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/367), [#413](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/413))
@@ -629,7 +631,9 @@ Continues the **v1.5.0 — Analytics dashboard** milestone ([#182](https://githu
 
 ---
 
-First release of the **v1.5.0 — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
+## [1.5.0] - 2026-07-07
+
+First release of the **v1.5.x — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
 
 ### Added
 
