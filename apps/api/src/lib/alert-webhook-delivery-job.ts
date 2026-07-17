@@ -100,6 +100,24 @@ export async function claimNextAlertWebhookDelivery(
   });
 }
 
+export async function renewAlertWebhookDeliveryLease(
+  prisma: PrismaClient,
+  input: { deliveryId: string; workerId: string; now: Date; env?: NodeJS.ProcessEnv }
+): Promise<boolean> {
+  const leaseExpiresAt = new Date(
+    input.now.getTime() + resolveAlertWebhookWorkerLeaseMs(input.env)
+  );
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      id: input.deliveryId,
+      lease_owner: input.workerId,
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+    },
+    data: { lease_expires_at: leaseExpiresAt },
+  });
+  return result.count > 0;
+}
+
 export async function completeAlertWebhookDelivery(
   prisma: PrismaClient,
   input: {

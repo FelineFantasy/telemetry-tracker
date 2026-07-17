@@ -2,8 +2,24 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import https from "node:https";
 import { isIP } from "node:net";
-import type { AlertRuleType, AlertWebhookDeliveryStatus, Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type AlertRuleType, type AlertWebhookDeliveryStatus, type PrismaClient } from "@prisma/client";
 import { dashboardOriginOrNull } from "./dashboard-origin.js";
+
+const WEBHOOK_CAP_TX = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+  maxWait: 5000,
+  timeout: 15000,
+} as const;
+const WEBHOOK_CAP_TX_RETRIES = 5;
+
+function isPrismaTransactionConflict(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "P2034"
+  );
+}
 
 export const MAX_PROJECT_WEBHOOKS = 5;
 export const WEBHOOK_MAX_ATTEMPTS = 2;
@@ -476,37 +492,52 @@ export async function createProjectWebhook(
     return { ok: false, error: validated.error, status: 400 };
   }
 
-  const count = await countActiveProjectWebhooks(prisma, projectId);
-  if (count >= MAX_PROJECT_WEBHOOKS) {
-    return {
-      ok: false,
-      error: `At most ${MAX_PROJECT_WEBHOOKS} webhooks per project`,
-      status: 409,
-    };
-  }
-
   const label =
     typeof input.label === "string" && input.label.trim().length > 0
       ? input.label.trim().slice(0, 80)
       : null;
   const signingSecret = input.withSigningSecret === false ? null : generateWebhookSigningSecret();
 
-  const row = await prisma.projectWebhook.create({
-    data: {
-      id: randomUUID(),
-      project_id: projectId,
-      url: validated.url,
-      label,
-      enabled: input.enabled !== false,
-      signing_secret: signingSecret,
-    },
-  });
+  // Count + insert under serializable isolation so concurrent creates cannot exceed the cap.
+  for (let attempt = 0; attempt < WEBHOOK_CAP_TX_RETRIES; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const count = await tx.projectWebhook.count({
+          where: { project_id: projectId, deleted_at: null },
+        });
+        if (count >= MAX_PROJECT_WEBHOOKS) {
+          return {
+            ok: false as const,
+            error: `At most ${MAX_PROJECT_WEBHOOKS} webhooks per project`,
+            status: 409 as const,
+          };
+        }
 
-  return {
-    ok: true,
-    webhook: toProjectWebhookPublic(row),
-    signingSecret,
-  };
+        const row = await tx.projectWebhook.create({
+          data: {
+            id: randomUUID(),
+            project_id: projectId,
+            url: validated.url,
+            label,
+            enabled: input.enabled !== false,
+            signing_secret: signingSecret,
+          },
+        });
+
+        return {
+          ok: true as const,
+          webhook: toProjectWebhookPublic(row),
+          signingSecret,
+        };
+      }, WEBHOOK_CAP_TX);
+    } catch (e) {
+      const retry =
+        isPrismaTransactionConflict(e) && attempt < WEBHOOK_CAP_TX_RETRIES - 1;
+      if (!retry) throw e;
+    }
+  }
+
+  throw new Error("createProjectWebhook: exhausted serializable retries");
 }
 
 export async function updateProjectWebhook(

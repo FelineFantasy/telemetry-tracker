@@ -15,6 +15,7 @@ import {
   claimNextAlertWebhookDelivery,
   completeAlertWebhookDelivery,
   failAlertWebhookDeliveryAttempt,
+  renewAlertWebhookDeliveryLease,
   type AlertWebhookDeliveryJobRow,
 } from "./alert-webhook-delivery-job.js";
 
@@ -141,6 +142,23 @@ async function deliverClaimedAlertWebhook(
         lookupFn: input.lookupFn ?? deps.lookupFn,
       }));
 
+  // Renew before POST so a slow/hung recipient cannot expire the lease mid-flight
+  // and leave a successful delivery stuck in PROCESSING (duplicate on reclaim).
+  const leaseHeld = await renewAlertWebhookDeliveryLease(deps.prisma, {
+    deliveryId: job.id,
+    workerId,
+    now: nowFn(),
+    env: deps.env,
+  });
+  if (!leaseHeld) {
+    return {
+      status: "failed",
+      deliveryId: job.id,
+      terminal: "FAILED",
+      error: "Lease lost before delivery",
+    };
+  }
+
   const result = await sendImpl({
     url: webhook.url,
     body: bodyJson,
@@ -150,11 +168,21 @@ async function deliverClaimedAlertWebhook(
   });
 
   if (result.ok) {
-    await completeAlertWebhookDelivery(deps.prisma, {
+    const completed = await completeAlertWebhookDelivery(deps.prisma, {
       deliveryId: job.id,
       workerId,
       httpStatus: result.httpStatus,
     });
+    if (!completed) {
+      // HTTP already succeeded; do not report success if the row was not finalized,
+      // or another worker may reclaim PROCESSING and POST again.
+      return {
+        status: "failed",
+        deliveryId: job.id,
+        terminal: "FAILED",
+        error: "Lease lost after successful delivery",
+      };
+    }
     return { status: "success", deliveryId: job.id };
   }
 

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildAlertWebhookPayload,
+  createProjectWebhook,
   enqueueAlertWebhookDeliveries,
   isBlockedIpAddress,
   isBlockedWebhookHostname,
   listAlertWebhookDeliveries,
+  MAX_PROJECT_WEBHOOKS,
   postWebhookOnce,
   resolveWebhookHostForDelivery,
   sendTestWebhook,
@@ -224,7 +226,12 @@ describe("claim / retry / DEAD", () => {
 describe("processNextAlertWebhookDelivery", () => {
   it("posts signed payload and marks SUCCESS", async () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
-    const completeUpdate = vi.fn(async () => ({ count: 1 }));
+    const updateMany = vi
+      .fn()
+      // renew lease
+      .mockResolvedValueOnce({ count: 1 })
+      // complete SUCCESS
+      .mockResolvedValueOnce({ count: 1 });
     const prisma = {
       $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
         fn({
@@ -282,7 +289,7 @@ describe("processNextAlertWebhookDelivery", () => {
           fired_at: new Date("2026-07-17T10:00:00.000Z"),
         }),
       },
-      alertWebhookDelivery: { updateMany: completeUpdate },
+      alertWebhookDelivery: { updateMany },
     };
     const result = await processNextAlertWebhookDelivery({
       prisma: prisma as never,
@@ -294,6 +301,217 @@ describe("processNextAlertWebhookDelivery", () => {
     const sent = sendImpl.mock.calls[0]?.[0];
     expect(JSON.parse(sent.body).event).toBe("alert.fired");
     expect(sent.signature).toBe(signWebhookBody(sent.body, "sekrit"));
+    expect(updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not report success when completion loses the lease", async () => {
+    const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 }) // renew
+      .mockResolvedValueOnce({ count: 0 }); // complete missed
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 0,
+              status: "PENDING",
+              http_status: null,
+              error: null,
+              lease_owner: null,
+              lease_expires_at: null,
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: {
+            update: async () => ({
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "worker-1",
+              lease_expires_at: new Date("2026-07-17T12:01:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            }),
+          },
+        }),
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+          enabled: true,
+        }),
+      },
+      alertEvent: {
+        findUnique: async () => ({
+          rule: "ERROR_SPIKE",
+          title: "Spike",
+          body: "n",
+          href: null,
+          fired_at: new Date("2026-07-17T10:00:00.000Z"),
+        }),
+      },
+      alertWebhookDelivery: { updateMany },
+    };
+    const result = await processNextAlertWebhookDelivery({
+      prisma: prisma as never,
+      workerId: "worker-1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      sendImpl,
+    });
+    expect(result).toEqual({
+      status: "failed",
+      deliveryId: "d1",
+      terminal: "FAILED",
+      error: "Lease lost after successful delivery",
+    });
+    expect(sendImpl).toHaveBeenCalledOnce();
+  });
+
+  it("skips POST when the lease cannot be renewed", async () => {
+    const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 0,
+              status: "PENDING",
+              http_status: null,
+              error: null,
+              lease_owner: null,
+              lease_expires_at: null,
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: {
+            update: async () => ({
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "worker-1",
+              lease_expires_at: new Date("2026-07-17T12:01:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            }),
+          },
+        }),
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+          enabled: true,
+        }),
+      },
+      alertEvent: {
+        findUnique: async () => ({
+          rule: "ERROR_SPIKE",
+          title: "Spike",
+          body: "n",
+          href: null,
+          fired_at: new Date("2026-07-17T10:00:00.000Z"),
+        }),
+      },
+      alertWebhookDelivery: { updateMany },
+    };
+    const result = await processNextAlertWebhookDelivery({
+      prisma: prisma as never,
+      workerId: "worker-1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      sendImpl,
+    });
+    expect(result).toEqual({
+      status: "failed",
+      deliveryId: "d1",
+      terminal: "FAILED",
+      error: "Lease lost before delivery",
+    });
+    expect(sendImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("createProjectWebhook", () => {
+  it("enforces the per-project cap inside a serializable transaction", async () => {
+    const create = vi.fn();
+    const count = vi.fn(async () => 5);
+    const prisma = {
+      $transaction: async (
+        fn: (tx: unknown) => Promise<unknown>,
+        opts?: { isolationLevel?: string }
+      ) => {
+        expect(opts?.isolationLevel).toBeTruthy();
+        return fn({
+          projectWebhook: { count, create },
+        });
+      },
+    };
+    const result = await createProjectWebhook(prisma as never, "p1", {
+      url: "https://hooks.example.com/a",
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: `At most ${MAX_PROJECT_WEBHOOKS} webhooks per project`,
+      status: 409,
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("creates when under the cap", async () => {
+    const create = vi.fn(async (args: { data: Record<string, unknown> }) => ({
+      id: args.data.id,
+      url: args.data.url,
+      label: null,
+      enabled: true,
+      created_at: new Date("2026-07-17T12:00:00.000Z"),
+      updated_at: new Date("2026-07-17T12:00:00.000Z"),
+      signing_secret: "sekrit",
+    }));
+    const count = vi.fn(async () => 1);
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ projectWebhook: { count, create } }),
+    };
+    const result = await createProjectWebhook(prisma as never, "p1", {
+      url: "https://hooks.example.com/a",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.webhook.urlMasked).toContain("***");
+      expect(result.signingSecret).toBeTruthy();
+    }
+    expect(create).toHaveBeenCalledOnce();
   });
 });
 
