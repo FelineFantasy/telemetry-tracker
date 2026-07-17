@@ -13,17 +13,39 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+### Fixed
+
+- **Navigation overlay** — profile/settings links from the user menu, quick actions, and theme entry use the shared nav loader; soft navigations keep the overlay visible for a short minimum so fast settings pages still show it
+
+### Changed
+
+### Database
+
+---
+
+## [1.13.1] - 2026-07-17
+
+### Fixed
+
+- **Navigation overlay** — after a workspace/project switch, keep the full-screen loader until the refresh settle hold finishes (not only when the nav scope ack arrives), so list/overview RSC is less likely to flash stale data
+
+---
+
+## [1.13.0] - 2026-07-17
+
+### Added
+
 - Dashboard: full-screen loading overlay while switching app, environment, workspace, project, section tabs, settings pages, time range, and command-palette / keyboard navigation ([#484](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/484)).
 - **Rename project** — owners can update project name and slug from Settings → Organization; project switcher “Rename this project” links to the edit form ([#480](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/480))
 - **Rename workspace** — owners can update the organization name from Settings → Organization; org switcher “Rename your workspace” links to the edit form ([#482](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/482))
 
 ### Fixed
 
+- **Overview session counts** — fix Postgres syntax error (42601 near `s`) on `GET /api/overview` when environment or release filters are set (missing `AND` before upper-bound `started_at` / `created_at` clauses) ([#490](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/490))
+
 ### Changed
 
 - Dashboard: errors, events, and sessions list pages load filters, summary, and the table first; analytics panels render below the list and fetch after paint so above-the-fold content is not blocked ([#486](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/486)).
-
-### Database
 
 ---
 

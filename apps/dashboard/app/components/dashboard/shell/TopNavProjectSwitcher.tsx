@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Pin, Plus, Search } from "lucide-react";
 import { setDashboardProjectId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
@@ -16,7 +16,7 @@ import {
 import { formatProjectRailName } from "@/lib/workspace-placeholders";
 import type { ProjectOption } from "@/lib/dashboard-workspace-types";
 import { searchInputClassName } from "@/lib/input-classes";
-import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
+import { useDashboardNavigation, useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 import { cn } from "@/lib/utils";
 import { DashboardPopover, ShellKbd } from "./DashboardPopover";
 import { NavPickerSection } from "./NavPickerSection";
@@ -36,10 +36,12 @@ const IDLE_SUMMARY: ProjectNavSummary = {
 
 export function TopNavProjectSwitcher({
   projects,
+  currentOrganizationId,
   currentProjectId,
   projectNavSummaries,
 }: {
   projects: ProjectOption[];
+  currentOrganizationId: string | null;
   currentProjectId: string;
   projectNavSummaries: Record<string, ProjectNavSummary>;
 }) {
@@ -99,7 +101,10 @@ export function TopNavProjectSwitcher({
         const r = await setDashboardProjectId(projectId);
         if (r.ok) {
           setPrefs({ ...prefs, recent: recordRecentProject(projectId) });
-          await replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams));
+          await replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams), {
+            organizationId: currentOrganizationId,
+            projectId,
+          });
           close();
         } else {
           setValue(currentProjectId);
@@ -107,6 +112,7 @@ export function TopNavProjectSwitcher({
       });
     },
     [
+      currentOrganizationId,
       currentProjectId,
       pathname,
       prefs,
@@ -128,14 +134,7 @@ export function TopNavProjectSwitcher({
   );
 
   if (projects.length === 0) {
-    return (
-      <Link
-        href={ORGANIZATION_SETTINGS_NEW_PROJECT_URL}
-        className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-sm hover:bg-surface"
-      >
-        Create project
-      </Link>
-    );
+    return <EmptyProjectCreateLink />;
   }
 
   const current = projects.find((p) => p.id === value) ?? projects[0]!;
@@ -251,18 +250,49 @@ export function TopNavProjectSwitcher({
           </div>
 
           <div className="border-t border-border p-1.5">
-            <Link
+            <ProjectSettingsLink
               href={ORGANIZATION_SETTINGS_NEW_PROJECT_URL}
-              onClick={close}
+              onNavigate={close}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground"
             >
               <Plus className="h-3.5 w-3.5" />
               Create new project
-            </Link>
+            </ProjectSettingsLink>
           </div>
         </div>
       )}
     </DashboardPopover>
+  );
+}
+
+function EmptyProjectCreateLink() {
+  const linkProps = useDashboardNavLinkProps(ORGANIZATION_SETTINGS_NEW_PROJECT_URL);
+  return (
+    <Link
+      {...linkProps}
+      className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-sm hover:bg-surface"
+    >
+      Create project
+    </Link>
+  );
+}
+
+function ProjectSettingsLink({
+  href,
+  onNavigate,
+  className,
+  children,
+}: {
+  href: string;
+  onNavigate: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const linkProps = useDashboardNavLinkProps(href, { onNavigate });
+  return (
+    <Link {...linkProps} className={className}>
+      {children}
+    </Link>
   );
 }
 
