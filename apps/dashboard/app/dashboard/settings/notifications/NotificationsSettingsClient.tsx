@@ -36,10 +36,10 @@ const CHANNELS: { id: NotificationChannel; label: string; desc: string; disabled
 ];
 
 const CATEGORIES: { id: NotificationCategory; label: string; desc: string }[] = [
-  { id: "issues", label: "Issues", desc: "Open error groups for the active project" },
+  { id: "issues", label: "Issues", desc: "New error groups and open issues for the active project" },
   { id: "billing", label: "Billing", desc: "Quota thresholds and payment issues" },
   { id: "team", label: "Team", desc: "Invitations and new members in your organizations" },
-  { id: "alerts", label: "Alerts", desc: "Error spikes and quota threshold rules" },
+  { id: "alerts", label: "Alerts", desc: "Error spikes and quota threshold rules (email templates + project recipients)" },
 ];
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({

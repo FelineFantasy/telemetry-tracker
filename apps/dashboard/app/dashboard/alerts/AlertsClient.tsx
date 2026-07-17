@@ -380,7 +380,7 @@ export function AlertsClient({
 
         <Section
           title="Email recipients"
-          description="Who receives project alert and new-error emails. Recipients still need the email channel enabled under Notification settings."
+          description="Who receives this project's alert emails (spike/quota) and new-error emails. Alert mail uses the Alerts email route; new-error mail uses the Issues route — both still need the global email channel on."
         >
           <FieldGroup>
             <Field label="Send alert emails for this project">
@@ -457,7 +457,9 @@ export function AlertsClient({
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Up to 10 addresses, one per line. Registered accounts respect their
-                notification preferences; others receive alert mail directly.
+                notification preferences (Alerts for alert mail, Issues for new
+                errors); unknown addresses receive project alert/new-error mail
+                directly.
               </p>
             </Field>
           </FieldGroup>

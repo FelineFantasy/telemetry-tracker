@@ -273,6 +273,7 @@ export async function notifyNewErrorGroupEmail(
   }
 ): Promise<void> {
   const envPart = group.environment ? ` · ${group.environment}` : "";
+  // type "issue" → Issues email routing (not Alerts). Project recipient list still applies.
   const item: DashboardNotificationItem = {
     id: `issue:${group.id}`,
     type: "issue",
