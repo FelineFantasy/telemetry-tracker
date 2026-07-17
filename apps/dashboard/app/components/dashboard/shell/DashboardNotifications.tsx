@@ -18,6 +18,7 @@ import {
 import { DashboardPopover } from "./DashboardPopover";
 import type { DashboardNotificationItem } from "@/lib/dashboard-notifications";
 import { formatRelativeTime } from "@/lib/format-time";
+import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 
 type Props = {
   initialItems: DashboardNotificationItem[];
@@ -220,13 +221,7 @@ export function DashboardNotifications({ initialItems }: Props) {
             ) : null}
           </ul>
           <div className="flex items-center justify-between border-t border-border px-3 py-2">
-            <Link
-              href="/dashboard/settings/notifications"
-              onClick={close}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              Notification settings
-            </Link>
+            <NotificationSettingsLink onNavigate={close} />
             <span className="text-[11px] text-muted-foreground">
               {effectiveProjectLabel(viewItems)}
             </span>
@@ -234,6 +229,20 @@ export function DashboardNotifications({ initialItems }: Props) {
         </div>
       )}
     </DashboardPopover>
+  );
+}
+
+function NotificationSettingsLink({ onNavigate }: { onNavigate: () => void }) {
+  const linkProps = useDashboardNavLinkProps("/dashboard/settings/notifications", {
+    onNavigate,
+  });
+  return (
+    <Link
+      {...linkProps}
+      className="text-[11px] text-muted-foreground hover:text-foreground"
+    >
+      Notification settings
+    </Link>
   );
 }
 
