@@ -10,6 +10,7 @@ import {
   postWebhookOnce,
   resolveAlertWebhookWorkerLeaseMs,
   resolveWebhookHostForDelivery,
+  finalizeTestWebhookDelivery,
   sendTestWebhook,
   signWebhookBody,
   validateWebhookUrl,
@@ -823,6 +824,124 @@ describe("sendTestWebhook", () => {
       )
     ).rejects.toThrow("db unavailable");
     expect(sendImpl).not.toHaveBeenCalled();
+  });
+
+  it("retries terminal status update after transient DB failure", async () => {
+    const update = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("db blip"))
+      .mockResolvedValueOnce({ id: "log" });
+    const result = await sendTestWebhook(
+      {
+        projectWebhook: {
+          findFirst: async () => ({
+            id: "wh1",
+            url: "https://hooks.example.com/a",
+            signing_secret: null,
+          }),
+        },
+        alertWebhookDelivery: {
+          create: async () => ({ id: "log" }),
+          update,
+        },
+      } as never,
+      "p1",
+      "wh1",
+      {
+        sendImpl: async () => ({ ok: true, httpStatus: 200 }),
+      }
+    );
+    expect(result).toEqual({ ok: true, httpStatus: 200 });
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(update.mock.calls[1]?.[0]).toMatchObject({
+      data: { status: "SUCCESS", lease_owner: null },
+    });
+  });
+
+  it("falls back to FAILED when SUCCESS finalize keeps failing", async () => {
+    const update = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("db down"))
+      .mockRejectedValueOnce(new Error("db down"))
+      .mockRejectedValueOnce(new Error("db down"))
+      .mockResolvedValueOnce({ id: "log" });
+    const result = await sendTestWebhook(
+      {
+        projectWebhook: {
+          findFirst: async () => ({
+            id: "wh1",
+            url: "https://hooks.example.com/a",
+            signing_secret: null,
+          }),
+        },
+        alertWebhookDelivery: {
+          create: async () => ({ id: "log" }),
+          update,
+        },
+      } as never,
+      "p1",
+      "wh1",
+      {
+        sendImpl: async () => ({ ok: true, httpStatus: 200 }),
+      }
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("Could not finalize delivery status");
+      expect(result.status).toBe(502);
+    }
+    expect(update).toHaveBeenCalledTimes(4);
+    expect(update.mock.calls[3]?.[0]).toMatchObject({
+      data: { status: "FAILED", lease_owner: null },
+    });
+  });
+
+  it("marks FAILED when sendImpl throws so the row is not left PROCESSING", async () => {
+    const update = vi.fn(async () => ({ id: "log" }));
+    const result = await sendTestWebhook(
+      {
+        projectWebhook: {
+          findFirst: async () => ({
+            id: "wh1",
+            url: "https://hooks.example.com/a",
+            signing_secret: null,
+          }),
+        },
+        alertWebhookDelivery: {
+          create: async () => ({ id: "log" }),
+          update,
+        },
+      } as never,
+      "p1",
+      "wh1",
+      {
+        sendImpl: async () => {
+          throw new Error("socket hang up");
+        },
+      }
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe("socket hang up");
+      expect(result.status).toBe(502);
+    }
+    expect(update.mock.calls[0]?.[0]).toMatchObject({
+      data: { status: "FAILED", error: "socket hang up", lease_owner: null },
+    });
+  });
+});
+
+describe("finalizeTestWebhookDelivery", () => {
+  it("returns false when every update attempt fails", async () => {
+    const update = vi.fn().mockRejectedValue(new Error("db down"));
+    const ok = await finalizeTestWebhookDelivery(
+      { alertWebhookDelivery: { update } } as never,
+      "d1",
+      { status: "SUCCESS", http_status: 200, error: null }
+    );
+    expect(ok).toBe(false);
+    // 3 intended SUCCESS retries + 1 FAILED last resort
+    expect(update).toHaveBeenCalledTimes(4);
   });
 });
 

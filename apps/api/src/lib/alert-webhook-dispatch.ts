@@ -774,6 +774,64 @@ export async function postWebhookOnce(
   });
 }
 
+const TEST_WEBHOOK_FINALIZE_ATTEMPTS = 3;
+
+/**
+ * Write a terminal status for a test delivery. Retries transient DB failures.
+ * Test rows are excluded from worker reclaim (`webhook:test:%`), so leaving
+ * PROCESSING would show "Sending" forever in the UI.
+ *
+ * @returns true when the intended status was written; false if only a FAILED
+ *   last-resort write succeeded (or nothing could be written).
+ */
+export async function finalizeTestWebhookDelivery(
+  prisma: PrismaClient,
+  deliveryId: string,
+  data: {
+    status: "SUCCESS" | "FAILED";
+    http_status: number | null;
+    error: string | null;
+  }
+): Promise<boolean> {
+  const clearLease = {
+    lease_owner: null as null,
+    lease_expires_at: null as null,
+  };
+
+  for (let attempt = 0; attempt < TEST_WEBHOOK_FINALIZE_ATTEMPTS; attempt++) {
+    try {
+      await prisma.alertWebhookDelivery.update({
+        where: { id: deliveryId },
+        data: {
+          status: data.status,
+          http_status: data.http_status,
+          error: data.error,
+          ...clearLease,
+        },
+      });
+      return true;
+    } catch {
+      // Transient DB error — retry before falling back.
+    }
+  }
+
+  // Absolute last resort — any terminal state beats stuck PROCESSING.
+  try {
+    await prisma.alertWebhookDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: "FAILED",
+        http_status: data.http_status,
+        error: (data.error ?? "Could not finalize delivery status").slice(0, 400),
+        ...clearLease,
+      },
+    });
+    return data.status === "FAILED";
+  } catch {
+    return false;
+  }
+}
+
 /** Send a sample alert payload to one webhook (editors testing the destination). */
 export async function sendTestWebhook(
   prisma: PrismaClient,
@@ -829,25 +887,36 @@ export async function sendTestWebhook(
   });
 
   const sendImpl = options?.sendImpl ?? postWebhookOnceAsSendImpl;
-  const result = await sendImpl({
-    url: webhook.url,
-    body,
-    signature,
-    deliveryId,
-    lookupFn: options?.lookupFn,
-  });
+  let result: WebhookSendResult;
+  try {
+    result = await sendImpl({
+      url: webhook.url,
+      body,
+      signature,
+      deliveryId,
+      lookupFn: options?.lookupFn,
+    });
+  } catch (e) {
+    const message =
+      e instanceof Error ? e.message.slice(0, 400) : "Request failed";
+    result = { ok: false, httpStatus: null, error: message };
+  }
 
   // Single-shot test — FAILED (not DEAD) when the destination rejects.
-  await prisma.alertWebhookDelivery.update({
-    where: { id: deliveryId },
-    data: {
-      status: result.ok ? "SUCCESS" : "FAILED",
-      http_status: result.httpStatus,
-      error: result.ok ? null : result.error,
-      lease_owner: null,
-      lease_expires_at: null,
-    },
+  // Always terminalize: worker will not reclaim webhook:test:% rows.
+  const finalized = await finalizeTestWebhookDelivery(prisma, deliveryId, {
+    status: result.ok ? "SUCCESS" : "FAILED",
+    http_status: result.httpStatus,
+    error: result.ok ? null : result.error,
   });
+  if (!finalized) {
+    return {
+      ok: false,
+      error: "Could not finalize delivery status",
+      status: 502,
+      httpStatus: result.httpStatus,
+    };
+  }
 
   if (!result.ok) {
     return {
