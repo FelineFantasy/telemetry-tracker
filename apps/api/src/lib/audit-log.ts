@@ -13,6 +13,8 @@ export const AUDIT_ACTIONS = {
   PROJECT_PII_SCRUB_UPDATE: "project.pii_scrub.update",
   /** Project display name and/or slug changed. */
   PROJECT_UPDATE: "project.update",
+  /** Organization (workspace) display name changed. */
+  ORGANIZATION_UPDATE: "organization.update",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

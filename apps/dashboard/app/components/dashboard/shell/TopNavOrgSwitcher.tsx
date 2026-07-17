@@ -6,10 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Check, ChevronDown, Plus, Users } from "lucide-react";
 import { setDashboardOrganizationId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
-import {
-  formatOrganizationRailName,
-  LEGACY_SEEDED_ORG_NAME,
-} from "@/lib/workspace-placeholders";
+import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
 import type { OrgOption } from "@/lib/dashboard-workspace-types";
 import { DashboardPopover } from "./DashboardPopover";
 import { NavPickerTrigger } from "./shell-primitives";
@@ -104,17 +101,15 @@ export function TopNavOrgSwitcher({
               </button>
             );
           })}
-          {current.name === LEGACY_SEEDED_ORG_NAME ? (
-            <p className="px-2 py-2 text-[12px] text-muted-foreground">
-              <Link
-                href="/dashboard/settings/organization"
-                onClick={close}
-                className="text-brand hover:underline"
-              >
-                Rename your workspace
-              </Link>
-            </p>
-          ) : null}
+          <p className="px-2 py-2 text-[12px] text-muted-foreground">
+            <Link
+              href="/dashboard/settings/organization#rename-workspace"
+              onClick={close}
+              className="text-brand hover:underline"
+            >
+              Rename your workspace
+            </Link>
+          </p>
           <div className="my-1 h-px bg-border" />
           <Link
             href="/dashboard/settings/organization"
