@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Pin, Plus, Search } from "lucide-react";
 import { setDashboardProjectId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
@@ -16,6 +16,7 @@ import {
 import { formatProjectRailName } from "@/lib/workspace-placeholders";
 import type { ProjectOption } from "@/lib/dashboard-workspace-types";
 import { searchInputClassName } from "@/lib/input-classes";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import { cn } from "@/lib/utils";
 import { DashboardPopover, ShellKbd } from "./DashboardPopover";
 import { NavPickerSection } from "./NavPickerSection";
@@ -42,10 +43,10 @@ export function TopNavProjectSwitcher({
   currentProjectId: string;
   projectNavSummaries: Record<string, ProjectNavSummary>;
 }) {
-  const router = useRouter();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const [pending, startTransition] = useTransition();
+  const { replaceAndRefresh, runPending, isPending: pending } =
+    useDashboardNavigation();
   const [value, setValue] = useState(currentProjectId);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -94,19 +95,26 @@ export function TopNavProjectSwitcher({
         return;
       }
       setValue(projectId);
-      startTransition(async () => {
+      void runPending(async () => {
         const r = await setDashboardProjectId(projectId);
         if (r.ok) {
           setPrefs({ ...prefs, recent: recordRecentProject(projectId) });
-          router.replace(hrefWithoutAppSearchParam(pathname, searchParams));
-          router.refresh();
+          await replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams));
           close();
         } else {
           setValue(currentProjectId);
         }
       });
     },
-    [currentProjectId, pathname, prefs, router, searchParams, value]
+    [
+      currentProjectId,
+      pathname,
+      prefs,
+      replaceAndRefresh,
+      runPending,
+      searchParams,
+      value,
+    ]
   );
 
   const onTogglePin = useCallback(

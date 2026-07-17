@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import {
   useCallback,
   useEffect,
@@ -105,7 +105,7 @@ function matchCommand(item: CommandItem, query: string) {
 }
 
 export function DashboardCommandPalette() {
-  const router = useRouter();
+  const { push, isPending } = useDashboardNavigation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -125,13 +125,18 @@ export function DashboardCommandPalette() {
   const run = useCallback(
     (href: string) => {
       close();
-      router.push(href);
+      push(href);
     },
-    [close, router]
+    [close, push]
   );
 
   useEffect(() => {
+    if (isPending && open) close();
+  }, [close, isPending, open]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isPending) return;
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -145,7 +150,7 @@ export function DashboardCommandPalette() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [close, open]);
+  }, [close, isPending, open]);
 
   useEffect(() => {
     if (!open) return;

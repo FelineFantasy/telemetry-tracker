@@ -13,6 +13,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- Dashboard: full-screen loading overlay while switching app, environment, workspace, project, section tabs, settings pages, time range, and command-palette / keyboard navigation ([#484](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/484)).
 - **Rename project** — owners can update project name and slug from Settings → Organization; project switcher “Rename this project” links to the edit form ([#480](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/480))
 - **Rename workspace** — owners can update the organization name from Settings → Organization; org switcher “Rename your workspace” links to the edit form ([#482](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/482))
 

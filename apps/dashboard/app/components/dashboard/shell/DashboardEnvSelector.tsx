@@ -13,7 +13,7 @@ import { NavPickerLabel, NavPickerTrigger } from "./shell-primitives";
 export function DashboardEnvSelector({ environments }: { environments: string[] }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const { push, replace, isPending } = useDashboardNavigation();
+  const { push, replaceSilent, isPending } = useDashboardNavigation();
   const pathForLinks = dashboardPathForAppFilter(pathname);
 
   const rawEnv = searchParams.get("environment") ?? "";
@@ -22,8 +22,8 @@ export function DashboardEnvSelector({ environments }: { environments: string[] 
 
   useEffect(() => {
     if (rawEnv === "" || environments.includes(rawEnv)) return;
-    replace(buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams));
-  }, [environments, pathForLinks, rawEnv, replace, searchParams]);
+    replaceSilent(buildDashboardHrefWithEnvironment(pathForLinks, null, searchParams));
+  }, [environments, pathForLinks, rawEnv, replaceSilent, searchParams]);
 
   return (
     <DashboardPopover
