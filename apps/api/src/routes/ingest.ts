@@ -30,6 +30,7 @@ import {
   loadProjectPiiDenyKeys,
   loadProjectPiiScrubSettings,
 } from "../lib/project-pii-scrub-cache.js";
+import { normalizeIngestEnvironment } from "../lib/ingest-environment.js";
 
 /**
  * Ingest pipeline (implement in order):
@@ -99,7 +100,9 @@ function sessionContextPatch(
   if (body.device_os !== undefined) patch.device_os = body.device_os ?? null;
   if (body.sdk_version !== undefined) patch.sdk_version = body.sdk_version ?? null;
   if (body.platform !== undefined) patch.platform = body.platform ?? null;
-  if (body.environment !== undefined) patch.environment = body.environment ?? null;
+  if (body.environment !== undefined) {
+    patch.environment = normalizeIngestEnvironment(body.environment);
+  }
   if (body.release !== undefined) patch.release = body.release ?? null;
   return patch;
 }
@@ -225,7 +228,7 @@ export async function ingestRoutes(
           session_id: body.session_id,
           app,
           platform: body.platform ?? null,
-          environment: body.environment ?? null,
+          environment: normalizeIngestEnvironment(body.environment),
           release: body.release ?? null,
           user_id: body.user_id ?? null,
           user_email: scrubbedEmail === undefined ? null : scrubbedEmail,
@@ -295,13 +298,14 @@ export async function ingestRoutes(
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const fingerprint = computeFingerprint(body.message, body.stack);
     const platform = body.platform ?? null;
+    const environment = normalizeIngestEnvironment(body.environment);
     const { group: errorGroup, isNew } = await findOrCreateErrorGroup(prisma, {
       projectId,
       fingerprint,
       message: body.message,
       top_stack: body.stack?.split("\n")[0]?.trim() ?? null,
       app,
-      environment: body.environment ?? null,
+      environment,
       release,
       platform,
     });
@@ -311,7 +315,7 @@ export async function ingestRoutes(
         stack: body.stack ?? null,
         release,
         platform,
-        environment: body.environment ?? null,
+        environment,
         context: (body.context ?? undefined) as Prisma.InputJsonValue | undefined,
         session_id: body.session_id ?? null,
         user_id: body.user_id ?? null,

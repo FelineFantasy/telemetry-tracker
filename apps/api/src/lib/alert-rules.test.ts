@@ -10,12 +10,22 @@ import {
   softDeleteAlertRule,
   updateAlertRule,
 } from "./alert-rules.js";
+import { normalizeIngestEnvironment } from "./ingest-environment.js";
 
 const fireProjectAlert = vi.fn(async () => true);
 
 vi.mock("./alert-dispatch.js", () => ({
   fireProjectAlert: (...args: unknown[]) => fireProjectAlert(...args),
 }));
+
+describe("normalizeIngestEnvironment", () => {
+  it("trims and caps to match alert-rule environment filters", () => {
+    expect(normalizeIngestEnvironment("  production  ")).toBe("production");
+    expect(normalizeIngestEnvironment("   ")).toBeNull();
+    expect(normalizeIngestEnvironment(undefined)).toBeNull();
+    expect(normalizeIngestEnvironment("x".repeat(80))).toHaveLength(64);
+  });
+});
 
 describe("alertRuleDedupeKey", () => {
   it("buckets by cooldown window", () => {
@@ -341,6 +351,31 @@ describe("maybeEvaluateAlertRules", () => {
     } as never;
 
     await maybeEvaluateAlertRules(prisma, "p1");
+    expect(fireProjectAlert).not.toHaveBeenCalled();
+  });
+
+  it("skips enabled rules whose stored conditions fail validation", async () => {
+    const count = vi.fn(async () => 100);
+    const prisma = {
+      alertRule: {
+        findMany: async () => [
+          {
+            id: "rule-corrupt",
+            name: "Corrupt",
+            enabled: true,
+            conditions: [{ type: "UNKNOWN_FUTURE", threshold: 1 }],
+            destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+            cooldown_minutes: 15,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        ],
+      },
+      errorOccurrence: { count },
+    } as never;
+
+    await maybeEvaluateAlertRules(prisma, "p1");
+    expect(count).not.toHaveBeenCalled();
     expect(fireProjectAlert).not.toHaveBeenCalled();
   });
 });

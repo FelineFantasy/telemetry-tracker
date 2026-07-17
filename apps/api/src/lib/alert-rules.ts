@@ -137,16 +137,11 @@ function toPublic(row: {
     id: row.id,
     name: row.name,
     enabled: row.enabled,
+    // Invalid / unknown condition JSON must not synthesize a default spike —
+    // evaluation skips empty conditions (same as unimplemented types).
     conditions: conditionsParsed.success
       ? conditionsParsed.data.map(normalizeCondition)
-      : [
-          {
-            type: "ERROR_COUNT",
-            threshold: 25,
-            windowMinutes: 15,
-            environment: null,
-          },
-        ],
+      : [],
     destinationIds: destinationIdsParsed.success ? destinationIdsParsed.data : [],
     cooldownMinutes: row.cooldown_minutes,
     createdAt: row.created_at.toISOString(),
@@ -436,7 +431,7 @@ async function evaluateAlertRule(
 
 /**
  * Evaluate enabled custom alert rules for a project (ingest-triggered).
- * Unknown / unimplemented condition types cause that rule to be skipped.
+ * Unknown / unimplemented / unparsable conditions cause that rule to be skipped.
  */
 export async function maybeEvaluateAlertRules(
   prisma: PrismaClient,
@@ -445,6 +440,7 @@ export async function maybeEvaluateAlertRules(
   const rules = await listAlertRules(prisma, projectId);
   for (const rule of rules) {
     if (!rule.enabled) continue;
+    if (rule.conditions.length === 0) continue;
     await evaluateAlertRule(prisma, projectId, rule);
   }
 }
