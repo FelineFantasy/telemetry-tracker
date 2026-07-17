@@ -1032,7 +1032,12 @@ export async function projectDashboardRoutes(
     const session = await requireSessionUser(request, reply);
     if (!session) return;
 
-    const parsed = validateNotificationPreferencesPatch(request.body);
+    const existing = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { notification_preferences: true },
+    });
+    const previous = parseNotificationPreferences(existing?.notification_preferences);
+    const parsed = validateNotificationPreferencesPatch(request.body, previous);
     if (!parsed.ok) {
       return reply.status(400).send({ error: parsed.error });
     }
@@ -1257,10 +1262,12 @@ export async function projectDashboardRoutes(
     if (!canCreateApiKey(projRole)) {
       return reply.status(403).send({ error: "Forbidden" });
     }
+    const { loadProjectAlertSettings } = await import("../lib/error-spike-alert.js");
     const { validateProjectAlertSettingsPatch } = await import(
       "../lib/project-alert-settings.js"
     );
-    const validated = validateProjectAlertSettingsPatch(request.body);
+    const previous = await loadProjectAlertSettings(prisma, projectId);
+    const validated = validateProjectAlertSettingsPatch(request.body, previous);
     if (!validated.ok) {
       return reply.status(400).send({ error: validated.error });
     }

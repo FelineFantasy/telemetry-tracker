@@ -1,12 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { OrgRole, type PrismaClient } from "@prisma/client";
+import {
+  OrgRole,
+  type AlertRuleType,
+  type PrismaClient,
+} from "@prisma/client";
 import { sendTransactionalEmail } from "./email.js";
 import { dashboardOriginOrNull } from "./dashboard-origin.js";
 import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 import {
-  categoryForNotificationType,
   parseNotificationPreferences,
-  shouldSendEmailForCategory,
+  shouldSendEmailForItem,
   type NotificationPreferences,
 } from "./notification-preferences.js";
 import { quotaNotificationKey } from "./quota-notification-keys.js";
@@ -16,32 +19,22 @@ import {
 } from "./billing-alert.js";
 import { billingNotificationKey } from "./billing-notification-keys.js";
 import { teamInviteNotificationKey } from "./team-notification-keys.js";
-
-function absoluteHref(href: string | null, base: string | null): string | null {
-  if (!href) return null;
-  if (href.startsWith("http://") || href.startsWith("https://")) return href;
-  if (!base) return href;
-  return `${base.replace(/\/$/, "")}${href.startsWith("/") ? href : `/${href}`}`;
-}
-
-function emailHtml(item: DashboardNotificationItem, base: string | null): string {
-  const link = absoluteHref(item.href, base);
-  const linkBlock = link
-    ? `<p><a href="${link}">View in Telemetry Tracker</a></p>`
-    : "";
-  return `<p><strong>${escapeHtml(item.title)}</strong></p><p>${escapeHtml(item.body)}</p>${linkBlock}`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+import {
+  alertEmailRolesToOrgRoles,
+  parseProjectAlertSettings,
+} from "./project-alert-settings.js";
+import {
+  buildNotificationEmailHtml,
+  buildNotificationEmailSubject,
+  inferNotificationEmailKind,
+} from "./notification-email-template.js";
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function isValidEmailAddress(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
 export async function sendNotificationEmailIfAllowed(
@@ -49,10 +42,13 @@ export async function sendNotificationEmailIfAllowed(
   userId: string,
   email: string,
   item: DashboardNotificationItem,
-  prefs: NotificationPreferences
+  prefs: NotificationPreferences,
+  options?: {
+    rule?: AlertRuleType | null;
+    projectName?: string | null;
+  }
 ): Promise<boolean> {
-  const category = categoryForNotificationType(item.type);
-  if (!shouldSendEmailForCategory(prefs, category)) {
+  if (!shouldSendEmailForItem(prefs, item)) {
     return false;
   }
 
@@ -69,10 +65,16 @@ export async function sendNotificationEmailIfAllowed(
   if (claimed.count === 0) return false;
 
   const base = dashboardOriginOrNull();
+  const kind = inferNotificationEmailKind(item, options?.rule);
   const result = await sendTransactionalEmail({
     to: email,
-    subject: `[Telemetry Tracker] ${item.title}`,
-    html: emailHtml(item, base),
+    subject: buildNotificationEmailSubject(item, kind),
+    html: buildNotificationEmailHtml({
+      item,
+      kind,
+      dashboardOrigin: base,
+      projectName: options?.projectName,
+    }),
   });
 
   if (!result.sent && !result.devLogged) {
@@ -92,11 +94,40 @@ export async function sendNotificationEmailIfAllowed(
   return true;
 }
 
+/** Send to an address that is not a registered user (no prefs / NotificationEmailLog). */
+async function sendAdditionalRecipientEmail(
+  email: string,
+  item: DashboardNotificationItem,
+  options?: {
+    rule?: AlertRuleType | null;
+    projectName?: string | null;
+  }
+): Promise<boolean> {
+  const base = dashboardOriginOrNull();
+  const kind = inferNotificationEmailKind(item, options?.rule);
+  const result = await sendTransactionalEmail({
+    to: email,
+    subject: buildNotificationEmailSubject(item, kind),
+    html: buildNotificationEmailHtml({
+      item,
+      kind,
+      dashboardOrigin: base,
+      projectName: options?.projectName,
+    }),
+  });
+  return Boolean(result.sent || result.devLogged);
+}
+
 export async function notifyOrganizationMembersByEmail(
   prisma: PrismaClient,
   organizationId: string,
   item: DashboardNotificationItem,
-  options?: { roles?: OrgRole[]; excludeEmails?: string[] }
+  options?: {
+    roles?: OrgRole[];
+    excludeEmails?: string[];
+    rule?: AlertRuleType | null;
+    projectName?: string | null;
+  }
 ): Promise<void> {
   const roles = options?.roles ?? [OrgRole.OWNER, OrgRole.EDITOR, OrgRole.VIEWER];
   const excludeEmails = new Set(
@@ -127,7 +158,8 @@ export async function notifyOrganizationMembersByEmail(
           member.user.id,
           member.user.email,
           item,
-          parseNotificationPreferences(member.user.notification_preferences)
+          parseNotificationPreferences(member.user.notification_preferences),
+          { rule: options?.rule, projectName: options?.projectName }
         )
       )
   );
@@ -137,18 +169,96 @@ export async function notifyProjectMembersByEmail(
   prisma: PrismaClient,
   projectId: string,
   item: DashboardNotificationItem,
-  options?: { roles?: OrgRole[] }
+  options?: {
+    roles?: OrgRole[];
+    rule?: AlertRuleType | null;
+    /** When true (default for alerts), honor project alert email settings. */
+    respectProjectEmailSettings?: boolean;
+  }
 ): Promise<void> {
   const project = await prisma.project.findFirst({
     where: { id: projectId, deleted_at: null },
-    select: { organization_id: true },
+    select: { organization_id: true, alert_settings: true, name: true },
   });
   if (!project) return;
+
+  const respect = options?.respectProjectEmailSettings !== false;
+  const settings = parseProjectAlertSettings(project.alert_settings);
+
+  if (respect && !settings.email.enabled) {
+    return;
+  }
+
+  const roles =
+    options?.roles ??
+    (respect
+      ? alertEmailRolesToOrgRoles(settings.email.roles)
+      : [OrgRole.OWNER, OrgRole.EDITOR]);
+
   await notifyOrganizationMembersByEmail(
     prisma,
     project.organization_id,
     item,
-    options
+    {
+      roles,
+      rule: options?.rule,
+      projectName: project.name,
+    }
+  );
+
+  if (!respect || settings.email.additionalEmails.length === 0) {
+    return;
+  }
+
+  const memberEmails = new Set(
+    (
+      await prisma.organizationMembership.findMany({
+        where: {
+          organization_id: project.organization_id,
+          role: { in: roles },
+        },
+        select: { user: { select: { email: true } } },
+      })
+    ).map((row) => normalizeEmail(row.user.email))
+  );
+
+  const extra = settings.email.additionalEmails
+    .map(normalizeEmail)
+    .filter((address) => isValidEmailAddress(address) && !memberEmails.has(address));
+
+  if (extra.length === 0) return;
+
+  const knownUsers = await prisma.user.findMany({
+    where: { email: { in: extra } },
+    select: {
+      id: true,
+      email: true,
+      notification_preferences: true,
+    },
+  });
+  const knownByEmail = new Map(
+    knownUsers.map((user) => [normalizeEmail(user.email), user])
+  );
+
+  await Promise.all(
+    extra.map(async (address) => {
+      const user = knownByEmail.get(address);
+      if (user) {
+        await sendNotificationEmailIfAllowed(
+          prisma,
+          user.id,
+          user.email,
+          item,
+          parseNotificationPreferences(user.notification_preferences),
+          { rule: options?.rule, projectName: project.name }
+        );
+        return;
+      }
+      await sendAdditionalRecipientEmail(address, item, {
+        rule: options?.rule,
+        projectName: project.name,
+      });
+    })
   );
 }
 
@@ -163,6 +273,7 @@ export async function notifyNewErrorGroupEmail(
   }
 ): Promise<void> {
   const envPart = group.environment ? ` · ${group.environment}` : "";
+  // type "issue" → Issues email routing (not Alerts). Project recipient list still applies.
   const item: DashboardNotificationItem = {
     id: `issue:${group.id}`,
     type: "issue",
@@ -174,6 +285,7 @@ export async function notifyNewErrorGroupEmail(
   await notifyProjectMembersByEmail(prisma, projectId, item);
 }
 
+/** @deprecated Prefer fireProjectAlert via maybeNotifyQuotaAlerts */
 export async function notifyQuotaThresholdEmail(
   prisma: PrismaClient,
   projectId: string,
@@ -282,7 +394,15 @@ export async function shouldSendInviteEmail(
   });
   if (!user) return true;
   const prefs = parseNotificationPreferences(user.notification_preferences);
-  return shouldSendEmailForCategory(prefs, "team");
+  const item: DashboardNotificationItem = {
+    id: "team:invite:probe",
+    type: "team",
+    title: "Invite",
+    body: "",
+    occurredAt: new Date().toISOString(),
+    href: null,
+  };
+  return shouldSendEmailForItem(prefs, item);
 }
 
 export async function sendOrganizationInviteEmail(
@@ -338,10 +458,16 @@ export async function sendOrganizationInviteEmail(
   });
   if (claimed.count === 0) return;
 
+  const base = dashboardOriginOrNull();
+  const kind = inferNotificationEmailKind(item);
   const result = await sendTransactionalEmail({
     to: invite.email,
-    subject: "You're invited to Telemetry Tracker",
-    html: `<p>You were invited to join an organization on Telemetry Tracker.</p><p><a href="${inviteUrl}">Accept invite</a></p>`,
+    subject: buildNotificationEmailSubject(item, kind),
+    html: buildNotificationEmailHtml({
+      item: { ...item, href: inviteUrl },
+      kind,
+      dashboardOrigin: base,
+    }),
   });
 
   if (!result.sent && !result.devLogged) {

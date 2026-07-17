@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { OrgRole, type AlertRuleType, type PrismaClient } from "@prisma/client";
+import { type AlertRuleType, type PrismaClient } from "@prisma/client";
 import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 import { notifyProjectMembersByEmail } from "./notification-email-dispatch.js";
 import { enqueueAlertWebhookDeliveries } from "./alert-webhook-dispatch.js";
@@ -80,7 +80,7 @@ export async function fireProjectAlert(
   };
 
   void notifyProjectMembersByEmail(prisma, payload.projectId, item, {
-    roles: [OrgRole.OWNER, OrgRole.EDITOR],
+    rule: payload.rule,
   });
 
   return true;
