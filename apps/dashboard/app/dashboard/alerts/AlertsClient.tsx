@@ -31,8 +31,11 @@ import {
 } from "@/app/components/dashboard/settings/settings-ui";
 import {
   alertSettingsEqual,
+  formatAdditionalEmailsInput,
+  parseAdditionalEmailsInput,
   ruleLabel,
   type AlertEventRow,
+  type ProjectAlertEmailRole,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
@@ -260,7 +263,7 @@ export function AlertsClient({
     <>
       <SettingsPageHeader
         title="Alerts"
-        description="Threshold rules for the active project. Fired alerts appear in the notification bell, email owners and editors, and POST to configured webhooks."
+        description="Threshold rules for the active project. Fired alerts appear in the notification bell, email configured recipients, and POST to configured webhooks."
         actions={
           canEdit ? (
             <SettingsBtn variant="primary" disabled={!dirty || pending} onClick={save}>
@@ -376,15 +379,103 @@ export function AlertsClient({
         </Section>
 
         <Section
-          title="Delivery"
-          description="Email uses notification preferences. HTTPS webhooks receive JSON when an alert fires (error spike or quota)."
+          title="Email recipients"
+          description="Who receives project alert and new-error emails. Recipients still need the email channel enabled under Notification settings."
         >
-          <p className="mb-3 text-[13px] text-muted-foreground">
-            Configure in-app and email routing under{" "}
+          <FieldGroup>
+            <Field label="Send alert emails for this project">
+              <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
+                <SettingsToggle
+                  on={settings.email.enabled}
+                  onChange={(enabled) =>
+                    setSettings((s) => ({
+                      ...s,
+                      email: { ...s.email, enabled },
+                    }))
+                  }
+                />
+              </div>
+            </Field>
+            <Field label="Include org roles">
+              <div
+                className={`flex flex-wrap gap-3 ${canEdit && settings.email.enabled ? "" : "pointer-events-none opacity-50"}`}
+              >
+                {(
+                  [
+                    { id: "OWNER" as const, label: "Owners" },
+                    { id: "EDITOR" as const, label: "Editors" },
+                    { id: "VIEWER" as const, label: "Viewers" },
+                  ] satisfies { id: ProjectAlertEmailRole; label: string }[]
+                ).map((role) => {
+                  const on = settings.email.roles.includes(role.id);
+                  return (
+                    <label
+                      key={role.id}
+                      className="flex items-center gap-2 text-[13px]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        disabled={!canEdit || !settings.email.enabled}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSettings((s) => {
+                            const next = new Set(s.email.roles);
+                            if (checked) next.add(role.id);
+                            else next.delete(role.id);
+                            const roles = [...next] as ProjectAlertEmailRole[];
+                            if (roles.length === 0) return s;
+                            return {
+                              ...s,
+                              email: { ...s.email, roles },
+                            };
+                          });
+                        }}
+                      />
+                      {role.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="Additional emails (optional)">
+              <SettingsTextarea
+                value={formatAdditionalEmailsInput(settings.email.additionalEmails)}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    email: {
+                      ...s.email,
+                      additionalEmails: parseAdditionalEmailsInput(e.target.value),
+                    },
+                  }))
+                }
+                disabled={!canEdit || !settings.email.enabled}
+                placeholder={"ops@example.com\noncall@example.com"}
+                rows={3}
+                className="max-w-xl font-mono text-[12px]"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Up to 10 addresses, one per line. Registered accounts respect their
+                notification preferences; others receive alert mail directly.
+              </p>
+            </Field>
+          </FieldGroup>
+          <p className="mt-3 text-[13px] text-muted-foreground">
+            Per-user routing lives under{" "}
             <Link href="/dashboard/settings/notifications" className="text-brand hover:underline">
               Notification settings
             </Link>
-            . Payload schema lives in{" "}
+            .
+          </p>
+        </Section>
+
+        <Section
+          title="Delivery"
+          description="HTTPS webhooks receive JSON when an alert fires (error spike or quota)."
+        >
+          <p className="mb-3 text-[13px] text-muted-foreground">
+            Payload schema lives in{" "}
             <code className="font-mono text-[11px]">docs/ALERT-WEBHOOKS.md</code>.
           </p>
 

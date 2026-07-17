@@ -18,9 +18,11 @@ import {
 } from "@/app/components/dashboard/settings/settings-ui";
 import {
   browserTimezone,
+  muteUntilHoursFromNow,
   preferencesEqual,
   type NotificationCategory,
   type NotificationChannel,
+  type NotificationDigest,
   type NotificationPreferences,
 } from "@/lib/notification-preferences-shared";
 
@@ -201,7 +203,7 @@ export function NotificationsSettingsClient({
 
         <Section
           title="Quiet hours"
-          description={`Mute non-critical in-app alerts during a daily window (${prefs.quietHours.timezone}). Issue alerts are muted; billing, quota, and alert rules still show.`}
+          description={`Mute non-critical alerts during a daily window (${prefs.quietHours.timezone}). Applies to in-app and email. Issue and team notices are muted; billing, quota, and alert rules still deliver.`}
         >
           <FieldGroup>
             <Field label="Enable quiet hours">
@@ -213,7 +215,7 @@ export function NotificationsSettingsClient({
                     quietHours: { ...current.quietHours, enabled },
                   }))
                 }
-                label="Mute non-critical in-app alerts"
+                label="Mute non-critical notifications"
               />
             </Field>
             <Field label="From / To">
@@ -252,6 +254,80 @@ export function NotificationsSettingsClient({
               </div>
             </Field>
           </FieldGroup>
+        </Section>
+
+        <Section
+          title="Temporary mute"
+          description="Pause non-critical in-app and email notifications. Billing, quota, and alert emails still arrive."
+        >
+          <FieldGroup>
+            <Field label="Mute status">
+              <p className="text-[13px] text-muted-foreground">
+                {prefs.mutedUntil && Date.parse(prefs.mutedUntil) > Date.now()
+                  ? `Muted until ${new Date(prefs.mutedUntil).toLocaleString()}`
+                  : "Not muted"}
+              </p>
+            </Field>
+            <Field label="Quick mute">
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { label: "1 hour", hours: 1 },
+                    { label: "8 hours", hours: 8 },
+                    { label: "24 hours", hours: 24 },
+                  ] as const
+                ).map((opt) => (
+                  <SettingsBtn
+                    key={opt.hours}
+                    variant="outline"
+                    onClick={() =>
+                      setPrefs((current) => ({
+                        ...current,
+                        mutedUntil: muteUntilHoursFromNow(opt.hours),
+                      }))
+                    }
+                  >
+                    {opt.label}
+                  </SettingsBtn>
+                ))}
+                <SettingsBtn
+                  variant="outline"
+                  disabled={!prefs.mutedUntil}
+                  onClick={() =>
+                    setPrefs((current) => ({
+                      ...current,
+                      mutedUntil: null,
+                    }))
+                  }
+                >
+                  Clear mute
+                </SettingsBtn>
+              </div>
+            </Field>
+          </FieldGroup>
+        </Section>
+
+        <Section
+          title="Email digests"
+          description="Preference is saved for a future digest sender. Alert and billing emails stay immediate for now."
+        >
+          <Field label="Digest cadence">
+            <SettingsSelect
+              value={prefs.digest}
+              onChange={(v) =>
+                setPrefs((current) => ({
+                  ...current,
+                  digest: v as NotificationDigest,
+                }))
+              }
+              options={[
+                { label: "Off (immediate only)", value: "off" },
+                { label: "Daily (coming soon)", value: "daily" },
+                { label: "Weekly (coming soon)", value: "weekly" },
+              ]}
+              className="!w-56"
+            />
+          </Field>
         </Section>
       </SettingsPageBody>
     </>
