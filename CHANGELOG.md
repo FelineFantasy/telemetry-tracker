@@ -19,6 +19,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Fixed
 
+- **Overview session counts** — fix Postgres syntax error (42601 near `s`) on `GET /api/overview` when environment or release filters are set (missing `AND` before upper-bound `started_at` / `created_at` clauses)
+
 ### Changed
 
 - Dashboard: errors, events, and sessions list pages load filters, summary, and the table first; analytics panels render below the list and fetch after paint so above-the-fold content is not blocked ([#486](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/486)).
