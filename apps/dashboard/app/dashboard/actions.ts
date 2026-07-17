@@ -798,18 +798,22 @@ export async function markNotificationsReadAction(
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/notifications");
   return { ok: true };
 }
 
-export async function markAllNotificationsReadAction(): Promise<
-  { ok: true } | { ok: false; error: string }
-> {
+export async function markAllNotificationsReadAction(options?: {
+  scope?: "project" | "organization";
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const res = await dashboardApiFetch(
     "/api/meta/notifications/read",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ all: true }),
+      body: JSON.stringify({
+        all: true,
+        ...(options?.scope === "organization" ? { scope: "organization" } : {}),
+      }),
     },
     await notificationApiFetchOptions()
   );
@@ -818,6 +822,7 @@ export async function markAllNotificationsReadAction(): Promise<
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/notifications");
   return { ok: true };
 }
 
