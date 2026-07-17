@@ -108,6 +108,20 @@ describe("organization-integrations", () => {
     expect(integrations.find((i) => i.id === "webhooks")?.status).toBe("disconnected");
   });
 
+  it("marks Discord connected when enabled Discord destinations exist", () => {
+    const integrations = resolveOrganizationIntegrations({
+      activeApiKeyCount: 0,
+      projectCount: 1,
+      ...emptyChannelCounts,
+      enabledDiscordWebhookCount: 1,
+    });
+
+    expect(integrations.find((i) => i.id === "discord")).toMatchObject({
+      availability: "available",
+      status: "connected",
+    });
+  });
+
   it("returns disconnected signals when the scoped project is not in the org", async () => {
     const prisma = {
       project: {
@@ -198,7 +212,7 @@ describe("organization-integrations", () => {
       connectHref: "/dashboard/alerts",
     });
     expect(integrations.find((i) => i.id === "discord")).toMatchObject({
-      availability: "planned",
+      availability: "available",
       trackedIssue: 224,
     });
     expect(integrations.find((i) => i.id === "microsoft_teams")).toMatchObject({

@@ -84,9 +84,9 @@ const INTEGRATION_CATALOG: IntegrationCatalogEntry[] = [
   {
     id: "discord",
     name: "Discord",
-    description: "Deliver alert notifications to a Discord channel.",
+    description: "Deliver alert notifications to a Discord channel via webhook.",
     scope: "project",
-    availability: "planned",
+    availability: "available",
     connectHref: "/dashboard/alerts",
     configureHref: "/dashboard/alerts",
     trackedIssue: 224,

@@ -11,7 +11,7 @@ channels). Choose a channel when adding:
 |----------|---------|--------|
 | **GENERIC** (`#225`) | Signed `alert.fired` JSON below | Optional HMAC signing secret |
 | **SLACK** (`#223`) | Slack Incoming Webhook (`text` + Block Kit) | URL must be `hooks.slack.com/services/…` |
-| **DISCORD** (`#224`) | Discord webhook embeds | First-party UI shipping separately |
+| **DISCORD** (`#224`) | Discord webhook embeds | URL must be `discord.com` / `discordapp.com` `/api/webhooks/{id}/{token}` |
 | **MICROSOFT_TEAMS** / **TELEGRAM** (`#500`) | Teams MessageCard / Bot `sendMessage` | First-party UI shipping separately |
 
 - URLs must be `https:` and must not target loopback, private, or link-local hosts
@@ -50,6 +50,12 @@ otherwise it may be a path like `/dashboard/errors`.
 Slack destinations POST JSON shaped for [Incoming Webhooks](https://api.slack.com/messaging/webhooks)
 (`text` fallback plus a `section` block with mrkdwn). Create the URL in Slack
 (Incoming Webhooks app or workflow) and paste it on Alerts → Delivery → Slack.
+
+## Discord payload
+
+Discord destinations POST JSON with a single embed (`title`, `description`, rule field,
+optional `url` back to the dashboard). Create a channel webhook in Discord
+(Channel settings → Integrations → Webhooks) and paste it on Alerts → Delivery → Discord.
 
 ## Headers
 

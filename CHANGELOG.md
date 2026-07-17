@@ -14,6 +14,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Added
 
 - **Slack alert notifications** — add Slack Incoming Webhook destinations on Alerts → Delivery; worker POSTs Slack Block Kit–compatible JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Slack connected when an enabled Slack destination exists ([#223](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/223); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); builds on [#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225))
+- **Discord alert notifications** — add Discord webhook destinations on Alerts → Delivery; worker POSTs embed JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Discord connected when an enabled Discord destination exists ([#224](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/224); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
 
 ### Fixed
 
