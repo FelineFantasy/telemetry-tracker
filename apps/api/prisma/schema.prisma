@@ -490,6 +490,8 @@ model ErrorOccurrence {
   stack          String?
   release        String?
   platform       String?
+  /// Ingest environment for this occurrence (alert rule env scope).
+  environment    String?
   context        Json?
   session_id     String?
   user_id        String?
@@ -500,6 +502,7 @@ model ErrorOccurrence {
   @@index([error_group_id, created_at])
   @@index([error_group_id, platform])
   @@index([error_group_id, release])
+  @@index([error_group_id, environment])
 }
 
 model Session {

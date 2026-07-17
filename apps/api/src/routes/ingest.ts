@@ -311,6 +311,7 @@ export async function ingestRoutes(
         stack: body.stack ?? null,
         release,
         platform,
+        environment: body.environment ?? null,
         context: (body.context ?? undefined) as Prisma.InputJsonValue | undefined,
         session_id: body.session_id ?? null,
         user_id: body.user_id ?? null,

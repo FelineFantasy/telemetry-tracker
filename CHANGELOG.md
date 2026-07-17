@@ -22,6 +22,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Database
 
 - `AlertRule` table; `AlertConditionType` (`ERROR_COUNT`); `AlertRuleType.ALERT_RULE` for custom-rule firings
+- `ErrorOccurrence.environment` for accurate alert-rule environment scope (group-level env remains a last-seen tag only)
 
 ---
 

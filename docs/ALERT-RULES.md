@@ -16,7 +16,8 @@ Built-in spike/quota thresholds on `Project.alert_settings` remain supported. Cu
 
 ### Condition examples (extensible)
 
-Only **ERROR_COUNT** is evaluated in this release:
+Only **ERROR_COUNT** is evaluated in this release. Optional `environment` filters on
+`ErrorOccurrence.environment` (set at ingest), not the mutable last-seen tag on `ErrorGroup`.
 
 ```text
 IF error count ≥ threshold in windowMinutes [AND environment = X]

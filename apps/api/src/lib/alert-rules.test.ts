@@ -181,17 +181,22 @@ describe("maybeEvaluateAlertRules", () => {
       created_at: new Date("2026-07-17T00:00:00.000Z"),
       updated_at: new Date("2026-07-17T00:00:00.000Z"),
     };
+    const count = vi.fn(async () => 12);
     const prisma = {
       alertRule: {
         findMany: async () => [ruleRow],
       },
-      errorOccurrence: {
-        count: async () => 12,
-      },
+      errorOccurrence: { count },
     } as never;
 
     await maybeEvaluateAlertRules(prisma, "p1");
 
+    expect(count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        environment: "production",
+        error_group: { project_id: "p1" },
+      }),
+    });
     expect(fireProjectAlert).toHaveBeenCalledTimes(1);
     expect(fireProjectAlert).toHaveBeenCalledWith(
       prisma,

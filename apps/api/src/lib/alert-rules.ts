@@ -324,9 +324,9 @@ async function evaluateErrorCountRule(
   const count = await prisma.errorOccurrence.count({
     where: {
       created_at: { gte: since },
+      ...(environment ? { environment } : {}),
       error_group: {
         project_id: projectId,
-        ...(environment ? { environment } : {}),
       },
     },
   });
