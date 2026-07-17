@@ -427,6 +427,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: "sekrit",
           enabled: true,
         }),
@@ -507,6 +509,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: null,
           enabled: true,
         }),
@@ -593,6 +597,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: null,
           enabled: true,
         }),
@@ -680,6 +686,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: null,
           enabled: true,
         }),
@@ -762,6 +770,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: null,
           enabled: true,
         }),
@@ -858,6 +868,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: null,
           enabled: true,
         }),
@@ -943,6 +955,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: null,
           enabled: true,
         }),
@@ -1025,6 +1039,8 @@ describe("processNextAlertWebhookDelivery", () => {
         findFirst: async () => ({
           id: "wh1",
           url: "https://hooks.example.com/a",
+          provider: "GENERIC",
+          config: null,
           signing_secret: null,
           enabled: true,
         }),
@@ -1080,6 +1096,8 @@ describe("createProjectWebhook", () => {
       id: args.data.id,
       url: args.data.url,
       label: null,
+      provider: args.data.provider ?? "GENERIC",
+      config: args.data.config ?? null,
       enabled: true,
       created_at: new Date("2026-07-17T12:00:00.000Z"),
       updated_at: new Date("2026-07-17T12:00:00.000Z"),
@@ -1135,6 +1153,8 @@ describe("sendTestWebhook", () => {
           findFirst: async () => ({
             id: "wh1",
             url: "https://hooks.example.com/a",
+            provider: "GENERIC",
+            config: null,
             signing_secret: null,
           }),
         },
@@ -1171,6 +1191,8 @@ describe("sendTestWebhook", () => {
           findFirst: async () => ({
             id: "wh1",
             url: "https://hooks.example.com/a",
+            provider: "GENERIC",
+            config: null,
             signing_secret: null,
           }),
         },
@@ -1199,6 +1221,8 @@ describe("sendTestWebhook", () => {
           findFirst: async () => ({
             id: "wh1",
             url: "https://hooks.example.com/a",
+            provider: "GENERIC",
+            config: null,
             signing_secret: null,
           }),
         },
@@ -1234,6 +1258,8 @@ describe("sendTestWebhook", () => {
             findFirst: async () => ({
               id: "wh1",
               url: "https://hooks.example.com/a",
+              provider: "GENERIC",
+              config: null,
               signing_secret: null,
             }),
           },
@@ -1263,6 +1289,8 @@ describe("sendTestWebhook", () => {
           findFirst: async () => ({
             id: "wh1",
             url: "https://hooks.example.com/a",
+            provider: "GENERIC",
+            config: null,
             signing_secret: null,
           }),
         },
@@ -1297,6 +1325,8 @@ describe("sendTestWebhook", () => {
           findFirst: async () => ({
             id: "wh1",
             url: "https://hooks.example.com/a",
+            provider: "GENERIC",
+            config: null,
             signing_secret: null,
           }),
         },
@@ -1330,6 +1360,8 @@ describe("sendTestWebhook", () => {
           findFirst: async () => ({
             id: "wh1",
             url: "https://hooks.example.com/a",
+            provider: "GENERIC",
+            config: null,
             signing_secret: null,
           }),
         },

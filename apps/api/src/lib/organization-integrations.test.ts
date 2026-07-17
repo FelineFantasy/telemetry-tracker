@@ -4,6 +4,14 @@ import {
   resolveOrganizationIntegrations,
 } from "./organization-integrations.js";
 
+const emptyChannelCounts = {
+  enabledWebhookCount: 0,
+  enabledSlackWebhookCount: 0,
+  enabledDiscordWebhookCount: 0,
+  enabledTeamsWebhookCount: 0,
+  enabledTelegramWebhookCount: 0,
+};
+
 describe("organization-integrations", () => {
   it("marks SDK connected when the scoped project has active API keys", async () => {
     let capturedWhere: unknown;
@@ -32,17 +40,19 @@ describe("organization-integrations", () => {
     expect(signals).toEqual({
       activeApiKeyCount: 2,
       projectCount: 1,
-      enabledWebhookCount: 0,
+      ...emptyChannelCounts,
     });
     expect(capturedWhere).toMatchObject({
       project_id: "proj-1",
       deleted_at: null,
-      revoked_at: null,
-      OR: [{ expires_at: null }, { expires_at: { gt: expect.any(Date) } }],
     });
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("connected");
     expect(integrations.find((i) => i.id === "email_alerts")?.status).toBe("connected");
-    expect(integrations.find((i) => i.id === "slack")?.status).toBe("disconnected");
+    expect(integrations.find((i) => i.id === "slack")).toMatchObject({
+      availability: "available",
+      status: "disconnected",
+      trackedIssue: 223,
+    });
     expect(integrations.find((i) => i.id === "webhooks")?.status).toBe("disconnected");
   });
 
@@ -50,7 +60,7 @@ describe("organization-integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 0,
-      enabledWebhookCount: 0,
+      ...emptyChannelCounts,
     });
 
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("disconnected");
@@ -61,17 +71,18 @@ describe("organization-integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 1,
-      enabledWebhookCount: 0,
+      ...emptyChannelCounts,
     });
 
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("disconnected");
     expect(integrations.find((i) => i.id === "email_alerts")?.status).toBe("connected");
   });
 
-  it("marks webhooks connected when enabled destinations exist", () => {
+  it("marks webhooks connected when enabled generic destinations exist", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 1,
+      ...emptyChannelCounts,
       enabledWebhookCount: 2,
     });
 
@@ -80,6 +91,21 @@ describe("organization-integrations", () => {
       status: "connected",
       trackedIssue: 225,
     });
+  });
+
+  it("marks Slack connected when enabled Slack destinations exist", () => {
+    const integrations = resolveOrganizationIntegrations({
+      activeApiKeyCount: 0,
+      projectCount: 1,
+      ...emptyChannelCounts,
+      enabledSlackWebhookCount: 1,
+    });
+
+    expect(integrations.find((i) => i.id === "slack")).toMatchObject({
+      availability: "available",
+      status: "connected",
+    });
+    expect(integrations.find((i) => i.id === "webhooks")?.status).toBe("disconnected");
   });
 
   it("returns disconnected signals when the scoped project is not in the org", async () => {
@@ -108,7 +134,7 @@ describe("organization-integrations", () => {
     expect(signals).toEqual({
       activeApiKeyCount: 0,
       projectCount: 0,
-      enabledWebhookCount: 0,
+      ...emptyChannelCounts,
     });
   });
 
@@ -130,7 +156,6 @@ describe("organization-integrations", () => {
     };
 
     await loadOrganizationIntegrationSignals(prisma as never, "org-1", "proj-1");
-
     expect(capturedWhere).toMatchObject({
       OR: [{ expires_at: null }, { expires_at: { gt: expect.any(Date) } }],
     });
@@ -138,7 +163,7 @@ describe("organization-integrations", () => {
 
   it("scopes project integration hrefs when a project id is provided", () => {
     const integrations = resolveOrganizationIntegrations(
-      { activeApiKeyCount: 0, projectCount: 1, enabledWebhookCount: 0 },
+      { activeApiKeyCount: 0, projectCount: 1, ...emptyChannelCounts },
       "proj-1"
     );
 
@@ -151,16 +176,16 @@ describe("organization-integrations", () => {
       configureHref: "/dashboard/alerts?projectId=proj-1",
     });
     expect(integrations.find((i) => i.id === "slack")).toMatchObject({
-      connectHref: "/dashboard/alerts",
-      configureHref: "/dashboard/alerts",
+      connectHref: "/dashboard/alerts?projectId=proj-1",
+      configureHref: "/dashboard/alerts?projectId=proj-1",
     });
   });
 
-  it("exposes configure links for planned integrations", () => {
+  it("exposes configure links for available and planned channel integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 0,
-      enabledWebhookCount: 0,
+      ...emptyChannelCounts,
     });
 
     expect(integrations.find((i) => i.id === "webhooks")).toMatchObject({
@@ -168,12 +193,21 @@ describe("organization-integrations", () => {
       trackedIssue: 225,
     });
     expect(integrations.find((i) => i.id === "slack")).toMatchObject({
-      availability: "planned",
+      availability: "available",
       trackedIssue: 223,
       connectHref: "/dashboard/alerts",
     });
     expect(integrations.find((i) => i.id === "discord")).toMatchObject({
+      availability: "planned",
       trackedIssue: 224,
+    });
+    expect(integrations.find((i) => i.id === "microsoft_teams")).toMatchObject({
+      availability: "planned",
+      trackedIssue: 500,
+    });
+    expect(integrations.find((i) => i.id === "telegram")).toMatchObject({
+      availability: "planned",
+      trackedIssue: 500,
     });
   });
 });

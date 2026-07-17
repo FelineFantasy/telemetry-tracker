@@ -13,11 +13,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Slack alert notifications** — add Slack Incoming Webhook destinations on Alerts → Delivery; worker POSTs Slack Block Kit–compatible JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Slack connected when an enabled Slack destination exists ([#223](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/223); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); builds on [#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225))
+
 ### Fixed
 
 ### Changed
 
 ### Database
+
+- `ProjectWebhook.provider` (`GENERIC` | `SLACK` | `DISCORD` | `MICROSOFT_TEAMS` | `TELEGRAM`) and optional `config` JSON for provider-specific non-secret settings (e.g. Telegram chat id)
 
 ---
 

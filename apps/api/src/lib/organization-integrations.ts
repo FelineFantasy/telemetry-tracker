@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { AlertWebhookProvider, PrismaClient } from "@prisma/client";
 
 export const INTEGRATION_IDS = [
   "sdk",
@@ -6,6 +6,8 @@ export const INTEGRATION_IDS = [
   "webhooks",
   "slack",
   "discord",
+  "microsoft_teams",
+  "telegram",
   "github",
 ] as const;
 
@@ -72,9 +74,9 @@ const INTEGRATION_CATALOG: IntegrationCatalogEntry[] = [
   {
     id: "slack",
     name: "Slack",
-    description: "Post alerts and error summaries to a channel.",
-    scope: "organization",
-    availability: "planned",
+    description: "Post alerts to a Slack channel via Incoming Webhook.",
+    scope: "project",
+    availability: "available",
     connectHref: "/dashboard/alerts",
     configureHref: "/dashboard/alerts",
     trackedIssue: 223,
@@ -83,11 +85,31 @@ const INTEGRATION_CATALOG: IntegrationCatalogEntry[] = [
     id: "discord",
     name: "Discord",
     description: "Deliver alert notifications to a Discord channel.",
-    scope: "organization",
+    scope: "project",
     availability: "planned",
     connectHref: "/dashboard/alerts",
     configureHref: "/dashboard/alerts",
     trackedIssue: 224,
+  },
+  {
+    id: "microsoft_teams",
+    name: "Microsoft Teams",
+    description: "Post alerts to a Teams channel via Incoming Webhook.",
+    scope: "project",
+    availability: "planned",
+    connectHref: "/dashboard/alerts",
+    configureHref: "/dashboard/alerts",
+    trackedIssue: 500,
+  },
+  {
+    id: "telegram",
+    name: "Telegram",
+    description: "Send alerts to a Telegram chat via Bot API.",
+    scope: "project",
+    availability: "planned",
+    connectHref: "/dashboard/alerts",
+    configureHref: "/dashboard/alerts",
+    trackedIssue: 500,
   },
   {
     id: "github",
@@ -103,8 +125,12 @@ const INTEGRATION_CATALOG: IntegrationCatalogEntry[] = [
 export type OrganizationIntegrationSignals = {
   activeApiKeyCount: number;
   projectCount: number;
-  /** Enabled, non-deleted project webhooks for the scoped project. */
+  /** Enabled GENERIC project webhooks (not chat channel destinations). */
   enabledWebhookCount: number;
+  enabledSlackWebhookCount: number;
+  enabledDiscordWebhookCount: number;
+  enabledTeamsWebhookCount: number;
+  enabledTelegramWebhookCount: number;
 };
 
 function activeApiKeyWhere(projectId: string, now: Date) {
@@ -116,11 +142,35 @@ function activeApiKeyWhere(projectId: string, now: Date) {
   };
 }
 
+async function countEnabledProviderWebhooks(
+  db: PrismaClient,
+  projectId: string,
+  provider: AlertWebhookProvider
+): Promise<number> {
+  return db.projectWebhook.count({
+    where: {
+      project_id: projectId,
+      deleted_at: null,
+      enabled: true,
+      provider,
+    },
+  });
+}
+
 export async function loadOrganizationIntegrationSignals(
   db: PrismaClient,
   organizationId: string,
   projectId?: string | null
 ): Promise<OrganizationIntegrationSignals> {
+  const empty: OrganizationIntegrationSignals = {
+    activeApiKeyCount: 0,
+    projectCount: 0,
+    enabledWebhookCount: 0,
+    enabledSlackWebhookCount: 0,
+    enabledDiscordWebhookCount: 0,
+    enabledTeamsWebhookCount: 0,
+    enabledTelegramWebhookCount: 0,
+  };
   const now = new Date();
 
   if (projectId) {
@@ -129,26 +179,39 @@ export async function loadOrganizationIntegrationSignals(
       select: { id: true },
     });
     if (!project) {
-      return { activeApiKeyCount: 0, projectCount: 0, enabledWebhookCount: 0 };
+      return empty;
     }
 
-    const [activeApiKeyCount, enabledWebhookCount] = await Promise.all([
+    const [
+      activeApiKeyCount,
+      enabledWebhookCount,
+      enabledSlackWebhookCount,
+      enabledDiscordWebhookCount,
+      enabledTeamsWebhookCount,
+      enabledTelegramWebhookCount,
+    ] = await Promise.all([
       db.apiKey.count({
         where: activeApiKeyWhere(project.id, now),
       }),
-      db.projectWebhook.count({
-        where: {
-          project_id: project.id,
-          deleted_at: null,
-          enabled: true,
-        },
-      }),
+      countEnabledProviderWebhooks(db, project.id, "GENERIC"),
+      countEnabledProviderWebhooks(db, project.id, "SLACK"),
+      countEnabledProviderWebhooks(db, project.id, "DISCORD"),
+      countEnabledProviderWebhooks(db, project.id, "MICROSOFT_TEAMS"),
+      countEnabledProviderWebhooks(db, project.id, "TELEGRAM"),
     ]);
 
-    return { activeApiKeyCount, projectCount: 1, enabledWebhookCount };
+    return {
+      activeApiKeyCount,
+      projectCount: 1,
+      enabledWebhookCount,
+      enabledSlackWebhookCount,
+      enabledDiscordWebhookCount,
+      enabledTeamsWebhookCount,
+      enabledTelegramWebhookCount,
+    };
   }
 
-  return { activeApiKeyCount: 0, projectCount: 0, enabledWebhookCount: 0 };
+  return empty;
 }
 
 function projectScopedHref(
@@ -188,7 +251,13 @@ function resolveIntegrationStatus(
     case "webhooks":
       return signals.enabledWebhookCount > 0 ? "connected" : "disconnected";
     case "slack":
+      return signals.enabledSlackWebhookCount > 0 ? "connected" : "disconnected";
     case "discord":
+      return signals.enabledDiscordWebhookCount > 0 ? "connected" : "disconnected";
+    case "microsoft_teams":
+      return signals.enabledTeamsWebhookCount > 0 ? "connected" : "disconnected";
+    case "telegram":
+      return signals.enabledTelegramWebhookCount > 0 ? "connected" : "disconnected";
     case "github":
       return "disconnected";
     default: {

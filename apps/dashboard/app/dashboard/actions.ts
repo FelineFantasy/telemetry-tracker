@@ -855,6 +855,8 @@ export type ProjectWebhookActionRow = {
   id: string;
   urlMasked: string;
   label: string | null;
+  provider: "GENERIC" | "SLACK" | "DISCORD" | "MICROSOFT_TEAMS" | "TELEGRAM";
+  config: { chatId?: string } | null;
   enabled: boolean;
   hasSigningSecret: boolean;
   createdAt: string;
@@ -865,6 +867,8 @@ export async function createProjectWebhookAction(input: {
   url: string;
   label?: string;
   withSigningSecret?: boolean;
+  provider?: ProjectWebhookActionRow["provider"];
+  config?: { chatId?: string };
 }): Promise<
   | { ok: true; webhook: ProjectWebhookActionRow; signingSecret: string | null }
   | { ok: false; error: string }
@@ -875,7 +879,9 @@ export async function createProjectWebhookAction(input: {
     body: JSON.stringify({
       url: input.url,
       label: input.label ?? null,
-      withSigningSecret: input.withSigningSecret !== false,
+      provider: input.provider ?? "GENERIC",
+      config: input.config ?? undefined,
+      withSigningSecret: input.withSigningSecret,
     }),
   });
   if (!res.ok) {

@@ -1,11 +1,18 @@
 # Alert webhooks
 
-Project-scoped HTTPS webhooks receive JSON when Telemetry Tracker fires an alert
+Project-scoped HTTPS destinations receive a POST when Telemetry Tracker fires an alert
 (`ERROR_SPIKE`, `QUOTA_NEAR`, `QUOTA_EXCEEDED`) via `fireProjectAlert`.
 
 Configure destinations under **Dashboard → Alerts → Delivery** (owners/editors).
-Up to **5** webhooks per project. Slack/Discord/Teams incoming webhooks work as DIY
-destinations until first-party channel UIs ship.
+Up to **5** destinations per project (shared across generic HTTPS webhooks and chat
+channels). Choose a channel when adding:
+
+| Provider | Payload | Notes |
+|----------|---------|--------|
+| **GENERIC** (`#225`) | Signed `alert.fired` JSON below | Optional HMAC signing secret |
+| **SLACK** (`#223`) | Slack Incoming Webhook (`text` + Block Kit) | URL must be `hooks.slack.com/services/…` |
+| **DISCORD** (`#224`) | Discord webhook embeds | First-party UI shipping separately |
+| **MICROSOFT_TEAMS** / **TELEGRAM** (`#500`) | Teams MessageCard / Bot `sendMessage` | First-party UI shipping separately |
 
 - URLs must be `https:` and must not target loopback, private, or link-local hosts
   (create/update string checks).
@@ -14,8 +21,9 @@ destinations until first-party channel UIs ship.
   (custom `lookup` + TLS SNI / `Host` for the original hostname) so a rebinding race
   cannot retarget the socket after validation.
 - Delivery POSTs do not follow redirects (`https.request` does not auto-follow).
+- Chat providers skip Telemetry HMAC signing (recipients ignore custom signature headers).
 
-## Payload
+## Generic payload
 
 ```json
 {
@@ -37,6 +45,12 @@ otherwise it may be a path like `/dashboard/errors`.
 
 `deliveryId` is the durable `AlertWebhookDelivery.id` (stable across retries).
 
+## Slack payload
+
+Slack destinations POST JSON shaped for [Incoming Webhooks](https://api.slack.com/messaging/webhooks)
+(`text` fallback plus a `section` block with mrkdwn). Create the URL in Slack
+(Incoming Webhooks app or workflow) and paste it on Alerts → Delivery → Slack.
+
 ## Headers
 
 | Header | Value |
@@ -45,7 +59,7 @@ otherwise it may be a path like `/dashboard/errors`.
 | `User-Agent` | `TelemetryTracker-Webhooks/1.0` |
 | `X-Telemetry-Event` | `alert.fired` |
 | `X-Telemetry-Delivery` | Same UUID as `deliveryId` |
-| `X-Telemetry-Signature` | `sha256=<hex>` when a signing secret is set |
+| `X-Telemetry-Signature` | `sha256=<hex>` when a signing secret is set (generic destinations) |
 
 Verify signatures with HMAC-SHA256 over the **raw request body** using the secret
 shown once when the webhook is created.
@@ -83,7 +97,9 @@ shown once when the webhook is created.
 ## Related
 
 - Parent notifications vision: GitHub #492
-- This channel: #225
-- Slack / Discord first-party UIs: #223 / #224
+- Generic HTTPS webhooks: #225
+- Slack first-party: #223
+- Discord first-party: #224
+- Telegram / Microsoft Teams: #500
 - In-product Notification Center: #508
 - Configurable alert rules engine: #493 (priority 2)

@@ -1,9 +1,18 @@
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
+export type AlertWebhookProvider =
+  | "GENERIC"
+  | "SLACK"
+  | "DISCORD"
+  | "MICROSOFT_TEAMS"
+  | "TELEGRAM";
+
 export type ProjectWebhookRow = {
   id: string;
   urlMasked: string;
   label: string | null;
+  provider: AlertWebhookProvider;
+  config: { chatId?: string } | null;
   enabled: boolean;
   hasSigningSecret: boolean;
   createdAt: string;
@@ -21,6 +30,33 @@ export type AlertWebhookDeliveryRow = {
   error: string | null;
   createdAt: string;
 };
+
+const PROVIDERS = new Set<string>([
+  "GENERIC",
+  "SLACK",
+  "DISCORD",
+  "MICROSOFT_TEAMS",
+  "TELEGRAM",
+]);
+
+export function providerLabel(provider: AlertWebhookProvider): string {
+  switch (provider) {
+    case "GENERIC":
+      return "Webhook";
+    case "SLACK":
+      return "Slack";
+    case "DISCORD":
+      return "Discord";
+    case "MICROSOFT_TEAMS":
+      return "Microsoft Teams";
+    case "TELEGRAM":
+      return "Telegram";
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
 
 export async function fetchProjectWebhooks(): Promise<ProjectWebhookRow[]> {
   const res = await dashboardApiFetch("/api/project/webhooks");
@@ -53,15 +89,35 @@ export async function fetchProjectWebhookDeliveries(
 function isWebhookRow(value: unknown): value is ProjectWebhookRow {
   if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
-  return (
-    typeof o.id === "string" &&
-    typeof o.urlMasked === "string" &&
-    (o.label === null || typeof o.label === "string") &&
-    typeof o.enabled === "boolean" &&
-    typeof o.hasSigningSecret === "boolean" &&
-    typeof o.createdAt === "string" &&
-    typeof o.updatedAt === "string"
-  );
+  if (
+    typeof o.id !== "string" ||
+    typeof o.urlMasked !== "string" ||
+    (o.label !== null && typeof o.label !== "string") ||
+    typeof o.enabled !== "boolean" ||
+    typeof o.hasSigningSecret !== "boolean" ||
+    typeof o.createdAt !== "string" ||
+    typeof o.updatedAt !== "string"
+  ) {
+    return false;
+  }
+  // Older API responses without provider are treated as generic HTTPS webhooks.
+  const provider =
+    typeof o.provider === "string" && PROVIDERS.has(o.provider)
+      ? (o.provider as AlertWebhookProvider)
+      : "GENERIC";
+  o.provider = provider;
+  if (o.config === undefined || o.config === null) {
+    o.config = null;
+  } else if (typeof o.config === "object" && !Array.isArray(o.config)) {
+    const chatId = (o.config as { chatId?: unknown }).chatId;
+    o.config =
+      typeof chatId === "string" || typeof chatId === "number"
+        ? { chatId: String(chatId) }
+        : null;
+  } else {
+    return false;
+  }
+  return true;
 }
 
 function isDeliveryRow(value: unknown): value is AlertWebhookDeliveryRow {
