@@ -487,7 +487,11 @@ describe("processNextAlertWebhookDelivery", () => {
 
   it("skips POST when the lease cannot be renewed", async () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
-    const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+    // renew miss, then releaseAlertWebhookDeliveryClaim also misses (reclaimed)
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 0 });
     const prisma = {
       $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
         fn({
@@ -560,6 +564,95 @@ describe("processNextAlertWebhookDelivery", () => {
       error: "Lease lost before delivery",
     });
     expect(sendImpl).not.toHaveBeenCalled();
+    expect(updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears PROCESSING when lease renew fails but ownership remains", async () => {
+    const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 0,
+              status: "PENDING",
+              http_status: null,
+              error: null,
+              lease_owner: null,
+              lease_expires_at: null,
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: {
+            update: async () => ({
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "worker-1",
+              lease_expires_at: new Date("2026-07-17T12:01:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            }),
+          },
+        }),
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+          enabled: true,
+        }),
+      },
+      alertEvent: {
+        findUnique: async () => ({
+          rule: "ERROR_SPIKE",
+          title: "Spike",
+          body: "n",
+          href: null,
+          fired_at: new Date("2026-07-17T10:00:00.000Z"),
+        }),
+      },
+      alertWebhookDelivery: { updateMany },
+    };
+    const result = await processNextAlertWebhookDelivery({
+      prisma: prisma as never,
+      workerId: "worker-1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      sendImpl,
+    });
+    expect(result).toEqual({
+      status: "failed",
+      deliveryId: "d1",
+      terminal: "FAILED",
+      error: "Lease lost before delivery",
+    });
+    expect(sendImpl).not.toHaveBeenCalled();
+    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(updateMany.mock.calls[1][0].data).toMatchObject({
+      status: "FAILED",
+      error: "Lease lost before delivery",
+      lease_owner: null,
+      lease_expires_at: null,
+      attempt: { decrement: 1 },
+    });
   });
 
   it("does not POST a generic payload when alert_event_id is null", async () => {

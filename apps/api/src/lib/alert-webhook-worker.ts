@@ -16,6 +16,7 @@ import {
   completeAlertWebhookDelivery,
   failAlertWebhookDeliveryAttempt,
   finalizeAlertWebhookDeliverySuccess,
+  releaseAlertWebhookDeliveryClaim,
   renewAlertWebhookDeliveryLease,
   type AlertWebhookDeliveryJobRow,
 } from "./alert-webhook-delivery-job.js";
@@ -163,6 +164,15 @@ async function deliverClaimedAlertWebhook(
     env: deps.env,
   });
   if (!leaseHeld) {
+    // Best-effort release (same ownership guard as renew). If another worker
+    // already reclaimed, this is a no-op; otherwise clear PROCESSING immediately
+    // without burning the claim's attempt toward DEAD.
+    await releaseAlertWebhookDeliveryClaim(deps.prisma, {
+      deliveryId: job.id,
+      workerId,
+      error: "Lease lost before delivery",
+      now: nowFn(),
+    });
     return {
       status: "failed",
       deliveryId: job.id,

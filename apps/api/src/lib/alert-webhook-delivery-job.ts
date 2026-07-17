@@ -171,6 +171,38 @@ export async function finalizeAlertWebhookDeliverySuccess(
   return result.count > 0;
 }
 
+/**
+ * Drop a PROCESSING claim without counting it as a delivery failure (e.g. lease
+ * lost before POST). Undoes the claim attempt increment and retries immediately.
+ */
+export async function releaseAlertWebhookDeliveryClaim(
+  prisma: PrismaClient,
+  input: {
+    deliveryId: string;
+    workerId: string;
+    error: string;
+    now: Date;
+  }
+): Promise<boolean> {
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      id: input.deliveryId,
+      lease_owner: input.workerId,
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+    },
+    data: {
+      status: AlertWebhookDeliveryStatus.FAILED,
+      http_status: null,
+      error: input.error.slice(0, 400),
+      lease_owner: null,
+      lease_expires_at: null,
+      next_attempt_at: input.now,
+      attempt: { decrement: 1 },
+    },
+  });
+  return result.count > 0;
+}
+
 export async function failAlertWebhookDeliveryAttempt(
   prisma: PrismaClient,
   input: {
