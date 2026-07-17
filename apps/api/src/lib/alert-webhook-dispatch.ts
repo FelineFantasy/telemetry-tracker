@@ -1,11 +1,34 @@
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
-import type { AlertRuleType, PrismaClient } from "@prisma/client";
+import { lookup as dnsLookup } from "node:dns/promises";
+import https from "node:https";
+import { isIP } from "node:net";
+import type { AlertRuleType, AlertWebhookDeliveryStatus, PrismaClient } from "@prisma/client";
 import { dashboardOriginOrNull } from "./dashboard-origin.js";
 
 export const MAX_PROJECT_WEBHOOKS = 5;
 export const WEBHOOK_MAX_ATTEMPTS = 2;
 export const WEBHOOK_RETRY_DELAY_MS = 500;
 export const WEBHOOK_FETCH_TIMEOUT_MS = 8_000;
+export const WEBHOOK_WORKER_LEASE_MS_DEFAULT = 30_000;
+export const WEBHOOK_WORKER_POLL_MS_DEFAULT = 1_000;
+
+export type WebhookDnsAddress = { address: string; family: 4 | 6 };
+
+/** Injectable DNS resolver for delivery-time SSRF checks (tests mock this). */
+export type WebhookDnsLookup = (hostname: string) => Promise<WebhookDnsAddress[]>;
+
+export type WebhookSendResult =
+  | { ok: true; httpStatus: number }
+  | { ok: false; httpStatus: number | null; error: string };
+
+/** Injectable POST transport (defaults to DNS-pinned HTTPS). */
+export type WebhookSendImpl = (input: {
+  url: string;
+  body: string;
+  signature: string | null;
+  deliveryId: string;
+  lookupFn?: WebhookDnsLookup;
+}) => Promise<WebhookSendResult>;
 
 export type AlertWebhookPayload = {
   version: 1;
@@ -35,7 +58,7 @@ export type AlertWebhookDeliveryPublic = {
   webhookId: string;
   webhookLabel: string | null;
   webhookUrlMasked: string;
-  status: "SUCCESS" | "FAILED" | "DEAD";
+  status: AlertWebhookDeliveryStatus;
   attempt: number;
   httpStatus: number | null;
   error: string | null;
@@ -44,6 +67,26 @@ export type AlertWebhookDeliveryPublic = {
 
 export function generateWebhookSigningSecret(): string {
   return randomBytes(32).toString("hex");
+}
+
+export function resolveAlertWebhookWorkerPollMs(
+  env: NodeJS.ProcessEnv = process.env
+): number {
+  const raw = env.ALERT_WEBHOOK_WORKER_POLL_MS;
+  if (raw === undefined || raw.trim() === "") return WEBHOOK_WORKER_POLL_MS_DEFAULT;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return WEBHOOK_WORKER_POLL_MS_DEFAULT;
+  return parsed;
+}
+
+export function resolveAlertWebhookWorkerLeaseMs(
+  env: NodeJS.ProcessEnv = process.env
+): number {
+  const raw = env.ALERT_WEBHOOK_WORKER_LEASE_MS;
+  if (raw === undefined || raw.trim() === "") return WEBHOOK_WORKER_LEASE_MS_DEFAULT;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return WEBHOOK_WORKER_LEASE_MS_DEFAULT;
+  return parsed;
 }
 
 export function validateWebhookUrl(
@@ -74,6 +117,47 @@ export function validateWebhookUrl(
   return { ok: true, url: parsed.toString() };
 }
 
+/** True for loopback / link-local / private / CGNAT / unspecified IPv4. */
+export function isBlockedIpv4Address(ip: string): boolean {
+  const parts = ip.split(".").map((p) => Number(p));
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return true;
+  }
+  const [a, b] = parts;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  return false;
+}
+
+/** True for loopback / link-local / ULA / multicast / unspecified IPv6 (and IPv4-mapped privates). */
+export function isBlockedIpv6Address(ip: string): boolean {
+  const host = ip.toLowerCase().trim();
+  if (host === "::" || host === "::1") return true;
+
+  const v4Mapped = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+  if (v4Mapped?.[1]) {
+    return isBlockedIpv4Address(v4Mapped[1]);
+  }
+
+  if (/^fe[89ab][0-9a-f]:/i.test(host)) return true; // link-local fe80::/10
+  if (/^f[cd][0-9a-f]{2}:/i.test(host)) return true; // ULA fc00::/7
+  if (/^ff[0-9a-f]{2}:/i.test(host)) return true; // multicast
+  return false;
+}
+
+/** Block resolved addresses that must never be webhook targets. */
+export function isBlockedIpAddress(ip: string): boolean {
+  const version = isIP(ip);
+  if (version === 4) return isBlockedIpv4Address(ip);
+  if (version === 6) return isBlockedIpv6Address(ip);
+  return true;
+}
+
 /** Block obvious SSRF targets (loopback / link-local / private / cloud metadata). */
 export function isBlockedWebhookHostname(hostname: string): boolean {
   const host = hostname.trim().toLowerCase().replace(/\.$/, "");
@@ -88,33 +172,73 @@ export function isBlockedWebhookHostname(hostname: string): boolean {
   }
 
   if (host.includes(":")) {
-    // IPv6 — allow only if clearly not loopback/link-local/ULA (conservative reject of bare IPv6 literals).
-    return true;
+    // Bare IPv6 literals — same private/special checks as resolved addresses.
+    return isBlockedIpAddress(host);
   }
 
-  // Reject dotted / shorthand numeric hosts (e.g. 127.0.0.1, 127.1, 10.1) — not public DNS names.
+  // Reject dotted / shorthand numeric hosts (e.g. 127.0.0.1, 127.1, 10.1).
   if (/^\d+(?:\.\d+){0,3}$/.test(host)) {
     const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
     if (!ipv4) {
-      // Incomplete IPv4 shorthand (127.1, 10.0.0, …) often resolves as loopback/private.
       return true;
     }
-    const parts = ipv4.slice(1).map((p) => Number(p));
-    if (parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
-    const [a, b] = parts;
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 0) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-    // Any other literal IPv4 — block to avoid SSRF via public-looking but operator-controlled IPs
-    // is overly strict; allow non-private dotted quads only.
-    return false;
+    return isBlockedIpv4Address(host);
   }
 
   return false;
+}
+
+export async function defaultWebhookDnsLookup(hostname: string): Promise<WebhookDnsAddress[]> {
+  const results = await dnsLookup(hostname, { all: true, verbatim: true });
+  return results.map((r) => ({
+    address: r.address,
+    family: (r.family === 6 ? 6 : 4) as 4 | 6,
+  }));
+}
+
+/**
+ * Resolve hostname and reject if any address is private/loopback/link-local.
+ * Closes the DNS-rebinding gap left by create-time hostname string checks alone.
+ */
+export async function resolveWebhookHostForDelivery(
+  hostname: string,
+  lookupFn: WebhookDnsLookup = defaultWebhookDnsLookup
+): Promise<{ ok: true; addresses: WebhookDnsAddress[] } | { ok: false; error: string }> {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, "");
+  if (!host) {
+    return { ok: false, error: "Webhook URL host is not allowed" };
+  }
+  if (isBlockedWebhookHostname(host)) {
+    return { ok: false, error: "Webhook URL host is not allowed" };
+  }
+
+  const ipVersion = isIP(host);
+  if (ipVersion === 4 || ipVersion === 6) {
+    if (isBlockedIpAddress(host)) {
+      return { ok: false, error: "Webhook URL host is not allowed" };
+    }
+    return { ok: true, addresses: [{ address: host, family: ipVersion }] };
+  }
+
+  try {
+    const results = await lookupFn(host);
+    if (results.length === 0) {
+      return { ok: false, error: "Webhook URL host could not be resolved" };
+    }
+    for (const { address } of results) {
+      if (isBlockedIpAddress(address)) {
+        return { ok: false, error: "Webhook URL host is not allowed" };
+      }
+    }
+    return { ok: true, addresses: results };
+  } catch {
+    return { ok: false, error: "Webhook URL host could not be resolved" };
+  }
+}
+
+/** Prefer IPv4 when both families are present (validated already). */
+export function pickPinnedWebhookAddress(addresses: WebhookDnsAddress[]): WebhookDnsAddress {
+  return addresses.find((a) => a.family === 4) ?? addresses[0]!;
 }
 
 export function maskWebhookUrl(url: string): string {
@@ -393,164 +517,145 @@ export async function softDeleteProjectWebhook(
   return { ok: true };
 }
 
-type DispatchAlertInput = {
+export type EnqueueAlertWebhookInput = {
   projectId: string;
   alertEventId: string;
-  rule: AlertRuleType;
-  title: string;
-  body: string;
-  href: string | null;
   dedupeKey: string;
-  firedAt?: Date;
 };
 
-type FetchImpl = typeof fetch;
-
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function postWebhookOnce(
-  url: string,
-  body: string,
-  signature: string | null,
-  deliveryId: string,
-  fetchImpl: FetchImpl
-): Promise<{ ok: true; httpStatus: number } | { ok: false; httpStatus: number | null; error: string }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), WEBHOOK_FETCH_TIMEOUT_MS);
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": "TelemetryTracker-Webhooks/1.0",
-      "X-Telemetry-Event": "alert.fired",
-      "X-Telemetry-Delivery": deliveryId,
-    };
-    if (signature) {
-      headers["X-Telemetry-Signature"] = signature;
-    }
-    const res = await fetchImpl(url, {
-      method: "POST",
-      headers,
-      body,
-      signal: controller.signal,
-      // Do not follow redirects — a 302 to a private host would bypass create-time SSRF checks.
-      redirect: "manual",
-    });
-    if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
-      return {
-        ok: false,
-        httpStatus: res.status,
-        error: `HTTP ${res.status} (redirect not followed)`,
-      };
-    }
-    if (res.ok) {
-      return { ok: true, httpStatus: res.status };
-    }
-    return {
-      ok: false,
-      httpStatus: res.status,
-      error: `HTTP ${res.status}`,
-    };
-  } catch (e: unknown) {
-    const message =
-      e instanceof Error
-        ? e.name === "AbortError"
-          ? "Request timed out"
-          : e.message
-        : "Request failed";
-    return { ok: false, httpStatus: null, error: message.slice(0, 400) };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/** Deliver an alert payload to all enabled project webhooks (best-effort, with retry). */
-export async function dispatchAlertWebhooks(
+/**
+ * Persist PENDING delivery rows for each enabled webhook.
+ * Must complete before fireProjectAlert returns (durable enqueue).
+ */
+export async function enqueueAlertWebhookDeliveries(
   prisma: PrismaClient,
-  input: DispatchAlertInput,
-  options?: { fetchImpl?: FetchImpl }
-): Promise<void> {
-  const fetchImpl = options?.fetchImpl ?? fetch;
+  input: EnqueueAlertWebhookInput
+): Promise<number> {
   const webhooks = await prisma.projectWebhook.findMany({
     where: {
       project_id: input.projectId,
       deleted_at: null,
       enabled: true,
     },
-    select: {
-      id: true,
-      url: true,
-      signing_secret: true,
-    },
+    select: { id: true },
   });
-  if (webhooks.length === 0) return;
+  if (webhooks.length === 0) return 0;
 
-  await Promise.all(
-    webhooks.map(async (webhook) => {
-      for (let attempt = 1; attempt <= WEBHOOK_MAX_ATTEMPTS; attempt++) {
-        const deliveryId = randomUUID();
-        const payload = buildAlertWebhookPayload({
-          deliveryId,
-          projectId: input.projectId,
-          rule: input.rule,
-          title: input.title,
-          body: input.body,
-          href: input.href,
-          dedupeKey: input.dedupeKey,
-          firedAt: input.firedAt,
-        });
-        const body = JSON.stringify(payload);
-        const signature = webhook.signing_secret
-          ? signWebhookBody(body, webhook.signing_secret)
-          : null;
+  const now = new Date();
+  await prisma.alertWebhookDelivery.createMany({
+    data: webhooks.map((webhook) => ({
+      id: randomUUID(),
+      webhook_id: webhook.id,
+      project_id: input.projectId,
+      alert_event_id: input.alertEventId,
+      dedupe_key: input.dedupeKey,
+      attempt: 0,
+      status: "PENDING" as const,
+      next_attempt_at: now,
+    })),
+  });
+  return webhooks.length;
+}
 
-        const result = await postWebhookOnce(
-          webhook.url,
-          body,
-          signature,
-          deliveryId,
-          fetchImpl
-        );
+/**
+ * POST over HTTPS while pinning the TCP connect to a pre-validated IP.
+ * Uses custom `lookup` so Node never re-resolves (closes DNS rebinding TOCTOU).
+ * Redirects are not followed (`https.request` does not auto-follow).
+ */
+export async function postWebhookOnce(
+  url: string,
+  body: string,
+  signature: string | null,
+  deliveryId: string,
+  options?: { lookupFn?: WebhookDnsLookup }
+): Promise<WebhookSendResult> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, httpStatus: null, error: "Webhook URL is invalid" };
+  }
+  if (parsed.protocol !== "https:") {
+    return { ok: false, httpStatus: null, error: "Webhook URL must use HTTPS" };
+  }
 
-        if (result.ok) {
-          await prisma.alertWebhookDelivery.create({
-            data: {
-              id: randomUUID(),
-              webhook_id: webhook.id,
-              project_id: input.projectId,
-              alert_event_id: input.alertEventId,
-              dedupe_key: input.dedupeKey,
-              attempt,
-              status: "SUCCESS",
-              http_status: result.httpStatus,
-            },
+  const resolved = await resolveWebhookHostForDelivery(
+    parsed.hostname,
+    options?.lookupFn ?? defaultWebhookDnsLookup
+  );
+  if (!resolved.ok) {
+    return { ok: false, httpStatus: null, error: resolved.error };
+  }
+  const pinned = pickPinnedWebhookAddress(resolved.addresses);
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "User-Agent": "TelemetryTracker-Webhooks/1.0",
+    "X-Telemetry-Event": "alert.fired",
+    "X-Telemetry-Delivery": deliveryId,
+    Host: parsed.host,
+    "Content-Length": String(Buffer.byteLength(body, "utf8")),
+  };
+  if (signature) {
+    headers["X-Telemetry-Signature"] = signature;
+  }
+
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        protocol: "https:",
+        hostname: parsed.hostname,
+        port: parsed.port ? Number(parsed.port) : 443,
+        path: `${parsed.pathname}${parsed.search}`,
+        method: "POST",
+        headers,
+        servername: parsed.hostname,
+        timeout: WEBHOOK_FETCH_TIMEOUT_MS,
+        // Pin connect to the address we validated — do not call system DNS again.
+        lookup: (_hostname, _opts, callback) => {
+          callback(null, pinned.address, pinned.family);
+        },
+      },
+      (res) => {
+        res.resume();
+        const status = res.statusCode ?? 0;
+        if (status >= 300 && status < 400) {
+          resolve({
+            ok: false,
+            httpStatus: status,
+            error: `HTTP ${status} (redirect not followed)`,
           });
           return;
         }
-
-        const isLast = attempt >= WEBHOOK_MAX_ATTEMPTS;
-        await prisma.alertWebhookDelivery.create({
-          data: {
-            id: randomUUID(),
-            webhook_id: webhook.id,
-            project_id: input.projectId,
-            alert_event_id: input.alertEventId,
-            dedupe_key: input.dedupeKey,
-            attempt,
-            status: isLast ? "DEAD" : "FAILED",
-            http_status: result.httpStatus,
-            error: result.error,
-          },
-        });
-
-        if (!isLast) {
-          await sleep(WEBHOOK_RETRY_DELAY_MS);
+        if (status >= 200 && status < 300) {
+          resolve({ ok: true, httpStatus: status });
+          return;
         }
+        resolve({
+          ok: false,
+          httpStatus: status || null,
+          error: `HTTP ${status || "unknown"}`,
+        });
       }
-    })
-  );
+    );
+
+    req.on("timeout", () => {
+      req.destroy(new Error("Request timed out"));
+    });
+    req.on("error", (e: unknown) => {
+      const message =
+        e instanceof Error
+          ? e.message === "Request timed out" || e.name === "AbortError"
+            ? "Request timed out"
+            : e.message
+          : "Request failed";
+      resolve({ ok: false, httpStatus: null, error: message.slice(0, 400) });
+    });
+
+    req.write(body, "utf8");
+    req.end();
+  });
 }
 
 /** Send a sample alert payload to one webhook (editors testing the destination). */
@@ -558,7 +663,7 @@ export async function sendTestWebhook(
   prisma: PrismaClient,
   projectId: string,
   webhookId: string,
-  options?: { fetchImpl?: FetchImpl }
+  options?: { sendImpl?: WebhookSendImpl; lookupFn?: WebhookDnsLookup }
 ): Promise<
   | { ok: true; httpStatus: number }
   | { ok: false; error: string; status: 404 | 502; httpStatus?: number | null }
@@ -585,13 +690,14 @@ export async function sendTestWebhook(
   const signature = webhook.signing_secret
     ? signWebhookBody(body, webhook.signing_secret)
     : null;
-  const result = await postWebhookOnce(
-    webhook.url,
+  const sendImpl = options?.sendImpl ?? postWebhookOnceAsSendImpl;
+  const result = await sendImpl({
+    url: webhook.url,
     body,
     signature,
     deliveryId,
-    options?.fetchImpl ?? fetch
-  );
+    lookupFn: options?.lookupFn,
+  });
 
   await prisma.alertWebhookDelivery.create({
     data: {
@@ -600,7 +706,8 @@ export async function sendTestWebhook(
       project_id: projectId,
       dedupe_key: dedupeKey,
       attempt: 1,
-      status: result.ok ? "SUCCESS" : "DEAD",
+      // Single-shot test — FAILED (not DEAD) when the destination rejects.
+      status: result.ok ? "SUCCESS" : "FAILED",
       http_status: result.httpStatus,
       error: result.ok ? null : result.error,
     },
@@ -615,4 +722,16 @@ export async function sendTestWebhook(
     };
   }
   return { ok: true, httpStatus: result.httpStatus };
+}
+
+async function postWebhookOnceAsSendImpl(input: {
+  url: string;
+  body: string;
+  signature: string | null;
+  deliveryId: string;
+  lookupFn?: WebhookDnsLookup;
+}): Promise<WebhookSendResult> {
+  return postWebhookOnce(input.url, input.body, input.signature, input.deliveryId, {
+    lookupFn: input.lookupFn,
+  });
 }

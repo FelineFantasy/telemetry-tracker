@@ -1,13 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  assertWebhookResolvedHostAllowed,
   buildAlertWebhookPayload,
   dispatchAlertWebhooks,
+  isBlockedIpAddress,
   listAlertWebhookDeliveries,
   maskWebhookUrl,
+  sendTestWebhook,
   signWebhookBody,
   validateWebhookUrl,
   WEBHOOK_MAX_ATTEMPTS,
 } from "./alert-webhook-dispatch.js";
+
+const allowHost = async () => ({ ok: true as const });
 
 describe("validateWebhookUrl", () => {
   it("requires https and rejects private / loopback hosts", () => {
@@ -18,6 +23,37 @@ describe("validateWebhookUrl", () => {
     expect(validateWebhookUrl("https://10.0.0.5/hook").ok).toBe(false);
     expect(validateWebhookUrl("https://192.168.1.1/hook").ok).toBe(false);
     expect(validateWebhookUrl("https://hooks.example.com/a/b").ok).toBe(true);
+  });
+});
+
+describe("isBlockedIpAddress", () => {
+  it("blocks private, loopback, link-local, and CGNAT IPv4", () => {
+    expect(isBlockedIpAddress("127.0.0.1")).toBe(true);
+    expect(isBlockedIpAddress("10.0.0.1")).toBe(true);
+    expect(isBlockedIpAddress("192.168.1.1")).toBe(true);
+    expect(isBlockedIpAddress("169.254.169.254")).toBe(true);
+    expect(isBlockedIpAddress("172.16.0.1")).toBe(true);
+    expect(isBlockedIpAddress("100.64.0.1")).toBe(true);
+    expect(isBlockedIpAddress("8.8.8.8")).toBe(false);
+  });
+
+  it("blocks loopback / ULA / link-local IPv6 and mapped private IPv4", () => {
+    expect(isBlockedIpAddress("::1")).toBe(true);
+    expect(isBlockedIpAddress("fc00::1")).toBe(true);
+    expect(isBlockedIpAddress("fe80::1")).toBe(true);
+    expect(isBlockedIpAddress("::ffff:127.0.0.1")).toBe(true);
+    expect(isBlockedIpAddress("2001:4860:4860::8888")).toBe(false);
+  });
+});
+
+describe("assertWebhookResolvedHostAllowed", () => {
+  it("rejects literal private hosts without DNS", async () => {
+    await expect(assertWebhookResolvedHostAllowed("127.0.0.1")).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(assertWebhookResolvedHostAllowed("localhost")).resolves.toMatchObject({
+      ok: false,
+    });
   });
 });
 
@@ -98,7 +134,7 @@ describe("dispatchAlertWebhooks", () => {
         href: "/dashboard/settings/billing",
         dedupeKey: "quota:near:p1:2026-07",
       },
-      { fetchImpl: fetchImpl as never }
+      { fetchImpl: fetchImpl as never, resolveHost: allowHost }
     );
 
     expect(calls).toBe(WEBHOOK_MAX_ATTEMPTS);
@@ -141,7 +177,7 @@ describe("dispatchAlertWebhooks", () => {
         href: null,
         dedupeKey: "k-redirect",
       },
-      { fetchImpl: fetchImpl as never }
+      { fetchImpl: fetchImpl as never, resolveHost: allowHost }
     );
 
     expect(create.mock.calls.at(-1)?.[0]).toMatchObject({
@@ -151,6 +187,47 @@ describe("dispatchAlertWebhooks", () => {
       },
     });
   });
+
+  it("skips fetch when resolved host is blocked (DNS rebinding guard)", async () => {
+    const create = vi.fn(async () => ({ id: "log" }));
+    const prisma = {
+      projectWebhook: {
+        findMany: async () => [
+          { id: "wh1", url: "https://127.0.0.1.nip.io/hook", signing_secret: null },
+        ],
+      },
+      alertWebhookDelivery: { create },
+    };
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200 }) as Response);
+    const resolveHost = vi.fn(async () => ({
+      ok: false as const,
+      error: "Webhook URL host is not allowed",
+    }));
+
+    await dispatchAlertWebhooks(
+      prisma as never,
+      {
+        projectId: "p1",
+        alertEventId: "ae1",
+        rule: "ERROR_SPIKE",
+        title: "Spike",
+        body: "n",
+        href: null,
+        dedupeKey: "k-ssrf",
+      },
+      { fetchImpl: fetchImpl as never, resolveHost }
+    );
+
+    expect(resolveHost).toHaveBeenCalledWith("127.0.0.1.nip.io");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(create.mock.calls.at(-1)?.[0]).toMatchObject({
+      data: {
+        status: "DEAD",
+        error: "Webhook URL host is not allowed",
+      },
+    });
+  });
+
   it("records SUCCESS on the first successful attempt", async () => {
     const create = vi.fn(async () => ({ id: "log" }));
     const prisma = {
@@ -174,13 +251,42 @@ describe("dispatchAlertWebhooks", () => {
         href: null,
         dedupeKey: "k1",
       },
-      { fetchImpl: fetchImpl as never }
+      { fetchImpl: fetchImpl as never, resolveHost: allowHost }
     );
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "SUCCESS", attempt: 1 }),
+      })
+    );
+  });
+});
+
+describe("sendTestWebhook", () => {
+  it("records FAILED (not DEAD) for a single-shot test error", async () => {
+    const create = vi.fn(async () => ({ id: "log" }));
+    const prisma = {
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+        }),
+      },
+      alertWebhookDelivery: { create },
+    };
+    const fetchImpl = vi.fn(async () => ({ ok: false, status: 500 }) as Response);
+
+    const result = await sendTestWebhook(prisma as never, "p1", "wh1", {
+      fetchImpl: fetchImpl as never,
+      resolveHost: allowHost,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "FAILED", attempt: 1 }),
       })
     );
   });

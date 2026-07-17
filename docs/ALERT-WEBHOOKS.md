@@ -7,9 +7,12 @@ Configure destinations under **Dashboard → Alerts → Delivery** (owners/edito
 Up to **5** webhooks per project. Slack/Discord/Teams incoming webhooks work as DIY
 destinations until first-party channel UIs ship.
 
-- URLs must be `https:` and must not target loopback, private, or link-local hosts.
+- URLs must be `https:` and must not target loopback, private, or link-local hosts
+  (hostname checks at create/update).
+- Before each delivery POST, the API resolves the hostname and rejects private /
+  loopback / link-local addresses (mitigates DNS-rebinding helpers like `*.nip.io`).
 - Delivery POSTs use `redirect: "manual"` so a 3xx cannot bounce the request to an
-  internal host after create-time validation.
+  internal host after validation.
 
 ## Payload
 
@@ -48,11 +51,12 @@ shown once when the webhook is created.
 
 - Fired only after a new `AlertEvent` row is inserted (dedupe key unique per project).
 - Best-effort: up to **2** attempts with a short backoff; failures are recorded in
-  `AlertWebhookDelivery` (`FAILED` then `DEAD`).
+  `AlertWebhookDelivery` (`FAILED` then `DEAD` after retries are exhausted).
 - Operators can browse recent attempts under **Alerts → Delivery** (read access for
   project members; same auth as alert history). Optionally filter via
   `GET /api/project/webhook-deliveries?webhookId=…`.
-- Use **Test** on the Alerts page to POST a sample payload without waiting for a real spike.
+- Use **Test** on the Alerts page to POST a sample payload without waiting for a real
+  spike (single attempt; errors log as `FAILED`, not `DEAD`).
 
 ## Related
 

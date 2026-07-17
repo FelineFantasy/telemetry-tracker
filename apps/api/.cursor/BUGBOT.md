@@ -22,7 +22,7 @@ Files: `dashboard-notifications.ts`, `notification-preferences.ts`, `notificatio
 - **Dedupe by id**: `quota:near:{projectId}:{YYYY-MM}` and `quota:exceeded:…` keys are shared between session items and `AlertEvent.dedupe_key`. Collisions must use routing-aware dedupe (pass `preferences` into `dedupeNotificationItems`).
 - **Email vs in-app**: `shouldShowInAppNotification` and `shouldSendEmailForCategory` must stay aligned when adding new notification types.
 - **fireProjectAlert**: unique constraint on `dedupe_key` is intentional — do not swallow non-P2002 errors. After a successful insert, fan out to email **and** `dispatchAlertWebhooks` (best-effort; must not block alert persistence).
-- **Webhooks**: only `https:` URLs; never return raw URL or signing secret on list/GET (mask URL; secret only on create/rotate). Soft-delete with `deleted_at`. Cap destinations per project (`MAX_PROJECT_WEBHOOKS`).
+- **Webhooks**: only `https:` URLs; never return raw URL or signing secret on list/GET (mask URL; secret only on create/rotate). Soft-delete with `deleted_at`. Cap destinations per project (`MAX_PROJECT_WEBHOOKS`). Resolve DNS and reject private/loopback/link-local addresses before each delivery POST (create-time hostname checks alone are insufficient against rebinding). `DEAD` is only for exhausted retries; single-shot test deliveries use `FAILED`.
 - **Alert settings defaults**: changes to `DEFAULT_PROJECT_ALERT_SETTINGS` affect all projects with null/invalid JSON — treat as user-facing.
 
 ## Routes (`src/routes/`)
