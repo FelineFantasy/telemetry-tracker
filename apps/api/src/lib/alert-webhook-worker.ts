@@ -1,0 +1,176 @@
+/**
+ * Alert webhook delivery worker — claim PENDING/FAILED rows, DNS-pin SSRF check, POST, retry/DEAD.
+ */
+import { randomUUID } from "node:crypto";
+import type { PrismaClient } from "@prisma/client";
+import {
+  buildAlertWebhookPayload,
+  postWebhookOnce,
+  signWebhookBody,
+  WEBHOOK_MAX_ATTEMPTS,
+  type WebhookDnsLookup,
+  type WebhookSendImpl,
+} from "./alert-webhook-dispatch.js";
+import {
+  claimNextAlertWebhookDelivery,
+  completeAlertWebhookDelivery,
+  failAlertWebhookDeliveryAttempt,
+  type AlertWebhookDeliveryJobRow,
+} from "./alert-webhook-delivery-job.js";
+
+export type AlertWebhookWorkerDeps = {
+  prisma: PrismaClient;
+  env?: NodeJS.ProcessEnv;
+  now?: () => Date;
+  workerId?: string;
+  sendImpl?: WebhookSendImpl;
+  lookupFn?: WebhookDnsLookup;
+};
+
+export type AlertWebhookWorkerProcessResult =
+  | { status: "idle" }
+  | { status: "success"; deliveryId: string }
+  | { status: "failed"; deliveryId: string; terminal: "FAILED" | "DEAD"; error: string };
+
+export async function processNextAlertWebhookDelivery(
+  deps: AlertWebhookWorkerDeps
+): Promise<AlertWebhookWorkerProcessResult> {
+  const nowFn = deps.now ?? (() => new Date());
+  const now = nowFn();
+  const workerId = deps.workerId ?? `alert-webhook-worker-${randomUUID()}`;
+
+  const job = await claimNextAlertWebhookDelivery(deps.prisma, {
+    workerId,
+    now,
+    env: deps.env,
+  });
+  if (!job) {
+    return { status: "idle" };
+  }
+
+  return deliverClaimedAlertWebhook(deps, job, workerId, nowFn);
+}
+
+async function deliverClaimedAlertWebhook(
+  deps: AlertWebhookWorkerDeps,
+  job: AlertWebhookDeliveryJobRow,
+  workerId: string,
+  nowFn: () => Date
+): Promise<AlertWebhookWorkerProcessResult> {
+  const webhook = await deps.prisma.projectWebhook.findFirst({
+    where: { id: job.webhookId, deleted_at: null },
+    select: { id: true, url: true, signing_secret: true, enabled: true },
+  });
+
+  if (!webhook || !webhook.enabled) {
+    const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {
+      deliveryId: job.id,
+      workerId,
+      attempt: WEBHOOK_MAX_ATTEMPTS,
+      httpStatus: null,
+      error: webhook ? "Webhook disabled" : "Webhook not found",
+      now: nowFn(),
+    });
+    return {
+      status: "failed",
+      deliveryId: job.id,
+      terminal: terminal ?? "DEAD",
+      error: webhook ? "Webhook disabled" : "Webhook not found",
+    };
+  }
+
+  let rule: "ERROR_SPIKE" | "QUOTA_NEAR" | "QUOTA_EXCEEDED" = "ERROR_SPIKE";
+  let title = "Alert";
+  let body = "";
+  let href: string | null = null;
+  let firedAt: Date | undefined;
+
+  if (job.alertEventId) {
+    const event = await deps.prisma.alertEvent.findUnique({
+      where: { id: job.alertEventId },
+      select: {
+        rule: true,
+        title: true,
+        body: true,
+        href: true,
+        fired_at: true,
+      },
+    });
+    if (!event) {
+      const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {
+        deliveryId: job.id,
+        workerId,
+        attempt: WEBHOOK_MAX_ATTEMPTS,
+        httpStatus: null,
+        error: "Alert event missing",
+        now: nowFn(),
+      });
+      return {
+        status: "failed",
+        deliveryId: job.id,
+        terminal: terminal ?? "DEAD",
+        error: "Alert event missing",
+      };
+    }
+    rule = event.rule;
+    title = event.title;
+    body = event.body;
+    href = event.href;
+    firedAt = event.fired_at;
+  }
+
+  const payload = buildAlertWebhookPayload({
+    deliveryId: job.id,
+    projectId: job.projectId,
+    rule,
+    title,
+    body,
+    href,
+    dedupeKey: job.dedupeKey,
+    firedAt,
+  });
+  const bodyJson = JSON.stringify(payload);
+  const signature = webhook.signing_secret
+    ? signWebhookBody(bodyJson, webhook.signing_secret)
+    : null;
+
+  const sendImpl =
+    deps.sendImpl ??
+    (async (input) =>
+      postWebhookOnce(input.url, input.body, input.signature, input.deliveryId, {
+        lookupFn: input.lookupFn ?? deps.lookupFn,
+      }));
+
+  const result = await sendImpl({
+    url: webhook.url,
+    body: bodyJson,
+    signature,
+    deliveryId: job.id,
+    lookupFn: deps.lookupFn,
+  });
+
+  if (result.ok) {
+    await completeAlertWebhookDelivery(deps.prisma, {
+      deliveryId: job.id,
+      workerId,
+      httpStatus: result.httpStatus,
+    });
+    return { status: "success", deliveryId: job.id };
+  }
+
+  const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {
+    deliveryId: job.id,
+    workerId,
+    attempt: job.attempt,
+    httpStatus: result.httpStatus,
+    error: result.error,
+    now: nowFn(),
+  });
+
+  return {
+    status: "failed",
+    deliveryId: job.id,
+    terminal: terminal ?? "DEAD",
+    error: result.error,
+  };
+}

@@ -50,6 +50,10 @@ import type {
 
 function deliveryStatusLabel(status: AlertWebhookDeliveryRow["status"]): string {
   switch (status) {
+    case "PENDING":
+      return "Pending";
+    case "PROCESSING":
+      return "Sending";
     case "SUCCESS":
       return "Success";
     case "FAILED":

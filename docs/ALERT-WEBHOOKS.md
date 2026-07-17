@@ -8,11 +8,12 @@ Up to **5** webhooks per project. Slack/Discord/Teams incoming webhooks work as 
 destinations until first-party channel UIs ship.
 
 - URLs must be `https:` and must not target loopback, private, or link-local hosts
-  (hostname checks at create/update).
-- Before each delivery POST, the API resolves the hostname and rejects private /
-  loopback / link-local addresses (mitigates DNS-rebinding helpers like `*.nip.io`).
-- Delivery POSTs use `redirect: "manual"` so a 3xx cannot bounce the request to an
-  internal host after validation.
+  (create/update string checks).
+- At delivery time the worker **resolves DNS**, rejects private/loopback/link-local
+  **IPv4 and IPv6** answers, and **pins the HTTPS connect** to a validated address
+  (custom `lookup` + TLS SNI / `Host` for the original hostname) so a rebinding race
+  cannot retarget the socket after validation.
+- Delivery POSTs do not follow redirects (`https.request` does not auto-follow).
 
 ## Payload
 
@@ -34,6 +35,8 @@ destinations until first-party channel UIs ship.
 `href` is absolutized when `DASHBOARD_ORIGIN` (or equivalent) is configured on the API;
 otherwise it may be a path like `/dashboard/errors`.
 
+`deliveryId` is the durable `AlertWebhookDelivery.id` (stable across retries).
+
 ## Headers
 
 | Header | Value |
@@ -50,13 +53,26 @@ shown once when the webhook is created.
 ## Delivery semantics
 
 - Fired only after a new `AlertEvent` row is inserted (dedupe key unique per project).
-- Best-effort: up to **2** attempts with a short backoff; failures are recorded in
-  `AlertWebhookDelivery` (`FAILED` then `DEAD` after retries are exhausted).
-- Operators can browse recent attempts under **Alerts → Delivery** (read access for
+- `fireProjectAlert` **awaits** inserting `PENDING` `AlertWebhookDelivery` rows for each
+  enabled webhook, then returns (survives API process restart).
+- Run the worker (same Postgres claim/lease pattern as brief generation):
+
+  ```bash
+  pnpm --filter api alert-webhook-worker          # poll loop
+  pnpm --filter api alert-webhook-worker -- --once  # single delivery
+  ```
+
+  Env: `ALERT_WEBHOOK_WORKER_POLL_MS` (default `1000`),
+  `ALERT_WEBHOOK_WORKER_LEASE_MS` (default `30000`).
+
+- Worker flow: claim (`FOR UPDATE SKIP LOCKED` + lease) → DNS/IP validate + pin →
+  POST → record outcome → retry with short backoff (`FAILED` + `next_attempt_at`) or
+  terminal `DEAD` after **2** attempts.
+- Operators can browse recent rows under **Alerts → Delivery** (read access for
   project members; same auth as alert history). Optionally filter via
   `GET /api/project/webhook-deliveries?webhookId=…`.
-- Use **Test** on the Alerts page to POST a sample payload without waiting for a real
-  spike (single attempt; errors log as `FAILED`, not `DEAD`).
+- Use **Test** on the Alerts page to POST a sample payload immediately (not queued);
+  a failed test is logged as `FAILED` (single-shot).
 
 ## Related
 

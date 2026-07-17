@@ -15,7 +15,7 @@ export type AlertWebhookDeliveryRow = {
   webhookId: string;
   webhookLabel: string | null;
   webhookUrlMasked: string;
-  status: "SUCCESS" | "FAILED" | "DEAD";
+  status: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DEAD";
   attempt: number;
   httpStatus: number | null;
   error: string | null;
@@ -72,7 +72,11 @@ function isDeliveryRow(value: unknown): value is AlertWebhookDeliveryRow {
     typeof o.webhookId === "string" &&
     (o.webhookLabel === null || typeof o.webhookLabel === "string") &&
     typeof o.webhookUrlMasked === "string" &&
-    (o.status === "SUCCESS" || o.status === "FAILED" || o.status === "DEAD") &&
+    (o.status === "PENDING" ||
+      o.status === "PROCESSING" ||
+      o.status === "SUCCESS" ||
+      o.status === "FAILED" ||
+      o.status === "DEAD") &&
     typeof o.attempt === "number" &&
     (o.httpStatus === null || typeof o.httpStatus === "number") &&
     (o.error === null || typeof o.error === "string") &&

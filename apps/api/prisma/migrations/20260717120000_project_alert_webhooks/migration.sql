@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "AlertWebhookDeliveryStatus" AS ENUM ('SUCCESS', 'FAILED', 'DEAD');
+CREATE TYPE "AlertWebhookDeliveryStatus" AS ENUM ('PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'DEAD');
 
 -- CreateTable
 CREATE TABLE "ProjectWebhook" (
@@ -23,11 +23,15 @@ CREATE TABLE "AlertWebhookDelivery" (
     "project_id" TEXT NOT NULL,
     "alert_event_id" TEXT,
     "dedupe_key" TEXT NOT NULL,
-    "attempt" INTEGER NOT NULL,
-    "status" "AlertWebhookDeliveryStatus" NOT NULL,
+    "attempt" INTEGER NOT NULL DEFAULT 0,
+    "status" "AlertWebhookDeliveryStatus" NOT NULL DEFAULT 'PENDING',
     "http_status" INTEGER,
     "error" TEXT,
+    "lease_owner" TEXT,
+    "lease_expires_at" TIMESTAMP(3),
+    "next_attempt_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "AlertWebhookDelivery_pkey" PRIMARY KEY ("id")
 );
@@ -46,6 +50,9 @@ CREATE INDEX "AlertWebhookDelivery_project_id_created_at_idx" ON "AlertWebhookDe
 
 -- CreateIndex
 CREATE INDEX "AlertWebhookDelivery_dedupe_key_idx" ON "AlertWebhookDelivery"("dedupe_key");
+
+-- CreateIndex
+CREATE INDEX "AlertWebhookDelivery_status_next_attempt_at_lease_expires_at_idx" ON "AlertWebhookDelivery"("status", "next_attempt_at", "lease_expires_at");
 
 -- AddForeignKey
 ALTER TABLE "ProjectWebhook" ADD CONSTRAINT "ProjectWebhook_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;

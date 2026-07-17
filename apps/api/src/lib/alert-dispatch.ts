@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { OrgRole, type AlertRuleType, type PrismaClient } from "@prisma/client";
 import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 import { notifyProjectMembersByEmail } from "./notification-email-dispatch.js";
-import { dispatchAlertWebhooks } from "./alert-webhook-dispatch.js";
+import { enqueueAlertWebhookDeliveries } from "./alert-webhook-dispatch.js";
 
 export type AlertFirePayload = {
   projectId: string;
@@ -74,15 +74,11 @@ export async function fireProjectAlert(
     roles: [OrgRole.OWNER, OrgRole.EDITOR],
   });
 
-  void dispatchAlertWebhooks(prisma, {
+  // Durable enqueue before return — worker claims PENDING rows (survives process restart).
+  await enqueueAlertWebhookDeliveries(prisma, {
     projectId: payload.projectId,
     alertEventId,
-    rule: payload.rule,
-    title: payload.title,
-    body: payload.body,
-    href: payload.href,
     dedupeKey: payload.dedupeKey,
-    firedAt,
   });
 
   return true;
