@@ -27,7 +27,6 @@ const RESERVED_MARKETING_EMAIL_DOMAINS = new Set([
   "example.com",
   "example.org",
   "example.net",
-  "test.com",
   "localhost",
 ]);
 

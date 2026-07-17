@@ -16,9 +16,12 @@ describe("marketing-subscriber lib", () => {
   it("normalizes and validates emails", () => {
     expect(normalizeMarketingEmail("  User@Example.COM ")).toBe("user@example.com");
     expect(isValidMarketingEmail("ops@acme.io")).toBe(true);
+    expect(isValidMarketingEmail("user@test.com")).toBe(true);
     expect(isValidMarketingEmail("not-an-email")).toBe(false);
     expect(isValidMarketingEmail("user@example.com")).toBe(false);
+    expect(isValidMarketingEmail("user@foo.test")).toBe(false);
     expect(isReservedMarketingEmailDomain("diag@example.com")).toBe(true);
+    expect(isReservedMarketingEmailDomain("user@foo.test")).toBe(true);
     expect(isReservedMarketingEmailDomain("ops@acme.io")).toBe(false);
   });
 
