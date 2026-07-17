@@ -1,18 +1,16 @@
--- CreateEnum
-CREATE TYPE "AlertConditionType" AS ENUM ('ERROR_COUNT');
-
 -- AlterEnum
 ALTER TYPE "AlertRuleType" ADD VALUE 'ALERT_RULE';
 
 -- CreateTable
+-- Alert rules store Condition[] (AND) + opaque destination_ids.
+-- Delivery (email / Slack / Discord / …) is owned by Notifications via fireProjectAlert.
 CREATE TABLE "AlertRule" (
     "id" TEXT NOT NULL,
     "project_id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "condition_type" "AlertConditionType" NOT NULL,
-    "condition" JSONB NOT NULL,
-    "destinations" JSONB NOT NULL,
+    "conditions" JSONB NOT NULL,
+    "destination_ids" JSONB NOT NULL,
     "cooldown_minutes" INTEGER NOT NULL DEFAULT 15,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,

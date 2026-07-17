@@ -13,7 +13,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
-- **Alert rules** — configurable per-project rules with condition params (threshold, window, optional environment), destination binding to email and Delivery channels (Slack / Discord / Teams / Telegram / webhook), Alerts dashboard CRUD, and ingest-time evaluation for `ERROR_COUNT` with cooldown dedupe into existing `fireProjectAlert` fan-out ([#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); milestone v1.15.x)
+- **Alert rules** — configurable per-project rules with `Condition[]` (AND), opaque `destinationIds` resolved by Notifications, Alerts dashboard CRUD, and ingest-time evaluation for `ERROR_COUNT` with cooldown dedupe into existing `fireProjectAlert` fan-out ([#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); milestone v1.15.x). Rules decide conditions → trigger → bindings; Notifications owns delivery.
 
 ### Fixed
 
@@ -21,7 +21,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Database
 
-- `AlertRule` table; `AlertConditionType` (`ERROR_COUNT`); `AlertRuleType.ALERT_RULE` for custom-rule firings
+- `AlertRule` table (`conditions` JSON AND-array, `destination_ids` opaque refs); `AlertRuleType.ALERT_RULE` for custom-rule firings
 - `ErrorOccurrence.environment` for accurate alert-rule environment scope (group-level env remains a last-seen tag only)
 
 ---

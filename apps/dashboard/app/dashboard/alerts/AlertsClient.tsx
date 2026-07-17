@@ -42,8 +42,8 @@ import {
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
-  conditionTypeLabel,
   formatAlertRuleSummary,
+  PROJECT_EMAIL_DESTINATION_ID,
   type AlertRuleRow,
 } from "@/lib/alert-rules";
 import {
@@ -172,7 +172,7 @@ export function AlertsClient({
   const [ruleEnvironment, setRuleEnvironment] = useState("");
   const [ruleCooldownMinutes, setRuleCooldownMinutes] = useState(15);
   const [ruleEmail, setRuleEmail] = useState(true);
-  const [ruleWebhookIds, setRuleWebhookIds] = useState<string[]>([]);
+  const [ruleDestinationIds, setRuleDestinationIds] = useState<string[]>([]);
   const [denyKeysText, setDenyKeysText] = useState(() =>
     formatDenyKeysInput(initialPiiSettings.denyKeys)
   );
@@ -196,7 +196,7 @@ export function AlertsClient({
   }, [initialRules]);
 
   useEffect(() => {
-    setRuleWebhookIds((prev) =>
+    setRuleDestinationIds((prev) =>
       prev.filter((id) => initialWebhooks.some((w) => w.id === id))
     );
   }, [initialWebhooks]);
@@ -331,7 +331,7 @@ export function AlertsClient({
         return;
       }
       setWebhooks((prev) => prev.filter((w) => w.id !== id));
-      setRuleWebhookIds((prev) => prev.filter((wid) => wid !== id));
+      setRuleDestinationIds((prev) => prev.filter((wid) => wid !== id));
       setLastSigningSecret((prev) => (prev?.webhookId === id ? null : prev));
       toast.success("Webhook removed");
       router.refresh();
@@ -344,18 +344,21 @@ export function AlertsClient({
       return;
     }
     startRuleTransition(async () => {
+      const destinationIds = [
+        ...(ruleEmail ? [PROJECT_EMAIL_DESTINATION_ID] : []),
+        ...ruleDestinationIds,
+      ];
       const result = await createProjectAlertRuleAction({
         name: ruleName.trim(),
-        conditionType: "ERROR_COUNT",
-        condition: {
-          threshold: ruleThreshold,
-          windowMinutes: ruleWindowMinutes,
-          environment: ruleEnvironment.trim() || null,
-        },
-        destinations: {
-          email: ruleEmail,
-          webhookIds: ruleWebhookIds,
-        },
+        conditions: [
+          {
+            type: "ERROR_COUNT",
+            threshold: ruleThreshold,
+            windowMinutes: ruleWindowMinutes,
+            environment: ruleEnvironment.trim() || null,
+          },
+        ],
+        destinationIds,
         cooldownMinutes: ruleCooldownMinutes,
       });
       if (!result.ok) {
@@ -365,7 +368,7 @@ export function AlertsClient({
       setRules((prev) => [...prev, result.rule]);
       setRuleName("");
       setRuleEnvironment("");
-      setRuleWebhookIds([]);
+      setRuleDestinationIds([]);
       toast.success("Alert rule created");
       router.refresh();
     });
@@ -430,7 +433,7 @@ export function AlertsClient({
 
         <Section
           title="Custom rules"
-          description="Extensible conditions with destination binding. This MVP evaluates error-count spikes (optional environment). More condition kinds can be added without changing delivery channels."
+          description="Rules decide when to fire (AND of conditions) and which opaque destination ids to notify. Delivery (email, Slack, Discord, …) is owned by Notifications — not by the rule."
         >
           {rules.length > 0 ? (
             <ul className="mb-4 divide-y divide-border rounded-md border border-border">
@@ -444,16 +447,20 @@ export function AlertsClient({
                       {rule.name}
                     </p>
                     <p className="text-[12px] text-muted-foreground">
-                      {conditionTypeLabel(rule.conditionType)} ·{" "}
                       {formatAlertRuleSummary(rule)} · cooldown{" "}
                       {rule.cooldownMinutes}m ·{" "}
                       {(() => {
-                        const liveChannels = rule.destinations.webhookIds.filter((id) =>
+                        const channelIds = rule.destinationIds.filter(
+                          (id) => id !== PROJECT_EMAIL_DESTINATION_ID
+                        );
+                        const liveChannels = channelIds.filter((id) =>
                           webhooks.some((w) => w.id === id && w.enabled)
                         ).length;
-                        const bound = rule.destinations.webhookIds.length;
+                        const bound = channelIds.length;
                         const parts = [
-                          rule.destinations.email ? "email" : null,
+                          rule.destinationIds.includes(PROJECT_EMAIL_DESTINATION_ID)
+                            ? "email"
+                            : null,
                           liveChannels > 0
                             ? `${liveChannels} channel${liveChannels === 1 ? "" : "s"}`
                             : null,
@@ -506,9 +513,10 @@ export function AlertsClient({
                   className="w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-[13px]"
                 />
               </Field>
-              <Field label="Condition">
+              <Field label="Conditions (AND)">
                 <p className="text-[13px] text-muted-foreground">
-                  Error count (example — more kinds later)
+                  Error count for now — the API accepts multiple conditions ANDed together;
+                  more kinds later.
                 </p>
               </Field>
               <Field label="Threshold (errors per window)">
@@ -551,19 +559,23 @@ export function AlertsClient({
                   className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-[13px]"
                 />
               </Field>
-              <Field label="Email recipients">
-                <SettingsToggle on={ruleEmail} onChange={setRuleEmail} />
-              </Field>
-              <Field label="Delivery channels">
+              <Field label="Destinations">
+                <p className="mb-2 text-[12px] text-muted-foreground">
+                  Bind opaque destination ids. Notifications resolves email vs chat/webhook
+                  providers.
+                </p>
+                <div className="mb-2 flex items-center gap-2 text-[13px] text-foreground">
+                  <SettingsToggle on={ruleEmail} onChange={setRuleEmail} />
+                  <span>Project alert email</span>
+                </div>
                 {webhooks.length === 0 ? (
                   <p className="text-[13px] text-muted-foreground">
-                    Add Slack, Discord, Teams, Telegram, or webhook destinations in Delivery below,
-                    then bind them here.
+                    Add Delivery destinations below, then bind their ids here.
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {webhooks.map((wh) => {
-                      const checked = ruleWebhookIds.includes(wh.id);
+                      const checked = ruleDestinationIds.includes(wh.id);
                       const label =
                         wh.label?.trim() ||
                         `${providerLabel(wh.provider)} · ${wh.urlMasked}`;
@@ -576,7 +588,7 @@ export function AlertsClient({
                             type="checkbox"
                             checked={checked}
                             onChange={() =>
-                              setRuleWebhookIds((prev) =>
+                              setRuleDestinationIds((prev) =>
                                 checked
                                   ? prev.filter((id) => id !== wh.id)
                                   : [...prev, wh.id]

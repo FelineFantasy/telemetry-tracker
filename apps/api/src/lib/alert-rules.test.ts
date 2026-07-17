@@ -4,7 +4,9 @@ import {
   createAlertRule,
   MAX_ALERT_RULES,
   maybeEvaluateAlertRules,
-  pruneWebhookIdFromAlertRules,
+  PROJECT_EMAIL_DESTINATION_ID,
+  pruneDestinationIdFromAlertRules,
+  resolveDestinationIds,
   softDeleteAlertRule,
   updateAlertRule,
 } from "./alert-rules.js";
@@ -25,6 +27,21 @@ describe("alertRuleDedupeKey", () => {
   });
 });
 
+describe("resolveDestinationIds", () => {
+  it("maps opaque ids to Notifications fire filters", () => {
+    expect(
+      resolveDestinationIds([
+        PROJECT_EMAIL_DESTINATION_ID,
+        "22222222-2222-2222-2222-222222222222",
+      ])
+    ).toEqual({
+      email: true,
+      webhookIds: ["22222222-2222-2222-2222-222222222222"],
+    });
+    expect(resolveDestinationIds([])).toEqual({ email: false, webhookIds: [] });
+  });
+});
+
 describe("createAlertRule", () => {
   it("rejects invalid payload", async () => {
     const prisma = { project: { findFirst: vi.fn() } } as never;
@@ -36,23 +53,26 @@ describe("createAlertRule", () => {
     });
   });
 
-  it("rejects webhook ids outside the project", async () => {
+  it("rejects destination ids outside the project", async () => {
     const prisma = {
       project: { findFirst: async () => ({ id: "p1" }) },
       projectWebhook: { count: async () => 0 },
     } as never;
     const result = await createAlertRule(prisma, "p1", {
       name: "Prod spike",
-      conditionType: "ERROR_COUNT",
-      condition: { threshold: 10, windowMinutes: 15, environment: "production" },
-      destinations: {
-        email: true,
-        webhookIds: ["11111111-1111-1111-1111-111111111111"],
-      },
+      conditions: [
+        {
+          type: "ERROR_COUNT",
+          threshold: 10,
+          windowMinutes: 15,
+          environment: "production",
+        },
+      ],
+      destinationIds: ["11111111-1111-1111-1111-111111111111"],
     });
     expect(result).toEqual({
       ok: false,
-      error: "One or more webhook destinations were not found",
+      error: "One or more destinations were not found",
       status: 400,
     });
   });
@@ -62,9 +82,15 @@ describe("createAlertRule", () => {
       id: "rule-1",
       name: "Prod spike",
       enabled: true,
-      condition_type: "ERROR_COUNT" as const,
-      condition: { threshold: 10, windowMinutes: 15, environment: "production" },
-      destinations: { email: true, webhookIds: [] as string[] },
+      conditions: [
+        {
+          type: "ERROR_COUNT" as const,
+          threshold: 10,
+          windowMinutes: 15,
+          environment: "production",
+        },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID] as string[],
       cooldown_minutes: 15,
       created_at: new Date("2026-07-17T00:00:00.000Z"),
       updated_at: new Date("2026-07-17T00:00:00.000Z"),
@@ -83,14 +109,21 @@ describe("createAlertRule", () => {
 
     const result = await createAlertRule(prisma, "p1", {
       name: "Prod spike",
-      conditionType: "ERROR_COUNT",
-      condition: { threshold: 10, windowMinutes: 15, environment: "production" },
-      destinations: { email: true, webhookIds: [] },
+      conditions: [
+        {
+          type: "ERROR_COUNT",
+          threshold: 10,
+          windowMinutes: 15,
+          environment: "production",
+        },
+      ],
+      destinationIds: [PROJECT_EMAIL_DESTINATION_ID],
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.rule.name).toBe("Prod spike");
-      expect(result.rule.condition.environment).toBe("production");
+      expect(result.rule.conditions[0]?.environment).toBe("production");
+      expect(result.rule.destinationIds).toEqual([PROJECT_EMAIL_DESTINATION_ID]);
     }
   });
 
@@ -109,9 +142,8 @@ describe("createAlertRule", () => {
 
     const result = await createAlertRule(prisma, "p1", {
       name: "Overflow",
-      conditionType: "ERROR_COUNT",
-      condition: { threshold: 5, windowMinutes: 10 },
-      destinations: { email: false, webhookIds: [] },
+      conditions: [{ type: "ERROR_COUNT", threshold: 5, windowMinutes: 10 }],
+      destinationIds: [],
     });
     expect(result).toEqual({
       ok: false,
@@ -128,9 +160,15 @@ describe("updateAlertRule / softDeleteAlertRule", () => {
       project_id: "p1",
       name: "Prod spike",
       enabled: true,
-      condition_type: "ERROR_COUNT" as const,
-      condition: { threshold: 10, windowMinutes: 15, environment: null },
-      destinations: { email: true, webhookIds: [] },
+      conditions: [
+        {
+          type: "ERROR_COUNT" as const,
+          threshold: 10,
+          windowMinutes: 15,
+          environment: null,
+        },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
       cooldown_minutes: 15,
       created_at: new Date("2026-07-17T00:00:00.000Z"),
       updated_at: new Date("2026-07-17T00:00:00.000Z"),
@@ -161,32 +199,30 @@ describe("updateAlertRule / softDeleteAlertRule", () => {
   });
 });
 
-describe("pruneWebhookIdFromAlertRules", () => {
-  it("removes the webhook id from destinations", async () => {
+describe("pruneDestinationIdFromAlertRules", () => {
+  it("removes the destination id from destinationIds", async () => {
     const update = vi.fn(async () => ({}));
     const prisma = {
       alertRule: {
         findMany: async () => [
           {
             id: "rule-1",
-            destinations: {
-              email: true,
-              webhookIds: [
-                "22222222-2222-2222-2222-222222222222",
-                "33333333-3333-3333-3333-333333333333",
-              ],
-            },
+            destination_ids: [
+              PROJECT_EMAIL_DESTINATION_ID,
+              "22222222-2222-2222-2222-222222222222",
+              "33333333-3333-3333-3333-333333333333",
+            ],
           },
           {
             id: "rule-2",
-            destinations: { email: false, webhookIds: [] },
+            destination_ids: [],
           },
         ],
         update,
       },
     } as never;
 
-    const n = await pruneWebhookIdFromAlertRules(
+    const n = await pruneDestinationIdFromAlertRules(
       prisma,
       "p1",
       "22222222-2222-2222-2222-222222222222"
@@ -195,10 +231,10 @@ describe("pruneWebhookIdFromAlertRules", () => {
     expect(update).toHaveBeenCalledWith({
       where: { id: "rule-1" },
       data: {
-        destinations: {
-          email: true,
-          webhookIds: ["33333333-3333-3333-3333-333333333333"],
-        },
+        destination_ids: [
+          PROJECT_EMAIL_DESTINATION_ID,
+          "33333333-3333-3333-3333-333333333333",
+        ],
       },
     });
   });
@@ -210,17 +246,20 @@ describe("maybeEvaluateAlertRules", () => {
     fireProjectAlert.mockResolvedValue(true);
   });
 
-  it("fires ERROR_COUNT when threshold met with destination binding", async () => {
+  it("fires when all AND conditions match with destination binding", async () => {
     const ruleRow = {
       id: "rule-1",
       name: "Prod errors",
       enabled: true,
-      condition_type: "ERROR_COUNT" as const,
-      condition: { threshold: 5, windowMinutes: 15, environment: "production" },
-      destinations: {
-        email: false,
-        webhookIds: ["22222222-2222-2222-2222-222222222222"],
-      },
+      conditions: [
+        {
+          type: "ERROR_COUNT" as const,
+          threshold: 5,
+          windowMinutes: 15,
+          environment: "production",
+        },
+      ],
+      destination_ids: ["22222222-2222-2222-2222-222222222222"],
       cooldown_minutes: 15,
       created_at: new Date("2026-07-17T00:00:00.000Z"),
       updated_at: new Date("2026-07-17T00:00:00.000Z"),
@@ -264,9 +303,15 @@ describe("maybeEvaluateAlertRules", () => {
             id: "rule-off",
             name: "Off",
             enabled: false,
-            condition_type: "ERROR_COUNT",
-            condition: { threshold: 1, windowMinutes: 15, environment: null },
-            destinations: { email: true, webhookIds: [] },
+            conditions: [
+              {
+                type: "ERROR_COUNT",
+                threshold: 1,
+                windowMinutes: 15,
+                environment: null,
+              },
+            ],
+            destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
             cooldown_minutes: 15,
             created_at: new Date(),
             updated_at: new Date(),
@@ -275,9 +320,15 @@ describe("maybeEvaluateAlertRules", () => {
             id: "rule-low",
             name: "Low",
             enabled: true,
-            condition_type: "ERROR_COUNT",
-            condition: { threshold: 100, windowMinutes: 15, environment: null },
-            destinations: { email: true, webhookIds: [] },
+            conditions: [
+              {
+                type: "ERROR_COUNT",
+                threshold: 100,
+                windowMinutes: 15,
+                environment: null,
+              },
+            ],
+            destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
             cooldown_minutes: 15,
             created_at: new Date(),
             updated_at: new Date(),

@@ -855,13 +855,13 @@ export type AlertRuleActionRow = {
   id: string;
   name: string;
   enabled: boolean;
-  conditionType: "ERROR_COUNT";
-  condition: {
+  conditions: Array<{
+    type: "ERROR_COUNT";
     threshold: number;
     windowMinutes: number;
     environment: string | null;
-  };
-  destinations: { email: boolean; webhookIds: string[] };
+  }>;
+  destinationIds: string[];
   cooldownMinutes: number;
   createdAt: string;
   updatedAt: string;
@@ -870,13 +870,13 @@ export type AlertRuleActionRow = {
 export async function createProjectAlertRuleAction(input: {
   name: string;
   enabled?: boolean;
-  conditionType: "ERROR_COUNT";
-  condition: {
+  conditions: Array<{
+    type: "ERROR_COUNT";
     threshold: number;
     windowMinutes: number;
     environment?: string | null;
-  };
-  destinations: { email: boolean; webhookIds: string[] };
+  }>;
+  destinationIds: string[];
   cooldownMinutes?: number;
 }): Promise<{ ok: true; rule: AlertRuleActionRow } | { ok: false; error: string }> {
   const res = await dashboardApiFetch("/api/project/alert-rules", {
@@ -904,13 +904,13 @@ export async function updateProjectAlertRuleAction(
   patch: Partial<{
     name: string;
     enabled: boolean;
-    conditionType: "ERROR_COUNT";
-    condition: {
+    conditions: Array<{
+      type: "ERROR_COUNT";
       threshold: number;
       windowMinutes: number;
       environment?: string | null;
-    };
-    destinations: { email: boolean; webhookIds: string[] };
+    }>;
+    destinationIds: string[];
     cooldownMinutes: number;
   }>
 ): Promise<{ ok: true; rule: AlertRuleActionRow } | { ok: false; error: string }> {

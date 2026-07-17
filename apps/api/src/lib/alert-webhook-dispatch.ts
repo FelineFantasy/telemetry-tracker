@@ -794,8 +794,8 @@ export async function softDeleteProjectWebhook(
   if (result.count === 0) {
     return { ok: false, error: "Webhook not found", status: 404 };
   }
-  const { pruneWebhookIdFromAlertRules } = await import("./alert-rules.js");
-  await pruneWebhookIdFromAlertRules(prisma, projectId, webhookId);
+  const { pruneDestinationIdFromAlertRules } = await import("./alert-rules.js");
+  await pruneDestinationIdFromAlertRules(prisma, projectId, webhookId);
   return { ok: true };
 }
 

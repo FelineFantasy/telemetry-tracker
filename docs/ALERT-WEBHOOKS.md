@@ -122,4 +122,4 @@ shown once when the webhook is created.
 - Discord first-party: #224
 - Telegram / Microsoft Teams: #500
 - In-product Notification Center: #508
-- Configurable alert rules engine: #493 (priority 2)
+- Configurable alert rules engine: #493 (priority 2) — rules bind opaque destination ids; this doc owns channel delivery
