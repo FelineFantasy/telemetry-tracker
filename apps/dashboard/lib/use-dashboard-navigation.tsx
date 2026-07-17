@@ -92,6 +92,15 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
   }, [transitionPending]);
 
   const markScopeRendered = useCallback((scope: DashboardNavigationScope) => {
+    const prev = renderedScopeRef.current;
+    if (
+      prev &&
+      prev.organizationId === scope.organizationId &&
+      prev.projectId === scope.projectId
+    ) {
+      // Remounts of the top nav must not advance the settle signal with the same scope.
+      return;
+    }
     renderedScopeRef.current = scope;
     scopeSignalRef.current += 1;
   }, []);
