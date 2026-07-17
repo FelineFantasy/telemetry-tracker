@@ -13,11 +13,19 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
-- **Alert webhooks** — configure HTTPS destinations per project on Alerts → Delivery; `fireProjectAlert` enqueues durable `PENDING` deliveries (worker POSTs signed `alert.fired` JSON with DNS-pinned SSRF checks + retry); operators can browse delivery status in the same Delivery section ([#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
-
 ### Fixed
 
 ### Changed
+
+### Database
+
+---
+
+## [1.14.0] - 2026-07-17
+
+### Added
+
+- **Alert webhooks** — configure HTTPS destinations per project on Alerts → Delivery; `fireProjectAlert` enqueues durable `PENDING` deliveries (worker POSTs signed `alert.fired` JSON with DNS-pinned SSRF checks + retry); operators can browse delivery status in the same Delivery section ([#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
 
 ### Database
 

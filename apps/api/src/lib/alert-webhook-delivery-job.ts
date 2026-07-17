@@ -67,6 +67,34 @@ function mapDelivery(row: DeliveryDbRow): AlertWebhookDeliveryJobRow {
   };
 }
 
+/**
+ * Terminalize expired sendTestWebhook rows that never reached SUCCESS/FAILED
+ * (e.g. API process died mid-POST). Never re-POSTs — claim SQL excludes
+ * `webhook:test:%` so these would otherwise stay "Sending" forever.
+ */
+export async function abandonExpiredTestWebhookDeliveries(
+  prisma: PrismaClient,
+  input: { now: Date }
+): Promise<number> {
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+      dedupe_key: { startsWith: "webhook:test:" },
+      OR: [
+        { lease_expires_at: { lt: input.now } },
+        { lease_expires_at: null },
+      ],
+    },
+    data: {
+      status: AlertWebhookDeliveryStatus.FAILED,
+      error: "Test delivery abandoned (interrupted before finalize)",
+      lease_owner: null,
+      lease_expires_at: null,
+    },
+  });
+  return result.count;
+}
+
 export async function claimNextAlertWebhookDelivery(
   prisma: PrismaClient,
   input: { workerId: string; now: Date; env?: NodeJS.ProcessEnv }
@@ -77,7 +105,7 @@ export async function claimNextAlertWebhookDelivery(
   return prisma.$transaction(async (tx) => {
     // Never reclaim sendTestWebhook rows (PROCESSING + lease, alert_event_id null,
     // dedupe webhook:test:…). Those are single-shot; reclaim would duplicate POSTs
-    // or send a generic alert.fired payload.
+    // or send a generic alert.fired payload. Expired tests are abandoned separately.
     const rows = await tx.$queryRaw<DeliveryDbRow[]>(Prisma.sql`
       SELECT *
       FROM "AlertWebhookDelivery"
@@ -157,28 +185,56 @@ export async function completeAlertWebhookDelivery(
   return result.count > 0;
 }
 
+/** Retries for post-POST SUCCESS finalize (scoped updateMany + force-by-id). */
+const WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS = 3;
+
 /**
  * After a successful HTTP POST, finalize SUCCESS even if the worker lost its lease.
- * Prevents a stuck PROCESSING row from being reclaimed and POSTed again.
+ * Prefer PROCESSING-scoped updateMany; on miss/transient error, force SUCCESS by id
+ * so the row cannot stay reclaimable PROCESSING and duplicate the POST.
  */
 export async function finalizeAlertWebhookDeliverySuccess(
   prisma: PrismaClient,
   input: { deliveryId: string; httpStatus: number }
 ): Promise<boolean> {
-  const result = await prisma.alertWebhookDelivery.updateMany({
-    where: {
-      id: input.deliveryId,
-      status: AlertWebhookDeliveryStatus.PROCESSING,
-    },
-    data: {
-      status: AlertWebhookDeliveryStatus.SUCCESS,
-      http_status: input.httpStatus,
-      error: null,
-      lease_owner: null,
-      lease_expires_at: null,
-    },
-  });
-  return result.count > 0;
+  const data = {
+    status: AlertWebhookDeliveryStatus.SUCCESS,
+    http_status: input.httpStatus,
+    error: null,
+    lease_owner: null,
+    lease_expires_at: null,
+  };
+
+  for (let attempt = 0; attempt < WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS; attempt++) {
+    try {
+      const result = await prisma.alertWebhookDelivery.updateMany({
+        where: {
+          id: input.deliveryId,
+          status: AlertWebhookDeliveryStatus.PROCESSING,
+        },
+        data,
+      });
+      if (result.count > 0) return true;
+      break; // not PROCESSING (or gone) — fall through to force-by-id
+    } catch {
+      // Transient DB error — retry scoped update before forcing by id.
+    }
+  }
+
+  // Last resort: id-only SUCCESS. Idempotent if already SUCCESS; prevents reclaim
+  // if still PROCESSING (or any other status after a successful HTTP delivery).
+  for (let attempt = 0; attempt < WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS; attempt++) {
+    try {
+      await prisma.alertWebhookDelivery.update({
+        where: { id: input.deliveryId },
+        data,
+      });
+      return true;
+    } catch {
+      // Transient DB error or missing row — retry, then give up.
+    }
+  }
+  return false;
 }
 
 /**

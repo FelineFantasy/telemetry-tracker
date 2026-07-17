@@ -13,6 +13,7 @@ import {
 } from "./alert-webhook-dispatch.js";
 import {
   claimNextAlertWebhookDelivery,
+  abandonExpiredTestWebhookDeliveries,
   completeAlertWebhookDelivery,
   failAlertWebhookDeliveryAttempt,
   finalizeAlertWebhookDeliverySuccess,
@@ -41,6 +42,9 @@ export async function processNextAlertWebhookDelivery(
   const nowFn = deps.now ?? (() => new Date());
   const now = nowFn();
   const workerId = deps.workerId ?? `alert-webhook-worker-${randomUUID()}`;
+
+  // Best-effort: clear stuck test rows before claiming real work (no re-POST).
+  await abandonExpiredTestWebhookDeliveries(deps.prisma, { now });
 
   const job = await claimNextAlertWebhookDelivery(deps.prisma, {
     workerId,
@@ -155,8 +159,9 @@ async function deliverClaimedAlertWebhook(
         lookupFn: input.lookupFn ?? deps.lookupFn,
       }));
 
-  // Renew before POST so a slow/hung recipient cannot expire the lease mid-flight
-  // and leave a successful delivery stuck in PROCESSING (duplicate on reclaim).
+  // Renew before DNS+POST so a slow resolver or hung recipient cannot expire
+  // the lease mid-flight and leave a successful delivery stuck in PROCESSING
+  // (duplicate on reclaim). Lease minimum covers DNS timeout + POST + margin.
   const leaseHeld = await renewAlertWebhookDeliveryLease(deps.prisma, {
     deliveryId: job.id,
     workerId,
@@ -199,8 +204,9 @@ async function deliverClaimedAlertWebhook(
     if (completed) {
       return { status: "success", deliveryId: job.id };
     }
-    // HTTP already succeeded — still mark SUCCESS without the lease so the row
-    // cannot stay PROCESSING and be reclaimed for a duplicate POST.
+    // HTTP already succeeded — finalize SUCCESS without the lease (retry +
+    // force-by-id) so the row cannot stay PROCESSING and be reclaimed for a
+    // duplicate POST.
     const finalized = await finalizeAlertWebhookDeliverySuccess(deps.prisma, {
       deliveryId: job.id,
       httpStatus: result.httpStatus,
@@ -208,6 +214,7 @@ async function deliverClaimedAlertWebhook(
     if (finalized) {
       return { status: "success", deliveryId: job.id };
     }
+    // DB unreachable / row deleted — nothing left to reclaim for a duplicate.
     return {
       status: "failed",
       deliveryId: job.id,

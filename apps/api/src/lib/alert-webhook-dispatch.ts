@@ -25,8 +25,17 @@ export const MAX_PROJECT_WEBHOOKS = 5;
 export const WEBHOOK_MAX_ATTEMPTS = 2;
 export const WEBHOOK_RETRY_DELAY_MS = 500;
 export const WEBHOOK_FETCH_TIMEOUT_MS = 8_000;
+/** Bound delivery-time DNS so a hung resolver cannot outlive the claim lease. */
+export const WEBHOOK_DNS_TIMEOUT_MS = 5_000;
+/** Extra lease headroom beyond DNS+POST so reclaim cannot race a slow response. */
+export const WEBHOOK_LEASE_POST_MARGIN_MS = 5_000;
 export const WEBHOOK_WORKER_LEASE_MS_DEFAULT = 30_000;
 export const WEBHOOK_WORKER_POLL_MS_DEFAULT = 1_000;
+
+/** Minimum claim/renew lease: DNS budget + HTTPS POST timeout + margin. */
+export function webhookDeliveryLeaseMinimumMs(): number {
+  return WEBHOOK_DNS_TIMEOUT_MS + WEBHOOK_FETCH_TIMEOUT_MS + WEBHOOK_LEASE_POST_MARGIN_MS;
+}
 
 export type WebhookDnsAddress = { address: string; family: 4 | 6 };
 
@@ -96,9 +105,11 @@ export function resolveAlertWebhookWorkerPollMs(
 }
 
 /**
- * Lease duration for claim/renew. Always at least {@link WEBHOOK_FETCH_TIMEOUT_MS}
- * so a short env override cannot expire the lease while HTTPS POST is still in flight
- * (which would let another worker reclaim and duplicate the delivery).
+ * Lease duration for claim/renew. Always at least
+ * {@link webhookDeliveryLeaseMinimumMs} (DNS timeout + POST timeout + margin)
+ * so a short env override cannot expire the lease while delivery-time DNS or
+ * HTTPS POST is still in flight (which would let another worker reclaim and
+ * duplicate the delivery).
  */
 export function resolveAlertWebhookWorkerLeaseMs(
   env: NodeJS.ProcessEnv = process.env
@@ -111,7 +122,7 @@ export function resolveAlertWebhookWorkerLeaseMs(
       leaseMs = parsed;
     }
   }
-  return Math.max(leaseMs, WEBHOOK_FETCH_TIMEOUT_MS);
+  return Math.max(leaseMs, webhookDeliveryLeaseMinimumMs());
 }
 
 export function validateWebhookUrl(
@@ -297,9 +308,25 @@ export async function defaultWebhookDnsLookup(hostname: string): Promise<Webhook
   }));
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 /**
  * Resolve hostname and reject if any address is private/loopback/link-local.
  * Closes the DNS-rebinding gap left by create-time hostname string checks alone.
+ * Lookup is bounded by {@link WEBHOOK_DNS_TIMEOUT_MS} so a hung resolver cannot
+ * outlive the worker claim lease (lease minimum includes this budget).
  */
 export async function resolveWebhookHostForDelivery(
   hostname: string,
@@ -322,7 +349,11 @@ export async function resolveWebhookHostForDelivery(
   }
 
   try {
-    const results = await lookupFn(host);
+    const results = await withTimeout(
+      lookupFn(host),
+      WEBHOOK_DNS_TIMEOUT_MS,
+      "DNS lookup timed out"
+    );
     if (results.length === 0) {
       return { ok: false, error: "Webhook URL host could not be resolved" };
     }
@@ -332,7 +363,11 @@ export async function resolveWebhookHostForDelivery(
       }
     }
     return { ok: true, addresses: results };
-  } catch {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "";
+    if (message === "DNS lookup timed out") {
+      return { ok: false, error: "Webhook URL host DNS lookup timed out" };
+    }
     return { ok: false, error: "Webhook URL host could not be resolved" };
   }
 }
