@@ -95,14 +95,23 @@ export function resolveAlertWebhookWorkerPollMs(
   return parsed;
 }
 
+/**
+ * Lease duration for claim/renew. Always at least {@link WEBHOOK_FETCH_TIMEOUT_MS}
+ * so a short env override cannot expire the lease while HTTPS POST is still in flight
+ * (which would let another worker reclaim and duplicate the delivery).
+ */
 export function resolveAlertWebhookWorkerLeaseMs(
   env: NodeJS.ProcessEnv = process.env
 ): number {
   const raw = env.ALERT_WEBHOOK_WORKER_LEASE_MS;
-  if (raw === undefined || raw.trim() === "") return WEBHOOK_WORKER_LEASE_MS_DEFAULT;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) return WEBHOOK_WORKER_LEASE_MS_DEFAULT;
-  return parsed;
+  let leaseMs = WEBHOOK_WORKER_LEASE_MS_DEFAULT;
+  if (raw !== undefined && raw.trim() !== "") {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed >= 1) {
+      leaseMs = parsed;
+    }
+  }
+  return Math.max(leaseMs, WEBHOOK_FETCH_TIMEOUT_MS);
 }
 
 export function validateWebhookUrl(
@@ -797,6 +806,27 @@ export async function sendTestWebhook(
   const signature = webhook.signing_secret
     ? signWebhookBody(body, webhook.signing_secret)
     : null;
+
+  // Persist the delivery row before POST so a create failure cannot leave the
+  // destination with a payload that Recent deliveries never records.
+  const leaseOwner = `test-webhook:${deliveryId}`;
+  const leaseMs = resolveAlertWebhookWorkerLeaseMs();
+  await prisma.alertWebhookDelivery.create({
+    data: {
+      // Same id as payload / X-Telemetry-Delivery so Recent deliveries match the POST.
+      id: deliveryId,
+      webhook_id: webhook.id,
+      project_id: projectId,
+      dedupe_key: dedupeKey,
+      attempt: 1,
+      status: "PROCESSING",
+      lease_owner: leaseOwner,
+      lease_expires_at: new Date(Date.now() + leaseMs),
+      http_status: null,
+      error: null,
+    },
+  });
+
   const sendImpl = options?.sendImpl ?? postWebhookOnceAsSendImpl;
   const result = await sendImpl({
     url: webhook.url,
@@ -806,18 +836,15 @@ export async function sendTestWebhook(
     lookupFn: options?.lookupFn,
   });
 
-  await prisma.alertWebhookDelivery.create({
+  // Single-shot test — FAILED (not DEAD) when the destination rejects.
+  await prisma.alertWebhookDelivery.update({
+    where: { id: deliveryId },
     data: {
-      // Same id as payload / X-Telemetry-Delivery so Recent deliveries match the POST.
-      id: deliveryId,
-      webhook_id: webhook.id,
-      project_id: projectId,
-      dedupe_key: dedupeKey,
-      attempt: 1,
-      // Single-shot test — FAILED (not DEAD) when the destination rejects.
       status: result.ok ? "SUCCESS" : "FAILED",
       http_status: result.httpStatus,
       error: result.ok ? null : result.error,
+      lease_owner: null,
+      lease_expires_at: null,
     },
   });
 

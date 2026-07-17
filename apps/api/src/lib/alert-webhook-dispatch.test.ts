@@ -8,11 +8,14 @@ import {
   listAlertWebhookDeliveries,
   MAX_PROJECT_WEBHOOKS,
   postWebhookOnce,
+  resolveAlertWebhookWorkerLeaseMs,
   resolveWebhookHostForDelivery,
   sendTestWebhook,
   signWebhookBody,
   validateWebhookUrl,
+  WEBHOOK_FETCH_TIMEOUT_MS,
   WEBHOOK_MAX_ATTEMPTS,
+  WEBHOOK_WORKER_LEASE_MS_DEFAULT,
   type WebhookDnsLookup,
 } from "./alert-webhook-dispatch.js";
 import {
@@ -592,9 +595,23 @@ describe("createProjectWebhook", () => {
   });
 });
 
+describe("resolveAlertWebhookWorkerLeaseMs", () => {
+  it("defaults to 30s and clamps below the HTTPS POST timeout", () => {
+    expect(resolveAlertWebhookWorkerLeaseMs({})).toBe(WEBHOOK_WORKER_LEASE_MS_DEFAULT);
+    expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "5000" })).toBe(
+      WEBHOOK_FETCH_TIMEOUT_MS
+    );
+    expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "45000" })).toBe(45_000);
+    expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "nope" })).toBe(
+      WEBHOOK_WORKER_LEASE_MS_DEFAULT
+    );
+  });
+});
+
 describe("sendTestWebhook", () => {
   it("logs single-shot failures as FAILED not DEAD", async () => {
     const create = vi.fn(async () => ({ id: "log" }));
+    const update = vi.fn(async () => ({ id: "log" }));
     const result = await sendTestWebhook(
       {
         projectWebhook: {
@@ -604,7 +621,7 @@ describe("sendTestWebhook", () => {
             signing_secret: null,
           }),
         },
-        alertWebhookDelivery: { create },
+        alertWebhookDelivery: { create, update },
       } as never,
       "p1",
       "wh1",
@@ -614,12 +631,49 @@ describe("sendTestWebhook", () => {
     );
     expect(result.ok).toBe(false);
     expect(create.mock.calls[0]?.[0]).toMatchObject({
-      data: { status: "FAILED" },
+      data: { status: "PROCESSING", attempt: 1 },
     });
+    expect(update.mock.calls[0]?.[0]).toMatchObject({
+      data: { status: "FAILED", lease_owner: null },
+    });
+  });
+
+  it("persists the delivery row before POSTing", async () => {
+    const order: string[] = [];
+    const create = vi.fn(async () => {
+      order.push("create");
+      return { id: "log" };
+    });
+    const update = vi.fn(async () => {
+      order.push("update");
+      return { id: "log" };
+    });
+    await sendTestWebhook(
+      {
+        projectWebhook: {
+          findFirst: async () => ({
+            id: "wh1",
+            url: "https://hooks.example.com/a",
+            signing_secret: null,
+          }),
+        },
+        alertWebhookDelivery: { create, update },
+      } as never,
+      "p1",
+      "wh1",
+      {
+        sendImpl: async () => {
+          order.push("post");
+          return { ok: true, httpStatus: 200 };
+        },
+      }
+    );
+    expect(order).toEqual(["create", "post", "update"]);
   });
 
   it("persists the same delivery id sent in the payload and header", async () => {
     const create = vi.fn(async () => ({ id: "log" }));
+    const update = vi.fn(async () => ({ id: "log" }));
     let sentDeliveryId: string | undefined;
     let payloadDeliveryId: string | undefined;
     await sendTestWebhook(
@@ -631,7 +685,7 @@ describe("sendTestWebhook", () => {
             signing_secret: null,
           }),
         },
-        alertWebhookDelivery: { create },
+        alertWebhookDelivery: { create, update },
       } as never,
       "p1",
       "wh1",
@@ -639,15 +693,46 @@ describe("sendTestWebhook", () => {
         sendImpl: async (input) => {
           sentDeliveryId = input.deliveryId;
           payloadDeliveryId = (JSON.parse(input.body) as { deliveryId: string }).deliveryId;
-          return { ok: true, httpStatus: 200, error: null };
+          return { ok: true, httpStatus: 200 };
         },
       }
     );
     expect(sentDeliveryId).toBeTruthy();
     expect(payloadDeliveryId).toBe(sentDeliveryId);
     expect(create.mock.calls[0]?.[0]).toMatchObject({
-      data: { id: sentDeliveryId, status: "SUCCESS" },
+      data: { id: sentDeliveryId, status: "PROCESSING" },
     });
+    expect(update.mock.calls[0]?.[0]).toMatchObject({
+      where: { id: sentDeliveryId },
+      data: { status: "SUCCESS" },
+    });
+  });
+
+  it("does not POST when creating the delivery row fails", async () => {
+    const sendImpl = vi.fn(async () => ({ ok: true, httpStatus: 200 }));
+    await expect(
+      sendTestWebhook(
+        {
+          projectWebhook: {
+            findFirst: async () => ({
+              id: "wh1",
+              url: "https://hooks.example.com/a",
+              signing_secret: null,
+            }),
+          },
+          alertWebhookDelivery: {
+            create: async () => {
+              throw new Error("db unavailable");
+            },
+            update: vi.fn(),
+          },
+        } as never,
+        "p1",
+        "wh1",
+        { sendImpl }
+      )
+    ).rejects.toThrow("db unavailable");
+    expect(sendImpl).not.toHaveBeenCalled();
   });
 });
 

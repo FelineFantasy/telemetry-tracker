@@ -21,7 +21,7 @@ Options:
 Environment:
   DATABASE_URL
   ALERT_WEBHOOK_WORKER_POLL_MS (default 1000)
-  ALERT_WEBHOOK_WORKER_LEASE_MS (default 30000)
+  ALERT_WEBHOOK_WORKER_LEASE_MS (default 30000, min = HTTPS POST timeout 8000)
 `);
   process.exit(0);
 }

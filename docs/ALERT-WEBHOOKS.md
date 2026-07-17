@@ -63,7 +63,8 @@ shown once when the webhook is created.
   ```
 
   Env: `ALERT_WEBHOOK_WORKER_POLL_MS` (default `1000`),
-  `ALERT_WEBHOOK_WORKER_LEASE_MS` (default `30000`).
+  `ALERT_WEBHOOK_WORKER_LEASE_MS` (default `30000`, minimum = HTTPS POST
+  timeout `8000`).
 
 - Worker flow: claim (`FOR UPDATE SKIP LOCKED` + lease) → DNS/IP validate + pin →
   POST → record outcome → retry with short backoff (`FAILED` + `next_attempt_at`) or
