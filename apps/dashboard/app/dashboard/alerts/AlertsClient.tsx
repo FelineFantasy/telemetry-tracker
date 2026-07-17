@@ -87,6 +87,21 @@ const DELIVERY_PROVIDER_OPTIONS: {
     label: "Slack",
     urlPlaceholder: "https://hooks.slack.com/services/T…/B…/…",
   },
+  {
+    value: "DISCORD",
+    label: "Discord",
+    urlPlaceholder: "https://discord.com/api/webhooks/…/…",
+  },
+  {
+    value: "MICROSOFT_TEAMS",
+    label: "Microsoft Teams",
+    urlPlaceholder: "https://….webhook.office.com/webhookb2/…",
+  },
+  {
+    value: "TELEGRAM",
+    label: "Telegram",
+    urlPlaceholder: "https://api.telegram.org/bot<token>/sendMessage",
+  },
 ];
 
 function deliveryStatusLabel(status: AlertWebhookDeliveryRow["status"]): string {
@@ -521,13 +536,12 @@ export function AlertsClient({
 
         <Section
           title="Delivery"
-          description="HTTPS webhooks and Slack Incoming Webhooks receive a message when an alert fires (error spike or quota)."
+          description="HTTPS webhooks and chat destinations (Slack, Discord, Teams, Telegram) receive a message when an alert fires."
         >
           <p className="mb-3 text-[13px] text-muted-foreground">
             Generic webhook payload schema lives in{" "}
             <code className="font-mono text-[11px]">docs/ALERT-WEBHOOKS.md</code>.
-            Slack destinations POST Block Kit–compatible JSON to{" "}
-            <code className="font-mono text-[11px]">hooks.slack.com</code>.
+            Chat channels use provider-native payloads (Incoming Webhooks or Telegram Bot API).
           </p>
 
           {lastSigningSecret ? (
@@ -631,7 +645,13 @@ export function AlertsClient({
                 label={
                   webhookProvider === "SLACK"
                     ? "Slack Incoming Webhook URL"
-                    : "HTTPS URL"
+                    : webhookProvider === "DISCORD"
+                      ? "Discord webhook URL"
+                      : webhookProvider === "MICROSOFT_TEAMS"
+                        ? "Teams Incoming Webhook URL"
+                        : webhookProvider === "TELEGRAM"
+                          ? "Telegram Bot API sendMessage URL"
+                          : "HTTPS URL"
                 }
               >
                 <input
@@ -664,7 +684,15 @@ export function AlertsClient({
                   value={webhookLabel}
                   onChange={(e) => setWebhookLabel(e.target.value)}
                   placeholder={
-                    webhookProvider === "SLACK" ? "#alerts" : "Ops channel"
+                    webhookProvider === "SLACK"
+                      ? "#alerts"
+                      : webhookProvider === "DISCORD"
+                        ? "#ops"
+                        : webhookProvider === "MICROSOFT_TEAMS"
+                          ? "Ops channel"
+                          : webhookProvider === "TELEGRAM"
+                            ? "Ops chat"
+                            : "Ops channel"
                   }
                   disabled={webhookPending}
                   className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"

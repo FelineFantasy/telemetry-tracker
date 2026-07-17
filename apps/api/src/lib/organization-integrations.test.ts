@@ -108,6 +108,20 @@ describe("organization-integrations", () => {
     expect(integrations.find((i) => i.id === "webhooks")?.status).toBe("disconnected");
   });
 
+  it("marks Discord connected when enabled Discord destinations exist", () => {
+    const integrations = resolveOrganizationIntegrations({
+      activeApiKeyCount: 0,
+      projectCount: 1,
+      ...emptyChannelCounts,
+      enabledDiscordWebhookCount: 1,
+    });
+
+    expect(integrations.find((i) => i.id === "discord")).toMatchObject({
+      availability: "available",
+      status: "connected",
+    });
+  });
+
   it("returns disconnected signals when the scoped project is not in the org", async () => {
     const prisma = {
       project: {
@@ -198,16 +212,35 @@ describe("organization-integrations", () => {
       connectHref: "/dashboard/alerts",
     });
     expect(integrations.find((i) => i.id === "discord")).toMatchObject({
-      availability: "planned",
+      availability: "available",
       trackedIssue: 224,
     });
     expect(integrations.find((i) => i.id === "microsoft_teams")).toMatchObject({
-      availability: "planned",
+      availability: "available",
       trackedIssue: 500,
     });
     expect(integrations.find((i) => i.id === "telegram")).toMatchObject({
-      availability: "planned",
+      availability: "available",
       trackedIssue: 500,
     });
+  });
+
+  it("marks Teams and Telegram connected when enabled destinations exist", () => {
+    expect(
+      resolveOrganizationIntegrations({
+        activeApiKeyCount: 0,
+        projectCount: 1,
+        ...emptyChannelCounts,
+        enabledTeamsWebhookCount: 1,
+      }).find((i) => i.id === "microsoft_teams")?.status
+    ).toBe("connected");
+    expect(
+      resolveOrganizationIntegrations({
+        activeApiKeyCount: 0,
+        projectCount: 1,
+        ...emptyChannelCounts,
+        enabledTelegramWebhookCount: 1,
+      }).find((i) => i.id === "telegram")?.status
+    ).toBe("connected");
   });
 });
