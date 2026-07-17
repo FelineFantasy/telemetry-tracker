@@ -343,7 +343,7 @@ export function AlertsClient({
                   id="pii-scrub-session-email"
                   label="Scrub session user email"
                   on={scrubSessionUserEmail}
-                  onChange={setScrubSessionUserEmail}
+                  onChange={(v) => setScrubSessionUserEmail(v)}
                   disabled={!piiEditable}
                 />
               </div>
