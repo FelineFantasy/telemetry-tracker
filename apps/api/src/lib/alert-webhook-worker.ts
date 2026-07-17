@@ -13,6 +13,7 @@ import {
 } from "./alert-webhook-dispatch.js";
 import {
   claimNextAlertWebhookDelivery,
+  abandonExpiredTestWebhookDeliveries,
   completeAlertWebhookDelivery,
   failAlertWebhookDeliveryAttempt,
   finalizeAlertWebhookDeliverySuccess,
@@ -41,6 +42,9 @@ export async function processNextAlertWebhookDelivery(
   const nowFn = deps.now ?? (() => new Date());
   const now = nowFn();
   const workerId = deps.workerId ?? `alert-webhook-worker-${randomUUID()}`;
+
+  // Best-effort: clear stuck test rows before claiming real work (no re-POST).
+  await abandonExpiredTestWebhookDeliveries(deps.prisma, { now });
 
   const job = await claimNextAlertWebhookDelivery(deps.prisma, {
     workerId,

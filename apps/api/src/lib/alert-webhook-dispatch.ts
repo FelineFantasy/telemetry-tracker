@@ -25,6 +25,8 @@ export const MAX_PROJECT_WEBHOOKS = 5;
 export const WEBHOOK_MAX_ATTEMPTS = 2;
 export const WEBHOOK_RETRY_DELAY_MS = 500;
 export const WEBHOOK_FETCH_TIMEOUT_MS = 8_000;
+/** Extra lease headroom beyond POST timeout so reclaim cannot race a slow response. */
+export const WEBHOOK_LEASE_POST_MARGIN_MS = 5_000;
 export const WEBHOOK_WORKER_LEASE_MS_DEFAULT = 30_000;
 export const WEBHOOK_WORKER_POLL_MS_DEFAULT = 1_000;
 
@@ -96,7 +98,8 @@ export function resolveAlertWebhookWorkerPollMs(
 }
 
 /**
- * Lease duration for claim/renew. Always at least {@link WEBHOOK_FETCH_TIMEOUT_MS}
+ * Lease duration for claim/renew. Always at least
+ * {@link WEBHOOK_FETCH_TIMEOUT_MS} + {@link WEBHOOK_LEASE_POST_MARGIN_MS}
  * so a short env override cannot expire the lease while HTTPS POST is still in flight
  * (which would let another worker reclaim and duplicate the delivery).
  */
@@ -111,7 +114,10 @@ export function resolveAlertWebhookWorkerLeaseMs(
       leaseMs = parsed;
     }
   }
-  return Math.max(leaseMs, WEBHOOK_FETCH_TIMEOUT_MS);
+  return Math.max(
+    leaseMs,
+    WEBHOOK_FETCH_TIMEOUT_MS + WEBHOOK_LEASE_POST_MARGIN_MS
+  );
 }
 
 export function validateWebhookUrl(

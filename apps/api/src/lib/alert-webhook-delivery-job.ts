@@ -67,6 +67,34 @@ function mapDelivery(row: DeliveryDbRow): AlertWebhookDeliveryJobRow {
   };
 }
 
+/**
+ * Terminalize expired sendTestWebhook rows that never reached SUCCESS/FAILED
+ * (e.g. API process died mid-POST). Never re-POSTs — claim SQL excludes
+ * `webhook:test:%` so these would otherwise stay "Sending" forever.
+ */
+export async function abandonExpiredTestWebhookDeliveries(
+  prisma: PrismaClient,
+  input: { now: Date }
+): Promise<number> {
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+      dedupe_key: { startsWith: "webhook:test:" },
+      OR: [
+        { lease_expires_at: { lt: input.now } },
+        { lease_expires_at: null },
+      ],
+    },
+    data: {
+      status: AlertWebhookDeliveryStatus.FAILED,
+      error: "Test delivery abandoned (interrupted before finalize)",
+      lease_owner: null,
+      lease_expires_at: null,
+    },
+  });
+  return result.count;
+}
+
 export async function claimNextAlertWebhookDelivery(
   prisma: PrismaClient,
   input: { workerId: string; now: Date; env?: NodeJS.ProcessEnv }
@@ -77,7 +105,7 @@ export async function claimNextAlertWebhookDelivery(
   return prisma.$transaction(async (tx) => {
     // Never reclaim sendTestWebhook rows (PROCESSING + lease, alert_event_id null,
     // dedupe webhook:test:…). Those are single-shot; reclaim would duplicate POSTs
-    // or send a generic alert.fired payload.
+    // or send a generic alert.fired payload. Expired tests are abandoned separately.
     const rows = await tx.$queryRaw<DeliveryDbRow[]>(Prisma.sql`
       SELECT *
       FROM "AlertWebhookDelivery"

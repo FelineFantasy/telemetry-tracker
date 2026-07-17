@@ -15,11 +15,13 @@ import {
   signWebhookBody,
   validateWebhookUrl,
   WEBHOOK_FETCH_TIMEOUT_MS,
+  WEBHOOK_LEASE_POST_MARGIN_MS,
   WEBHOOK_MAX_ATTEMPTS,
   WEBHOOK_WORKER_LEASE_MS_DEFAULT,
   type WebhookDnsLookup,
 } from "./alert-webhook-dispatch.js";
 import {
+  abandonExpiredTestWebhookDeliveries,
   claimNextAlertWebhookDelivery,
   completeAlertWebhookDelivery,
   failAlertWebhookDeliveryAttempt,
@@ -305,6 +307,29 @@ describe("claim / retry / DEAD", () => {
       )
     ).toBe(true);
   });
+
+  it("abandons expired webhook:test PROCESSING rows without POSTing", async () => {
+    const updateMany = vi.fn(async () => ({ count: 2 }));
+    const now = new Date("2026-07-17T12:00:00.000Z");
+    const count = await abandonExpiredTestWebhookDeliveries(
+      { alertWebhookDelivery: { updateMany } } as never,
+      { now }
+    );
+    expect(count).toBe(2);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        status: "PROCESSING",
+        dedupe_key: { startsWith: "webhook:test:" },
+        OR: [{ lease_expires_at: { lt: now } }, { lease_expires_at: null }],
+      },
+      data: {
+        status: "FAILED",
+        error: "Test delivery abandoned (interrupted before finalize)",
+        lease_owner: null,
+        lease_expires_at: null,
+      },
+    });
+  });
 });
 
 describe("processNextAlertWebhookDelivery", () => {
@@ -312,6 +337,7 @@ describe("processNextAlertWebhookDelivery", () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       // renew lease
       .mockResolvedValueOnce({ count: 1 })
       // complete SUCCESS
@@ -385,13 +411,14 @@ describe("processNextAlertWebhookDelivery", () => {
     const sent = sendImpl.mock.calls[0]?.[0];
     expect(JSON.parse(sent.body).event).toBe("alert.fired");
     expect(sent.signature).toBe(signWebhookBody(sent.body, "sekrit"));
-    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(updateMany).toHaveBeenCalledTimes(3);
   });
 
   it("does not report success when completion loses the lease", async () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       .mockResolvedValueOnce({ count: 1 }) // renew
       .mockResolvedValueOnce({ count: 0 }) // lease-scoped complete missed
       .mockResolvedValueOnce({ count: 1 }); // finalize SUCCESS without lease
@@ -462,13 +489,14 @@ describe("processNextAlertWebhookDelivery", () => {
     });
     expect(result).toEqual({ status: "success", deliveryId: "d1" });
     expect(sendImpl).toHaveBeenCalledOnce();
-    expect(updateMany).toHaveBeenCalledTimes(3);
+    expect(updateMany).toHaveBeenCalledTimes(4);
   });
 
   it("reports failure only when SUCCESS cannot be finalized after POST", async () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       .mockResolvedValueOnce({ count: 1 }) // renew
       .mockResolvedValueOnce({ count: 0 }) // lease-scoped complete
       .mockResolvedValueOnce({ count: 0 }); // finalize also missed
@@ -550,6 +578,7 @@ describe("processNextAlertWebhookDelivery", () => {
     // renew miss, then releaseAlertWebhookDeliveryClaim also misses (reclaimed)
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 0 });
     const prisma = {
@@ -624,13 +653,14 @@ describe("processNextAlertWebhookDelivery", () => {
       error: "Lease lost before delivery",
     });
     expect(sendImpl).not.toHaveBeenCalled();
-    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(updateMany).toHaveBeenCalledTimes(3);
   });
 
   it("clears PROCESSING when lease renew fails but ownership remains", async () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 1 });
     const prisma = {
@@ -705,8 +735,8 @@ describe("processNextAlertWebhookDelivery", () => {
       error: "Lease lost before delivery",
     });
     expect(sendImpl).not.toHaveBeenCalled();
-    expect(updateMany).toHaveBeenCalledTimes(2);
-    expect(updateMany.mock.calls[1][0].data).toMatchObject({
+    expect(updateMany).toHaveBeenCalledTimes(3);
+    expect(updateMany.mock.calls[2][0].data).toMatchObject({
       status: "FAILED",
       error: "Lease lost before delivery",
       lease_owner: null,
@@ -723,6 +753,7 @@ describe("processNextAlertWebhookDelivery", () => {
     }));
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       .mockResolvedValueOnce({ count: 1 }) // renew
       .mockResolvedValueOnce({ count: 1 }); // fail
     const prisma = {
@@ -800,16 +831,17 @@ describe("processNextAlertWebhookDelivery", () => {
       error: "HTTP 500",
     });
     expect(sendImpl).toHaveBeenCalledOnce();
-    expect(updateMany.mock.calls[1][0].data).toMatchObject({
+    expect(updateMany.mock.calls[2][0].data).toMatchObject({
       status: "FAILED",
     });
-    expect(updateMany.mock.calls[1][0].data.status).not.toBe("DEAD");
+    expect(updateMany.mock.calls[2][0].data.status).not.toBe("DEAD");
   });
 
   it("does not undo attempt when renew misses after PROCESSING reclaim", async () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
     const updateMany = vi
       .fn()
+      .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 1 });
     const prisma = {
@@ -884,11 +916,11 @@ describe("processNextAlertWebhookDelivery", () => {
       error: "Lease lost before delivery",
     });
     expect(sendImpl).not.toHaveBeenCalled();
-    expect(updateMany.mock.calls[1][0].data).toMatchObject({
+    expect(updateMany.mock.calls[2][0].data).toMatchObject({
       status: "FAILED",
       error: "Lease lost before delivery",
     });
-    expect(updateMany.mock.calls[1][0].data).not.toHaveProperty("attempt");
+    expect(updateMany.mock.calls[2][0].data).not.toHaveProperty("attempt");
   });
 
   it("does not POST a generic payload when alert_event_id is null", async () => {
@@ -1016,10 +1048,13 @@ describe("createProjectWebhook", () => {
 });
 
 describe("resolveAlertWebhookWorkerLeaseMs", () => {
-  it("defaults to 30s and clamps below the HTTPS POST timeout", () => {
+  it("defaults to 30s and clamps below POST timeout plus margin", () => {
     expect(resolveAlertWebhookWorkerLeaseMs({})).toBe(WEBHOOK_WORKER_LEASE_MS_DEFAULT);
     expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "5000" })).toBe(
-      WEBHOOK_FETCH_TIMEOUT_MS
+      WEBHOOK_FETCH_TIMEOUT_MS + WEBHOOK_LEASE_POST_MARGIN_MS
+    );
+    expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "8000" })).toBe(
+      WEBHOOK_FETCH_TIMEOUT_MS + WEBHOOK_LEASE_POST_MARGIN_MS
     );
     expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "45000" })).toBe(45_000);
     expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "nope" })).toBe(
