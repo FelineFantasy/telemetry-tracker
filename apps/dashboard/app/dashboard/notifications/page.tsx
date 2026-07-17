@@ -50,6 +50,8 @@ export default async function NotificationsPage({
         initialType={type}
         initialProjectId={projectId}
         initialUnreadOnly={unreadOnly}
+        currentProjectId={effectiveProjectId}
+        currentOrganizationId={resolvedOrgId}
       />
     </Suspense>
   );

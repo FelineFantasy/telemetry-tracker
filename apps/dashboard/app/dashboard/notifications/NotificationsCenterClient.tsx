@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
+  markAllNotificationsReadAction,
   markNotificationsReadAction,
+  setDashboardProjectId,
 } from "@/app/dashboard/actions";
 import {
   NotificationTypeIcon,
@@ -28,7 +30,10 @@ import type {
 } from "@/lib/dashboard-notifications";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-time";
 import { groupNotificationsByDay } from "@/lib/notification-day-groups";
-import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
+import {
+  useDashboardNavigation,
+  useDashboardNavLinkProps,
+} from "@/lib/use-dashboard-navigation";
 
 const TYPE_FILTERS = [
   { value: "", label: "All types" },
@@ -45,6 +50,8 @@ type Props = {
   initialType: string;
   initialProjectId: string;
   initialUnreadOnly: boolean;
+  currentProjectId: string;
+  currentOrganizationId: string | null;
 };
 
 export function NotificationsCenterClient({
@@ -53,10 +60,13 @@ export function NotificationsCenterClient({
   initialType,
   initialProjectId,
   initialUnreadOnly,
+  currentProjectId,
+  currentOrganizationId,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { replaceAndRefresh, runPending } = useDashboardNavigation();
   const [pending, startTransition] = useTransition();
   const [items, setItems] = useState(initialItems);
   const [type, setType] = useState(initialType);
@@ -119,19 +129,62 @@ export function NotificationsCenterClient({
     setItems((prev) => {
       const unreadIds = prev.filter((item) => item.unread).map((item) => item.id);
       if (unreadIds.length === 0) return prev;
-      void markNotificationsReadAction(unreadIds).then((result) => {
-        if (!result.ok) {
-          setItems((current) =>
-            current.map((item) =>
-              unreadIds.includes(item.id) ? { ...item, unread: true } : item
-            )
-          );
-          toast.error(result.error || "Could not mark notifications as read");
+      void markAllNotificationsReadAction({ scope: "organization" }).then(
+        (result) => {
+          if (!result.ok) {
+            setItems((current) =>
+              current.map((item) =>
+                unreadIds.includes(item.id) ? { ...item, unread: true } : item
+              )
+            );
+            toast.error(result.error || "Could not mark notifications as read");
+            return;
+          }
+          router.refresh();
         }
-      });
+      );
       return prev.map((item) => ({ ...item, unread: false }));
     });
-  }, []);
+  }, [router]);
+
+  const openNotification = useCallback(
+    async (item: DashboardNotificationItem) => {
+      markRead(item.id);
+      const href = item.href;
+      if (!href) return;
+
+      const targetProjectId = item.projectId?.trim() || "";
+      const needsProjectSwitch =
+        Boolean(targetProjectId) &&
+        targetProjectId.toLowerCase() !== currentProjectId.toLowerCase();
+
+      if (!needsProjectSwitch) {
+        router.push(href);
+        return;
+      }
+
+      await runPending(async () => {
+        const result = await setDashboardProjectId(targetProjectId);
+        if (!result.ok) {
+          toast.error(result.error || "Could not switch project");
+          router.push(href);
+          return;
+        }
+        await replaceAndRefresh(href, {
+          organizationId: currentOrganizationId,
+          projectId: targetProjectId,
+        });
+      });
+    },
+    [
+      currentOrganizationId,
+      currentProjectId,
+      markRead,
+      replaceAndRefresh,
+      router,
+      runPending,
+    ]
+  );
 
   const groups = useMemo(() => groupNotificationsByDay(items), [items]);
   const unreadCount = items.filter((item) => item.unread).length;
@@ -267,7 +320,7 @@ export function NotificationsCenterClient({
                     <NotificationCenterRow
                       key={n.id}
                       item={n}
-                      onMarkRead={markRead}
+                      onOpen={openNotification}
                     />
                   ))}
                 </ul>
@@ -291,10 +344,10 @@ function NotificationSettingsInlineLink() {
 
 function NotificationCenterRow({
   item,
-  onMarkRead,
+  onOpen,
 }: {
   item: DashboardNotificationItem;
-  onMarkRead: (id: string) => void;
+  onOpen: (item: DashboardNotificationItem) => void;
 }) {
   const content = (
     <>
@@ -333,31 +386,15 @@ function NotificationCenterRow({
     </>
   );
 
-  const className = cn(
-    "flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-surface/60",
-    item.unread ? "bg-brand-soft/20" : "bg-background"
-  );
-
-  if (item.href) {
-    return (
-      <li>
-        <Link
-          href={item.href}
-          onClick={() => onMarkRead(item.id)}
-          className={className}
-        >
-          {content}
-        </Link>
-      </li>
-    );
-  }
-
   return (
     <li>
       <button
         type="button"
-        onClick={() => onMarkRead(item.id)}
-        className={className}
+        onClick={() => onOpen(item)}
+        className={cn(
+          "flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-surface/60",
+          item.unread ? "bg-brand-soft/20" : "bg-background"
+        )}
       >
         {content}
       </button>

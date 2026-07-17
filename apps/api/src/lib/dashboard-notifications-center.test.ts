@@ -112,6 +112,12 @@ describe("buildOrganizationDashboardNotifications", () => {
           },
         ],
       },
+      project: {
+        findFirst: async () => null,
+      },
+      usageMonthly: {
+        findUnique: async () => null,
+      },
     } as never;
 
     const items = await buildOrganizationDashboardNotifications(

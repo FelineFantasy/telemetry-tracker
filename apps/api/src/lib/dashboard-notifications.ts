@@ -16,6 +16,11 @@ import {
 } from "./alert-dispatch.js";
 import { currentYearMonth } from "./usage-meter.js";
 import { quotaNotificationKey } from "./quota-notification-keys.js";
+import {
+  getMonthlyIngestUsed,
+  loadPlanContextForProject,
+} from "./plan-enforcement.js";
+import { loadProjectAlertSettings, quotaNearRatio } from "./error-spike-alert.js";
 
 export type DashboardNotificationType =
   | "issue"
@@ -113,6 +118,32 @@ function quotaNotifications(
   }
 
   return items;
+}
+
+/** Live usage quota snapshot for one project (same rules as session context). */
+export async function loadUsageQuotaForProject(
+  prisma: PrismaClient,
+  projectId: string
+): Promise<NonNullable<DashboardSessionContextPayload["usageQuota"]> | null> {
+  const ctx = await loadPlanContextForProject(prisma, projectId);
+  if (!ctx) return null;
+  const used = await getMonthlyIngestUsed(prisma, projectId);
+  const limit = ctx.limits.monthlyIngestUnits;
+  const ratio = limit > 0 ? used / limit : 0;
+  const quotaExceeded = limit > 0 && used >= limit;
+  const alertSettings = await loadProjectAlertSettings(prisma, projectId);
+  return {
+    planTier: ctx.planTier,
+    monthlyIngestUsed: used,
+    monthlyIngestLimit: limit,
+    percentUsed: Math.round(ratio * 100),
+    quotaExceeded,
+    nearQuota:
+      !quotaExceeded &&
+      alertSettings.quota.enabled &&
+      ratio >= quotaNearRatio(alertSettings),
+    retentionDays: ctx.limits.retentionDays,
+  };
 }
 
 function preferredQuotaCollisionItem(
@@ -321,7 +352,8 @@ export async function buildDashboardNotifications(
 
 /**
  * Org-wide Notification Center feed: billing + team once, alerts/issues across
- * accessible projects, plus live quota for the active project when present.
+ * accessible projects, plus live quota for every project (so billing-only routing
+ * still sees near/exceeded outside the active project).
  */
 export async function buildOrganizationDashboardNotifications(
   prisma: PrismaClient,
@@ -341,18 +373,27 @@ export async function buildOrganizationDashboardNotifications(
     : null;
   if (billingItem) items.push(billingItem);
 
-  if (session.usageQuota && activeProjectId) {
-    const activeMeta = projects.find((p) => p.id === activeProjectId) ?? null;
-    items.push(
-      ...quotaNotifications(activeProjectId, session.usageQuota, activeMeta?.name ?? null)
-    );
-  }
-
   if (projects.length > 0) {
+    const quotaBatches = await Promise.all(
+      projects.map(async (project) => {
+        const quota =
+          project.id === activeProjectId && session.usageQuota
+            ? session.usageQuota
+            : await loadUsageQuotaForProject(prisma, project.id);
+        if (!quota) return [] as DashboardNotificationItem[];
+        return quotaNotifications(project.id, quota, project.name);
+      })
+    );
+    for (const batch of quotaBatches) items.push(...batch);
+
     items.push(
       ...(await recentAlertNotificationsForProjects(prisma, projects, { mode }))
     );
     items.push(...(await issueNotificationsForProjects(prisma, projects, issueTake)));
+  } else if (session.usageQuota && activeProjectId) {
+    items.push(
+      ...quotaNotifications(activeProjectId, session.usageQuota, null)
+    );
   }
 
   if (context) {
