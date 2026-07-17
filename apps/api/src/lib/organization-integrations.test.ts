@@ -17,6 +17,9 @@ describe("organization-integrations", () => {
           return 2;
         },
       },
+      projectWebhook: {
+        count: async () => 0,
+      },
     };
 
     const signals = await loadOrganizationIntegrationSignals(
@@ -29,6 +32,7 @@ describe("organization-integrations", () => {
     expect(signals).toEqual({
       activeApiKeyCount: 2,
       projectCount: 1,
+      enabledWebhookCount: 0,
     });
     expect(capturedWhere).toMatchObject({
       project_id: "proj-1",
@@ -46,6 +50,7 @@ describe("organization-integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 0,
+      enabledWebhookCount: 0,
     });
 
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("disconnected");
@@ -56,10 +61,25 @@ describe("organization-integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 1,
+      enabledWebhookCount: 0,
     });
 
     expect(integrations.find((i) => i.id === "sdk")?.status).toBe("disconnected");
     expect(integrations.find((i) => i.id === "email_alerts")?.status).toBe("connected");
+  });
+
+  it("marks webhooks connected when enabled destinations exist", () => {
+    const integrations = resolveOrganizationIntegrations({
+      activeApiKeyCount: 0,
+      projectCount: 1,
+      enabledWebhookCount: 2,
+    });
+
+    expect(integrations.find((i) => i.id === "webhooks")).toMatchObject({
+      availability: "available",
+      status: "connected",
+      trackedIssue: 225,
+    });
   });
 
   it("returns disconnected signals when the scoped project is not in the org", async () => {
@@ -72,6 +92,11 @@ describe("organization-integrations", () => {
           throw new Error("should not count keys without a project");
         },
       },
+      projectWebhook: {
+        count: async () => {
+          throw new Error("should not count webhooks without a project");
+        },
+      },
     };
 
     const signals = await loadOrganizationIntegrationSignals(
@@ -80,7 +105,11 @@ describe("organization-integrations", () => {
       "proj-other"
     );
 
-    expect(signals).toEqual({ activeApiKeyCount: 0, projectCount: 0 });
+    expect(signals).toEqual({
+      activeApiKeyCount: 0,
+      projectCount: 0,
+      enabledWebhookCount: 0,
+    });
   });
 
   it("excludes expired API keys from active counts", async () => {
@@ -95,6 +124,9 @@ describe("organization-integrations", () => {
           return 0;
         },
       },
+      projectWebhook: {
+        count: async () => 0,
+      },
     };
 
     await loadOrganizationIntegrationSignals(prisma as never, "org-1", "proj-1");
@@ -106,7 +138,7 @@ describe("organization-integrations", () => {
 
   it("scopes project integration hrefs when a project id is provided", () => {
     const integrations = resolveOrganizationIntegrations(
-      { activeApiKeyCount: 0, projectCount: 1 },
+      { activeApiKeyCount: 0, projectCount: 1, enabledWebhookCount: 0 },
       "proj-1"
     );
 
@@ -128,8 +160,13 @@ describe("organization-integrations", () => {
     const integrations = resolveOrganizationIntegrations({
       activeApiKeyCount: 0,
       projectCount: 0,
+      enabledWebhookCount: 0,
     });
 
+    expect(integrations.find((i) => i.id === "webhooks")).toMatchObject({
+      availability: "available",
+      trackedIssue: 225,
+    });
     expect(integrations.find((i) => i.id === "slack")).toMatchObject({
       availability: "planned",
       trackedIssue: 223,
