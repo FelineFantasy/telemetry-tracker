@@ -153,41 +153,47 @@ export function resolveCompareWindow(
   return { previousSince, previousUntil: currentSince };
 }
 
-/** @internal Exported for unit tests. */
+/**
+ * Upper-bound time clauses for env/release session counts.
+ * Includes leading `AND` so callers can splice them after `started_at` / `created_at` lower bounds
+ * (omitting `AND` produced Postgres 42601 near `s` / `e`).
+ * @internal Exported for unit tests.
+ */
 export function overviewEnvironmentSessionCountUpperClauses(
   scope: Scope,
   exclusiveUntil?: Date
 ): { session: Prisma.Sql; event: Prisma.Sql } {
   if (exclusiveUntil !== undefined) {
     return {
-      session: Prisma.sql`s."started_at" < ${exclusiveUntil}`,
-      event: Prisma.sql`e."created_at" < ${exclusiveUntil}`,
+      session: Prisma.sql`AND s."started_at" < ${exclusiveUntil}`,
+      event: Prisma.sql`AND e."created_at" < ${exclusiveUntil}`,
     };
   }
   if (scope.until !== undefined) {
     return {
-      session: Prisma.sql`s."started_at" <= ${scope.until}`,
-      event: Prisma.sql`e."created_at" <= ${scope.until}`,
+      session: Prisma.sql`AND s."started_at" <= ${scope.until}`,
+      event: Prisma.sql`AND e."created_at" <= ${scope.until}`,
     };
   }
   return { session: Prisma.empty, event: Prisma.empty };
 }
 
-export async function countSessions(
-  prisma: PrismaClient,
+/**
+ * Assembles the env/release session COUNT SQL used by {@link countSessions}.
+ * @internal Exported for unit tests (regression: missing AND on upper bounds).
+ */
+export function overviewEnvironmentSessionCountSql(
   scope: Scope,
   exclusiveUntil?: Date
-): Promise<number> {
-  // Prefer Session.environment / release; single-event EXISTS when both filters apply.
-  if (scope.environment || scope.release) {
-    const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
-    const platformClause = scope.platform
-      ? Prisma.sql`AND s."platform" = ${scope.platform}`
-      : Prisma.empty;
-    const { session: sessionUpperClause, event: eventUpperClause } =
-      overviewEnvironmentSessionCountUpperClauses(scope, exclusiveUntil);
-    const eventTime = Prisma.sql`e."created_at" >= ${scope.since} ${eventUpperClause}`;
-    const eventExists = (extra: Prisma.Sql) => Prisma.sql`EXISTS (
+): Prisma.Sql {
+  const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+  const platformClause = scope.platform
+    ? Prisma.sql`AND s."platform" = ${scope.platform}`
+    : Prisma.empty;
+  const { session: sessionUpperClause, event: eventUpperClause } =
+    overviewEnvironmentSessionCountUpperClauses(scope, exclusiveUntil);
+  const eventTime = Prisma.sql`e."created_at" >= ${scope.since} ${eventUpperClause}`;
+  const eventExists = (extra: Prisma.Sql) => Prisma.sql`EXISTS (
       SELECT 1 FROM "Event" e
       WHERE e."project_id" = s."project_id"
         AND e."session_id" = s."session_id"
@@ -196,9 +202,9 @@ export async function countSessions(
         AND ${eventTime}
     )`;
 
-    let envReleaseMatch: Prisma.Sql;
-    if (scope.environment && scope.release) {
-      envReleaseMatch = Prisma.sql`(
+  let envReleaseMatch: Prisma.Sql;
+  if (scope.environment && scope.release) {
+    envReleaseMatch = Prisma.sql`(
         (
           s."environment" = ${scope.environment}
           AND s."release" = ${scope.release}
@@ -225,25 +231,25 @@ export async function countSessions(
           )}
         )
       )`;
-    } else if (scope.environment) {
-      envReleaseMatch = Prisma.sql`(
+  } else if (scope.environment) {
+    envReleaseMatch = Prisma.sql`(
         s."environment" = ${scope.environment}
         OR (
           s."environment" IS NULL
           AND ${eventExists(Prisma.sql`e."environment" = ${scope.environment}`)}
         )
       )`;
-    } else {
-      envReleaseMatch = Prisma.sql`(
+  } else {
+    envReleaseMatch = Prisma.sql`(
         s."release" = ${scope.release}
         OR (
           s."release" IS NULL
           AND ${eventExists(Prisma.sql`e."release" = ${scope.release}`)}
         )
       )`;
-    }
+  }
 
-    const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
+  return Prisma.sql`
       SELECT COUNT(*)::bigint AS c
       FROM "Session" s
       WHERE s."project_id" = ${scope.projectId}
@@ -252,7 +258,19 @@ export async function countSessions(
         ${appClause}
         ${platformClause}
         AND ${envReleaseMatch}
-    `);
+    `;
+}
+
+export async function countSessions(
+  prisma: PrismaClient,
+  scope: Scope,
+  exclusiveUntil?: Date
+): Promise<number> {
+  // Prefer Session.environment / release; single-event EXISTS when both filters apply.
+  if (scope.environment || scope.release) {
+    const rows = await prisma.$queryRaw<[{ c: bigint }]>(
+      overviewEnvironmentSessionCountSql(scope, exclusiveUntil)
+    );
     return Number(rows[0]?.c ?? 0);
   }
 

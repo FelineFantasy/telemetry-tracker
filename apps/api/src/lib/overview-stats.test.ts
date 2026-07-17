@@ -4,6 +4,7 @@ import {
   buildWorkspaceTelemetry,
   computeOverviewHealth,
   errorGroupDetailHref,
+  overviewEnvironmentSessionCountSql,
   overviewEnvironmentSessionCountUpperClauses,
   resolveCompareWindow,
 } from "./overview-stats.js";
@@ -13,6 +14,11 @@ function prismaSqlText(fragment: Prisma.Sql): string {
     (acc, part, i) => acc + part + (fragment.values[i] ?? ""),
     ""
   );
+}
+
+/** Collapse whitespace so SQL shape assertions stay readable. */
+function normalizeSql(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
 }
 
 describe("resolveCompareWindow", () => {
@@ -71,8 +77,12 @@ describe("overviewEnvironmentSessionCountUpperClauses", () => {
       environment: "production",
     });
 
-    expect(prismaSqlText(clauses.session)).toContain("<=");
-    expect(prismaSqlText(clauses.event)).toContain("<=");
+    expect(normalizeSql(prismaSqlText(clauses.session))).toContain(
+      'AND s."started_at" <='
+    );
+    expect(normalizeSql(prismaSqlText(clauses.event))).toContain(
+      'AND e."created_at" <='
+    );
   });
 
   it("uses exclusive upper bounds for the previous compare window", () => {
@@ -87,9 +97,53 @@ describe("overviewEnvironmentSessionCountUpperClauses", () => {
       previousUntil
     );
 
-    expect(prismaSqlText(clauses.session)).toContain("<");
-    expect(prismaSqlText(clauses.session)).not.toContain("<=");
-    expect(prismaSqlText(clauses.event)).toContain("<");
+    expect(normalizeSql(prismaSqlText(clauses.session))).toContain(
+      'AND s."started_at" <'
+    );
+    expect(normalizeSql(prismaSqlText(clauses.session))).not.toContain("<=");
+    expect(normalizeSql(prismaSqlText(clauses.event))).toContain(
+      'AND e."created_at" <'
+    );
+  });
+});
+
+describe("overviewEnvironmentSessionCountSql", () => {
+  const since = new Date("2026-07-16T02:00:00.000Z");
+  const until = new Date("2026-07-17T02:00:00.000Z");
+  const previousUntil = since;
+
+  it("keeps AND before session upper bound (Sentry 42601 near s)", () => {
+    // Mirrors GET /api/overview?range=24h&environment=development&… compare window.
+    const sql = overviewEnvironmentSessionCountSql(
+      {
+        projectId: "proj_1",
+        since,
+        until,
+        environment: "development",
+      },
+      previousUntil
+    );
+    const text = normalizeSql(prismaSqlText(sql));
+
+    // Regression: missing AND produced `... >= <date> s."started_at" < ...` (42601 near "s").
+    expect(text).toMatch(/s\."started_at" >= .+ AND s\."started_at" </);
+    expect(text).not.toMatch(/started_at" >=\s+s\."started_at"/);
+    expect(text).toMatch(/e\."created_at" >= .+ AND e\."created_at" </);
+    expect(text).not.toMatch(/created_at" >=\s+e\."created_at"/);
+    expect(text).toContain('s."environment" =');
+  });
+
+  it("keeps AND for inclusive until on the current metrics window", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "development",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toMatch(/s\."started_at" >= .+ AND s\."started_at" <=/);
+    expect(text).toMatch(/e\."created_at" >= .+ AND e\."created_at" <=/);
   });
 });
 
