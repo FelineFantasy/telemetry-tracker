@@ -445,7 +445,10 @@ export function applyNotificationFeedFilters(
     next = next.filter((item) => allowed.has(item.type));
   }
   if (filters.projectId) {
-    next = next.filter((item) => item.projectId === filters.projectId);
+    const filterId = filters.projectId.toLowerCase();
+    next = next.filter(
+      (item) => item.projectId != null && item.projectId.toLowerCase() === filterId
+    );
   }
   return next;
 }

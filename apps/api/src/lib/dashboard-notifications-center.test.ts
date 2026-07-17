@@ -81,6 +81,22 @@ describe("applyNotificationFeedFilters", () => {
       applyNotificationFeedFilters(sampleItems, { projectId: "p1" }).map((i) => i.id)
     ).toEqual(["issue:1"]);
   });
+
+  it("matches projectId case-insensitively", () => {
+    const mixedCase: DashboardNotificationItem[] = [
+      {
+        ...sampleItems[0],
+        id: "issue:uuid",
+        projectId: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE",
+      },
+      sampleItems[2],
+    ];
+    expect(
+      applyNotificationFeedFilters(mixedCase, {
+        projectId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      }).map((i) => i.id)
+    ).toEqual(["issue:uuid"]);
+  });
 });
 
 describe("buildOrganizationDashboardNotifications", () => {

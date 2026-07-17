@@ -168,7 +168,6 @@ export function NotificationsCenterClient({
         const result = await setDashboardProjectId(targetProjectId);
         if (!result.ok) {
           toast.error(result.error || "Could not switch project");
-          push(href);
           return;
         }
         await replaceAndRefresh(href, {
