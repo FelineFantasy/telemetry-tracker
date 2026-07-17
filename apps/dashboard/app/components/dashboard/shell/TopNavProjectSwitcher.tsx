@@ -13,10 +13,7 @@ import {
   recordRecentProject,
   togglePinnedProject,
 } from "@/lib/project-picker-prefs";
-import {
-  formatProjectRailName,
-  LEGACY_SEEDED_PROJECT_NAME,
-} from "@/lib/workspace-placeholders";
+import { formatProjectRailName } from "@/lib/workspace-placeholders";
 import type { ProjectOption } from "@/lib/dashboard-workspace-types";
 import { searchInputClassName } from "@/lib/input-classes";
 import { cn } from "@/lib/utils";
@@ -24,7 +21,11 @@ import { DashboardPopover, ShellKbd } from "./DashboardPopover";
 import { NavPickerSection } from "./NavPickerSection";
 import { ProjectStatusDot } from "./ProjectStatusDot";
 import { NavPickerTrigger } from "./shell-primitives";
-import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
+import {
+  ORGANIZATION_SETTINGS_NEW_PROJECT_URL,
+  ORGANIZATION_SETTINGS_PATH,
+} from "@/app/components/OrganizationSettingsNewProjectParam";
+import { scrollToSectionId } from "@/app/components/ScrollToHash";
 
 const IDLE_SUMMARY: ProjectNavSummary = {
   projectId: "",
@@ -224,17 +225,21 @@ export function TopNavProjectSwitcher({
               </p>
             ) : null}
 
-            {current.name === LEGACY_SEEDED_PROJECT_NAME && current.slug === "default" ? (
-              <p className="px-4 pb-2 text-[12px] text-muted-foreground">
-                <Link
-                  href="/dashboard/settings/organization"
-                  onClick={close}
-                  className="text-brand hover:underline"
-                >
-                  Rename this project
-                </Link>
-              </p>
-            ) : null}
+            <p className="px-4 pb-2 text-[12px] text-muted-foreground">
+              <Link
+                href={`${ORGANIZATION_SETTINGS_PATH}#rename-project-${current.id}`}
+                onClick={() => {
+                  close();
+                  // Same pathname: ScrollToHash only re-runs on route change; scroll now.
+                  if (pathname === ORGANIZATION_SETTINGS_PATH) {
+                    scrollToSectionId(`rename-project-${current.id}`);
+                  }
+                }}
+                className="text-brand hover:underline"
+              >
+                Rename this project
+              </Link>
+            </p>
           </div>
 
           <div className="border-t border-border p-1.5">

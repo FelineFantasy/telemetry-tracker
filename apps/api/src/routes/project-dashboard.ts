@@ -60,6 +60,10 @@ import {
   recordOrganizationAuditEvent,
 } from "../lib/audit-log.js";
 import { listOrganizationIntegrations } from "../lib/organization-integrations.js";
+import {
+  ensureUniqueProjectSlug,
+  slugifyProjectName,
+} from "../lib/project-slug.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -69,52 +73,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const INVITE_DAYS = 7;
-
-function slugifyProjectName(name: string): string {
-  const s = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-  return s || "project";
-}
-
-const MAX_SLUG_LEN = 64;
-/** Max stem length so `${stem}-${n}` fits in MAX_SLUG_LEN without truncating the counter into identical slugs. */
-const SLUG_STEM_MAX = 52;
-
-/**
- * Allocate a unique `slug` per org. Long `base` values are truncated to `SLUG_STEM_MAX` before appending
- * `-1`, `-2`, … so `.slice(0, 64)` cannot repeat the same string forever (see slug collision bug).
- */
-async function ensureUniqueSlug(orgId: string, base: string): Promise<string> {
-  const stem =
-    (base.length <= SLUG_STEM_MAX ? base : base.slice(0, SLUG_STEM_MAX)).replace(
-      /-+$/g,
-    "") || "project";
-  let n = 0;
-  while (n < 1_000_000) {
-    const slug =
-      n === 0 ? stem : `${stem}-${n}`.slice(0, MAX_SLUG_LEN);
-    // `@@unique([organization_id, slug])` applies to soft-deleted rows too — must not reuse.
-    const clash = await prisma.project.findFirst({
-      where: { organization_id: orgId, slug },
-      select: { id: true },
-    });
-    if (!clash) return slug;
-    n += 1;
-  }
-  for (let attempt = 0; attempt < 32; attempt++) {
-    const suffix = randomBytes(5).toString("hex");
-    const slug = `${stem}-${suffix}`.slice(0, MAX_SLUG_LEN);
-    const clash = await prisma.project.findFirst({
-      where: { organization_id: orgId, slug },
-      select: { id: true },
-    });
-    if (!clash) return slug;
-  }
-  throw new Error("Could not allocate unique project slug");
-}
 
 function parseOrgRole(raw: unknown): OrgRole | null {
   if (raw === "OWNER" || raw === "EDITOR" || raw === "VIEWER") return raw;
@@ -383,7 +341,7 @@ export async function projectDashboardRoutes(
       typeof body.slug === "string" && body.slug.trim() !== ""
         ? slugifyProjectName(body.slug.trim())
         : slugifyProjectName(name);
-    const slug = await ensureUniqueSlug(orgId, slugBase);
+    const slug = await ensureUniqueProjectSlug(prisma, orgId, slugBase);
 
     const created = await createProjectWithPlanLimitCheck(prisma, orgId, { name, slug });
     if (!created.ok) {
@@ -402,6 +360,139 @@ export async function projectDashboardRoutes(
       organizationId: project.organization_id,
     });
   });
+
+  app.patch<{ Params: { projectId: string } }>(
+    "/meta/projects/:projectId",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const projectId = request.params.projectId.trim();
+      if (!UUID_RE.test(projectId)) {
+        return reply.status(400).send({ error: "Invalid project id" });
+      }
+      const existing = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          deleted_at: null,
+          organization: { deleted_at: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          organization_id: true,
+        },
+      });
+      if (!existing) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+      const role = await getMembershipRoleForOrganization(
+        session.userId,
+        existing.organization_id
+      );
+      if (!canCreateProject(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+
+      const body = (request.body ?? {}) as { name?: string; slug?: string };
+      const nameProvided = typeof body.name === "string";
+      const slugProvided = typeof body.slug === "string";
+      if (!nameProvided && !slugProvided) {
+        return reply
+          .status(400)
+          .send({ error: "name or slug is required" });
+      }
+
+      let nextName = existing.name;
+      if (nameProvided) {
+        const trimmed = body.name!.trim().slice(0, 120);
+        if (!trimmed) {
+          return reply.status(400).send({ error: "name cannot be empty" });
+        }
+        nextName = trimmed;
+      }
+
+      let nextSlug = existing.slug;
+      if (slugProvided) {
+        const raw = body.slug!.trim();
+        if (!raw) {
+          return reply.status(400).send({ error: "slug cannot be empty" });
+        }
+        const desired = slugifyProjectName(raw);
+        if (desired !== existing.slug) {
+          const clash = await prisma.project.findFirst({
+            where: {
+              organization_id: existing.organization_id,
+              slug: desired,
+              id: { not: projectId },
+            },
+            select: { id: true },
+          });
+          if (clash) {
+            return reply
+              .status(409)
+              .send({ error: "slug already in use in this organization" });
+          }
+          nextSlug = desired;
+        }
+      }
+
+      if (nextName === existing.name && nextSlug === existing.slug) {
+        return reply.send({
+          id: existing.id,
+          name: existing.name,
+          slug: existing.slug,
+          organizationId: existing.organization_id,
+        });
+      }
+
+      let updated: {
+        id: string;
+        name: string;
+        slug: string;
+        organization_id: string;
+      };
+      try {
+        updated = await prisma.project.update({
+          where: { id: projectId },
+          data: { name: nextName, slug: nextSlug },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organization_id: true,
+          },
+        });
+      } catch (e: unknown) {
+        if (
+          typeof e === "object" &&
+          e !== null &&
+          "code" in e &&
+          (e as { code: string }).code === "P2002"
+        ) {
+          return reply
+            .status(409)
+            .send({ error: "slug already in use in this organization" });
+        }
+        throw e;
+      }
+
+      void recordOrganizationAuditEvent(
+        prisma,
+        existing.organization_id,
+        session.userId,
+        AUDIT_ACTIONS.PROJECT_UPDATE,
+        `project:${updated.id} name=${updated.name} slug=${updated.slug}`
+      );
+
+      return reply.send({
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        organizationId: updated.organization_id,
+      });
+    }
+  );
 
   app.post<{ Params: { orgId: string } }>(
     "/meta/organizations/:orgId/archive",
