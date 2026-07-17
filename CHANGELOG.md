@@ -15,11 +15,21 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Fixed
 
+### Changed
+
+### Database
+
+---
+
+## [1.14.4] - 2026-07-17
+
+### Fixed
+
 - **Alert webhook delivery on Node 24** — pinned HTTPS `lookup` now returns an address array when Node requests `{ all: true }`, fixing `Invalid IP address: undefined` delivery failures
 
 ### Changed
 
-### Database
+- **Release process** — document merge-only-when-required-checks-are-green and milestone close-out notes ([#526](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/526))
 
 ---
 
