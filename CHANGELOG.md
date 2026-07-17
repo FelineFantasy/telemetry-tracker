@@ -13,13 +13,53 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
-### Fixed
+- **Slack alert notifications** — add Slack Incoming Webhook destinations on Alerts → Delivery; worker POSTs Slack Block Kit–compatible JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Slack connected when an enabled Slack destination exists ([#223](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/223); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); builds on [#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225))
+- **Discord alert notifications** — add Discord webhook destinations on Alerts → Delivery; worker POSTs embed JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Discord connected when an enabled Discord destination exists ([#224](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/224); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+- **Telegram and Microsoft Teams alert channels** — add Teams Incoming Webhook and Telegram Bot API (`sendMessage` + chat id) destinations on Alerts → Delivery; Integrations catalog marks each connected when an enabled destination exists ([#500](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/500); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
 
-- **Navigation overlay** — profile/settings links from the user menu, quick actions, and theme entry use the shared nav loader; soft navigations keep the overlay visible for a short minimum so fast settings pages still show it
+### Fixed
 
 ### Changed
 
 ### Database
+
+- `ProjectWebhook.provider` (`GENERIC` | `SLACK` | `DISCORD` | `MICROSOFT_TEAMS` | `TELEGRAM`) and optional `config` JSON for provider-specific non-secret settings (e.g. Telegram chat id)
+
+---
+
+## [1.14.2] - 2026-07-17
+
+### Added
+
+- **Email alert delivery** — branded templates for error spike, new error, quota near/exceeded, and generic/custom alerts; per-project email recipients (roles + additional addresses) on Alerts → Email recipients; quiet hours apply to email as well as in-app; temporary mute and digest preference hooks in Settings → Notifications ([#499](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/499); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+---
+
+## [1.14.1] - 2026-07-17
+
+### Added
+
+- **Notification Center** — `/dashboard/notifications` inbox with day grouping, read/unread, project and type filters, and links into the dashboard; bell feed gains a “View all” entry while remaining the compact active-project preview ([#508](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/508); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+---
+
+## [1.14.0] - 2026-07-17
+
+### Added
+
+- **Alert webhooks** — configure HTTPS destinations per project on Alerts → Delivery; `fireProjectAlert` enqueues durable `PENDING` deliveries (worker POSTs signed `alert.fired` JSON with DNS-pinned SSRF checks + retry); operators can browse delivery status in the same Delivery section ([#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+### Database
+
+- `ProjectWebhook` and `AlertWebhookDelivery` tables for outbound alert webhook destinations; delivery rows use claim/lease fields (`PENDING`/`PROCESSING`, `lease_owner`, `lease_expires_at`, `next_attempt_at`) plus attempt/dead-letter history
+
+---
+
+## [1.13.2] - 2026-07-17
+
+### Fixed
+
+- **Navigation overlay** — profile/settings links from the user menu, quick actions, and theme entry use the shared nav loader; soft navigations keep the overlay visible for a short minimum so fast settings pages still show it ([#503](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/503))
 
 ---
 
@@ -168,6 +208,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Time range picker** — clearer copy when the table is unfiltered but charts use a recent window ([#422](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/422), [#427](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/427))
 
 ---
+
+## [1.8.11] - 2026-07-14
 
 ### Added
 
@@ -619,7 +661,9 @@ Continues the **v1.5.0 — Analytics dashboard** milestone ([#182](https://githu
 
 ---
 
-First release of the **v1.5.0 — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
+## [1.5.0] - 2026-07-07
+
+First release of the **v1.5.x — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
 
 ### Added
 

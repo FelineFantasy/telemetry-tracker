@@ -4,6 +4,7 @@ import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "./notification-preferences.js";
 import {
   notifyOrganizationMembersByEmail,
+  notifyProjectMembersByEmail,
   sendNotificationEmailIfAllowed,
   sendOrganizationInviteEmail,
 } from "./notification-email-dispatch.js";
@@ -67,6 +68,96 @@ describe("notifyOrganizationMembersByEmail", () => {
   });
 });
 
+describe("notifyProjectMembersByEmail", () => {
+  it("skips fan-out when project email delivery is disabled", async () => {
+    const { sendTransactionalEmail } = await import("./email.js");
+    const sendMock = vi.mocked(sendTransactionalEmail);
+    sendMock.mockClear();
+
+    const prisma = {
+      project: {
+        findFirst: vi.fn(async () => ({
+          organization_id: "org-1",
+          name: "Demo",
+          alert_settings: {
+            errorSpike: { enabled: true, threshold: 25, windowMinutes: 15 },
+            quota: { enabled: true, nearPercent: 90 },
+            email: { enabled: false, roles: ["OWNER"], additionalEmails: [] },
+          },
+        })),
+      },
+      organizationMembership: { findMany: vi.fn() },
+      user: { findMany: vi.fn() },
+      notificationEmailLog: { createMany: vi.fn(), delete: vi.fn() },
+    } as never;
+
+    await notifyProjectMembersByEmail(prisma, "proj-1", teamItem);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("sends additional non-member emails", async () => {
+    const { sendTransactionalEmail } = await import("./email.js");
+    const sendMock = vi.mocked(sendTransactionalEmail);
+    sendMock.mockClear();
+    sendMock.mockResolvedValue({ sent: true });
+
+    const createMany = vi.fn(async () => ({ count: 1 }));
+    const prisma = {
+      project: {
+        findFirst: vi.fn(async () => ({
+          organization_id: "org-1",
+          name: "Demo",
+          alert_settings: {
+            errorSpike: { enabled: true, threshold: 25, windowMinutes: 15 },
+            quota: { enabled: true, nearPercent: 90 },
+            email: {
+              enabled: true,
+              roles: ["OWNER"],
+              additionalEmails: ["pager@example.com"],
+            },
+          },
+        })),
+      },
+      organizationMembership: {
+        findMany: vi.fn(async () => [
+          {
+            user: {
+              id: "owner-1",
+              email: "owner@example.com",
+              notification_preferences: emailEnabledPrefs,
+            },
+          },
+        ]),
+      },
+      user: {
+        findMany: vi.fn(async () => []),
+      },
+      notificationEmailLog: {
+        createMany,
+        delete: vi.fn(),
+      },
+    } as never;
+
+    const alertItem: DashboardNotificationItem = {
+      id: "alert:error_spike:p1:15:1",
+      type: "alert",
+      title: "Error spike detected",
+      body: "Many errors",
+      occurredAt: new Date().toISOString(),
+      href: "/dashboard/errors",
+    };
+
+    await notifyProjectMembersByEmail(prisma, "proj-1", alertItem, {
+      rule: "ERROR_SPIKE",
+    });
+
+    expect(createMany).toHaveBeenCalled();
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "pager@example.com" })
+    );
+  });
+});
+
 describe("sendNotificationEmailIfAllowed", () => {
   it("claims dedupe row before sending email", async () => {
     const createMany = vi.fn(async () => ({ count: 1 }));
@@ -93,6 +184,30 @@ describe("sendNotificationEmailIfAllowed", () => {
     expect(deleteMock).not.toHaveBeenCalled();
   });
 
+  it("skips send when email channel is disabled", async () => {
+    const { sendTransactionalEmail } = await import("./email.js");
+    const sendMock = vi.mocked(sendTransactionalEmail);
+    sendMock.mockClear();
+
+    const prisma = {
+      notificationEmailLog: {
+        createMany: vi.fn(async () => ({ count: 1 })),
+        delete: vi.fn(),
+      },
+    } as unknown as Parameters<typeof sendNotificationEmailIfAllowed>[0];
+
+    const sent = await sendNotificationEmailIfAllowed(
+      prisma,
+      "user-1",
+      "user@example.com",
+      teamItem,
+      DEFAULT_NOTIFICATION_PREFERENCES
+    );
+
+    expect(sent).toBe(false);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
   it("skips send when dedupe row already exists", async () => {
     const { sendTransactionalEmail } = await import("./email.js");
     const sendMock = vi.mocked(sendTransactionalEmail);
@@ -110,7 +225,7 @@ describe("sendNotificationEmailIfAllowed", () => {
       "user-1",
       "user@example.com",
       teamItem,
-      DEFAULT_NOTIFICATION_PREFERENCES
+      emailEnabledPrefs
     );
 
     expect(sent).toBe(false);

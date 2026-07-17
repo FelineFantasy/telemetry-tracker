@@ -255,6 +255,8 @@ model Project {
   /// Project deny-list keys for ingest PII scrubbing (see docs/PII-SCRUBBING.md).
   pii_scrub_settings Json?       @map("pii_scrub_settings")
   alert_events    AlertEvent[]
+  webhooks        ProjectWebhook[]
+  webhook_deliveries AlertWebhookDelivery[]
   source_map_artifacts SourceMapArtifact[]
   brief_acknowledgements BriefAcknowledgement[]
 
@@ -327,9 +329,81 @@ model AlertEvent {
   href        String?
   dedupe_key  String        @map("dedupe_key")
   fired_at    DateTime      @default(now()) @map("fired_at")
+  webhook_deliveries AlertWebhookDelivery[]
 
   @@unique([project_id, dedupe_key])
   @@index([project_id, fired_at])
+}
+
+/// Outbound HTTPS webhook destination for project alert events (#225).
+/// Destination format for outbound alert deliveries (#225 generic; #223/#224/#500 chat).
+enum AlertWebhookProvider {
+  GENERIC
+  SLACK
+  DISCORD
+  MICROSOFT_TEAMS
+  TELEGRAM
+}
+
+model ProjectWebhook {
+  id              String               @id @default(uuid())
+  project_id      String               @map("project_id")
+  project         Project              @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  /// HTTPS URL (validated on write). May contain a provider-issued secret path segment.
+  url             String
+  /// Delivery payload format / first-party channel (#223 Slack, #224 Discord, #500 Teams/Telegram).
+  provider        AlertWebhookProvider @default(GENERIC)
+  /// Provider-specific non-secret config (e.g. Telegram `chatId`). Secrets stay in `url`.
+  config          Json?
+  /// Optional HMAC-SHA256 signing secret (plaintext; protect DB access). Null = unsigned.
+  /// Chat providers (Slack/Discord/Teams/Telegram) typically leave this null.
+  signing_secret  String?              @map("signing_secret")
+  label           String?
+  enabled         Boolean              @default(true)
+  created_at      DateTime             @default(now()) @map("created_at")
+  updated_at      DateTime             @updatedAt @map("updated_at")
+  deleted_at      DateTime?            @map("deleted_at")
+  deliveries      AlertWebhookDelivery[]
+
+  @@index([project_id, enabled])
+  @@index([project_id, deleted_at])
+  @@index([project_id, provider, enabled])
+}
+
+enum AlertWebhookDeliveryStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  DEAD
+}
+
+/// Durable outbound alert webhook delivery queue + attempt / dead-letter log (#225).
+/// Enqueued as PENDING before fireProjectAlert returns; claimed by alert-webhook-worker.
+model AlertWebhookDelivery {
+  id               String                     @id @default(uuid())
+  webhook_id       String                     @map("webhook_id")
+  webhook          ProjectWebhook             @relation(fields: [webhook_id], references: [id], onDelete: Cascade)
+  project_id       String                     @map("project_id")
+  project          Project                    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  alert_event_id   String?                    @map("alert_event_id")
+  alert_event      AlertEvent?                @relation(fields: [alert_event_id], references: [id], onDelete: SetNull)
+  dedupe_key       String                     @map("dedupe_key")
+  /// Delivery attempts so far (0 while PENDING before first claim).
+  attempt          Int                        @default(0)
+  status           AlertWebhookDeliveryStatus @default(PENDING)
+  http_status      Int?                       @map("http_status")
+  error            String?
+  lease_owner      String?                    @map("lease_owner")
+  lease_expires_at DateTime?                  @map("lease_expires_at")
+  next_attempt_at  DateTime                   @default(now()) @map("next_attempt_at")
+  created_at       DateTime                   @default(now()) @map("created_at")
+  updated_at       DateTime                   @updatedAt @map("updated_at")
+
+  @@index([webhook_id, created_at])
+  @@index([project_id, created_at])
+  @@index([dedupe_key])
+  @@index([status, next_attempt_at, lease_expires_at])
 }
 
 model Event {

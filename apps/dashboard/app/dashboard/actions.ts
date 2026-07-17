@@ -798,18 +798,22 @@ export async function markNotificationsReadAction(
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/notifications");
   return { ok: true };
 }
 
-export async function markAllNotificationsReadAction(): Promise<
-  { ok: true } | { ok: false; error: string }
-> {
+export async function markAllNotificationsReadAction(options?: {
+  scope?: "project" | "organization";
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const res = await dashboardApiFetch(
     "/api/meta/notifications/read",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ all: true }),
+      body: JSON.stringify({
+        all: true,
+        ...(options?.scope === "organization" ? { scope: "organization" } : {}),
+      }),
     },
     await notificationApiFetchOptions()
   );
@@ -818,6 +822,7 @@ export async function markAllNotificationsReadAction(): Promise<
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/notifications");
   return { ok: true };
 }
 
@@ -841,6 +846,123 @@ export async function saveProjectAlertSettingsAction(
     revalidatePath("/dashboard/alerts");
     revalidatePath("/dashboard", "layout");
     return { ok: true, settings: parseProjectAlertSettings(data.settings) };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export type ProjectWebhookActionRow = {
+  id: string;
+  urlMasked: string;
+  label: string | null;
+  provider: "GENERIC" | "SLACK" | "DISCORD" | "MICROSOFT_TEAMS" | "TELEGRAM";
+  config: { chatId?: string } | null;
+  enabled: boolean;
+  hasSigningSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function createProjectWebhookAction(input: {
+  url: string;
+  label?: string;
+  withSigningSecret?: boolean;
+  provider?: ProjectWebhookActionRow["provider"];
+  config?: { chatId?: string };
+}): Promise<
+  | { ok: true; webhook: ProjectWebhookActionRow; signingSecret: string | null }
+  | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch("/api/project/webhooks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: input.url,
+      label: input.label ?? null,
+      provider: input.provider ?? "GENERIC",
+      config: input.config ?? undefined,
+      withSigningSecret: input.withSigningSecret,
+    }),
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as {
+      webhook?: ProjectWebhookActionRow;
+      signingSecret?: string | null;
+    };
+    if (!data.webhook) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return {
+      ok: true,
+      webhook: data.webhook,
+      signingSecret: data.signingSecret ?? null,
+    };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function updateProjectWebhookAction(
+  webhookId: string,
+  patch: { enabled?: boolean; label?: string | null }
+): Promise<{ ok: true; webhook: ProjectWebhookActionRow } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/webhooks/${encodeURIComponent(webhookId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { webhook?: ProjectWebhookActionRow };
+    if (!data.webhook) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return { ok: true, webhook: data.webhook };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function deleteProjectWebhookAction(
+  webhookId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/webhooks/${encodeURIComponent(webhookId)}`,
+    { method: "DELETE" }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  revalidatePath("/dashboard/alerts");
+  return { ok: true };
+}
+
+export async function testProjectWebhookAction(
+  webhookId: string
+): Promise<{ ok: true; httpStatus: number } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/webhooks/${encodeURIComponent(webhookId)}/test`,
+    { method: "POST" }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { httpStatus?: number };
+    return {
+      ok: true,
+      httpStatus: typeof data.httpStatus === "number" ? data.httpStatus : 200,
+    };
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }

@@ -170,14 +170,15 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
 
 ## Deploy runbook (Railway)
 
-Production uses **three Railway services** (+ optional Cron):
+Production uses **three Railway services** (+ optional workers/cron):
 
 | Service | Root directory | Builder |
 |---------|----------------|---------|
 | PostgreSQL | — | Railway Postgres |
 | API | `apps/api` | Railpack (not Dockerfile) |
 | Dashboard | repo root (empty) | Dockerfile |
-| Retention cron (optional) | `apps/api` | Cron → `pnpm exec tsx src/jobs/run-retention.ts` |
+| Retention cron (optional) | `apps/api` | Cron → `node dist/jobs/run-retention.js` |
+| Alert webhook worker (optional) | `apps/api` | Always-on → `node dist/jobs/run-alert-webhook-worker.js` |
 
 ### 1. Trigger deploy
 
@@ -250,6 +251,18 @@ node dist/jobs/run-retention.js
 
 Same `DATABASE_URL` as the API. See [RAILWAY.md](./RAILWAY.md#retention-cron).
 
+### 6. Alert webhook worker
+
+If alert webhooks are enabled, keep a continuous worker running (not cron):
+
+```bash
+node dist/jobs/run-alert-webhook-worker.js
+```
+
+Same `DATABASE_URL` as the API. Confirm logs show `"status":"idle"` (or processing)
+JSON. See [RAILWAY.md](./RAILWAY.md#alert-webhook-worker) and
+[ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md).
+
 ---
 
 ## Post-deploy verification
@@ -313,7 +326,7 @@ First production-ready self-hosted release. Full changelog: [CHANGELOG.md#100---
 **Known limitations:**
 
 - Per-project ingest RPS is in-memory (single API process)
-- No built-in error spike alerts
+- Project alert webhooks for spike/quota — see [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md)
 - Open sessions without `ended_at` are not pruned by retention until closed
 
 **Live reference deployment:** `telemetry-tracker.com` (dashboard) / `api.telemetry-tracker.com` (API). Legacy: `telemetry-api.tacko.io`, `telemetry-tracker.tacko.io`.

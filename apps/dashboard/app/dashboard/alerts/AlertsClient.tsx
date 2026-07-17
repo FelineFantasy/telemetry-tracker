@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
+  createProjectWebhookAction,
+  deleteProjectWebhookAction,
   saveProjectAlertSettingsAction,
   saveProjectPiiScrubSettingsAction,
+  testProjectWebhookAction,
+  updateProjectWebhookAction,
 } from "@/app/dashboard/actions";
 import {
   AnalyticsPanel,
@@ -27,8 +31,11 @@ import {
 } from "@/app/components/dashboard/settings/settings-ui";
 import {
   alertSettingsEqual,
+  formatAdditionalEmailsInput,
+  parseAdditionalEmailsInput,
   ruleLabel,
   type AlertEventRow,
+  type ProjectAlertEmailRole,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
@@ -39,16 +46,94 @@ import {
   type ProjectPiiScrubSettings,
 } from "@/lib/pii-scrub-settings";
 import { formatRelativeTime } from "@/lib/format-time";
+import type {
+  AlertWebhookDeliveryRow,
+  AlertWebhookProvider,
+  ProjectWebhookRow,
+} from "@/lib/project-webhooks";
+
+function providerLabel(provider: AlertWebhookProvider): string {
+  switch (provider) {
+    case "GENERIC":
+      return "Webhook";
+    case "SLACK":
+      return "Slack";
+    case "DISCORD":
+      return "Discord";
+    case "MICROSOFT_TEAMS":
+      return "Microsoft Teams";
+    case "TELEGRAM":
+      return "Telegram";
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Channels exposed in Alerts → Delivery for this milestone PR. */
+const DELIVERY_PROVIDER_OPTIONS: {
+  value: AlertWebhookProvider;
+  label: string;
+  urlPlaceholder: string;
+}[] = [
+  {
+    value: "GENERIC",
+    label: "HTTPS webhook",
+    urlPlaceholder: "https://hooks.example.com/alerts",
+  },
+  {
+    value: "SLACK",
+    label: "Slack",
+    urlPlaceholder: "https://hooks.slack.com/services/T…/B…/…",
+  },
+  {
+    value: "DISCORD",
+    label: "Discord",
+    urlPlaceholder: "https://discord.com/api/webhooks/…/…",
+  },
+  {
+    value: "MICROSOFT_TEAMS",
+    label: "Microsoft Teams",
+    urlPlaceholder: "https://….webhook.office.com/webhookb2/…",
+  },
+  {
+    value: "TELEGRAM",
+    label: "Telegram",
+    urlPlaceholder: "https://api.telegram.org/bot<token>/sendMessage",
+  },
+];
+
+function deliveryStatusLabel(status: AlertWebhookDeliveryRow["status"]): string {
+  switch (status) {
+    case "PENDING":
+      return "Pending";
+    case "PROCESSING":
+      return "Sending";
+    case "SUCCESS":
+      return "Success";
+    case "FAILED":
+      return "Failed";
+    case "DEAD":
+      return "Dead";
+    default:
+      return status;
+  }
+}
 
 export function AlertsClient({
   initialSettings,
   initialEvents,
+  initialWebhooks,
+  initialDeliveries,
   initialPiiSettings,
   piiSettingsLoadError = null,
   canEdit,
 }: {
   initialSettings: ProjectAlertSettings;
   initialEvents: AlertEventRow[];
+  initialWebhooks: ProjectWebhookRow[];
+  initialDeliveries: AlertWebhookDeliveryRow[];
   initialPiiSettings: ProjectPiiScrubSettings;
   /** When set, PII section is read-only — do not save (avoids wiping deny-keys). */
   piiSettingsLoadError?: string | null;
@@ -57,7 +142,18 @@ export function AlertsClient({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [piiPending, startPiiTransition] = useTransition();
+  const [webhookPending, startWebhookTransition] = useTransition();
   const [settings, setSettings] = useState(initialSettings);
+  const [webhooks, setWebhooks] = useState(initialWebhooks);
+  const [webhookProvider, setWebhookProvider] =
+    useState<AlertWebhookProvider>("GENERIC");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookLabel, setWebhookLabel] = useState("");
+  const [telegramChatId, setTelegramChatId] = useState("");
+  const [lastSigningSecret, setLastSigningSecret] = useState<{
+    webhookId: string;
+    secret: string;
+  } | null>(null);
   const [denyKeysText, setDenyKeysText] = useState(() =>
     formatDenyKeysInput(initialPiiSettings.denyKeys)
   );
@@ -68,6 +164,13 @@ export function AlertsClient({
     normalizeProjectPiiScrubSettings(initialPiiSettings)
   );
   const piiEditable = canEdit && !piiSettingsLoadError;
+
+  useEffect(() => {
+    setWebhooks(initialWebhooks);
+    setLastSigningSecret((prev) =>
+      prev && initialWebhooks.some((w) => w.id === prev.webhookId) ? prev : null
+    );
+  }, [initialWebhooks]);
 
   // After router.refresh(), props can recover from a failed load while useState
   // still holds fallback defaults — resync so a later save cannot wipe real keys.
@@ -150,11 +253,79 @@ export function AlertsClient({
     });
   }
 
+  function addWebhook() {
+    startWebhookTransition(async () => {
+      const result = await createProjectWebhookAction({
+        url: webhookUrl,
+        label: webhookLabel.trim() || undefined,
+        provider: webhookProvider,
+        withSigningSecret: webhookProvider === "GENERIC" ? true : false,
+        config:
+          webhookProvider === "TELEGRAM"
+            ? { chatId: telegramChatId.trim() }
+            : undefined,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setWebhooks((prev) => [...prev, result.webhook]);
+      setWebhookUrl("");
+      setWebhookLabel("");
+      setTelegramChatId("");
+      setLastSigningSecret(
+        result.signingSecret
+          ? { webhookId: result.webhook.id, secret: result.signingSecret }
+          : null
+      );
+      toast.success(`${providerLabel(webhookProvider)} destination added`);
+      router.refresh();
+    });
+  }
+
+  function toggleWebhook(id: string, enabled: boolean) {
+    startWebhookTransition(async () => {
+      const result = await updateProjectWebhookAction(id, { enabled });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setWebhooks((prev) => prev.map((w) => (w.id === id ? result.webhook : w)));
+    });
+  }
+
+  function removeWebhook(id: string) {
+    startWebhookTransition(async () => {
+      const result = await deleteProjectWebhookAction(id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setWebhooks((prev) => prev.filter((w) => w.id !== id));
+      setLastSigningSecret((prev) => (prev?.webhookId === id ? null : prev));
+      toast.success("Webhook removed");
+      router.refresh();
+    });
+  }
+
+  function testWebhook(id: string) {
+    startWebhookTransition(async () => {
+      const result = await testProjectWebhookAction(id);
+      if (!result.ok) {
+        toast.error(result.error);
+        router.refresh();
+        return;
+      }
+      toast.success(`Test delivered (HTTP ${result.httpStatus})`);
+      router.refresh();
+    });
+  }
+
   return (
     <>
       <SettingsPageHeader
         title="Alerts"
-        description="Threshold rules for the active project. Fired alerts appear in the notification bell and can email owners and editors."
+        description="Threshold rules for the active project. Fired alerts appear in the notification bell, email configured recipients, and POST to configured webhooks."
         actions={
           canEdit ? (
             <SettingsBtn variant="primary" disabled={!dirty || pending} onClick={save}>
@@ -275,16 +446,336 @@ export function AlertsClient({
         </Section>
 
         <Section
-          title="Delivery"
-          description="Email delivery uses your notification preferences. Webhooks and Slack are planned for a future release."
+          title="Email recipients"
+          description="Who receives this project's alert emails (spike/quota) and new-error emails. Alert mail uses the Alerts email route; new-error mail uses the Issues route — both still need the global email channel on."
         >
-          <p className="text-[13px] text-muted-foreground">
-            Configure in-app and email routing under{" "}
+          <FieldGroup>
+            <Field label="Send alert emails for this project">
+              <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
+                <SettingsToggle
+                  on={settings.email.enabled}
+                  onChange={(enabled) =>
+                    setSettings((s) => ({
+                      ...s,
+                      email: { ...s.email, enabled },
+                    }))
+                  }
+                />
+              </div>
+            </Field>
+            <Field label="Include org roles">
+              <div
+                className={`flex flex-wrap gap-3 ${canEdit && settings.email.enabled ? "" : "pointer-events-none opacity-50"}`}
+              >
+                {(
+                  [
+                    { id: "OWNER" as const, label: "Owners" },
+                    { id: "EDITOR" as const, label: "Editors" },
+                    { id: "VIEWER" as const, label: "Viewers" },
+                  ] satisfies { id: ProjectAlertEmailRole; label: string }[]
+                ).map((role) => {
+                  const on = settings.email.roles.includes(role.id);
+                  return (
+                    <label
+                      key={role.id}
+                      className="flex items-center gap-2 text-[13px]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        disabled={!canEdit || !settings.email.enabled}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSettings((s) => {
+                            const next = new Set(s.email.roles);
+                            if (checked) next.add(role.id);
+                            else next.delete(role.id);
+                            const roles = [...next] as ProjectAlertEmailRole[];
+                            if (roles.length === 0) return s;
+                            return {
+                              ...s,
+                              email: { ...s.email, roles },
+                            };
+                          });
+                        }}
+                      />
+                      {role.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="Additional emails (optional)">
+              <SettingsTextarea
+                value={formatAdditionalEmailsInput(settings.email.additionalEmails)}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    email: {
+                      ...s.email,
+                      additionalEmails: parseAdditionalEmailsInput(e.target.value),
+                    },
+                  }))
+                }
+                disabled={!canEdit || !settings.email.enabled}
+                placeholder={"ops@example.com\noncall@example.com"}
+                rows={3}
+                className="max-w-xl font-mono text-[12px]"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Up to 10 addresses, one per line. Registered accounts respect their
+                notification preferences (Alerts for alert mail, Issues for new
+                errors); unknown addresses receive project alert/new-error mail
+                directly.
+              </p>
+            </Field>
+          </FieldGroup>
+          <p className="mt-3 text-[13px] text-muted-foreground">
+            Per-user routing lives under{" "}
             <Link href="/dashboard/settings/notifications" className="text-brand hover:underline">
               Notification settings
             </Link>
-            . Alert notifications use the Alerts category.
+            .
           </p>
+        </Section>
+
+        <Section
+          title="Delivery"
+          description="HTTPS webhooks and chat destinations (Slack, Discord, Teams, Telegram) receive a message when an alert fires."
+        >
+          <p className="mb-3 text-[13px] text-muted-foreground">
+            Generic webhook payload schema lives in{" "}
+            <code className="font-mono text-[11px]">docs/ALERT-WEBHOOKS.md</code>.
+            Chat channels use provider-native payloads (Incoming Webhooks or Telegram Bot API).
+          </p>
+
+          {lastSigningSecret ? (
+            <div
+              className="mb-3 rounded-md border border-border bg-surface/40 p-3"
+              role="status"
+            >
+              <p className="text-[12px] font-medium text-foreground">
+                Signing secret (copy now — shown once)
+              </p>
+              <code className="mt-1 block break-all font-mono text-[11px] text-muted-foreground">
+                {lastSigningSecret.secret}
+              </code>
+              <button
+                type="button"
+                className="mt-2 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={() => setLastSigningSecret(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
+          {webhooks.length > 0 ? (
+            <ul className="mb-4 divide-y divide-border rounded-md border border-border">
+              {webhooks.map((wh) => (
+                <li
+                  key={wh.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium">
+                      {wh.label?.trim() || providerLabel(wh.provider)}
+                      <span className="ml-2 rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] font-normal text-muted-foreground">
+                        {providerLabel(wh.provider)}
+                      </span>
+                    </p>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">
+                      {wh.urlMasked}
+                      {wh.hasSigningSecret ? " · signed" : ""}
+                      {wh.provider === "TELEGRAM" && wh.config?.chatId
+                        ? ` · chat ${wh.config.chatId}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
+                      <SettingsToggle
+                        on={wh.enabled}
+                        onChange={(enabled) => toggleWebhook(wh.id, enabled)}
+                        disabled={!canEdit || webhookPending}
+                      />
+                    </div>
+                    {canEdit ? (
+                      <>
+                        <SettingsBtn
+                          variant="outline"
+                          disabled={webhookPending}
+                          onClick={() => testWebhook(wh.id)}
+                        >
+                          Test
+                        </SettingsBtn>
+                        <SettingsBtn
+                          variant="outline"
+                          disabled={webhookPending}
+                          onClick={() => removeWebhook(wh.id)}
+                        >
+                          Remove
+                        </SettingsBtn>
+                      </>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mb-3 text-[13px] text-muted-foreground">
+              No delivery destinations configured for this project yet.
+            </p>
+          )}
+
+          {canEdit ? (
+            <FieldGroup>
+              <Field label="Channel">
+                <select
+                  value={webhookProvider}
+                  onChange={(e) =>
+                    setWebhookProvider(e.target.value as AlertWebhookProvider)
+                  }
+                  disabled={webhookPending}
+                  className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"
+                >
+                  {DELIVERY_PROVIDER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field
+                label={
+                  webhookProvider === "SLACK"
+                    ? "Slack Incoming Webhook URL"
+                    : webhookProvider === "DISCORD"
+                      ? "Discord webhook URL"
+                      : webhookProvider === "MICROSOFT_TEAMS"
+                        ? "Teams Incoming Webhook URL"
+                        : webhookProvider === "TELEGRAM"
+                          ? "Telegram Bot API sendMessage URL"
+                          : "HTTPS URL"
+                }
+              >
+                <input
+                  type="url"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  placeholder={
+                    DELIVERY_PROVIDER_OPTIONS.find((o) => o.value === webhookProvider)
+                      ?.urlPlaceholder ?? "https://…"
+                  }
+                  disabled={webhookPending}
+                  className="w-full max-w-xl rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] disabled:opacity-50"
+                />
+              </Field>
+              {webhookProvider === "TELEGRAM" ? (
+                <Field label="Chat id">
+                  <input
+                    type="text"
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="-100… or @channel"
+                    disabled={webhookPending}
+                    className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] disabled:opacity-50"
+                  />
+                </Field>
+              ) : null}
+              <Field label="Label (optional)">
+                <input
+                  type="text"
+                  value={webhookLabel}
+                  onChange={(e) => setWebhookLabel(e.target.value)}
+                  placeholder={
+                    webhookProvider === "SLACK"
+                      ? "#alerts"
+                      : webhookProvider === "DISCORD"
+                        ? "#ops"
+                        : webhookProvider === "MICROSOFT_TEAMS"
+                          ? "Ops channel"
+                          : webhookProvider === "TELEGRAM"
+                            ? "Ops chat"
+                            : "Ops channel"
+                  }
+                  disabled={webhookPending}
+                  className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"
+                />
+              </Field>
+              <div>
+                <SettingsBtn
+                  variant="primary"
+                  disabled={
+                    webhookPending ||
+                    webhookUrl.trim().length === 0 ||
+                    (webhookProvider === "TELEGRAM" &&
+                      telegramChatId.trim().length === 0)
+                  }
+                  onClick={addWebhook}
+                >
+                  {webhookPending
+                    ? "Saving…"
+                    : `Add ${providerLabel(webhookProvider).toLowerCase()}`}
+                </SettingsBtn>
+              </div>
+            </FieldGroup>
+          ) : null}
+
+          <div className="mt-6">
+            <p className="mb-2 text-[13px] font-medium text-foreground">
+              Recent deliveries
+            </p>
+            <p className="mb-3 text-[12px] text-muted-foreground">
+              Last 25 attempts (including tests). Failed retries are recorded before a final dead
+              letter.
+            </p>
+            {initialDeliveries.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground">No deliveries yet.</p>
+            ) : (
+              <AnalyticsPanel>
+                <AnalyticsPanelHeader
+                  title="Deliveries"
+                  description="Newest first"
+                />
+                <AnalyticsPanelList>
+                  {initialDeliveries.map((d) => (
+                    <li key={d.id} className="px-4 py-3 sm:px-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium">
+                            {d.webhookLabel?.trim() || "Destination"}
+                          </p>
+                          <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                            {d.webhookUrlMasked}
+                          </p>
+                          <p className="mt-1 text-[12px] text-muted-foreground">
+                            {d.error
+                              ? d.error
+                              : d.httpStatus != null
+                                ? `HTTP ${d.httpStatus}`
+                                : "No HTTP status"}
+                            {d.attempt > 1 ? ` · attempt ${d.attempt}` : ""}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span className="rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            {deliveryStatusLabel(d.status)}
+                          </span>
+                          <p
+                            className="mt-1 font-mono text-[10px] text-muted-foreground"
+                            title={d.createdAt}
+                          >
+                            {formatRelativeTime(d.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </AnalyticsPanelList>
+              </AnalyticsPanel>
+            )}
+          </div>
         </Section>
 
         <Section
