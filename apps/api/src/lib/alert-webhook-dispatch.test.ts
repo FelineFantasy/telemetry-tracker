@@ -309,7 +309,85 @@ describe("processNextAlertWebhookDelivery", () => {
     const updateMany = vi
       .fn()
       .mockResolvedValueOnce({ count: 1 }) // renew
-      .mockResolvedValueOnce({ count: 0 }); // complete missed
+      .mockResolvedValueOnce({ count: 0 }) // lease-scoped complete missed
+      .mockResolvedValueOnce({ count: 1 }); // finalize SUCCESS without lease
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 0,
+              status: "PENDING",
+              http_status: null,
+              error: null,
+              lease_owner: null,
+              lease_expires_at: null,
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: {
+            update: async () => ({
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "worker-1",
+              lease_expires_at: new Date("2026-07-17T12:01:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            }),
+          },
+        }),
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+          enabled: true,
+        }),
+      },
+      alertEvent: {
+        findUnique: async () => ({
+          rule: "ERROR_SPIKE",
+          title: "Spike",
+          body: "n",
+          href: null,
+          fired_at: new Date("2026-07-17T10:00:00.000Z"),
+        }),
+      },
+      alertWebhookDelivery: { updateMany },
+    };
+    const result = await processNextAlertWebhookDelivery({
+      prisma: prisma as never,
+      workerId: "worker-1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      sendImpl,
+    });
+    expect(result).toEqual({ status: "success", deliveryId: "d1" });
+    expect(sendImpl).toHaveBeenCalledOnce();
+    expect(updateMany).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports failure only when SUCCESS cannot be finalized after POST", async () => {
+    const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 }) // renew
+      .mockResolvedValueOnce({ count: 0 }) // lease-scoped complete
+      .mockResolvedValueOnce({ count: 0 }); // finalize also missed
     const prisma = {
       $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
         fn({
@@ -379,9 +457,8 @@ describe("processNextAlertWebhookDelivery", () => {
       status: "failed",
       deliveryId: "d1",
       terminal: "FAILED",
-      error: "Lease lost after successful delivery",
+      error: "Could not finalize successful delivery",
     });
-    expect(sendImpl).toHaveBeenCalledOnce();
   });
 
   it("skips POST when the lease cannot be renewed", async () => {

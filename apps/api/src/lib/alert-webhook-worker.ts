@@ -15,6 +15,7 @@ import {
   claimNextAlertWebhookDelivery,
   completeAlertWebhookDelivery,
   failAlertWebhookDeliveryAttempt,
+  finalizeAlertWebhookDeliverySuccess,
   renewAlertWebhookDeliveryLease,
   type AlertWebhookDeliveryJobRow,
 } from "./alert-webhook-delivery-job.js";
@@ -173,17 +174,24 @@ async function deliverClaimedAlertWebhook(
       workerId,
       httpStatus: result.httpStatus,
     });
-    if (!completed) {
-      // HTTP already succeeded; do not report success if the row was not finalized,
-      // or another worker may reclaim PROCESSING and POST again.
-      return {
-        status: "failed",
-        deliveryId: job.id,
-        terminal: "FAILED",
-        error: "Lease lost after successful delivery",
-      };
+    if (completed) {
+      return { status: "success", deliveryId: job.id };
     }
-    return { status: "success", deliveryId: job.id };
+    // HTTP already succeeded — still mark SUCCESS without the lease so the row
+    // cannot stay PROCESSING and be reclaimed for a duplicate POST.
+    const finalized = await finalizeAlertWebhookDeliverySuccess(deps.prisma, {
+      deliveryId: job.id,
+      httpStatus: result.httpStatus,
+    });
+    if (finalized) {
+      return { status: "success", deliveryId: job.id };
+    }
+    return {
+      status: "failed",
+      deliveryId: job.id,
+      terminal: "FAILED",
+      error: "Could not finalize successful delivery",
+    };
   }
 
   const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {

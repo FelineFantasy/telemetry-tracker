@@ -143,6 +143,30 @@ export async function completeAlertWebhookDelivery(
   return result.count > 0;
 }
 
+/**
+ * After a successful HTTP POST, finalize SUCCESS even if the worker lost its lease.
+ * Prevents a stuck PROCESSING row from being reclaimed and POSTed again.
+ */
+export async function finalizeAlertWebhookDeliverySuccess(
+  prisma: PrismaClient,
+  input: { deliveryId: string; httpStatus: number }
+): Promise<boolean> {
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      id: input.deliveryId,
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+    },
+    data: {
+      status: AlertWebhookDeliveryStatus.SUCCESS,
+      http_status: input.httpStatus,
+      error: null,
+      lease_owner: null,
+      lease_expires_at: null,
+    },
+  });
+  return result.count > 0;
+}
+
 export async function failAlertWebhookDeliveryAttempt(
   prisma: PrismaClient,
   input: {
