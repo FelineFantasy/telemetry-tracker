@@ -51,7 +51,25 @@ import type {
   AlertWebhookProvider,
   ProjectWebhookRow,
 } from "@/lib/project-webhooks";
-import { providerLabel } from "@/lib/project-webhooks";
+
+function providerLabel(provider: AlertWebhookProvider): string {
+  switch (provider) {
+    case "GENERIC":
+      return "Webhook";
+    case "SLACK":
+      return "Slack";
+    case "DISCORD":
+      return "Discord";
+    case "MICROSOFT_TEAMS":
+      return "Microsoft Teams";
+    case "TELEGRAM":
+      return "Telegram";
+    default: {
+      const _exhaustive: never = provider;
+      return _exhaustive;
+    }
+  }
+}
 
 /** Channels exposed in Alerts → Delivery for this milestone PR. */
 const DELIVERY_PROVIDER_OPTIONS: {

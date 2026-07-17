@@ -39,25 +39,6 @@ const PROVIDERS = new Set<string>([
   "TELEGRAM",
 ]);
 
-export function providerLabel(provider: AlertWebhookProvider): string {
-  switch (provider) {
-    case "GENERIC":
-      return "Webhook";
-    case "SLACK":
-      return "Slack";
-    case "DISCORD":
-      return "Discord";
-    case "MICROSOFT_TEAMS":
-      return "Microsoft Teams";
-    case "TELEGRAM":
-      return "Telegram";
-    default: {
-      const _exhaustive: never = provider;
-      return _exhaustive;
-    }
-  }
-}
-
 export async function fetchProjectWebhooks(): Promise<ProjectWebhookRow[]> {
   const res = await dashboardApiFetch("/api/project/webhooks");
   if (!res.ok) return [];
