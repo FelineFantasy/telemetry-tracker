@@ -49,6 +49,7 @@ export function inferNotificationEmailKind(
   if (rule === "ERROR_SPIKE") return "error_spike";
   if (rule === "QUOTA_NEAR") return "quota_near";
   if (rule === "QUOTA_EXCEEDED") return "quota_exceeded";
+  if (rule === "ALERT_RULE") return "custom_alert";
 
   if (item.type === "issue") return "new_error";
   if (item.type === "billing") return "billing";
@@ -60,9 +61,9 @@ export function inferNotificationEmailKind(
 
   if (item.type === "alert") {
     if (item.id.startsWith("alert:error_spike:")) return "error_spike";
+    if (item.id.startsWith("alert:rule:")) return "custom_alert";
     if (item.id.startsWith("quota:exceeded:")) return "quota_exceeded";
     if (item.id.startsWith("quota:near:")) return "quota_near";
-    // Future custom alert rules (#493) share this template until typed.
     return "custom_alert";
   }
 

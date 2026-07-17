@@ -24,6 +24,7 @@ const RULE_LABEL: Record<AlertRuleType, string> = {
   ERROR_SPIKE: "Error spike",
   QUOTA_NEAR: "Quota near limit",
   QUOTA_EXCEEDED: "Quota exceeded",
+  ALERT_RULE: "Alert rule",
 };
 
 /** Discord embed accent (blurple). */

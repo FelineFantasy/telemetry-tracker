@@ -21,7 +21,7 @@ export type ProjectAlertSettings = {
 
 export type AlertEventRow = {
   id: string;
-  rule: "ERROR_SPIKE" | "QUOTA_NEAR" | "QUOTA_EXCEEDED";
+  rule: "ERROR_SPIKE" | "QUOTA_NEAR" | "QUOTA_EXCEEDED" | "ALERT_RULE";
   title: string;
   body: string;
   href: string | null;
@@ -137,6 +137,8 @@ export function ruleLabel(rule: AlertEventRow["rule"]): string {
       return "Quota warning";
     case "QUOTA_EXCEEDED":
       return "Quota exceeded";
+    case "ALERT_RULE":
+      return "Alert rule";
     default:
       return rule;
   }

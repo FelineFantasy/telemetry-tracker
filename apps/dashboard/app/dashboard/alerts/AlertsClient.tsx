@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
+  createProjectAlertRuleAction,
   createProjectWebhookAction,
+  deleteProjectAlertRuleAction,
   deleteProjectWebhookAction,
   saveProjectAlertSettingsAction,
   saveProjectPiiScrubSettingsAction,
   testProjectWebhookAction,
+  updateProjectAlertRuleAction,
   updateProjectWebhookAction,
 } from "@/app/dashboard/actions";
 import {
@@ -38,6 +41,11 @@ import {
   type ProjectAlertEmailRole,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
+import {
+  formatAlertRuleSummary,
+  PROJECT_EMAIL_DESTINATION_ID,
+  type AlertRuleRow,
+} from "@/lib/alert-rules";
 import {
   formatDenyKeysInput,
   normalizeProjectPiiScrubSettings,
@@ -124,6 +132,7 @@ function deliveryStatusLabel(status: AlertWebhookDeliveryRow["status"]): string 
 export function AlertsClient({
   initialSettings,
   initialEvents,
+  initialRules,
   initialWebhooks,
   initialDeliveries,
   initialPiiSettings,
@@ -132,6 +141,7 @@ export function AlertsClient({
 }: {
   initialSettings: ProjectAlertSettings;
   initialEvents: AlertEventRow[];
+  initialRules: AlertRuleRow[];
   initialWebhooks: ProjectWebhookRow[];
   initialDeliveries: AlertWebhookDeliveryRow[];
   initialPiiSettings: ProjectPiiScrubSettings;
@@ -143,7 +153,9 @@ export function AlertsClient({
   const [pending, startTransition] = useTransition();
   const [piiPending, startPiiTransition] = useTransition();
   const [webhookPending, startWebhookTransition] = useTransition();
+  const [rulePending, startRuleTransition] = useTransition();
   const [settings, setSettings] = useState(initialSettings);
+  const [rules, setRules] = useState(initialRules);
   const [webhooks, setWebhooks] = useState(initialWebhooks);
   const [webhookProvider, setWebhookProvider] =
     useState<AlertWebhookProvider>("GENERIC");
@@ -154,6 +166,13 @@ export function AlertsClient({
     webhookId: string;
     secret: string;
   } | null>(null);
+  const [ruleName, setRuleName] = useState("");
+  const [ruleThreshold, setRuleThreshold] = useState(25);
+  const [ruleWindowMinutes, setRuleWindowMinutes] = useState(15);
+  const [ruleEnvironment, setRuleEnvironment] = useState("");
+  const [ruleCooldownMinutes, setRuleCooldownMinutes] = useState(15);
+  const [ruleEmail, setRuleEmail] = useState(true);
+  const [ruleDestinationIds, setRuleDestinationIds] = useState<string[]>([]);
   const [denyKeysText, setDenyKeysText] = useState(() =>
     formatDenyKeysInput(initialPiiSettings.denyKeys)
   );
@@ -169,6 +188,16 @@ export function AlertsClient({
     setWebhooks(initialWebhooks);
     setLastSigningSecret((prev) =>
       prev && initialWebhooks.some((w) => w.id === prev.webhookId) ? prev : null
+    );
+  }, [initialWebhooks]);
+
+  useEffect(() => {
+    setRules(initialRules);
+  }, [initialRules]);
+
+  useEffect(() => {
+    setRuleDestinationIds((prev) =>
+      prev.filter((id) => initialWebhooks.some((w) => w.id === id))
     );
   }, [initialWebhooks]);
 
@@ -302,8 +331,69 @@ export function AlertsClient({
         return;
       }
       setWebhooks((prev) => prev.filter((w) => w.id !== id));
+      setRuleDestinationIds((prev) => prev.filter((wid) => wid !== id));
       setLastSigningSecret((prev) => (prev?.webhookId === id ? null : prev));
       toast.success("Webhook removed");
+      router.refresh();
+    });
+  }
+
+  function addAlertRule() {
+    if (!ruleName.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    startRuleTransition(async () => {
+      const destinationIds = [
+        ...(ruleEmail ? [PROJECT_EMAIL_DESTINATION_ID] : []),
+        ...ruleDestinationIds,
+      ];
+      const result = await createProjectAlertRuleAction({
+        name: ruleName.trim(),
+        conditions: [
+          {
+            type: "ERROR_COUNT",
+            threshold: ruleThreshold,
+            windowMinutes: ruleWindowMinutes,
+            environment: ruleEnvironment.trim() || null,
+          },
+        ],
+        destinationIds,
+        cooldownMinutes: ruleCooldownMinutes,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setRules((prev) => [...prev, result.rule]);
+      setRuleName("");
+      setRuleEnvironment("");
+      setRuleDestinationIds([]);
+      toast.success("Alert rule created");
+      router.refresh();
+    });
+  }
+
+  function toggleAlertRule(id: string, enabled: boolean) {
+    startRuleTransition(async () => {
+      const result = await updateProjectAlertRuleAction(id, { enabled });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setRules((prev) => prev.map((r) => (r.id === id ? result.rule : r)));
+    });
+  }
+
+  function removeAlertRule(id: string) {
+    startRuleTransition(async () => {
+      const result = await deleteProjectAlertRuleAction(id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setRules((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Alert rule removed");
       router.refresh();
     });
   }
@@ -325,7 +415,7 @@ export function AlertsClient({
     <>
       <SettingsPageHeader
         title="Alerts"
-        description="Threshold rules for the active project. Fired alerts appear in the notification bell, email configured recipients, and POST to configured webhooks."
+        description="Configurable rules and built-in thresholds for the active project. Fired alerts appear in the notification bell and fan out to the destinations you bind."
         actions={
           canEdit ? (
             <SettingsBtn variant="primary" disabled={!dirty || pending} onClick={save}>
@@ -342,8 +432,192 @@ export function AlertsClient({
         ) : null}
 
         <Section
+          title="Custom rules"
+          description="Rules decide when to fire (AND of conditions) and which opaque destination ids to notify. Delivery (email, Slack, Discord, …) is owned by Notifications — not by the rule."
+        >
+          {rules.length > 0 ? (
+            <ul className="mb-4 divide-y divide-border rounded-md border border-border">
+              {rules.map((rule) => (
+                <li
+                  key={rule.id}
+                  className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-foreground">
+                      {rule.name}
+                    </p>
+                    <p className="text-[12px] text-muted-foreground">
+                      {formatAlertRuleSummary(rule)} · cooldown{" "}
+                      {rule.cooldownMinutes}m ·{" "}
+                      {(() => {
+                        const channelIds = rule.destinationIds.filter(
+                          (id) => id !== PROJECT_EMAIL_DESTINATION_ID
+                        );
+                        const liveChannels = channelIds.filter((id) =>
+                          webhooks.some((w) => w.id === id && w.enabled)
+                        ).length;
+                        const bound = channelIds.length;
+                        const parts = [
+                          rule.destinationIds.includes(PROJECT_EMAIL_DESTINATION_ID)
+                            ? "email"
+                            : null,
+                          liveChannels > 0
+                            ? `${liveChannels} channel${liveChannels === 1 ? "" : "s"}`
+                            : null,
+                          bound > liveChannels
+                            ? `${bound - liveChannels} inactive binding${
+                                bound - liveChannels === 1 ? "" : "s"
+                              }`
+                            : null,
+                        ].filter(Boolean);
+                        return parts.length > 0 ? parts.join(" · ") : "no destinations";
+                      })()}
+                    </p>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
+                      <SettingsToggle
+                        on={rule.enabled}
+                        onChange={(enabled) => toggleAlertRule(rule.id, enabled)}
+                      />
+                    </div>
+                    {canEdit ? (
+                      <SettingsBtn
+                        variant="ghost"
+                        disabled={rulePending}
+                        onClick={() => removeAlertRule(rule.id)}
+                      >
+                        Remove
+                      </SettingsBtn>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mb-4 text-[13px] text-muted-foreground">
+              No custom rules yet. Create one below, or keep using the built-in spike and quota
+              thresholds.
+            </p>
+          )}
+
+          {canEdit ? (
+            <FieldGroup>
+              <Field label="Name">
+                <input
+                  type="text"
+                  value={ruleName}
+                  onChange={(e) => setRuleName(e.target.value)}
+                  placeholder="Production error spike"
+                  maxLength={120}
+                  className="w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-[13px]"
+                />
+              </Field>
+              <Field label="Conditions (AND)">
+                <p className="text-[13px] text-muted-foreground">
+                  Error count for now — the API accepts multiple conditions ANDed together;
+                  more kinds later.
+                </p>
+              </Field>
+              <Field label="Threshold (errors per window)">
+                <input
+                  type="number"
+                  min={1}
+                  max={10000}
+                  value={ruleThreshold}
+                  onChange={(e) => setRuleThreshold(Number(e.target.value) || 1)}
+                  className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-[13px]"
+                />
+              </Field>
+              <Field label="Window (minutes)">
+                <input
+                  type="number"
+                  min={5}
+                  max={1440}
+                  value={ruleWindowMinutes}
+                  onChange={(e) => setRuleWindowMinutes(Number(e.target.value) || 15)}
+                  className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-[13px]"
+                />
+              </Field>
+              <Field label="Environment (optional)">
+                <input
+                  type="text"
+                  value={ruleEnvironment}
+                  onChange={(e) => setRuleEnvironment(e.target.value)}
+                  placeholder="production"
+                  maxLength={64}
+                  className="w-full max-w-md rounded-md border border-border bg-background px-2 py-1.5 text-[13px]"
+                />
+              </Field>
+              <Field label="Cooldown (minutes)">
+                <input
+                  type="number"
+                  min={5}
+                  max={1440}
+                  value={ruleCooldownMinutes}
+                  onChange={(e) => setRuleCooldownMinutes(Number(e.target.value) || 15)}
+                  className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-[13px]"
+                />
+              </Field>
+              <Field label="Destinations">
+                <p className="mb-2 text-[12px] text-muted-foreground">
+                  Bind opaque destination ids. Notifications resolves email vs chat/webhook
+                  providers.
+                </p>
+                <div className="mb-2 flex items-center gap-2 text-[13px] text-foreground">
+                  <SettingsToggle on={ruleEmail} onChange={setRuleEmail} />
+                  <span>Project alert email</span>
+                </div>
+                {webhooks.length === 0 ? (
+                  <p className="text-[13px] text-muted-foreground">
+                    Add Delivery destinations below, then bind their ids here.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {webhooks.map((wh) => {
+                      const checked = ruleDestinationIds.includes(wh.id);
+                      const label =
+                        wh.label?.trim() ||
+                        `${providerLabel(wh.provider)} · ${wh.urlMasked}`;
+                      return (
+                        <label
+                          key={wh.id}
+                          className="flex items-center gap-2 text-[13px] text-foreground"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setRuleDestinationIds((prev) =>
+                                checked
+                                  ? prev.filter((id) => id !== wh.id)
+                                  : [...prev, wh.id]
+                              )
+                            }
+                          />
+                          <span className="truncate">{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </Field>
+              <div>
+                <SettingsBtn
+                  variant="primary"
+                  disabled={rulePending || !ruleName.trim()}
+                  onClick={addAlertRule}
+                >
+                  {rulePending ? "Creating…" : "Create rule"}
+                </SettingsBtn>
+              </div>
+            </FieldGroup>
+          ) : null}
+        </Section>
+
+        <Section
           title="Error spike"
-          description="Fire when error occurrences in a rolling window exceed your threshold."
+          description="Built-in shortcut: fire when error occurrences in a rolling window exceed your threshold (all environments; fans out to all email recipients and delivery channels)."
         >
           <FieldGroup>
             <Field label="Enable error spike alerts">

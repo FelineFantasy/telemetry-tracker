@@ -21,6 +21,7 @@ describe("alertEventHref", () => {
 
   it("falls back by rule for legacy rows without href", () => {
     expect(alertEventHref("ERROR_SPIKE", null)).toBe("/dashboard/errors");
+    expect(alertEventHref("ALERT_RULE", null)).toBe("/dashboard/errors");
     expect(alertEventHref("QUOTA_NEAR", null)).toBe("/dashboard/settings/billing");
     expect(alertEventHref("QUOTA_EXCEEDED", null)).toBe("/dashboard/settings/billing");
   });
@@ -32,6 +33,7 @@ describe("fireProjectAlert", () => {
     const enqueue = vi.mocked(enqueueAlertWebhookDeliveries);
     enqueue.mockClear();
     enqueue.mockResolvedValue(1);
+    vi.mocked(notifyProjectMembersByEmail).mockClear();
 
     const tx = { alertEvent: { create } };
     const prisma = {
@@ -58,6 +60,41 @@ describe("fireProjectAlert", () => {
       })
     );
     expect(notifyProjectMembersByEmail).toHaveBeenCalled();
+  });
+
+  it("honors destination filters for email and webhooks", async () => {
+    const create = vi.fn(async () => ({ id: "ae1" }));
+    const enqueue = vi.mocked(enqueueAlertWebhookDeliveries);
+    enqueue.mockClear();
+    enqueue.mockResolvedValue(0);
+    vi.mocked(notifyProjectMembersByEmail).mockClear();
+
+    const tx = { alertEvent: { create } };
+    const prisma = {
+      $transaction: vi.fn(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
+    };
+
+    const ok = await fireProjectAlert(prisma as never, {
+      projectId: "p1",
+      rule: "ALERT_RULE",
+      dedupeKey: "alert:rule:r1:15:1",
+      title: "Custom",
+      body: "Triggered",
+      href: "/dashboard/errors",
+      destinations: {
+        email: false,
+        webhookIds: ["33333333-3333-3333-3333-333333333333"],
+      },
+    });
+
+    expect(ok).toBe(true);
+    expect(enqueue).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        webhookIds: ["33333333-3333-3333-3333-333333333333"],
+      })
+    );
+    expect(notifyProjectMembersByEmail).not.toHaveBeenCalled();
   });
 
   it("keeps AlertEvent and enqueue in the same transaction callback", async () => {
