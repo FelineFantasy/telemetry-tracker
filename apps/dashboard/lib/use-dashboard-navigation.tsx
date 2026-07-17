@@ -22,12 +22,16 @@ type DashboardNavigationValue = {
   replaceSilent: (href: string) => void;
   /**
    * Scope cookie change: replace URL and refresh RSC tree while keeping the overlay up.
-   * Resolves after the transition settles (with a short floor), because `useTransition`
-   * often does not stay pending through `router.refresh()` on Next.js 15.
+   * Resolves when the shell reports a new org/project scope (RSC re-render), or on timeout.
    */
   replaceAndRefresh: (href: string) => Promise<void>;
   /** Wrap async scope switches (org/project) so the overlay stays up through the server action. */
   runPending: (fn: () => Promise<void>) => Promise<void>;
+  /**
+   * Call from the shell when server-rendered org/project ids update so
+   * `replaceAndRefresh` can clear the overlay after RSC refresh, not on a timer.
+   */
+  markScopeRendered: () => void;
   isPending: boolean;
 };
 
@@ -52,20 +56,18 @@ function DashboardNavigationOverlay({ active }: { active: boolean }) {
   );
 }
 
-const REFRESH_MIN_HOLD_MS = 200;
-/** When `useTransition` never goes pending through `router.refresh()`, hold at least this long. */
-const REFRESH_FALLBACK_HOLD_MS = 500;
+const REFRESH_MIN_HOLD_MS = 100;
 const REFRESH_MAX_HOLD_MS = 10_000;
 
 export function DashboardNavigationProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [transitionPending, startTransition] = useTransition();
   const [asyncPendingCount, setAsyncPendingCount] = useState(0);
-  const transitionPendingRef = useRef(false);
+  const scopeEpochRef = useRef(0);
 
-  useEffect(() => {
-    transitionPendingRef.current = transitionPending;
-  }, [transitionPending]);
+  const markScopeRendered = useCallback(() => {
+    scopeEpochRef.current += 1;
+  }, []);
 
   const push = useCallback(
     (href: string) => {
@@ -92,43 +94,48 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
     [router]
   );
 
-  const replaceAndRefresh = useCallback((href: string) => {
-    setAsyncPendingCount((n) => n + 1);
-    startTransition(() => {
-      router.replace(href);
-      router.refresh();
-    });
+  const replaceAndRefresh = useCallback(
+    (href: string) => {
+      setAsyncPendingCount((n) => n + 1);
+      const epochAtStart = scopeEpochRef.current;
+      startTransition(() => {
+        router.replace(href);
+        router.refresh();
+      });
 
-    return new Promise<void>((resolve) => {
-      const startedAt = performance.now();
-      let settled = false;
-      let sawTransition = false;
+      return new Promise<void>((resolve) => {
+        const startedAt = performance.now();
+        let settled = false;
 
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        setAsyncPendingCount((n) => Math.max(0, n - 1));
-        resolve();
-      };
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          setAsyncPendingCount((n) => Math.max(0, n - 1));
+          resolve();
+        };
 
-      const tick = () => {
-        if (transitionPendingRef.current) sawTransition = true;
-        const elapsed = performance.now() - startedAt;
-        if (elapsed >= REFRESH_MAX_HOLD_MS) {
-          finish();
-          return;
-        }
-        const floor = sawTransition ? REFRESH_MIN_HOLD_MS : REFRESH_FALLBACK_HOLD_MS;
-        if (elapsed >= floor && !transitionPendingRef.current) {
-          finish();
-          return;
-        }
+        const tick = () => {
+          const elapsed = performance.now() - startedAt;
+          if (elapsed >= REFRESH_MAX_HOLD_MS) {
+            finish();
+            return;
+          }
+          // Wait for shell to report new org/project from RSC — not useTransition idle.
+          if (
+            elapsed >= REFRESH_MIN_HOLD_MS &&
+            scopeEpochRef.current > epochAtStart
+          ) {
+            finish();
+            return;
+          }
+          requestAnimationFrame(tick);
+        };
+
         requestAnimationFrame(tick);
-      };
-
-      requestAnimationFrame(tick);
-    });
-  }, [router]);
+      });
+    },
+    [router]
+  );
 
   const runPending = useCallback(async (fn: () => Promise<void>) => {
     setAsyncPendingCount((n) => n + 1);
@@ -148,9 +155,18 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
       replaceSilent,
       replaceAndRefresh,
       runPending,
+      markScopeRendered,
       isPending,
     }),
-    [push, replace, replaceSilent, replaceAndRefresh, runPending, isPending]
+    [
+      push,
+      replace,
+      replaceSilent,
+      replaceAndRefresh,
+      runPending,
+      markScopeRendered,
+      isPending,
+    ]
   );
 
   return (
@@ -174,6 +190,26 @@ export function useDashboardNavigation(): DashboardNavigationValue {
     throw new Error("useDashboardNavigation must be used within DashboardNavigationProvider");
   }
   return ctx;
+}
+
+/**
+ * Bumps the navigation scope epoch when server-rendered org/project ids change,
+ * so `replaceAndRefresh` can clear the overlay after RSC refresh.
+ */
+export function DashboardNavigationScopeAck({
+  organizationId,
+  projectId,
+}: {
+  organizationId: string | null;
+  projectId: string;
+}) {
+  const { markScopeRendered } = useDashboardNavigation();
+
+  useEffect(() => {
+    markScopeRendered();
+  }, [markScopeRendered, organizationId, projectId]);
+
+  return null;
 }
 
 /** Soft-navigate internal dashboard links so the full-screen overlay engages. */
