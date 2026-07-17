@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.14.1] - 2026-07-17
+
+### Added
+
+- **Notification Center** — `/dashboard/notifications` inbox with day grouping, read/unread, project and type filters, and links into the dashboard; bell feed gains a “View all” entry while remaining the compact active-project preview ([#508](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/508); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+---
+
 ## [1.14.0] - 2026-07-17
 
 ### Added
