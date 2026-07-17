@@ -70,12 +70,16 @@ export async function claimNextAlertWebhookDelivery(
   const leaseExpiresAt = new Date(input.now.getTime() + leaseMs);
 
   return prisma.$transaction(async (tx) => {
+    // Never reclaim sendTestWebhook rows (PROCESSING + lease, alert_event_id null,
+    // dedupe webhook:test:…). Those are single-shot; reclaim would duplicate POSTs
+    // or send a generic alert.fired payload.
     const rows = await tx.$queryRaw<DeliveryDbRow[]>(Prisma.sql`
       SELECT *
       FROM "AlertWebhookDelivery"
       WHERE "status" IN ('PENDING', 'FAILED', 'PROCESSING')
         AND "next_attempt_at" <= ${input.now}
         AND ("lease_expires_at" IS NULL OR "lease_expires_at" < ${input.now})
+        AND "dedupe_key" NOT LIKE 'webhook:test:%'
       ORDER BY "next_attempt_at" ASC, "created_at" ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED

@@ -807,8 +807,9 @@ export async function sendTestWebhook(
     ? signWebhookBody(body, webhook.signing_secret)
     : null;
 
-  // Persist the delivery row before POST so a create failure cannot leave the
-  // destination with a payload that Recent deliveries never records.
+  // Persist before POST (create failure must not leave an unlogged destination hit).
+  // PROCESSING + lease mirrors worker ownership for the in-flight request; claim SQL
+  // excludes webhook:test:% so an expired lease cannot be reclaimed for a duplicate POST.
   const leaseOwner = `test-webhook:${deliveryId}`;
   const leaseMs = resolveAlertWebhookWorkerLeaseMs();
   await prisma.alertWebhookDelivery.create({

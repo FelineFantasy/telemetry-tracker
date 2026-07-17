@@ -81,45 +81,56 @@ async function deliverClaimedAlertWebhook(
     };
   }
 
-  let rule: "ERROR_SPIKE" | "QUOTA_NEAR" | "QUOTA_EXCEEDED" = "ERROR_SPIKE";
-  let title = "Alert";
-  let body = "";
-  let href: string | null = null;
-  let firedAt: Date | undefined;
-
-  if (job.alertEventId) {
-    const event = await deps.prisma.alertEvent.findUnique({
-      where: { id: job.alertEventId },
-      select: {
-        rule: true,
-        title: true,
-        body: true,
-        href: true,
-        fired_at: true,
-      },
+  // Real queue rows always have an alert event. Null means deleted event (SetNull)
+  // or a test delivery that should never have been claimed — never invent a payload.
+  if (!job.alertEventId) {
+    const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {
+      deliveryId: job.id,
+      workerId,
+      attempt: WEBHOOK_MAX_ATTEMPTS,
+      httpStatus: null,
+      error: "Alert event missing",
+      now: nowFn(),
     });
-    if (!event) {
-      const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {
-        deliveryId: job.id,
-        workerId,
-        attempt: WEBHOOK_MAX_ATTEMPTS,
-        httpStatus: null,
-        error: "Alert event missing",
-        now: nowFn(),
-      });
-      return {
-        status: "failed",
-        deliveryId: job.id,
-        terminal: terminal ?? "DEAD",
-        error: "Alert event missing",
-      };
-    }
-    rule = event.rule;
-    title = event.title;
-    body = event.body;
-    href = event.href;
-    firedAt = event.fired_at;
+    return {
+      status: "failed",
+      deliveryId: job.id,
+      terminal: terminal ?? "DEAD",
+      error: "Alert event missing",
+    };
   }
+
+  const event = await deps.prisma.alertEvent.findUnique({
+    where: { id: job.alertEventId },
+    select: {
+      rule: true,
+      title: true,
+      body: true,
+      href: true,
+      fired_at: true,
+    },
+  });
+  if (!event) {
+    const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {
+      deliveryId: job.id,
+      workerId,
+      attempt: WEBHOOK_MAX_ATTEMPTS,
+      httpStatus: null,
+      error: "Alert event missing",
+      now: nowFn(),
+    });
+    return {
+      status: "failed",
+      deliveryId: job.id,
+      terminal: terminal ?? "DEAD",
+      error: "Alert event missing",
+    };
+  }
+  const rule = event.rule;
+  const title = event.title;
+  const body = event.body;
+  const href = event.href;
+  const firedAt = event.fired_at;
 
   const payload = buildAlertWebhookPayload({
     deliveryId: job.id,

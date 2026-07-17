@@ -190,6 +190,26 @@ describe("claim / retry / DEAD", () => {
     expect(row?.status).toBe("PROCESSING");
   });
 
+  it("excludes webhook:test: deliveries from claim SQL", async () => {
+    let capturedSql: { strings: string[] } | null = null;
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async (sql: { strings: string[] }) => {
+            capturedSql = sql;
+            return [];
+          },
+          alertWebhookDelivery: { update: vi.fn() },
+        }),
+    };
+    await claimNextAlertWebhookDelivery(prisma as never, {
+      workerId: "w1",
+      now: new Date("2026-07-17T12:00:00.000Z"),
+    });
+    const text = capturedSql?.strings.join("?") ?? "";
+    expect(text).toContain(`"dedupe_key" NOT LIKE 'webhook:test:%'`);
+  });
+
   it("schedules FAILED then DEAD", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = { alertWebhookDelivery: { updateMany } };
@@ -539,6 +559,76 @@ describe("processNextAlertWebhookDelivery", () => {
       error: "Lease lost before delivery",
     });
     expect(sendImpl).not.toHaveBeenCalled();
+  });
+
+  it("does not POST a generic payload when alert_event_id is null", async () => {
+    const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d-test",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: null,
+              dedupe_key: "webhook:test:wh1:d-test",
+              attempt: 0,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "test-webhook:d-test",
+              lease_expires_at: new Date("2026-07-17T11:00:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: {
+            update: async () => ({
+              id: "d-test",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: null,
+              dedupe_key: "webhook:test:wh1:d-test",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "worker-1",
+              lease_expires_at: new Date("2026-07-17T12:01:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            }),
+          },
+        }),
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+          enabled: true,
+        }),
+      },
+      alertEvent: { findUnique: vi.fn() },
+      alertWebhookDelivery: { updateMany },
+    };
+    const result = await processNextAlertWebhookDelivery({
+      prisma: prisma as never,
+      workerId: "worker-1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      sendImpl,
+    });
+    expect(result).toEqual({
+      status: "failed",
+      deliveryId: "d-test",
+      terminal: "DEAD",
+      error: "Alert event missing",
+    });
+    expect(sendImpl).not.toHaveBeenCalled();
+    expect(prisma.alertEvent.findUnique).not.toHaveBeenCalled();
   });
 });
 
