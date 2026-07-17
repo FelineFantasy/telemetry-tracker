@@ -4,6 +4,7 @@ import { MarketingSubscriberSource } from "@prisma/client";
 import {
   generateMarketingUnsubscribeToken,
   hashMarketingUnsubscribeToken,
+  isReservedMarketingEmailDomain,
   isValidMarketingEmail,
   normalizeMarketingEmail,
   subscribeMarketingEmail,
@@ -14,8 +15,11 @@ import { prisma } from "./db.js";
 describe("marketing-subscriber lib", () => {
   it("normalizes and validates emails", () => {
     expect(normalizeMarketingEmail("  User@Example.COM ")).toBe("user@example.com");
-    expect(isValidMarketingEmail("user@example.com")).toBe(true);
+    expect(isValidMarketingEmail("ops@acme.io")).toBe(true);
     expect(isValidMarketingEmail("not-an-email")).toBe(false);
+    expect(isValidMarketingEmail("user@example.com")).toBe(false);
+    expect(isReservedMarketingEmailDomain("diag@example.com")).toBe(true);
+    expect(isReservedMarketingEmailDomain("ops@acme.io")).toBe(false);
   });
 
   it("hashes unsubscribe tokens deterministically", () => {
