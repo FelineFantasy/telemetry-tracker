@@ -64,9 +64,10 @@ shown once when the webhook is created.
 
   Env: `ALERT_WEBHOOK_WORKER_POLL_MS` (default `1000`),
   `ALERT_WEBHOOK_WORKER_LEASE_MS` (default `30000`, minimum =
-  HTTPS POST timeout `8000` + `5000` margin).
+  DNS timeout `5000` + HTTPS POST timeout `8000` + `5000` margin).
 
-- Worker flow: claim (`FOR UPDATE SKIP LOCKED` + lease) → DNS/IP validate + pin →
+- Worker flow: claim (`FOR UPDATE SKIP LOCKED` + lease) → DNS/IP validate + pin
+  (DNS bounded by `WEBHOOK_DNS_TIMEOUT_MS`) →
   POST → record outcome → retry with short backoff (`FAILED` + `next_attempt_at`) or
   terminal `DEAD` after **2** attempts.
 - Operators can browse recent rows under **Alerts → Delivery** (read access for

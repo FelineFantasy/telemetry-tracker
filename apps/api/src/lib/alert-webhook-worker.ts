@@ -159,8 +159,9 @@ async function deliverClaimedAlertWebhook(
         lookupFn: input.lookupFn ?? deps.lookupFn,
       }));
 
-  // Renew before POST so a slow/hung recipient cannot expire the lease mid-flight
-  // and leave a successful delivery stuck in PROCESSING (duplicate on reclaim).
+  // Renew before DNS+POST so a slow resolver or hung recipient cannot expire
+  // the lease mid-flight and leave a successful delivery stuck in PROCESSING
+  // (duplicate on reclaim). Lease minimum covers DNS timeout + POST + margin.
   const leaseHeld = await renewAlertWebhookDeliveryLease(deps.prisma, {
     deliveryId: job.id,
     workerId,

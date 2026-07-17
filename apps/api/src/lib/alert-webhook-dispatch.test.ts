@@ -14,10 +14,12 @@ import {
   sendTestWebhook,
   signWebhookBody,
   validateWebhookUrl,
+  WEBHOOK_DNS_TIMEOUT_MS,
   WEBHOOK_FETCH_TIMEOUT_MS,
   WEBHOOK_LEASE_POST_MARGIN_MS,
   WEBHOOK_MAX_ATTEMPTS,
   WEBHOOK_WORKER_LEASE_MS_DEFAULT,
+  webhookDeliveryLeaseMinimumMs,
   type WebhookDnsLookup,
 } from "./alert-webhook-dispatch.js";
 import {
@@ -112,6 +114,45 @@ describe("delivery-time DNS protections", () => {
       ok: true,
       addresses: [{ address: "203.0.113.10", family: 4 }],
     });
+  });
+
+  it("times out a hung DNS resolver", async () => {
+    vi.useFakeTimers();
+    try {
+      const hungLookup: WebhookDnsLookup = () => new Promise(() => {});
+      const pending = resolveWebhookHostForDelivery("slow.example", hungLookup);
+      const expectation = expect(pending).resolves.toEqual({
+        ok: false,
+        error: "Webhook URL host DNS lookup timed out",
+      });
+      await vi.advanceTimersByTimeAsync(WEBHOOK_DNS_TIMEOUT_MS);
+      await expectation;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("surfaces DNS timeout from postWebhookOnce before HTTPS", async () => {
+    vi.useFakeTimers();
+    try {
+      const hungLookup: WebhookDnsLookup = () => new Promise(() => {});
+      const pending = postWebhookOnce(
+        "https://slow.example/hook",
+        "{}",
+        null,
+        "d1",
+        { lookupFn: hungLookup }
+      );
+      const expectation = expect(pending).resolves.toEqual({
+        ok: false,
+        httpStatus: null,
+        error: "Webhook URL host DNS lookup timed out",
+      });
+      await vi.advanceTimersByTimeAsync(WEBHOOK_DNS_TIMEOUT_MS);
+      await expectation;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -1048,13 +1089,20 @@ describe("createProjectWebhook", () => {
 });
 
 describe("resolveAlertWebhookWorkerLeaseMs", () => {
-  it("defaults to 30s and clamps below POST timeout plus margin", () => {
+  it("defaults to 30s and clamps below DNS+POST timeout plus margin", () => {
+    const minLease = webhookDeliveryLeaseMinimumMs();
+    expect(minLease).toBe(
+      WEBHOOK_DNS_TIMEOUT_MS + WEBHOOK_FETCH_TIMEOUT_MS + WEBHOOK_LEASE_POST_MARGIN_MS
+    );
     expect(resolveAlertWebhookWorkerLeaseMs({})).toBe(WEBHOOK_WORKER_LEASE_MS_DEFAULT);
     expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "5000" })).toBe(
-      WEBHOOK_FETCH_TIMEOUT_MS + WEBHOOK_LEASE_POST_MARGIN_MS
+      minLease
     );
     expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "8000" })).toBe(
-      WEBHOOK_FETCH_TIMEOUT_MS + WEBHOOK_LEASE_POST_MARGIN_MS
+      minLease
+    );
+    expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "15000" })).toBe(
+      minLease
     );
     expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "45000" })).toBe(45_000);
     expect(resolveAlertWebhookWorkerLeaseMs({ ALERT_WEBHOOK_WORKER_LEASE_MS: "nope" })).toBe(
