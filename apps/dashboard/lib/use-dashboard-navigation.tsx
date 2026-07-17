@@ -15,6 +15,11 @@ import {
 import { useRouter } from "next/navigation";
 import { useBodyScrollLock } from "@/lib/body-scroll-lock";
 
+export type DashboardNavigationScope = {
+  organizationId: string | null;
+  projectId: string;
+};
+
 type DashboardNavigationValue = {
   push: (href: string) => void;
   replace: (href: string) => void;
@@ -22,12 +27,17 @@ type DashboardNavigationValue = {
   replaceSilent: (href: string) => void;
   /**
    * Scope cookie change: replace URL and refresh RSC tree while keeping the overlay up.
-   * Resolves after the transition settles (with a short floor), because `useTransition`
-   * often does not stay pending through `router.refresh()` on Next.js 15.
+   * Pass the expected post-switch scope so we can wait for the shell ack (or hold through
+   * refresh when `revalidatePath` already updated the nav).
    */
-  replaceAndRefresh: (href: string) => Promise<void>;
+  replaceAndRefresh: (
+    href: string,
+    expect: DashboardNavigationScope
+  ) => Promise<void>;
   /** Wrap async scope switches (org/project) so the overlay stays up through the server action. */
   runPending: (fn: () => Promise<void>) => Promise<void>;
+  /** Report server-rendered org/project ids after they change. */
+  markScopeRendered: (scope: DashboardNavigationScope) => void;
   isPending: boolean;
 };
 
@@ -52,20 +62,47 @@ function DashboardNavigationOverlay({ active }: { active: boolean }) {
   );
 }
 
-const REFRESH_MIN_HOLD_MS = 200;
-/** When `useTransition` never goes pending through `router.refresh()`, hold at least this long. */
-const REFRESH_FALLBACK_HOLD_MS = 500;
+/** Nav already matches via revalidatePath — hold long enough for page RSC refresh. */
+const REFRESH_ALREADY_MATCHED_HOLD_MS = 800;
+const REFRESH_ALREADY_MATCHED_AFTER_TRANSITION_MS = 400;
 const REFRESH_MAX_HOLD_MS = 10_000;
+
+function scopesMatch(
+  rendered: DashboardNavigationScope | null,
+  expect: DashboardNavigationScope
+): boolean {
+  if (!rendered) return false;
+  if (rendered.organizationId !== expect.organizationId) return false;
+  // Org switches may land on a different default project; only require project when set.
+  if (expect.projectId && rendered.projectId !== expect.projectId) return false;
+  return true;
+}
 
 export function DashboardNavigationProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [transitionPending, startTransition] = useTransition();
   const [asyncPendingCount, setAsyncPendingCount] = useState(0);
   const transitionPendingRef = useRef(false);
+  const renderedScopeRef = useRef<DashboardNavigationScope | null>(null);
+  const scopeSignalRef = useRef(0);
 
   useEffect(() => {
     transitionPendingRef.current = transitionPending;
   }, [transitionPending]);
+
+  const markScopeRendered = useCallback((scope: DashboardNavigationScope) => {
+    const prev = renderedScopeRef.current;
+    if (
+      prev &&
+      prev.organizationId === scope.organizationId &&
+      prev.projectId === scope.projectId
+    ) {
+      // Remounts of the top nav must not advance the settle signal with the same scope.
+      return;
+    }
+    renderedScopeRef.current = scope;
+    scopeSignalRef.current += 1;
+  }, []);
 
   const push = useCallback(
     (href: string) => {
@@ -92,43 +129,73 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
     [router]
   );
 
-  const replaceAndRefresh = useCallback((href: string) => {
-    setAsyncPendingCount((n) => n + 1);
-    startTransition(() => {
-      router.replace(href);
-      router.refresh();
-    });
+  const replaceAndRefresh = useCallback(
+    (href: string, expect: DashboardNavigationScope) => {
+      setAsyncPendingCount((n) => n + 1);
+      const signalAtStart = scopeSignalRef.current;
+      const alreadyMatches = scopesMatch(renderedScopeRef.current, expect);
 
-    return new Promise<void>((resolve) => {
-      const startedAt = performance.now();
-      let settled = false;
-      let sawTransition = false;
+      startTransition(() => {
+        router.replace(href);
+        router.refresh();
+      });
 
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        setAsyncPendingCount((n) => Math.max(0, n - 1));
-        resolve();
-      };
+      return new Promise<void>((resolve) => {
+        const startedAt = performance.now();
+        let settled = false;
+        let sawTransition = false;
+        let scopeMatchedAt: number | null = null;
 
-      const tick = () => {
-        if (transitionPendingRef.current) sawTransition = true;
-        const elapsed = performance.now() - startedAt;
-        if (elapsed >= REFRESH_MAX_HOLD_MS) {
-          finish();
-          return;
-        }
-        const floor = sawTransition ? REFRESH_MIN_HOLD_MS : REFRESH_FALLBACK_HOLD_MS;
-        if (elapsed >= floor && !transitionPendingRef.current) {
-          finish();
-          return;
-        }
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          setAsyncPendingCount((n) => Math.max(0, n - 1));
+          resolve();
+        };
+
+        const tick = () => {
+          if (transitionPendingRef.current) sawTransition = true;
+          const elapsed = performance.now() - startedAt;
+          if (elapsed >= REFRESH_MAX_HOLD_MS) {
+            finish();
+            return;
+          }
+
+          if (alreadyMatches) {
+            // Shell already shows the new scope (server action revalidatePath).
+            // Hold through router.refresh() via transition idle + floor.
+            const floor = sawTransition
+              ? REFRESH_ALREADY_MATCHED_AFTER_TRANSITION_MS
+              : REFRESH_ALREADY_MATCHED_HOLD_MS;
+            if (elapsed >= floor && !transitionPendingRef.current) {
+              finish();
+              return;
+            }
+          } else {
+            const advanced = scopeSignalRef.current > signalAtStart;
+            if (advanced && scopesMatch(renderedScopeRef.current, expect)) {
+              if (scopeMatchedAt === null) scopeMatchedAt = performance.now();
+              // Nav scope updated, but page RSC may still be refreshing — wait for
+              // transition idle plus a post-ack floor (refresh often never stays pending).
+              const sinceMatch = performance.now() - scopeMatchedAt;
+              const floor = sawTransition
+                ? REFRESH_ALREADY_MATCHED_AFTER_TRANSITION_MS
+                : REFRESH_ALREADY_MATCHED_HOLD_MS;
+              if (sinceMatch >= floor && !transitionPendingRef.current) {
+                finish();
+                return;
+              }
+            }
+          }
+
+          requestAnimationFrame(tick);
+        };
+
         requestAnimationFrame(tick);
-      };
-
-      requestAnimationFrame(tick);
-    });
-  }, [router]);
+      });
+    },
+    [router]
+  );
 
   const runPending = useCallback(async (fn: () => Promise<void>) => {
     setAsyncPendingCount((n) => n + 1);
@@ -148,9 +215,18 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
       replaceSilent,
       replaceAndRefresh,
       runPending,
+      markScopeRendered,
       isPending,
     }),
-    [push, replace, replaceSilent, replaceAndRefresh, runPending, isPending]
+    [
+      push,
+      replace,
+      replaceSilent,
+      replaceAndRefresh,
+      runPending,
+      markScopeRendered,
+      isPending,
+    ]
   );
 
   return (
@@ -174,6 +250,29 @@ export function useDashboardNavigation(): DashboardNavigationValue {
     throw new Error("useDashboardNavigation must be used within DashboardNavigationProvider");
   }
   return ctx;
+}
+
+/**
+ * Reports org/project scope when server-rendered ids change (not on every remount).
+ */
+export function DashboardNavigationScopeAck({
+  organizationId,
+  projectId,
+}: {
+  organizationId: string | null;
+  projectId: string;
+}) {
+  const { markScopeRendered } = useDashboardNavigation();
+  const prevKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const key = `${organizationId ?? ""}:${projectId}`;
+    if (prevKeyRef.current === key) return;
+    prevKeyRef.current = key;
+    markScopeRendered({ organizationId, projectId });
+  }, [markScopeRendered, organizationId, projectId]);
+
+  return null;
 }
 
 /** Soft-navigate internal dashboard links so the full-screen overlay engages. */

@@ -36,10 +36,12 @@ const IDLE_SUMMARY: ProjectNavSummary = {
 
 export function TopNavProjectSwitcher({
   projects,
+  currentOrganizationId,
   currentProjectId,
   projectNavSummaries,
 }: {
   projects: ProjectOption[];
+  currentOrganizationId: string | null;
   currentProjectId: string;
   projectNavSummaries: Record<string, ProjectNavSummary>;
 }) {
@@ -99,7 +101,10 @@ export function TopNavProjectSwitcher({
         const r = await setDashboardProjectId(projectId);
         if (r.ok) {
           setPrefs({ ...prefs, recent: recordRecentProject(projectId) });
-          await replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams));
+          await replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams), {
+            organizationId: currentOrganizationId,
+            projectId,
+          });
           close();
         } else {
           setValue(currentProjectId);
@@ -107,6 +112,7 @@ export function TopNavProjectSwitcher({
       });
     },
     [
+      currentOrganizationId,
       currentProjectId,
       pathname,
       prefs,
