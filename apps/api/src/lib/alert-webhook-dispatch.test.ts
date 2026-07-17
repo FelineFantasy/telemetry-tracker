@@ -189,6 +189,66 @@ describe("claim / retry / DEAD", () => {
     });
     expect(row?.attempt).toBe(1);
     expect(row?.status).toBe("PROCESSING");
+    expect(row?.attemptChargedOnClaim).toBe(true);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ attempt: { increment: 1 } }),
+      })
+    );
+  });
+
+  it("reclaims expired PROCESSING without incrementing attempt", async () => {
+    const update = vi.fn(async () => ({
+      id: "d1",
+      webhook_id: "wh1",
+      project_id: "p1",
+      alert_event_id: "ae1",
+      dedupe_key: "k1",
+      attempt: 1,
+      status: "PROCESSING",
+      http_status: null,
+      error: null,
+      lease_owner: "w2",
+      lease_expires_at: new Date("2026-07-17T12:00:30.000Z"),
+      next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+      created_at: new Date("2026-07-17T12:00:00.000Z"),
+      updated_at: new Date("2026-07-17T12:00:00.000Z"),
+    }));
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "w1",
+              lease_expires_at: new Date("2026-07-17T11:59:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: { update },
+        }),
+    };
+    const row = await claimNextAlertWebhookDelivery(prisma as never, {
+      workerId: "w2",
+      now: new Date("2026-07-17T12:00:00.000Z"),
+    });
+    expect(row?.attempt).toBe(1);
+    expect(row?.attemptChargedOnClaim).toBe(false);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ attempt: expect.anything() }),
+      })
+    );
   });
 
   it("excludes webhook:test: deliveries from claim SQL", async () => {
@@ -653,6 +713,182 @@ describe("processNextAlertWebhookDelivery", () => {
       lease_expires_at: null,
       attempt: { decrement: 1 },
     });
+  });
+
+  it("reclaimed PROCESSING HTTP failure keeps attempt and stays FAILED not DEAD", async () => {
+    const sendImpl = vi.fn(async () => ({
+      ok: false as const,
+      httpStatus: 500,
+      error: "HTTP 500",
+    }));
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 1 }) // renew
+      .mockResolvedValueOnce({ count: 1 }); // fail
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "crashed-worker",
+              lease_expires_at: new Date("2026-07-17T11:59:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: {
+            update: async (args: { data: Record<string, unknown> }) => {
+              expect(args.data).not.toHaveProperty("attempt");
+              return {
+                id: "d1",
+                webhook_id: "wh1",
+                project_id: "p1",
+                alert_event_id: "ae1",
+                dedupe_key: "k1",
+                attempt: 1,
+                status: "PROCESSING",
+                http_status: null,
+                error: null,
+                lease_owner: "worker-1",
+                lease_expires_at: new Date("2026-07-17T12:01:00.000Z"),
+                next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+                created_at: new Date("2026-07-17T12:00:00.000Z"),
+                updated_at: new Date("2026-07-17T12:00:00.000Z"),
+              };
+            },
+          },
+        }),
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+          enabled: true,
+        }),
+      },
+      alertEvent: {
+        findUnique: async () => ({
+          rule: "ERROR_SPIKE",
+          title: "Spike",
+          body: "n",
+          href: null,
+          fired_at: new Date("2026-07-17T10:00:00.000Z"),
+        }),
+      },
+      alertWebhookDelivery: { updateMany },
+    };
+    const result = await processNextAlertWebhookDelivery({
+      prisma: prisma as never,
+      workerId: "worker-1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      sendImpl,
+    });
+    expect(result).toEqual({
+      status: "failed",
+      deliveryId: "d1",
+      terminal: "FAILED",
+      error: "HTTP 500",
+    });
+    expect(sendImpl).toHaveBeenCalledOnce();
+    expect(updateMany.mock.calls[1][0].data).toMatchObject({
+      status: "FAILED",
+    });
+    expect(updateMany.mock.calls[1][0].data.status).not.toBe("DEAD");
+  });
+
+  it("does not undo attempt when renew misses after PROCESSING reclaim", async () => {
+    const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
+    const updateMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+    const prisma = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({
+          $queryRaw: async () => [
+            {
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "crashed-worker",
+              lease_expires_at: new Date("2026-07-17T11:59:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            },
+          ],
+          alertWebhookDelivery: {
+            update: async () => ({
+              id: "d1",
+              webhook_id: "wh1",
+              project_id: "p1",
+              alert_event_id: "ae1",
+              dedupe_key: "k1",
+              attempt: 1,
+              status: "PROCESSING",
+              http_status: null,
+              error: null,
+              lease_owner: "worker-1",
+              lease_expires_at: new Date("2026-07-17T12:01:00.000Z"),
+              next_attempt_at: new Date("2026-07-17T12:00:00.000Z"),
+              created_at: new Date("2026-07-17T12:00:00.000Z"),
+              updated_at: new Date("2026-07-17T12:00:00.000Z"),
+            }),
+          },
+        }),
+      projectWebhook: {
+        findFirst: async () => ({
+          id: "wh1",
+          url: "https://hooks.example.com/a",
+          signing_secret: null,
+          enabled: true,
+        }),
+      },
+      alertEvent: {
+        findUnique: async () => ({
+          rule: "ERROR_SPIKE",
+          title: "Spike",
+          body: "n",
+          href: null,
+          fired_at: new Date("2026-07-17T10:00:00.000Z"),
+        }),
+      },
+      alertWebhookDelivery: { updateMany },
+    };
+    const result = await processNextAlertWebhookDelivery({
+      prisma: prisma as never,
+      workerId: "worker-1",
+      now: () => new Date("2026-07-17T12:00:00.000Z"),
+      sendImpl,
+    });
+    expect(result).toEqual({
+      status: "failed",
+      deliveryId: "d1",
+      terminal: "FAILED",
+      error: "Lease lost before delivery",
+    });
+    expect(sendImpl).not.toHaveBeenCalled();
+    expect(updateMany.mock.calls[1][0].data).toMatchObject({
+      status: "FAILED",
+      error: "Lease lost before delivery",
+    });
+    expect(updateMany.mock.calls[1][0].data).not.toHaveProperty("attempt");
   });
 
   it("does not POST a generic payload when alert_event_id is null", async () => {

@@ -18,7 +18,7 @@ import {
   finalizeAlertWebhookDeliverySuccess,
   releaseAlertWebhookDeliveryClaim,
   renewAlertWebhookDeliveryLease,
-  type AlertWebhookDeliveryJobRow,
+  type AlertWebhookDeliveryClaim,
 } from "./alert-webhook-delivery-job.js";
 
 export type AlertWebhookWorkerDeps = {
@@ -56,7 +56,7 @@ export async function processNextAlertWebhookDelivery(
 
 async function deliverClaimedAlertWebhook(
   deps: AlertWebhookWorkerDeps,
-  job: AlertWebhookDeliveryJobRow,
+  job: AlertWebhookDeliveryClaim,
   workerId: string,
   nowFn: () => Date
 ): Promise<AlertWebhookWorkerProcessResult> {
@@ -172,6 +172,7 @@ async function deliverClaimedAlertWebhook(
       workerId,
       error: "Lease lost before delivery",
       now: nowFn(),
+      undoAttemptIncrement: job.attemptChargedOnClaim,
     });
     return {
       status: "failed",

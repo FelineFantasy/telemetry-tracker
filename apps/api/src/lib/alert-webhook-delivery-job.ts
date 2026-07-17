@@ -26,6 +26,11 @@ export type AlertWebhookDeliveryJobRow = {
   updatedAt: Date;
 };
 
+/** Claim result; `attemptChargedOnClaim` is false when reclaiming an expired PROCESSING lease. */
+export type AlertWebhookDeliveryClaim = AlertWebhookDeliveryJobRow & {
+  attemptChargedOnClaim: boolean;
+};
+
 type DeliveryDbRow = {
   id: string;
   webhook_id: string;
@@ -65,7 +70,7 @@ function mapDelivery(row: DeliveryDbRow): AlertWebhookDeliveryJobRow {
 export async function claimNextAlertWebhookDelivery(
   prisma: PrismaClient,
   input: { workerId: string; now: Date; env?: NodeJS.ProcessEnv }
-): Promise<AlertWebhookDeliveryJobRow | null> {
+): Promise<AlertWebhookDeliveryClaim | null> {
   const leaseMs = resolveAlertWebhookWorkerLeaseMs(input.env);
   const leaseExpiresAt = new Date(input.now.getTime() + leaseMs);
 
@@ -88,19 +93,24 @@ export async function claimNextAlertWebhookDelivery(
     const candidate = rows[0];
     if (!candidate) return null;
 
+    // Reclaiming an expired PROCESSING lease must not burn retry budget — the prior
+    // worker may never have completed an outbound POST.
+    const attemptChargedOnClaim =
+      candidate.status !== AlertWebhookDeliveryStatus.PROCESSING;
+
     const updated = await tx.alertWebhookDelivery.update({
       where: { id: candidate.id },
       data: {
         status: AlertWebhookDeliveryStatus.PROCESSING,
         lease_owner: input.workerId,
         lease_expires_at: leaseExpiresAt,
-        attempt: { increment: 1 },
+        ...(attemptChargedOnClaim ? { attempt: { increment: 1 } } : {}),
         error: null,
         http_status: null,
       },
     });
 
-    return mapDelivery(updated);
+    return { ...mapDelivery(updated), attemptChargedOnClaim };
   });
 }
 
@@ -173,7 +183,8 @@ export async function finalizeAlertWebhookDeliverySuccess(
 
 /**
  * Drop a PROCESSING claim without counting it as a delivery failure (e.g. lease
- * lost before POST). Undoes the claim attempt increment and retries immediately.
+ * lost before POST). Undoes the claim attempt increment (when charged) and retries
+ * immediately.
  */
 export async function releaseAlertWebhookDeliveryClaim(
   prisma: PrismaClient,
@@ -182,8 +193,11 @@ export async function releaseAlertWebhookDeliveryClaim(
     workerId: string;
     error: string;
     now: Date;
+    /** When false (PROCESSING reclaim), leave attempt unchanged. Default true. */
+    undoAttemptIncrement?: boolean;
   }
 ): Promise<boolean> {
+  const undoAttempt = input.undoAttemptIncrement !== false;
   const result = await prisma.alertWebhookDelivery.updateMany({
     where: {
       id: input.deliveryId,
@@ -197,7 +211,7 @@ export async function releaseAlertWebhookDeliveryClaim(
       lease_owner: null,
       lease_expires_at: null,
       next_attempt_at: input.now,
-      attempt: { decrement: 1 },
+      ...(undoAttempt ? { attempt: { decrement: 1 } } : {}),
     },
   });
   return result.count > 0;
