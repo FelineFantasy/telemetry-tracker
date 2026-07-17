@@ -2,10 +2,7 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { EventsClientListSection } from "@/app/components/dashboard/EventsClientListSection";
 import { EventsSummaryMetrics, type EventsPageSummary } from "@/app/components/dashboard/EventsSummaryMetrics";
-import {
-  EventsAnalyticsPanels,
-  type EventsAnalyticsData,
-} from "@/app/components/dashboard/EventsAnalyticsPanels";
+import { DeferredEventsAnalytics } from "@/app/components/dashboard/DeferredEventsAnalytics";
 import { type EventsTableRow } from "@/app/components/dashboard/EventsTable";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
@@ -41,12 +38,6 @@ async function getEvents(search: URLSearchParams) {
 
 async function getEventsSummary(search: URLSearchParams): Promise<EventsPageSummary | null> {
   const res = await dashboardApiFetch(`/api/events/summary?${search.toString()}`);
-  if (!res.ok) return null;
-  return res.json();
-}
-
-async function getEventsAnalytics(search: URLSearchParams): Promise<EventsAnalyticsData | null> {
-  const res = await dashboardApiFetch(`/api/events/analytics?${search.toString()}`);
   if (!res.ok) return null;
   return res.json();
 }
@@ -161,7 +152,6 @@ export default async function EventsPage({
     pageSize: number;
   };
   let summary: EventsPageSummary | null = null;
-  let analytics: EventsAnalyticsData | null = null;
   let filterOptions = {
     environments: [] as string[],
     platforms: [] as string[],
@@ -169,11 +159,10 @@ export default async function EventsPage({
   };
 
   try {
-    const [opts, data, summaryData, analyticsData] = await Promise.all([
+    const [opts, data, summaryData] = await Promise.all([
       getFilterOptions(appFilter || undefined),
       getEvents(apiQuery),
       getEventsSummary(summaryQuery),
-      getEventsAnalytics(summaryQuery),
     ]);
     filterOptions = opts;
     initialListData = {
@@ -183,7 +172,6 @@ export default async function EventsPage({
       pageSize: data.pageSize ?? pageSize,
     };
     summary = summaryData;
-    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -220,8 +208,6 @@ export default async function EventsPage({
       <AnalyticsListShell>
         {summary ? <EventsSummaryMetrics summary={summary} /> : null}
 
-        {analytics ? <EventsAnalyticsPanels analytics={analytics} /> : null}
-
         <EventsClientListSection
           path={EVENTS_PATH}
           urlParams={currentParams}
@@ -244,6 +230,8 @@ export default async function EventsPage({
           platforms={filterOptions.platforms}
           releases={filterOptions.releases}
         />
+
+        <DeferredEventsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );
