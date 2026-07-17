@@ -11,10 +11,7 @@ import { ListResultCount } from "@/app/components/dashboard/ListResultCount";
 import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { Pagination } from "@/app/components/ui/Pagination";
-import {
-  SessionsAnalyticsPanels,
-  type SessionsAnalyticsData,
-} from "@/app/components/dashboard/SessionsAnalyticsPanels";
+import { DeferredSessionsAnalytics } from "@/app/components/dashboard/DeferredSessionsAnalytics";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
 import { resolveApiListTotal } from "@/lib/pagination";
@@ -33,7 +30,7 @@ type Props = {
   urlParams: Record<string, string>;
   initialListParams: Record<string, string>;
   initialData: SessionsListResponse;
-  analytics?: SessionsAnalyticsData | null;
+  analyticsQueryString: string;
   timeRange: ParsedTimeRange;
   fromParam: string;
   toParam: string;
@@ -59,7 +56,7 @@ export function SessionsClientListSection({
   urlParams,
   initialListParams,
   initialData,
-  analytics,
+  analyticsQueryString,
   timeRange,
   fromParam,
   toParam,
@@ -130,14 +127,6 @@ export function SessionsClientListSection({
 
   return (
     <>
-      {analytics ? (
-        <SessionsAnalyticsPanels
-          analytics={analytics}
-          path={path}
-          currentParams={liveUrlParams}
-        />
-      ) : null}
-
       <SessionsListToolbar
         path={path}
         currentParams={liveUrlParams}
@@ -199,6 +188,12 @@ export function SessionsClientListSection({
         pageSize={pageSizeNum}
         hrefForPage={hrefForPage}
         onPageChange={onPageChange}
+      />
+
+      <DeferredSessionsAnalytics
+        queryString={analyticsQueryString}
+        path={path}
+        currentParams={liveUrlParams}
       />
     </>
   );
