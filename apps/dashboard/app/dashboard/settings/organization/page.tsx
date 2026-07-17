@@ -14,6 +14,7 @@ import {
 import { CreateOrganizationForm } from "@/app/dashboard/settings/organization/CreateOrganizationForm";
 import { SettingsBtn, SettingsInput, Section } from "@/app/components/dashboard/settings/settings-ui";
 import { OrganizationArchiveSection } from "@/app/dashboard/settings/organization/OrganizationArchiveSection";
+import { OrganizationRenameSection } from "@/app/dashboard/settings/organization/OrganizationRenameSection";
 import { OrganizationUsageCard } from "@/app/dashboard/settings/organization/OrganizationUsageCard";
 
 export const dynamic = "force-dynamic";
@@ -119,10 +120,22 @@ export default async function OrganizationSettingsPage() {
         />
       ) : null}
 
+      {effectiveOrgId && activeOrgName ? (
+        <div className="mb-6">
+          <OrganizationRenameSection
+            organizationId={effectiveOrgId}
+            organizationName={activeOrgName}
+            canRename={canCreateProject}
+          />
+        </div>
+      ) : null}
+
       {effectiveOrgId ? (
         <div className="mb-6 flex max-w-2xl flex-col gap-3 rounded-xl border border-border bg-surface/40 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="m-0 text-sm text-muted-foreground">
-            Use this page to <strong className="text-foreground">add projects</strong> to the
+            Use this page to{" "}
+            <strong className="text-foreground">rename the workspace</strong> and{" "}
+            <strong className="text-foreground">add projects</strong> for the
             organization selected in the header.{" "}
             <strong className="text-foreground">Team</strong> and <strong className="text-foreground">API keys</strong>{" "}
             live under separate settings — open them from here when you need people or ingestion

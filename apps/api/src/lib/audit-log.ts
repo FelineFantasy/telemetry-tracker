@@ -11,6 +11,8 @@ export const AUDIT_ACTIONS = {
   PROFILE_AVATAR_REMOVE: "profile.avatar.remove",
   /** Project PII scrub settings changed (deny-keys / session email flag). */
   PROJECT_PII_SCRUB_UPDATE: "project.pii_scrub.update",
+  /** Organization (workspace) display name changed. */
+  ORGANIZATION_UPDATE: "organization.update",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

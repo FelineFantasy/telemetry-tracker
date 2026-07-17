@@ -165,6 +165,53 @@ export async function projectDashboardRoutes(
     return reply.status(201).send({ id: org.id, name: org.name });
   });
 
+  app.patch<{ Params: { orgId: string } }>(
+    "/meta/organizations/:orgId",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const orgId = request.params.orgId.trim();
+      if (!UUID_RE.test(orgId)) {
+        return reply.status(400).send({ error: "Invalid organization id" });
+      }
+      const existing = await prisma.organization.findFirst({
+        where: { id: orgId, deleted_at: null },
+        select: { id: true, name: true },
+      });
+      if (!existing) {
+        return reply.status(404).send({ error: "Organization not found" });
+      }
+      const role = await getMembershipRoleForOrganization(session.userId, orgId);
+      if (!canArchiveOrganization(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+      const body = (request.body ?? {}) as { name?: string };
+      if (typeof body.name !== "string") {
+        return reply.status(400).send({ error: "name is required" });
+      }
+      const name = body.name.trim().slice(0, 120);
+      if (!name) {
+        return reply.status(400).send({ error: "name cannot be empty" });
+      }
+      if (name === existing.name) {
+        return reply.send({ id: existing.id, name: existing.name });
+      }
+      const updated = await prisma.organization.update({
+        where: { id: orgId },
+        data: { name },
+        select: { id: true, name: true },
+      });
+      void recordOrganizationAuditEvent(
+        prisma,
+        orgId,
+        session.userId,
+        AUDIT_ACTIONS.ORGANIZATION_UPDATE,
+        `organization:${updated.id} name=${updated.name}`
+      );
+      return reply.send({ id: updated.id, name: updated.name });
+    }
+  );
+
   app.get("/meta/dashboard-bootstrap", async (request, reply) => {
     const session = await getSessionUser(request);
     if (!session) {
