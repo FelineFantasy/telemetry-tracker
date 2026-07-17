@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { OrgRole, type AlertRuleType, type PrismaClient } from "@prisma/client";
 import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 import { notifyProjectMembersByEmail } from "./notification-email-dispatch.js";
+import { enqueueAlertWebhookDeliveries } from "./alert-webhook-dispatch.js";
 
 export type AlertFirePayload = {
   projectId: string;
@@ -35,22 +36,34 @@ export function alertEventHref(rule: AlertRuleType, stored: string | null): stri
   }
 }
 
-/** Record alert history and notify org members (email deduped via notification key). */
+/** Record alert history and fan out to email + configured webhooks (deduped). */
 export async function fireProjectAlert(
   prisma: PrismaClient,
   payload: AlertFirePayload
 ): Promise<boolean> {
+  const alertEventId = randomUUID();
+  const firedAt = new Date();
   try {
-    await prisma.alertEvent.create({
-      data: {
-        id: randomUUID(),
-        project_id: payload.projectId,
-        rule: payload.rule,
-        title: payload.title,
-        body: payload.body,
-        href: payload.href,
-        dedupe_key: payload.dedupeKey,
-      },
+    // AlertEvent + PENDING webhook rows commit together so a failed enqueue
+    // cannot leave a dedupe key that blocks later retries from re-enqueueing.
+    await prisma.$transaction(async (tx) => {
+      await tx.alertEvent.create({
+        data: {
+          id: alertEventId,
+          project_id: payload.projectId,
+          rule: payload.rule,
+          title: payload.title,
+          body: payload.body,
+          href: payload.href,
+          dedupe_key: payload.dedupeKey,
+          fired_at: firedAt,
+        },
+      });
+      await enqueueAlertWebhookDeliveries(tx, {
+        projectId: payload.projectId,
+        alertEventId,
+        dedupeKey: payload.dedupeKey,
+      });
     });
   } catch (e: unknown) {
     if (isUniqueViolation(e)) return false;
@@ -62,7 +75,7 @@ export async function fireProjectAlert(
     type: "alert",
     title: payload.title,
     body: payload.body,
-    occurredAt: new Date().toISOString(),
+    occurredAt: firedAt.toISOString(),
     href: payload.href,
   };
 

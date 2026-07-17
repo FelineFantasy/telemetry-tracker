@@ -21,6 +21,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.14.0] - 2026-07-17
+
+### Added
+
+- **Alert webhooks** — configure HTTPS destinations per project on Alerts → Delivery; `fireProjectAlert` enqueues durable `PENDING` deliveries (worker POSTs signed `alert.fired` JSON with DNS-pinned SSRF checks + retry); operators can browse delivery status in the same Delivery section ([#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+### Database
+
+- `ProjectWebhook` and `AlertWebhookDelivery` tables for outbound alert webhook destinations; delivery rows use claim/lease fields (`PENDING`/`PROCESSING`, `lease_owner`, `lease_expires_at`, `next_attempt_at`) plus attempt/dead-letter history
+
+---
+
 ## [1.13.2] - 2026-07-17
 
 ### Fixed
@@ -174,6 +186,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Time range picker** — clearer copy when the table is unfiltered but charts use a recent window ([#422](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/422), [#427](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/427))
 
 ---
+
+## [1.8.11] - 2026-07-14
 
 ### Added
 
@@ -625,7 +639,9 @@ Continues the **v1.5.0 — Analytics dashboard** milestone ([#182](https://githu
 
 ---
 
-First release of the **v1.5.0 — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
+## [1.5.0] - 2026-07-07
+
+First release of the **v1.5.x — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
 
 ### Added
 

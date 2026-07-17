@@ -313,7 +313,7 @@ First production-ready self-hosted release. Full changelog: [CHANGELOG.md#100---
 **Known limitations:**
 
 - Per-project ingest RPS is in-memory (single API process)
-- No built-in error spike alerts
+- Project alert webhooks for spike/quota — see [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md)
 - Open sessions without `ended_at` are not pruned by retention until closed
 
 **Live reference deployment:** `telemetry-tracker.com` (dashboard) / `api.telemetry-tracker.com` (API). Legacy: `telemetry-api.tacko.io`, `telemetry-tracker.tacko.io`.

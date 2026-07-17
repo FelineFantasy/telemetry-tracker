@@ -62,11 +62,12 @@ const INTEGRATION_CATALOG: IntegrationCatalogEntry[] = [
   {
     id: "webhooks",
     name: "Webhooks",
-    description: "HTTP callbacks when errors spike or quotas are near limit.",
+    description: "HTTPS callbacks when error spikes or quota alerts fire.",
     scope: "project",
-    availability: "planned",
+    availability: "available",
     connectHref: "/dashboard/alerts",
     configureHref: "/dashboard/alerts",
+    trackedIssue: 225,
   },
   {
     id: "slack",
@@ -102,6 +103,8 @@ const INTEGRATION_CATALOG: IntegrationCatalogEntry[] = [
 export type OrganizationIntegrationSignals = {
   activeApiKeyCount: number;
   projectCount: number;
+  /** Enabled, non-deleted project webhooks for the scoped project. */
+  enabledWebhookCount: number;
 };
 
 function activeApiKeyWhere(projectId: string, now: Date) {
@@ -126,17 +129,26 @@ export async function loadOrganizationIntegrationSignals(
       select: { id: true },
     });
     if (!project) {
-      return { activeApiKeyCount: 0, projectCount: 0 };
+      return { activeApiKeyCount: 0, projectCount: 0, enabledWebhookCount: 0 };
     }
 
-    const activeApiKeyCount = await db.apiKey.count({
-      where: activeApiKeyWhere(project.id, now),
-    });
+    const [activeApiKeyCount, enabledWebhookCount] = await Promise.all([
+      db.apiKey.count({
+        where: activeApiKeyWhere(project.id, now),
+      }),
+      db.projectWebhook.count({
+        where: {
+          project_id: project.id,
+          deleted_at: null,
+          enabled: true,
+        },
+      }),
+    ]);
 
-    return { activeApiKeyCount, projectCount: 1 };
+    return { activeApiKeyCount, projectCount: 1, enabledWebhookCount };
   }
 
-  return { activeApiKeyCount: 0, projectCount: 0 };
+  return { activeApiKeyCount: 0, projectCount: 0, enabledWebhookCount: 0 };
 }
 
 function projectScopedHref(
@@ -174,6 +186,7 @@ function resolveIntegrationStatus(
       // QUOTA_EXCEEDED emails fire at monthly cap even when quota.enabled is false.
       return signals.projectCount > 0 ? "connected" : "disconnected";
     case "webhooks":
+      return signals.enabledWebhookCount > 0 ? "connected" : "disconnected";
     case "slack":
     case "discord":
     case "github":
