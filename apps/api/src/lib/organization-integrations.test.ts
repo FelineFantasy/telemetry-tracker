@@ -216,12 +216,31 @@ describe("organization-integrations", () => {
       trackedIssue: 224,
     });
     expect(integrations.find((i) => i.id === "microsoft_teams")).toMatchObject({
-      availability: "planned",
+      availability: "available",
       trackedIssue: 500,
     });
     expect(integrations.find((i) => i.id === "telegram")).toMatchObject({
-      availability: "planned",
+      availability: "available",
       trackedIssue: 500,
     });
+  });
+
+  it("marks Teams and Telegram connected when enabled destinations exist", () => {
+    expect(
+      resolveOrganizationIntegrations({
+        activeApiKeyCount: 0,
+        projectCount: 1,
+        ...emptyChannelCounts,
+        enabledTeamsWebhookCount: 1,
+      }).find((i) => i.id === "microsoft_teams")?.status
+    ).toBe("connected");
+    expect(
+      resolveOrganizationIntegrations({
+        activeApiKeyCount: 0,
+        projectCount: 1,
+        ...emptyChannelCounts,
+        enabledTelegramWebhookCount: 1,
+      }).find((i) => i.id === "telegram")?.status
+    ).toBe("connected");
   });
 });

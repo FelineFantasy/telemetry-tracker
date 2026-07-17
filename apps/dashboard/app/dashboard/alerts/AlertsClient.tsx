@@ -92,6 +92,16 @@ const DELIVERY_PROVIDER_OPTIONS: {
     label: "Discord",
     urlPlaceholder: "https://discord.com/api/webhooks/…/…",
   },
+  {
+    value: "MICROSOFT_TEAMS",
+    label: "Microsoft Teams",
+    urlPlaceholder: "https://….webhook.office.com/webhookb2/…",
+  },
+  {
+    value: "TELEGRAM",
+    label: "Telegram",
+    urlPlaceholder: "https://api.telegram.org/bot<token>/sendMessage",
+  },
 ];
 
 function deliveryStatusLabel(status: AlertWebhookDeliveryRow["status"]): string {
@@ -526,12 +536,12 @@ export function AlertsClient({
 
         <Section
           title="Delivery"
-          description="HTTPS webhooks, Slack, and Discord destinations receive a message when an alert fires (error spike or quota)."
+          description="HTTPS webhooks and chat destinations (Slack, Discord, Teams, Telegram) receive a message when an alert fires."
         >
           <p className="mb-3 text-[13px] text-muted-foreground">
             Generic webhook payload schema lives in{" "}
             <code className="font-mono text-[11px]">docs/ALERT-WEBHOOKS.md</code>.
-            Slack and Discord use provider-native Incoming Webhook JSON.
+            Chat channels use provider-native payloads (Incoming Webhooks or Telegram Bot API).
           </p>
 
           {lastSigningSecret ? (
@@ -637,7 +647,11 @@ export function AlertsClient({
                     ? "Slack Incoming Webhook URL"
                     : webhookProvider === "DISCORD"
                       ? "Discord webhook URL"
-                      : "HTTPS URL"
+                      : webhookProvider === "MICROSOFT_TEAMS"
+                        ? "Teams Incoming Webhook URL"
+                        : webhookProvider === "TELEGRAM"
+                          ? "Telegram Bot API sendMessage URL"
+                          : "HTTPS URL"
                 }
               >
                 <input
@@ -674,7 +688,11 @@ export function AlertsClient({
                       ? "#alerts"
                       : webhookProvider === "DISCORD"
                         ? "#ops"
-                        : "Ops channel"
+                        : webhookProvider === "MICROSOFT_TEAMS"
+                          ? "Ops channel"
+                          : webhookProvider === "TELEGRAM"
+                            ? "Ops chat"
+                            : "Ops channel"
                   }
                   disabled={webhookPending}
                   className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"
