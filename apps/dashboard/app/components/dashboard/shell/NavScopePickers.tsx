@@ -35,6 +35,7 @@ export function NavScopePickers({
       />
       <TopNavProjectSwitcher
         projects={projects}
+        currentOrganizationId={currentOrganizationId}
         currentProjectId={currentProjectId}
         projectNavSummaries={projectNavSummaries}
       />

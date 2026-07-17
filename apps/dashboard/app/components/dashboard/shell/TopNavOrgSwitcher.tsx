@@ -88,7 +88,9 @@ export function TopNavOrgSwitcher({
                     const r = await setDashboardOrganizationId(o.id);
                     if (r.ok) {
                       await replaceAndRefresh(
-                        hrefWithoutAppSearchParam(pathname, searchParams)
+                        hrefWithoutAppSearchParam(pathname, searchParams),
+                        // Project may change to the org default after switch.
+                        { organizationId: o.id, projectId: "" }
                       );
                       close();
                     } else {
