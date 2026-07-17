@@ -62,7 +62,6 @@ function DashboardNavigationOverlay({ active }: { active: boolean }) {
   );
 }
 
-const REFRESH_MIN_HOLD_MS = 100;
 /** Nav already matches via revalidatePath — hold long enough for page RSC refresh. */
 const REFRESH_ALREADY_MATCHED_HOLD_MS = 800;
 const REFRESH_ALREADY_MATCHED_AFTER_TRANSITION_MS = 400;
@@ -145,6 +144,7 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
         const startedAt = performance.now();
         let settled = false;
         let sawTransition = false;
+        let scopeMatchedAt: number | null = null;
 
         const finish = () => {
           if (settled) return;
@@ -173,13 +173,18 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
             }
           } else {
             const advanced = scopeSignalRef.current > signalAtStart;
-            if (
-              elapsed >= REFRESH_MIN_HOLD_MS &&
-              advanced &&
-              scopesMatch(renderedScopeRef.current, expect)
-            ) {
-              finish();
-              return;
+            if (advanced && scopesMatch(renderedScopeRef.current, expect)) {
+              if (scopeMatchedAt === null) scopeMatchedAt = performance.now();
+              // Nav scope updated, but page RSC may still be refreshing — wait for
+              // transition idle plus a post-ack floor (refresh often never stays pending).
+              const sinceMatch = performance.now() - scopeMatchedAt;
+              const floor = sawTransition
+                ? REFRESH_ALREADY_MATCHED_AFTER_TRANSITION_MS
+                : REFRESH_ALREADY_MATCHED_HOLD_MS;
+              if (sinceMatch >= floor && !transitionPendingRef.current) {
+                finish();
+                return;
+              }
             }
           }
 
