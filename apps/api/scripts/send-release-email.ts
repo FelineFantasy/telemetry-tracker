@@ -9,6 +9,7 @@ import {
 import { sendTransactionalEmail, isTransactionalEmailConfigured } from "../src/lib/email.js";
 import { isMinorOrMajorBump } from "../src/lib/release-email-semver.js";
 import {
+  emptyReleaseEmailAudienceMessage,
   isReleaseEmailBroadcastComplete,
   loadReleaseEmailSentSubscriberIds,
   pendingReleaseEmailRecipients,
@@ -166,13 +167,12 @@ async function main() {
   }
 
   if (subscribers.length === 0) {
+    const message = emptyReleaseEmailAudienceMessage(allSubscribers.length, { dryRun: DRY_RUN });
     if (DRY_RUN) {
-      console.log("--dry-run: would send to 0 subscriber(s).");
+      console.log(message);
       return;
     }
-    console.error(
-      "No active marketing subscribers. Re-run after subscribers exist; the workflow can be retried safely."
-    );
+    console.error(message);
     process.exit(1);
   }
 

@@ -16,6 +16,25 @@ export function pendingReleaseEmailRecipients<T extends { id: string }>(
   return subscribers.filter((subscriber) => !alreadySentIds.has(subscriber.id));
 }
 
+/**
+ * Live/dry-run copy when deliverable recipients are empty after reserved-domain filtering.
+ * Distinguishes “no active rows” from “all active rows were undeliverable.”
+ */
+export function emptyReleaseEmailAudienceMessage(
+  activeCount: number,
+  options: { dryRun?: boolean } = {}
+): string {
+  const dryRun = options.dryRun === true;
+  if (activeCount > 0) {
+    return dryRun
+      ? `--dry-run: would send to 0 subscriber(s) (${activeCount} active row(s) skipped as reserved/invalid).`
+      : `No deliverable marketing subscribers (${activeCount} active row(s) skipped as reserved/invalid). Clean up reserved addresses or add deliverable subscribers; the workflow can be retried safely.`;
+  }
+  return dryRun
+    ? "--dry-run: would send to 0 subscriber(s)."
+    : "No active marketing subscribers. Re-run after subscribers exist; the workflow can be retried safely.";
+}
+
 export async function loadReleaseEmailSentSubscriberIds(
   db: PrismaTypes.TransactionClient | PrismaTypes.DefaultPrismaClient,
   releaseVersion: string,
