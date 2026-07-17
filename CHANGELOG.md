@@ -15,6 +15,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Fixed
 
+- **Navigation overlay** — profile/settings links from the user menu, quick actions, and theme entry use the shared nav loader; soft navigations keep the overlay visible for a short minimum so fast settings pages still show it
+
 ### Changed
 
 ### Database
