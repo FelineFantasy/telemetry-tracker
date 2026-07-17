@@ -517,44 +517,88 @@ export async function softDeleteProjectWebhook(
   return { ok: true };
 }
 
-export type EnqueueAlertWebhookInput = {
+export type DispatchAlertInput = {
   projectId: string;
   alertEventId: string;
+  rule: AlertRuleType;
+  title: string;
+  body: string;
+  href: string | null;
   dedupeKey: string;
+  firedAt?: Date;
 };
 
-/**
- * Persist PENDING delivery rows for each enabled webhook.
- * Must complete before fireProjectAlert returns (durable enqueue).
- */
-export async function enqueueAlertWebhookDeliveries(
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Deliver an alert payload to all enabled project webhooks (best-effort, with retry). */
+export async function dispatchAlertWebhooks(
   prisma: PrismaClient,
-  input: EnqueueAlertWebhookInput
-): Promise<number> {
+  input: DispatchAlertInput,
+  options?: { sendImpl?: WebhookSendImpl; lookupFn?: WebhookDnsLookup }
+): Promise<void> {
   const webhooks = await prisma.projectWebhook.findMany({
     where: {
       project_id: input.projectId,
       deleted_at: null,
       enabled: true,
     },
-    select: { id: true },
+    select: {
+      id: true,
+      url: true,
+      signing_secret: true,
+    },
   });
-  if (webhooks.length === 0) return 0;
+  const sendImpl = options?.sendImpl ?? postWebhookOnceAsSendImpl;
 
-  const now = new Date();
-  await prisma.alertWebhookDelivery.createMany({
-    data: webhooks.map((webhook) => ({
-      id: randomUUID(),
-      webhook_id: webhook.id,
-      project_id: input.projectId,
-      alert_event_id: input.alertEventId,
-      dedupe_key: input.dedupeKey,
-      attempt: 0,
-      status: "PENDING" as const,
-      next_attempt_at: now,
-    })),
-  });
-  return webhooks.length;
+  await Promise.all(
+    webhooks.map(async (webhook) => {
+      for (let attempt = 1; attempt <= WEBHOOK_MAX_ATTEMPTS; attempt++) {
+        const deliveryId = randomUUID();
+        const body = JSON.stringify(
+          buildAlertWebhookPayload({
+            deliveryId,
+            projectId: input.projectId,
+            rule: input.rule,
+            title: input.title,
+            body: input.body,
+            href: input.href,
+            dedupeKey: input.dedupeKey,
+            firedAt: input.firedAt,
+          })
+        );
+        const signature = webhook.signing_secret
+          ? signWebhookBody(body, webhook.signing_secret)
+          : null;
+        const result = await sendImpl({
+          url: webhook.url,
+          body,
+          signature,
+          deliveryId,
+          lookupFn: options?.lookupFn,
+        });
+        const isLast = attempt === WEBHOOK_MAX_ATTEMPTS;
+
+        await prisma.alertWebhookDelivery.create({
+          data: {
+            id: randomUUID(),
+            webhook_id: webhook.id,
+            project_id: input.projectId,
+            alert_event_id: input.alertEventId,
+            dedupe_key: input.dedupeKey,
+            attempt,
+            status: result.ok ? "SUCCESS" : isLast ? "DEAD" : "FAILED",
+            http_status: result.httpStatus,
+            error: result.ok ? null : result.error,
+          },
+        });
+
+        if (result.ok || isLast) return;
+        await sleep(WEBHOOK_RETRY_DELAY_MS);
+      }
+    })
+  );
 }
 
 /**

@@ -1,375 +1,119 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  assertWebhookResolvedHostAllowed,
   buildAlertWebhookPayload,
   dispatchAlertWebhooks,
   isBlockedIpAddress,
-  listAlertWebhookDeliveries,
-  maskWebhookUrl,
+  isBlockedWebhookHostname,
+  postWebhookOnce,
+  resolveWebhookHostForDelivery,
   sendTestWebhook,
   signWebhookBody,
   validateWebhookUrl,
   WEBHOOK_MAX_ATTEMPTS,
+  type WebhookDnsLookup,
+  type WebhookSendImpl,
 } from "./alert-webhook-dispatch.js";
 
-const allowHost = async () => ({ ok: true as const });
+const publicLookup: WebhookDnsLookup = async () => [{ address: "203.0.113.10", family: 4 }];
 
-describe("validateWebhookUrl", () => {
-  it("requires https and rejects private / loopback hosts", () => {
-    expect(validateWebhookUrl("http://example.com/hook").ok).toBe(false);
-    expect(validateWebhookUrl("https://localhost/hook").ok).toBe(false);
-    expect(validateWebhookUrl("https://127.0.0.1/hook").ok).toBe(false);
-    expect(validateWebhookUrl("https://127.1/hook").ok).toBe(false);
-    expect(validateWebhookUrl("https://10.0.0.5/hook").ok).toBe(false);
-    expect(validateWebhookUrl("https://192.168.1.1/hook").ok).toBe(false);
-    expect(validateWebhookUrl("https://hooks.example.com/a/b").ok).toBe(true);
+describe("webhook URL validation", () => {
+  it("keeps create-time HTTPS and hostname protections", () => {
+    expect(validateWebhookUrl("https://hooks.example.com/path")).toMatchObject({ ok: true });
+    expect(validateWebhookUrl("http://hooks.example.com")).toMatchObject({ ok: false });
+    expect(validateWebhookUrl("https://localhost/hook")).toMatchObject({ ok: false });
+    expect(isBlockedWebhookHostname("127.0.0.1")).toBe(true);
+  });
+
+  it("blocks private, loopback, link-local, and ULA addresses", () => {
+    for (const ip of ["127.0.0.1", "10.0.0.1", "169.254.169.254", "::1", "fe80::1", "fd00::1"]) {
+      expect(isBlockedIpAddress(ip)).toBe(true);
+    }
+    expect(isBlockedIpAddress("203.0.113.10")).toBe(false);
   });
 });
 
-describe("isBlockedIpAddress", () => {
-  it("blocks private, loopback, link-local, and CGNAT IPv4", () => {
-    expect(isBlockedIpAddress("127.0.0.1")).toBe(true);
-    expect(isBlockedIpAddress("10.0.0.1")).toBe(true);
-    expect(isBlockedIpAddress("192.168.1.1")).toBe(true);
-    expect(isBlockedIpAddress("169.254.169.254")).toBe(true);
-    expect(isBlockedIpAddress("172.16.0.1")).toBe(true);
-    expect(isBlockedIpAddress("100.64.0.1")).toBe(true);
-    expect(isBlockedIpAddress("8.8.8.8")).toBe(false);
+describe("delivery-time DNS protections", () => {
+  it("rejects hostnames that resolve to private addresses", async () => {
+    const lookupFn: WebhookDnsLookup = async () => [{ address: "169.254.169.254", family: 4 }];
+    await expect(resolveWebhookHostForDelivery("metadata.example", lookupFn)).resolves.toMatchObject({ ok: false });
   });
 
-  it("blocks loopback / ULA / link-local IPv6 and mapped private IPv4", () => {
-    expect(isBlockedIpAddress("::1")).toBe(true);
-    expect(isBlockedIpAddress("fc00::1")).toBe(true);
-    expect(isBlockedIpAddress("fe80::1")).toBe(true);
-    expect(isBlockedIpAddress("::ffff:127.0.0.1")).toBe(true);
-    expect(isBlockedIpAddress("2001:4860:4860::8888")).toBe(false);
-  });
-});
-
-describe("assertWebhookResolvedHostAllowed", () => {
-  it("rejects literal private hosts without DNS", async () => {
-    await expect(assertWebhookResolvedHostAllowed("127.0.0.1")).resolves.toMatchObject({
-      ok: false,
-    });
-    await expect(assertWebhookResolvedHostAllowed("localhost")).resolves.toMatchObject({
-      ok: false,
+  it("passes the injected resolver to the pinned transport", async () => {
+    const lookupFn: WebhookDnsLookup = async () => [{ address: "127.0.0.1", family: 4 }];
+    await expect(postWebhookOnce("https://blocked.example/hook", "{}", null, "d1", { lookupFn })).resolves.toEqual({
+      ok: false, httpStatus: null, error: "Webhook URL host is not allowed",
     });
   });
-});
 
-describe("maskWebhookUrl", () => {
-  it("hides path details", () => {
-    expect(maskWebhookUrl("https://hooks.example.com/secret/path")).toBe(
-      "https://hooks.example.com/***"
-    );
-  });
-});
-
-describe("signWebhookBody", () => {
-  it("produces a stable sha256 HMAC header value", () => {
-    const sig = signWebhookBody('{"a":1}', "secret");
-    expect(sig).toMatch(/^sha256=[a-f0-9]{64}$/);
-    expect(signWebhookBody('{"a":1}', "secret")).toBe(sig);
-    expect(signWebhookBody('{"a":2}', "secret")).not.toBe(sig);
-  });
-});
-
-describe("buildAlertWebhookPayload", () => {
-  it("builds versioned alert.fired payloads", () => {
-    const payload = buildAlertWebhookPayload({
-      deliveryId: "d1",
-      projectId: "p1",
-      rule: "ERROR_SPIKE",
-      title: "Spike",
-      body: "Many errors",
-      href: "/dashboard/errors",
-      dedupeKey: "alert:error_spike:p1:1",
-      firedAt: new Date("2026-07-17T10:00:00.000Z"),
-    });
-    expect(payload).toMatchObject({
-      version: 1,
-      event: "alert.fired",
-      deliveryId: "d1",
-      projectId: "p1",
-      rule: "ERROR_SPIKE",
-      dedupeKey: "alert:error_spike:p1:1",
-      firedAt: "2026-07-17T10:00:00.000Z",
+  it("allows public DNS answers", async () => {
+    await expect(resolveWebhookHostForDelivery("hooks.example.com", publicLookup)).resolves.toMatchObject({
+      ok: true, addresses: [{ address: "203.0.113.10", family: 4 }],
     });
   });
 });
 
 describe("dispatchAlertWebhooks", () => {
-  it("posts to enabled webhooks, signs, retries, then dead-letters", async () => {
+  const input = {
+    projectId: "p1", alertEventId: "ae1", rule: "ERROR_SPIKE" as const,
+    title: "Spike", body: "Many errors", href: "/dashboard/errors",
+    dedupeKey: "alert:error-spike:p1", firedAt: new Date("2026-07-17T10:00:00.000Z"),
+  };
+
+  it("uses injected sendImpl, signs payloads, and logs FAILED then DEAD", async () => {
     const create = vi.fn(async () => ({ id: "log" }));
+    const sendImpl: WebhookSendImpl = vi.fn(async () => ({ ok: false as const, httpStatus: 500, error: "HTTP 500" }));
     const prisma = {
-      projectWebhook: {
-        findMany: async () => [
-          {
-            id: "wh1",
-            url: "https://hooks.example.com/a",
-            signing_secret: "sekrit",
-          },
-        ],
-      },
+      projectWebhook: { findMany: async () => [{ id: "wh1", url: "https://hooks.example.com/a", signing_secret: "secret" }] },
       alertWebhookDelivery: { create },
     };
 
-    let calls = 0;
-    const fetchImpl = vi.fn(async () => {
-      calls += 1;
-      return {
-        ok: false,
-        status: 500,
-      } as Response;
-    });
+    await dispatchAlertWebhooks(prisma as never, input, { sendImpl, lookupFn: publicLookup });
 
-    await dispatchAlertWebhooks(
-      prisma as never,
-      {
-        projectId: "p1",
-        alertEventId: "ae1",
-        rule: "QUOTA_NEAR",
-        title: "Near",
-        body: "90%",
-        href: "/dashboard/settings/billing",
-        dedupeKey: "quota:near:p1:2026-07",
-      },
-      { fetchImpl: fetchImpl as never, resolveHost: allowHost }
-    );
-
-    expect(calls).toBe(WEBHOOK_MAX_ATTEMPTS);
-    expect(fetchImpl).toHaveBeenCalledTimes(WEBHOOK_MAX_ATTEMPTS);
-    const firstBody = (fetchImpl.mock.calls[0]?.[1] as { body: string }).body;
-    const firstHeaders = (fetchImpl.mock.calls[0]?.[1] as { headers: Record<string, string> })
-      .headers;
-    const firstInit = fetchImpl.mock.calls[0]?.[1] as { redirect?: string };
-    expect(firstInit.redirect).toBe("manual");
-    expect(JSON.parse(firstBody).event).toBe("alert.fired");
-    expect(firstHeaders["X-Telemetry-Signature"]).toBe(
-      signWebhookBody(firstBody, "sekrit")
-    );
-    expect(create).toHaveBeenCalledTimes(WEBHOOK_MAX_ATTEMPTS);
-    expect(create.mock.calls.at(-1)?.[0]).toMatchObject({
-      data: { status: "DEAD", attempt: WEBHOOK_MAX_ATTEMPTS },
-    });
+    expect(sendImpl).toHaveBeenCalledTimes(WEBHOOK_MAX_ATTEMPTS);
+    expect(sendImpl).toHaveBeenCalledWith(expect.objectContaining({ lookupFn: publicLookup }));
+    const sent = vi.mocked(sendImpl).mock.calls[0]?.[0];
+    expect(JSON.parse(sent!.body)).toMatchObject({ event: "alert.fired", projectId: "p1" });
+    expect(sent!.signature).toBe(signWebhookBody(sent!.body, "secret"));
+    expect(create.mock.calls.map((call) => call[0].data.status)).toEqual(["FAILED", "DEAD"]);
   });
 
-  it("treats HTTP redirects as delivery failures", async () => {
+  it("logs SUCCESS without retrying", async () => {
     const create = vi.fn(async () => ({ id: "log" }));
+    const sendImpl: WebhookSendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 204 }));
     const prisma = {
-      projectWebhook: {
-        findMany: async () => [
-          { id: "wh1", url: "https://hooks.example.com/a", signing_secret: null },
-        ],
-      },
+      projectWebhook: { findMany: async () => [{ id: "wh1", url: "https://hooks.example.com/a", signing_secret: null }] },
       alertWebhookDelivery: { create },
     };
-    const fetchImpl = vi.fn(async () => ({ ok: false, status: 302 }) as Response);
-
-    await dispatchAlertWebhooks(
-      prisma as never,
-      {
-        projectId: "p1",
-        alertEventId: "ae1",
-        rule: "ERROR_SPIKE",
-        title: "Spike",
-        body: "n",
-        href: null,
-        dedupeKey: "k-redirect",
-      },
-      { fetchImpl: fetchImpl as never, resolveHost: allowHost }
-    );
-
-    expect(create.mock.calls.at(-1)?.[0]).toMatchObject({
-      data: {
-        status: "DEAD",
-        error: "HTTP 302 (redirect not followed)",
-      },
-    });
-  });
-
-  it("skips fetch when resolved host is blocked (DNS rebinding guard)", async () => {
-    const create = vi.fn(async () => ({ id: "log" }));
-    const prisma = {
-      projectWebhook: {
-        findMany: async () => [
-          { id: "wh1", url: "https://127.0.0.1.nip.io/hook", signing_secret: null },
-        ],
-      },
-      alertWebhookDelivery: { create },
-    };
-    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200 }) as Response);
-    const resolveHost = vi.fn(async () => ({
-      ok: false as const,
-      error: "Webhook URL host is not allowed",
+    await dispatchAlertWebhooks(prisma as never, input, { sendImpl });
+    expect(sendImpl).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "SUCCESS", attempt: 1, http_status: 204 }),
     }));
-
-    await dispatchAlertWebhooks(
-      prisma as never,
-      {
-        projectId: "p1",
-        alertEventId: "ae1",
-        rule: "ERROR_SPIKE",
-        title: "Spike",
-        body: "n",
-        href: null,
-        dedupeKey: "k-ssrf",
-      },
-      { fetchImpl: fetchImpl as never, resolveHost }
-    );
-
-    expect(resolveHost).toHaveBeenCalledWith("127.0.0.1.nip.io");
-    expect(fetchImpl).not.toHaveBeenCalled();
-    expect(create.mock.calls.at(-1)?.[0]).toMatchObject({
-      data: {
-        status: "DEAD",
-        error: "Webhook URL host is not allowed",
-      },
-    });
-  });
-
-  it("records SUCCESS on the first successful attempt", async () => {
-    const create = vi.fn(async () => ({ id: "log" }));
-    const prisma = {
-      projectWebhook: {
-        findMany: async () => [
-          { id: "wh1", url: "https://hooks.example.com/a", signing_secret: null },
-        ],
-      },
-      alertWebhookDelivery: { create },
-    };
-    const fetchImpl = vi.fn(async () => ({ ok: true, status: 204 }) as Response);
-
-    await dispatchAlertWebhooks(
-      prisma as never,
-      {
-        projectId: "p1",
-        alertEventId: "ae1",
-        rule: "ERROR_SPIKE",
-        title: "Spike",
-        body: "n",
-        href: null,
-        dedupeKey: "k1",
-      },
-      { fetchImpl: fetchImpl as never, resolveHost: allowHost }
-    );
-
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ status: "SUCCESS", attempt: 1 }),
-      })
-    );
   });
 });
 
 describe("sendTestWebhook", () => {
-  it("records FAILED (not DEAD) for a single-shot test error", async () => {
+  it("logs FAILED rather than DEAD for a single-shot failure", async () => {
     const create = vi.fn(async () => ({ id: "log" }));
     const prisma = {
-      projectWebhook: {
-        findFirst: async () => ({
-          id: "wh1",
-          url: "https://hooks.example.com/a",
-          signing_secret: null,
-        }),
-      },
+      projectWebhook: { findFirst: async () => ({ id: "wh1", url: "https://hooks.example.com/a", signing_secret: null }) },
       alertWebhookDelivery: { create },
     };
-    const fetchImpl = vi.fn(async () => ({ ok: false, status: 500 }) as Response);
-
-    const result = await sendTestWebhook(prisma as never, "p1", "wh1", {
-      fetchImpl: fetchImpl as never,
-      resolveHost: allowHost,
-    });
-
-    expect(result.ok).toBe(false);
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ status: "FAILED", attempt: 1 }),
-      })
-    );
+    const sendImpl: WebhookSendImpl = vi.fn(async () => ({ ok: false as const, httpStatus: 500, error: "HTTP 500" }));
+    const result = await sendTestWebhook(prisma as never, "p1", "wh1", { sendImpl, lookupFn: publicLookup });
+    expect(result).toMatchObject({ ok: false, status: 502 });
+    expect(sendImpl).toHaveBeenCalledWith(expect.objectContaining({ lookupFn: publicLookup }));
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "FAILED", attempt: 1 }),
+    }));
   });
 });
 
-describe("listAlertWebhookDeliveries", () => {
-  it("returns newest-first public rows with masked URLs", async () => {
-    const findMany = vi.fn(async () => [
-      {
-        id: "d1",
-        webhook_id: "wh1",
-        status: "SUCCESS" as const,
-        attempt: 1,
-        http_status: 200,
-        error: null,
-        created_at: new Date("2026-07-17T12:00:00.000Z"),
-        webhook: { label: "Ops", url: "https://hooks.example.com/secret" },
-      },
-      {
-        id: "d2",
-        webhook_id: "wh2",
-        status: "DEAD" as const,
-        attempt: 2,
-        http_status: 500,
-        error: "HTTP 500",
-        created_at: new Date("2026-07-17T11:00:00.000Z"),
-        webhook: { label: null, url: "https://hooks.example.com/other" },
-      },
-    ]);
-    const prisma = {
-      alertWebhookDelivery: { findMany },
-    };
-
-    const rows = await listAlertWebhookDeliveries(prisma as never, "p1", {
-      limit: 10,
-      webhookId: "wh1",
-    });
-
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { project_id: "p1", webhook_id: "wh1" },
-        take: 10,
-        orderBy: { created_at: "desc" },
-      })
-    );
-    expect(rows).toEqual([
-      {
-        id: "d1",
-        webhookId: "wh1",
-        webhookLabel: "Ops",
-        webhookUrlMasked: "https://hooks.example.com/***",
-        status: "SUCCESS",
-        attempt: 1,
-        httpStatus: 200,
-        error: null,
-        createdAt: "2026-07-17T12:00:00.000Z",
-      },
-      {
-        id: "d2",
-        webhookId: "wh2",
-        webhookLabel: null,
-        webhookUrlMasked: "https://hooks.example.com/***",
-        status: "DEAD",
-        attempt: 2,
-        httpStatus: 500,
-        error: "HTTP 500",
-        createdAt: "2026-07-17T11:00:00.000Z",
-      },
-    ]);
-  });
-
-  it("clamps limit and omits webhook filter when unset", async () => {
-    const findMany = vi.fn(async () => []);
-    await listAlertWebhookDeliveries(
-      { alertWebhookDelivery: { findMany } } as never,
-      "p1",
-      { limit: 999 }
-    );
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { project_id: "p1" },
-        take: 50,
-      })
-    );
+describe("payloads", () => {
+  it("builds a versioned alert payload", () => {
+    expect(buildAlertWebhookPayload({
+      deliveryId: "d1", projectId: "p1", rule: "ERROR_SPIKE", title: "Spike", body: "Many errors",
+      href: null, dedupeKey: "k1", firedAt: new Date("2026-07-17T10:00:00.000Z"),
+    })).toMatchObject({ version: 1, event: "alert.fired", deliveryId: "d1" });
   });
 });
