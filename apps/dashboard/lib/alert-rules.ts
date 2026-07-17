@@ -37,6 +37,11 @@ export function conditionTypeLabel(type: AlertConditionType): string {
 }
 
 export function formatAlertRuleSummary(rule: AlertRuleRow): string {
+  if (rule.conditions.length === 0) {
+    // API returns [] when stored conditions fail validation; rule still exists
+    // and must remain visible so editors can disable/remove it.
+    return "Invalid or unsupported conditions";
+  }
   return rule.conditions
     .map((c) => {
       if (c.type === "ERROR_COUNT") {
@@ -62,12 +67,13 @@ function isCondition(value: unknown): value is AlertRuleCondition {
 export function isAlertRuleRow(value: unknown): value is AlertRuleRow {
   if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
+  // Empty conditions are allowed: API `toPublic` maps unparsable stored JSON to
+  // [] (evaluation skips those rules). Editors must still see/remove them.
   return (
     typeof o.id === "string" &&
     typeof o.name === "string" &&
     typeof o.enabled === "boolean" &&
     Array.isArray(o.conditions) &&
-    o.conditions.length > 0 &&
     o.conditions.every(isCondition) &&
     Array.isArray(o.destinationIds) &&
     o.destinationIds.every((id) => typeof id === "string") &&
