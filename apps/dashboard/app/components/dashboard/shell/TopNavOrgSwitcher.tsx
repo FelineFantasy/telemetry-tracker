@@ -87,7 +87,7 @@ export function TopNavOrgSwitcher({
                   void runPending(async () => {
                     const r = await setDashboardOrganizationId(o.id);
                     if (r.ok) {
-                      replaceAndRefresh(
+                      await replaceAndRefresh(
                         hrefWithoutAppSearchParam(pathname, searchParams)
                       );
                       close();

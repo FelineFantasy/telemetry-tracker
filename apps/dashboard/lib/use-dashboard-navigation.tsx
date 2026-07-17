@@ -4,7 +4,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type MouseEvent,
@@ -18,8 +20,12 @@ type DashboardNavigationValue = {
   replace: (href: string) => void;
   /** URL cleanup that must not show the full-screen overlay (e.g. invalid query sanitization). */
   replaceSilent: (href: string) => void;
-  /** Scope cookie change: replace URL and refresh RSC tree in one pending transition. */
-  replaceAndRefresh: (href: string) => void;
+  /**
+   * Scope cookie change: replace URL and refresh RSC tree while keeping the overlay up.
+   * Resolves after the transition settles (with a short floor), because `useTransition`
+   * often does not stay pending through `router.refresh()` on Next.js 15.
+   */
+  replaceAndRefresh: (href: string) => Promise<void>;
   /** Wrap async scope switches (org/project) so the overlay stays up through the server action. */
   runPending: (fn: () => Promise<void>) => Promise<void>;
   isPending: boolean;
@@ -46,10 +52,20 @@ function DashboardNavigationOverlay({ active }: { active: boolean }) {
   );
 }
 
+const REFRESH_MIN_HOLD_MS = 200;
+/** When `useTransition` never goes pending through `router.refresh()`, hold at least this long. */
+const REFRESH_FALLBACK_HOLD_MS = 500;
+const REFRESH_MAX_HOLD_MS = 10_000;
+
 export function DashboardNavigationProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [transitionPending, startTransition] = useTransition();
   const [asyncPendingCount, setAsyncPendingCount] = useState(0);
+  const transitionPendingRef = useRef(false);
+
+  useEffect(() => {
+    transitionPendingRef.current = transitionPending;
+  }, [transitionPending]);
 
   const push = useCallback(
     (href: string) => {
@@ -76,15 +92,43 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
     [router]
   );
 
-  const replaceAndRefresh = useCallback(
-    (href: string) => {
-      startTransition(() => {
-        router.replace(href);
-        router.refresh();
-      });
-    },
-    [router]
-  );
+  const replaceAndRefresh = useCallback((href: string) => {
+    setAsyncPendingCount((n) => n + 1);
+    startTransition(() => {
+      router.replace(href);
+      router.refresh();
+    });
+
+    return new Promise<void>((resolve) => {
+      const startedAt = performance.now();
+      let settled = false;
+      let sawTransition = false;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        setAsyncPendingCount((n) => Math.max(0, n - 1));
+        resolve();
+      };
+
+      const tick = () => {
+        if (transitionPendingRef.current) sawTransition = true;
+        const elapsed = performance.now() - startedAt;
+        if (elapsed >= REFRESH_MAX_HOLD_MS) {
+          finish();
+          return;
+        }
+        const floor = sawTransition ? REFRESH_MIN_HOLD_MS : REFRESH_FALLBACK_HOLD_MS;
+        if (elapsed >= floor && !transitionPendingRef.current) {
+          finish();
+          return;
+        }
+        requestAnimationFrame(tick);
+      };
+
+      requestAnimationFrame(tick);
+    });
+  }, [router]);
 
   const runPending = useCallback(async (fn: () => Promise<void>) => {
     setAsyncPendingCount((n) => n + 1);
@@ -144,6 +188,10 @@ export function useDashboardNavLinkProps(href: string): {
     href,
     "aria-disabled": isPending || undefined,
     onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      if (isPending) {
+        event.preventDefault();
+        return;
+      }
       if (
         event.defaultPrevented ||
         event.button !== 0 ||

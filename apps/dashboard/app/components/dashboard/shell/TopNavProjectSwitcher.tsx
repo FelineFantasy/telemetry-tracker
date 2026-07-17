@@ -99,7 +99,7 @@ export function TopNavProjectSwitcher({
         const r = await setDashboardProjectId(projectId);
         if (r.ok) {
           setPrefs({ ...prefs, recent: recordRecentProject(projectId) });
-          replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams));
+          await replaceAndRefresh(hrefWithoutAppSearchParam(pathname, searchParams));
           close();
         } else {
           setValue(currentProjectId);
