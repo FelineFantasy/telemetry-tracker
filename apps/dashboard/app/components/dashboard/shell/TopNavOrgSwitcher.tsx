@@ -8,6 +8,10 @@ import { setDashboardOrganizationId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
 import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
 import type { OrgOption } from "@/lib/dashboard-workspace-types";
+import {
+  ORGANIZATION_SETTINGS_PATH,
+} from "@/app/components/OrganizationSettingsNewProjectParam";
+import { scrollToSectionId } from "@/app/components/ScrollToHash";
 import { DashboardPopover } from "./DashboardPopover";
 import { NavPickerTrigger } from "./shell-primitives";
 
@@ -103,8 +107,13 @@ export function TopNavOrgSwitcher({
           })}
           <p className="px-2 py-2 text-[12px] text-muted-foreground">
             <Link
-              href="/dashboard/settings/organization#rename-workspace"
-              onClick={close}
+              href={`${ORGANIZATION_SETTINGS_PATH}#rename-workspace`}
+              onClick={() => {
+                close();
+                if (pathname === ORGANIZATION_SETTINGS_PATH) {
+                  scrollToSectionId("rename-workspace");
+                }
+              }}
               className="text-brand hover:underline"
             >
               Rename your workspace

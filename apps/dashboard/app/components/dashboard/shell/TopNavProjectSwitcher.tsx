@@ -21,7 +21,11 @@ import { DashboardPopover, ShellKbd } from "./DashboardPopover";
 import { NavPickerSection } from "./NavPickerSection";
 import { ProjectStatusDot } from "./ProjectStatusDot";
 import { NavPickerTrigger } from "./shell-primitives";
-import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
+import {
+  ORGANIZATION_SETTINGS_NEW_PROJECT_URL,
+  ORGANIZATION_SETTINGS_PATH,
+} from "@/app/components/OrganizationSettingsNewProjectParam";
+import { scrollToSectionId } from "@/app/components/ScrollToHash";
 
 const IDLE_SUMMARY: ProjectNavSummary = {
   projectId: "",
@@ -223,8 +227,14 @@ export function TopNavProjectSwitcher({
 
             <p className="px-4 pb-2 text-[12px] text-muted-foreground">
               <Link
-                href={`/dashboard/settings/organization#rename-project-${current.id}`}
-                onClick={close}
+                href={`${ORGANIZATION_SETTINGS_PATH}#rename-project-${current.id}`}
+                onClick={() => {
+                  close();
+                  // Same pathname: ScrollToHash only re-runs on route change; scroll now.
+                  if (pathname === ORGANIZATION_SETTINGS_PATH) {
+                    scrollToSectionId(`rename-project-${current.id}`);
+                  }
+                }}
                 className="text-brand hover:underline"
               >
                 Rename this project
