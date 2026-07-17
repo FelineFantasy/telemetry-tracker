@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildAlertWebhookPayload,
+  createPinnedWebhookLookup,
   createProjectWebhook,
   enqueueAlertWebhookDeliveries,
   isBlockedIpAddress,
@@ -154,6 +155,53 @@ describe("delivery-time DNS protections", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("createPinnedWebhookLookup", () => {
+  const pinned = { address: "203.0.113.10", family: 4 as const };
+  const lookup = createPinnedWebhookLookup(pinned);
+
+  it("returns LookupAddress[] when options.all is true (Node 24+)", () => {
+    let err: Error | null | undefined;
+    let addresses: unknown;
+    let family: unknown;
+    lookup("hooks.example.com", { all: true }, (e, a, f) => {
+      err = e;
+      addresses = a;
+      family = f;
+    });
+    expect(err).toBeNull();
+    expect(addresses).toEqual([{ address: "203.0.113.10", family: 4 }]);
+    expect(family).toBeUndefined();
+  });
+
+  it("returns single address + family when all is not set", () => {
+    let err: Error | null | undefined;
+    let address: unknown;
+    let family: unknown;
+    lookup("hooks.example.com", { family: 4 }, (e, a, f) => {
+      err = e;
+      address = a;
+      family = f;
+    });
+    expect(err).toBeNull();
+    expect(address).toBe("203.0.113.10");
+    expect(family).toBe(4);
+  });
+
+  it("supports the two-arg form where options is the callback", () => {
+    let err: Error | null | undefined;
+    let address: unknown;
+    let family: unknown;
+    lookup("hooks.example.com", ((e: Error | null, a: string, f: number) => {
+      err = e;
+      address = a;
+      family = f;
+    }) as never);
+    expect(err).toBeNull();
+    expect(address).toBe("203.0.113.10");
+    expect(family).toBe(4);
   });
 });
 
