@@ -254,6 +254,7 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 | Topic | Doc |
 |-------|-----|
 | Architecture overview | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Product roadmap milestones | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | Deploy (overview) | [DEPLOYMENT.md](DEPLOYMENT.md) |
 | Railway setup & troubleshooting | [docs/RAILWAY.md](docs/RAILWAY.md) |
 | Stripe & Resend (optional) | [docs/BILLING.md](docs/BILLING.md) |

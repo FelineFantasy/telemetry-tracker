@@ -14,13 +14,14 @@ Deploy **Postgres + API + dashboard** as separate Railway services. Core env var
 | **API** | `apps/api` | **Railpack** (default Node) — **not** Dockerfile |
 | **Dashboard** | **empty** (repo root) | **Dockerfile** (repo root) — **only on this service** |
 | **Retention cron** (optional) | `apps/api` | Cron job |
+| **Alert webhook worker** (optional) | `apps/api` | Continuous poll loop (not cron) |
 
 ---
 
 ## PostgreSQL
 
 1. Create a PostgreSQL service in your Railway project.
-2. Copy **`DATABASE_URL`** to the API (and cron) service — prefer the **internal** URL when services are in the same project.
+2. Copy **`DATABASE_URL`** to the API, cron, and worker services — prefer the **internal** URL when services are in the same project.
 
 ---
 
@@ -105,6 +106,61 @@ pnpm --filter api retention                # live sweep (dev DB)
 ```
 
 After `pnpm --filter api build`, production entrypoint: `node dist/jobs/run-retention.js`.
+
+---
+
+## Alert webhook worker
+
+Delivers queued project alert webhooks (`AlertWebhookDelivery` rows). The job is
+implemented in `apps/api/src/jobs/run-alert-webhook-worker.ts` and must run as a
+**long-lived process** (not a cron) in each production environment that uses alert
+webhooks. Product details: [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md).
+
+### Railway setup (manual)
+
+Same pattern as the API / retention job: **Empty Service** first, configure
+Railpack + root directory + start command, **then** connect the GitHub repo.
+Connecting the repo before clearing Dockerfile settings can pick up the dashboard
+Dockerfile and fail at runtime.
+
+1. In your Railway project, click **+ New** → **Empty Service** (name it
+   `alert-webhook-worker`).
+2. **Settings → Source** → **Root Directory** = `apps/api`.
+3. **Settings → Build** → **Railpack** (not Dockerfile). Leave Dockerfile path empty.
+4. **Settings → Deploy** → **Start Command** =
+   `node dist/jobs/run-alert-webhook-worker.js`
+   - Use `node …` directly (same as retention). Do **not** set a Cron Schedule —
+     this is a continuous poll loop.
+5. **Settings → Source** → connect repo `Telemetry-Tracker/telemetry-tracker`,
+   branch **`main`**. Optional watch paths: `apps/api/**`.
+6. **Variables** → add **`DATABASE_URL`** (Reference from the Postgres / `DB`
+   service, same as API). Optional:
+   - `ALERT_WEBHOOK_WORKER_POLL_MS` (default `1000`)
+   - `ALERT_WEBHOOK_WORKER_LEASE_MS` (default `30000`)
+7. Deploy and confirm runtime logs show idle/processing JSON like:
+
+   ```json
+   {"ok":true,"status":"idle","at":"2026-07-17T12:27:31.755Z"}
+   ```
+
+| Setting | Value |
+|---------|--------|
+| Root Directory | `apps/api` |
+| Builder | Railpack (not Dockerfile) |
+| Start command | `node dist/jobs/run-alert-webhook-worker.js` |
+| Cron schedule | none (always-on) |
+| Branch | `main` |
+| `DATABASE_URL` | Same as API |
+
+### Local verification
+
+```bash
+pnpm --filter api alert-webhook-worker          # poll loop
+pnpm --filter api alert-webhook-worker -- --once  # single delivery
+```
+
+After `pnpm --filter api build`, production entrypoint:
+`node dist/jobs/run-alert-webhook-worker.js`.
 
 ---
 
