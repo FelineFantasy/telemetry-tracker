@@ -4,6 +4,10 @@
 import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import {
+  buildAlertDeliveryBody,
+  providerUsesSigningSecret,
+} from "./alert-webhook-channel-payload.js";
+import {
   buildAlertWebhookPayload,
   postWebhookOnce,
   signWebhookBody,
@@ -66,7 +70,14 @@ async function deliverClaimedAlertWebhook(
 ): Promise<AlertWebhookWorkerProcessResult> {
   const webhook = await deps.prisma.projectWebhook.findFirst({
     where: { id: job.webhookId, deleted_at: null },
-    select: { id: true, url: true, signing_secret: true, enabled: true },
+    select: {
+      id: true,
+      url: true,
+      signing_secret: true,
+      enabled: true,
+      provider: true,
+      config: true,
+    },
   });
 
   if (!webhook || !webhook.enabled) {
@@ -137,7 +148,7 @@ async function deliverClaimedAlertWebhook(
   const href = event.href;
   const firedAt = event.fired_at;
 
-  const payload = buildAlertWebhookPayload({
+  const channelInput = {
     deliveryId: job.id,
     projectId: job.projectId,
     rule,
@@ -146,11 +157,36 @@ async function deliverClaimedAlertWebhook(
     href,
     dedupeKey: job.dedupeKey,
     firedAt,
-  });
-  const bodyJson = JSON.stringify(payload);
-  const signature = webhook.signing_secret
-    ? signWebhookBody(bodyJson, webhook.signing_secret)
-    : null;
+  };
+  const payload = buildAlertWebhookPayload(channelInput);
+  const genericBody = JSON.stringify(payload);
+  const deliveryBody = buildAlertDeliveryBody(
+    webhook.provider,
+    channelInput,
+    genericBody,
+    webhook.config
+  );
+  if (!deliveryBody.ok) {
+    const terminal = await failAlertWebhookDeliveryAttempt(deps.prisma, {
+      deliveryId: job.id,
+      workerId,
+      attempt: WEBHOOK_MAX_ATTEMPTS,
+      httpStatus: null,
+      error: deliveryBody.error,
+      now: nowFn(),
+    });
+    return {
+      status: "failed",
+      deliveryId: job.id,
+      terminal: terminal ?? "DEAD",
+      error: deliveryBody.error,
+    };
+  }
+  const bodyJson = deliveryBody.body;
+  const signature =
+    webhook.signing_secret && providerUsesSigningSecret(webhook.provider)
+      ? signWebhookBody(bodyJson, webhook.signing_secret)
+      : null;
 
   const sendImpl =
     deps.sendImpl ??

@@ -1401,6 +1401,8 @@ export async function projectDashboardRoutes(
       label?: unknown;
       enabled?: unknown;
       withSigningSecret?: unknown;
+      provider?: unknown;
+      config?: unknown;
     };
     const { createProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
     const result = await createProjectWebhook(prisma, projectId, {
@@ -1408,7 +1410,9 @@ export async function projectDashboardRoutes(
       label: typeof body.label === "string" ? body.label : null,
       enabled: typeof body.enabled === "boolean" ? body.enabled : true,
       withSigningSecret:
-        typeof body.withSigningSecret === "boolean" ? body.withSigningSecret : true,
+        typeof body.withSigningSecret === "boolean" ? body.withSigningSecret : undefined,
+      provider: body.provider,
+      config: body.config,
     });
     if (!result.ok) {
       return reply.status(result.status).send({ error: result.error });
@@ -1435,6 +1439,7 @@ export async function projectDashboardRoutes(
       enabled?: unknown;
       rotateSigningSecret?: unknown;
       clearSigningSecret?: unknown;
+      config?: unknown;
     };
     const { updateProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
     const result = await updateProjectWebhook(prisma, projectId, webhookId, {
@@ -1448,6 +1453,7 @@ export async function projectDashboardRoutes(
       enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
       rotateSigningSecret: body.rotateSigningSecret === true,
       clearSigningSecret: body.clearSigningSecret === true,
+      config: body.config,
     });
     if (!result.ok) {
       return reply.status(result.status).send({ error: result.error });

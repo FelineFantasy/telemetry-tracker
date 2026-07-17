@@ -2,7 +2,21 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import https from "node:https";
 import { isIP } from "node:net";
-import { Prisma, type AlertRuleType, type AlertWebhookDeliveryStatus, type PrismaClient } from "@prisma/client";
+import {
+  Prisma,
+  type AlertRuleType,
+  type AlertWebhookDeliveryStatus,
+  type AlertWebhookProvider,
+  type PrismaClient,
+} from "@prisma/client";
+import {
+  buildAlertDeliveryBody,
+  parseAlertWebhookProvider,
+  parseTelegramWebhookConfig,
+  providerUsesSigningSecret,
+  validateProviderWebhookUrl,
+  type AlertChannelPayloadInput,
+} from "./alert-webhook-channel-payload.js";
 import { dashboardOriginOrNull } from "./dashboard-origin.js";
 
 const WEBHOOK_CAP_TX = {
@@ -72,6 +86,9 @@ export type ProjectWebhookPublic = {
   id: string;
   urlMasked: string;
   label: string | null;
+  provider: AlertWebhookProvider;
+  /** Non-secret provider config (e.g. Telegram chat id). */
+  config: { chatId?: string } | null;
   enabled: boolean;
   hasSigningSecret: boolean;
   createdAt: string;
@@ -428,15 +445,26 @@ export function toProjectWebhookPublic(row: {
   id: string;
   url: string;
   label: string | null;
+  provider: AlertWebhookProvider;
+  config: Prisma.JsonValue | null;
   enabled: boolean;
   signing_secret: string | null;
   created_at: Date;
   updated_at: Date;
 }): ProjectWebhookPublic {
+  let config: { chatId?: string } | null = null;
+  if (row.provider === "TELEGRAM" && row.config && typeof row.config === "object" && !Array.isArray(row.config)) {
+    const chatId = (row.config as { chatId?: unknown }).chatId;
+    if (typeof chatId === "string" || typeof chatId === "number") {
+      config = { chatId: String(chatId) };
+    }
+  }
   return {
     id: row.id,
     urlMasked: maskWebhookUrl(row.url),
     label: row.label,
+    provider: row.provider,
+    config,
     enabled: row.enabled,
     hasSigningSecret: Boolean(row.signing_secret),
     createdAt: row.created_at.toISOString(),
@@ -521,7 +549,29 @@ type CreateWebhookInput = {
   label?: string | null;
   enabled?: boolean;
   withSigningSecret?: boolean;
+  provider?: unknown;
+  /** Telegram: `{ chatId }`. Ignored for other providers. */
+  config?: unknown;
 };
+
+function resolveCreateProviderAndConfig(input: CreateWebhookInput):
+  | {
+      ok: true;
+      provider: AlertWebhookProvider;
+      config: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+    }
+  | { ok: false; error: string } {
+  const provider = parseAlertWebhookProvider(input.provider ?? "GENERIC");
+  if (!provider) {
+    return { ok: false, error: "Webhook provider is invalid" };
+  }
+  if (provider === "TELEGRAM") {
+    const parsed = parseTelegramWebhookConfig(input.config ?? {});
+    if (!parsed.ok) return parsed;
+    return { ok: true, provider, config: parsed.config };
+  }
+  return { ok: true, provider, config: Prisma.JsonNull };
+}
 
 export async function createProjectWebhook(
   prisma: PrismaClient,
@@ -536,11 +586,31 @@ export async function createProjectWebhook(
     return { ok: false, error: validated.error, status: 400 };
   }
 
+  const providerResolved = resolveCreateProviderAndConfig(input);
+  if (!providerResolved.ok) {
+    return { ok: false, error: providerResolved.error, status: 400 };
+  }
+
+  const providerCheck = validateProviderWebhookUrl(
+    providerResolved.provider,
+    validated.url
+  );
+  if (!providerCheck.ok) {
+    return { ok: false, error: providerCheck.error, status: 400 };
+  }
+
   const label =
     typeof input.label === "string" && input.label.trim().length > 0
       ? input.label.trim().slice(0, 80)
       : null;
-  const signingSecret = input.withSigningSecret === false ? null : generateWebhookSigningSecret();
+
+  const wantsSigning =
+    input.withSigningSecret === true
+      ? true
+      : input.withSigningSecret === false
+        ? false
+        : providerUsesSigningSecret(providerResolved.provider);
+  const signingSecret = wantsSigning ? generateWebhookSigningSecret() : null;
 
   // Count + insert under serializable isolation so concurrent creates cannot exceed the cap.
   for (let attempt = 0; attempt < WEBHOOK_CAP_TX_RETRIES; attempt++) {
@@ -562,6 +632,8 @@ export async function createProjectWebhook(
             id: randomUUID(),
             project_id: projectId,
             url: validated.url,
+            provider: providerResolved.provider,
+            config: providerResolved.config,
             label,
             enabled: input.enabled !== false,
             signing_secret: signingSecret,
@@ -594,6 +666,7 @@ export async function updateProjectWebhook(
     enabled?: boolean;
     rotateSigningSecret?: boolean;
     clearSigningSecret?: boolean;
+    config?: unknown;
   }
 ): Promise<
   | {
@@ -616,6 +689,10 @@ export async function updateProjectWebhook(
     if (!validated.ok) {
       return { ok: false, error: validated.error, status: 400 };
     }
+    const providerCheck = validateProviderWebhookUrl(existing.provider, validated.url);
+    if (!providerCheck.ok) {
+      return { ok: false, error: providerCheck.error, status: 400 };
+    }
     nextUrl = validated.url;
   }
 
@@ -625,6 +702,19 @@ export async function updateProjectWebhook(
       typeof patch.label === "string" && patch.label.trim().length > 0
         ? patch.label.trim().slice(0, 80)
         : null;
+  }
+
+  let nextConfig: Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined;
+  if (patch.config !== undefined) {
+    if (existing.provider === "TELEGRAM") {
+      const parsed = parseTelegramWebhookConfig(patch.config);
+      if (!parsed.ok) {
+        return { ok: false, error: parsed.error, status: 400 };
+      }
+      nextConfig = parsed.config;
+    } else {
+      nextConfig = Prisma.JsonNull;
+    }
   }
 
   let nextSecret = existing.signing_secret;
@@ -643,6 +733,7 @@ export async function updateProjectWebhook(
       label: nextLabel,
       enabled: patch.enabled ?? existing.enabled,
       signing_secret: nextSecret,
+      ...(nextConfig !== undefined ? { config: nextConfig } : {}),
     },
   });
 
@@ -708,10 +799,102 @@ export async function enqueueAlertWebhookDeliveries(
   return webhooks.length;
 }
 
+/** Cap Telegram Bot API response body reads (ok/description JSON is small). */
+const TELEGRAM_RESPONSE_BODY_MAX_BYTES = 8_192;
+
+/**
+ * Telegram Bot API often returns HTTP 200 with `{ "ok": false, … }` for delivery
+ * failures (bad chat id, bot blocked, etc.). Treat only `ok: true` as success.
+ */
+export function interpretTelegramBotApiResponse(
+  httpStatus: number,
+  bodyText: string
+): WebhookSendResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyText);
+  } catch {
+    return {
+      ok: false,
+      httpStatus,
+      error: "Telegram API response was not valid JSON",
+    };
+  }
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    !("ok" in parsed) ||
+    typeof (parsed as { ok: unknown }).ok !== "boolean"
+  ) {
+    return {
+      ok: false,
+      httpStatus,
+      error: "Telegram API response missing boolean ok field",
+    };
+  }
+  if ((parsed as { ok: boolean }).ok === true) {
+    return { ok: true, httpStatus };
+  }
+  const description =
+    "description" in parsed && typeof (parsed as { description: unknown }).description === "string"
+      ? (parsed as { description: string }).description.trim()
+      : "";
+  const errorCode =
+    "error_code" in parsed && typeof (parsed as { error_code: unknown }).error_code === "number"
+      ? (parsed as { error_code: number }).error_code
+      : null;
+  const detail = description
+    ? errorCode != null
+      ? `Telegram API error ${errorCode}: ${description}`
+      : `Telegram API error: ${description}`
+    : "Telegram API returned ok: false";
+  return { ok: false, httpStatus, error: detail.slice(0, 400) };
+}
+
+function readResponseBodyLimited(
+  res: NodeJS.ReadableStream,
+  maxBytes: number
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let settled = false;
+
+    const finish = (result: { ok: true; text: string } | { ok: false; error: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    res.on("data", (chunk: Buffer | string) => {
+      if (settled) return;
+      const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+      size += buf.length;
+      if (size > maxBytes) {
+        res.removeAllListeners("data");
+        res.resume();
+        finish({ ok: false, error: "Telegram API response body too large" });
+        return;
+      }
+      chunks.push(buf);
+    });
+    res.on("end", () => {
+      finish({ ok: true, text: Buffer.concat(chunks).toString("utf8") });
+    });
+    res.on("error", (e: unknown) => {
+      finish({
+        ok: false,
+        error: e instanceof Error ? e.message : "Failed to read response body",
+      });
+    });
+  });
+}
+
 /**
  * POST over HTTPS while pinning the TCP connect to a pre-validated IP.
  * Uses custom `lookup` so Node never re-resolves (closes DNS rebinding TOCTOU).
  * Redirects are not followed (`https.request` does not auto-follow).
+ * Telegram (`api.telegram.org`) responses are parsed for Bot API `{ ok }` JSON.
  */
 export async function postWebhookOnce(
   url: string,
@@ -738,6 +921,7 @@ export async function postWebhookOnce(
     return { ok: false, httpStatus: null, error: resolved.error };
   }
   const pinned = pickPinnedWebhookAddress(resolved.addresses);
+  const isTelegramHost = parsed.hostname.toLowerCase() === "api.telegram.org";
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -769,9 +953,9 @@ export async function postWebhookOnce(
         },
       },
       (res) => {
-        res.resume();
         const status = res.statusCode ?? 0;
         if (status >= 300 && status < 400) {
+          res.resume();
           resolve({
             ok: false,
             httpStatus: status,
@@ -780,9 +964,21 @@ export async function postWebhookOnce(
           return;
         }
         if (status >= 200 && status < 300) {
-          resolve({ ok: true, httpStatus: status });
+          if (!isTelegramHost) {
+            res.resume();
+            resolve({ ok: true, httpStatus: status });
+            return;
+          }
+          void readResponseBodyLimited(res, TELEGRAM_RESPONSE_BODY_MAX_BYTES).then((read) => {
+            if (!read.ok) {
+              resolve({ ok: false, httpStatus: status, error: read.error.slice(0, 400) });
+              return;
+            }
+            resolve(interpretTelegramBotApiResponse(status, read.text));
+          });
           return;
         }
+        res.resume();
         resolve({
           ok: false,
           httpStatus: status || null,
@@ -886,7 +1082,7 @@ export async function sendTestWebhook(
 
   const deliveryId = randomUUID();
   const dedupeKey = `webhook:test:${webhook.id}:${deliveryId}`;
-  const payload = buildAlertWebhookPayload({
+  const channelInput: AlertChannelPayloadInput = {
     deliveryId,
     projectId,
     rule: "ERROR_SPIKE",
@@ -894,11 +1090,23 @@ export async function sendTestWebhook(
     body: "This is a sample alert.fired payload so you can verify your endpoint.",
     href: "/dashboard/alerts",
     dedupeKey,
-  });
-  const body = JSON.stringify(payload);
-  const signature = webhook.signing_secret
-    ? signWebhookBody(body, webhook.signing_secret)
-    : null;
+  };
+  const payload = buildAlertWebhookPayload(channelInput);
+  const genericBody = JSON.stringify(payload);
+  const deliveryBody = buildAlertDeliveryBody(
+    webhook.provider,
+    channelInput,
+    genericBody,
+    webhook.config
+  );
+  if (!deliveryBody.ok) {
+    return { ok: false, error: deliveryBody.error, status: 502 };
+  }
+  const body = deliveryBody.body;
+  const signature =
+    webhook.signing_secret && providerUsesSigningSecret(webhook.provider)
+      ? signWebhookBody(body, webhook.signing_secret)
+      : null;
 
   // Persist before POST (create failure must not leave an unlogged destination hit).
   // PROCESSING + lease mirrors worker ownership for the in-flight request; claim SQL
