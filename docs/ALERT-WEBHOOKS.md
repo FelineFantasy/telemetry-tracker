@@ -62,6 +62,10 @@ shown once when the webhook is created.
   pnpm --filter api alert-webhook-worker -- --once  # single delivery
   ```
 
+  Production (Railway): long-running service `alert-webhook-worker` with start
+  command `node dist/jobs/run-alert-webhook-worker.js` — see
+  [RAILWAY.md → Alert webhook worker](./RAILWAY.md#alert-webhook-worker).
+
   Env: `ALERT_WEBHOOK_WORKER_POLL_MS` (default `1000`),
   `ALERT_WEBHOOK_WORKER_LEASE_MS` (default `30000`, minimum =
   DNS timeout `5000` + HTTPS POST timeout `8000` + `5000` margin).
