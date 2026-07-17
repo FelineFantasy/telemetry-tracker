@@ -15,6 +15,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Fixed
 
+- **Alert webhook delivery on Node 24** — pinned HTTPS `lookup` now returns an address array when Node requests `{ all: true }`, fixing `Invalid IP address: undefined` delivery failures
+
 ### Changed
 
 ### Database
