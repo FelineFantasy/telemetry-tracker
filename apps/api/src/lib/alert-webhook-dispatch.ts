@@ -801,6 +801,11 @@ export type EnqueueAlertWebhookInput = {
   projectId: string;
   alertEventId: string;
   dedupeKey: string;
+  /**
+   * When set, only these webhook ids (must still be enabled + belonging to project).
+   * Empty array skips webhook fan-out. When omitted, all enabled project webhooks.
+   */
+  webhookIds?: string[];
 };
 
 /**
@@ -811,11 +816,17 @@ export async function enqueueAlertWebhookDeliveries(
   prisma: PrismaClient | Prisma.TransactionClient,
   input: EnqueueAlertWebhookInput
 ): Promise<number> {
+  if (input.webhookIds !== undefined && input.webhookIds.length === 0) {
+    return 0;
+  }
   const webhooks = await prisma.projectWebhook.findMany({
     where: {
       project_id: input.projectId,
       deleted_at: null,
       enabled: true,
+      ...(input.webhookIds !== undefined
+        ? { id: { in: input.webhookIds } }
+        : {}),
     },
     select: { id: true },
   });

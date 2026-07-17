@@ -1,7 +1,8 @@
 # Alert webhooks
 
 Project-scoped HTTPS destinations receive a POST when Telemetry Tracker fires an alert
-(`ERROR_SPIKE`, `QUOTA_NEAR`, `QUOTA_EXCEEDED`) via `fireProjectAlert`.
+(`ERROR_SPIKE`, `QUOTA_NEAR`, `QUOTA_EXCEEDED`, `ALERT_RULE`) via `fireProjectAlert`.
+Configurable rules and destination binding: [ALERT-RULES.md](./ALERT-RULES.md).
 
 Configure destinations under **Dashboard → Alerts → Delivery** (owners/editors).
 Up to **5** destinations per project (shared across generic HTTPS webhooks and chat

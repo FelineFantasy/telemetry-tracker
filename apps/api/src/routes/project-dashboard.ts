@@ -1359,6 +1359,67 @@ export async function projectDashboardRoutes(
     });
   });
 
+  app.get("/project/alert-rules", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const { listAlertRules } = await import("../lib/alert-rules.js");
+    const rules = await listAlertRules(prisma, projectId);
+    return reply.send({ rules });
+  });
+
+  app.post("/project/alert-rules", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { createAlertRule } = await import("../lib/alert-rules.js");
+    const result = await createAlertRule(prisma, projectId, request.body);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(201).send({ rule: result.rule });
+  });
+
+  app.patch("/project/alert-rules/:ruleId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { ruleId } = request.params as { ruleId: string };
+    const { updateAlertRule } = await import("../lib/alert-rules.js");
+    const result = await updateAlertRule(prisma, projectId, ruleId, request.body);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.send({ rule: result.rule });
+  });
+
+  app.delete("/project/alert-rules/:ruleId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { ruleId } = request.params as { ruleId: string };
+    const { softDeleteAlertRule } = await import("../lib/alert-rules.js");
+    const result = await softDeleteAlertRule(prisma, projectId, ruleId);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(204).send();
+  });
+
   app.get("/project/webhooks", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;

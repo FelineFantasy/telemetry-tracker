@@ -13,11 +13,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Alert rules** — configurable per-project rules with condition params (threshold, window, optional environment), destination binding to email and Delivery channels (Slack / Discord / Teams / Telegram / webhook), Alerts dashboard CRUD, and ingest-time evaluation for `ERROR_COUNT` with cooldown dedupe into existing `fireProjectAlert` fan-out ([#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); milestone v1.15.x)
+
 ### Fixed
 
 ### Changed
 
 ### Database
+
+- `AlertRule` table; `AlertConditionType` (`ERROR_COUNT`); `AlertRuleType.ALERT_RULE` for custom-rule firings
 
 ---
 

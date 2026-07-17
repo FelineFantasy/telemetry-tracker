@@ -12,6 +12,7 @@ import { assertIngestPlanOrReply } from "../lib/plan-enforcement.js";
 import { addIngestUnits } from "../lib/usage-meter.js";
 import { notifyNewErrorGroupEmail } from "../lib/notification-email-dispatch.js";
 import { maybeNotifyErrorSpike } from "../lib/error-spike-alert.js";
+import { maybeEvaluateAlertRules } from "../lib/alert-rules.js";
 import { maybeNotifyQuotaAlerts } from "../lib/quota-alert.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
 import { findIngestSession } from "../lib/ingest-session.js";
@@ -322,6 +323,7 @@ export async function ingestRoutes(
       void notifyNewErrorGroupEmail(prisma, projectId, errorGroup);
     }
     void maybeNotifyErrorSpike(prisma, projectId);
+    void maybeEvaluateAlertRules(prisma, projectId);
     void maybeNotifyQuotaAlerts(prisma, projectId);
     return reply.status(204).send();
   });
