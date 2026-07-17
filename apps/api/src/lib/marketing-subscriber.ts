@@ -22,8 +22,29 @@ export function normalizeMarketingEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+/** Domains Resend (and RFC 2606) reject — keep them out of the marketing list and release sends. */
+const RESERVED_MARKETING_EMAIL_DOMAINS = new Set([
+  "example.com",
+  "example.org",
+  "example.net",
+  "localhost",
+]);
+
+export function isReservedMarketingEmailDomain(email: string): boolean {
+  const at = email.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = email.slice(at + 1).toLowerCase();
+  if (RESERVED_MARKETING_EMAIL_DOMAINS.has(domain)) return true;
+  // RFC 2606 / 6761 special-use TLDs
+  return /\.(example|invalid|localhost|test)$/i.test(domain);
+}
+
 export function isValidMarketingEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 255;
+  return (
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+    email.length <= 255 &&
+    !isReservedMarketingEmailDomain(email)
+  );
 }
 
 export function hashMarketingUnsubscribeToken(token: string): string {
