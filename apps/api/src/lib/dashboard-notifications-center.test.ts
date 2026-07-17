@@ -143,4 +143,71 @@ describe("buildOrganizationDashboardNotifications", () => {
       projectName: "Alpha",
     });
   });
+
+  it("scopes issue and alert queries to the filtered project before take", async () => {
+    const issueWheres: unknown[] = [];
+    const alertWheres: unknown[] = [];
+    const prisma = {
+      alertEvent: {
+        findMany: async (args: { where: unknown }) => {
+          alertWheres.push(args.where);
+          return [
+            {
+              project_id: "p2",
+              rule: "ERROR_SPIKE",
+              title: "Quiet project alert",
+              body: "up",
+              href: "/dashboard/errors",
+              dedupe_key: "error-spike:p2:quiet",
+              fired_at: new Date("2026-07-02T10:00:00.000Z"),
+            },
+          ];
+        },
+      },
+      errorGroup: {
+        findMany: async (args: { where: unknown }) => {
+          issueWheres.push(args.where);
+          return [
+            {
+              id: "eg-quiet",
+              project_id: "p2",
+              message: "quiet boom",
+              app: "web",
+              environment: "production",
+              occurrences: 1,
+              last_seen: new Date("2026-07-02T09:00:00.000Z"),
+            },
+          ];
+        },
+      },
+      project: {
+        findFirst: async () => null,
+      },
+      usageMonthly: {
+        findUnique: async () => null,
+      },
+    } as never;
+
+    // Callers (GET /meta/notifications) must pass only the filtered project so
+    // its issues/alerts are not crowded out by a global org-wide take.
+    const items = await buildOrganizationDashboardNotifications(
+      prisma,
+      [{ id: "p2", name: "Beta" }],
+      "p1",
+      baseSession
+    );
+
+    expect(issueWheres).toEqual([
+      {
+        project_id: { in: ["p2"] },
+        resolved_at: null,
+      },
+    ]);
+    expect(alertWheres[0]).toMatchObject({
+      project_id: { in: ["p2"] },
+    });
+    expect(items.map((i) => i.id)).toEqual(
+      expect.arrayContaining(["issue:eg-quiet", "error-spike:p2:quiet"])
+    );
+  });
 });

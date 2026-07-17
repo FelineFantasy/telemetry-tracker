@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
-  markAllNotificationsReadAction,
   markNotificationsReadAction,
   setDashboardProjectId,
 } from "@/app/dashboard/actions";
@@ -66,12 +65,13 @@ export function NotificationsCenterClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { replaceAndRefresh, runPending } = useDashboardNavigation();
+  const { push, replaceAndRefresh, runPending } = useDashboardNavigation();
   const [pending, startTransition] = useTransition();
   const [items, setItems] = useState(initialItems);
   const [type, setType] = useState(initialType);
   const [projectId, setProjectId] = useState(initialProjectId);
   const [unreadOnly, setUnreadOnly] = useState(initialUnreadOnly);
+  const filtersActive = Boolean(type || projectId || unreadOnly);
 
   useEffect(() => {
     setItems(initialItems);
@@ -127,23 +127,24 @@ export function NotificationsCenterClient({
 
   const markAllRead = useCallback(() => {
     setItems((prev) => {
+      // Mark only currently visible unread rows (respects type/project/unread filters).
       const unreadIds = prev.filter((item) => item.unread).map((item) => item.id);
       if (unreadIds.length === 0) return prev;
-      void markAllNotificationsReadAction({ scope: "organization" }).then(
-        (result) => {
-          if (!result.ok) {
-            setItems((current) =>
-              current.map((item) =>
-                unreadIds.includes(item.id) ? { ...item, unread: true } : item
-              )
-            );
-            toast.error(result.error || "Could not mark notifications as read");
-            return;
-          }
-          router.refresh();
+      void markNotificationsReadAction(unreadIds).then((result) => {
+        if (!result.ok) {
+          setItems((current) =>
+            current.map((item) =>
+              unreadIds.includes(item.id) ? { ...item, unread: true } : item
+            )
+          );
+          toast.error(result.error || "Could not mark notifications as read");
+          return;
         }
+        router.refresh();
+      });
+      return prev.map((item) =>
+        unreadIds.includes(item.id) ? { ...item, unread: false } : item
       );
-      return prev.map((item) => ({ ...item, unread: false }));
     });
   }, [router]);
 
@@ -159,7 +160,7 @@ export function NotificationsCenterClient({
         targetProjectId.toLowerCase() !== currentProjectId.toLowerCase();
 
       if (!needsProjectSwitch) {
-        router.push(href);
+        push(href);
         return;
       }
 
@@ -167,7 +168,7 @@ export function NotificationsCenterClient({
         const result = await setDashboardProjectId(targetProjectId);
         if (!result.ok) {
           toast.error(result.error || "Could not switch project");
-          router.push(href);
+          push(href);
           return;
         }
         await replaceAndRefresh(href, {
@@ -180,8 +181,8 @@ export function NotificationsCenterClient({
       currentOrganizationId,
       currentProjectId,
       markRead,
+      push,
       replaceAndRefresh,
-      router,
       runPending,
     ]
   );
@@ -199,9 +200,14 @@ export function NotificationsCenterClient({
             <button
               type="button"
               onClick={markAllRead}
+              title={
+                filtersActive
+                  ? "Mark unread notifications matching the current filters as read"
+                  : "Mark all visible unread notifications as read"
+              }
               className="h-9 rounded-md border border-border bg-transparent px-3 text-[13px] font-medium text-muted-foreground hover:bg-surface/60 hover:text-foreground"
             >
-              Mark all read
+              {filtersActive ? "Mark shown as read" : "Mark all read"}
             </button>
           ) : null
         }

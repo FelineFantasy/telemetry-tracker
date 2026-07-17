@@ -875,11 +875,25 @@ export async function projectDashboardRoutes(
       name: p.name,
     }));
 
+    if (filterProjectId) {
+      const allowed = new Set(orgProjects.map((p) => p.id.toLowerCase()));
+      if (!allowed.has(filterProjectId)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+    }
+
+    // When filtering by project, scope the DB queries to that project before
+    // take/caps so quieter projects are not crowded out by a global org cap.
+    const projectsForOrgFeed =
+      scope === "organization" && filterProjectId
+        ? orgProjects.filter((p) => p.id.toLowerCase() === filterProjectId)
+        : orgProjects;
+
     let items =
       scope === "organization"
         ? await buildOrganizationDashboardNotifications(
             prisma,
-            orgProjects,
+            projectsForOrgFeed,
             projectId,
             sessionContext,
             preferences,
@@ -902,13 +916,6 @@ export async function projectDashboardRoutes(
                 : null,
             }
           );
-
-    if (filterProjectId) {
-      const allowed = new Set(orgProjects.map((p) => p.id.toLowerCase()));
-      if (!allowed.has(filterProjectId)) {
-        return reply.status(403).send({ error: "Forbidden" });
-      }
-    }
 
     items = applyNotificationFeedFilters(items, {
       types: typeFilter,
