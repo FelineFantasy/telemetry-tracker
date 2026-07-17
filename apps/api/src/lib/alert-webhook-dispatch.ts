@@ -2,7 +2,7 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import https from "node:https";
 import { isIP } from "node:net";
-import type { AlertRuleType, AlertWebhookDeliveryStatus, PrismaClient } from "@prisma/client";
+import type { AlertRuleType, AlertWebhookDeliveryStatus, Prisma, PrismaClient } from "@prisma/client";
 import { dashboardOriginOrNull } from "./dashboard-origin.js";
 
 export const MAX_PROJECT_WEBHOOKS = 5;
@@ -528,7 +528,7 @@ export type EnqueueAlertWebhookInput = {
  * Must complete before fireProjectAlert returns (durable enqueue).
  */
 export async function enqueueAlertWebhookDeliveries(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   input: EnqueueAlertWebhookInput
 ): Promise<number> {
   const webhooks = await prisma.projectWebhook.findMany({
@@ -701,7 +701,8 @@ export async function sendTestWebhook(
 
   await prisma.alertWebhookDelivery.create({
     data: {
-      id: randomUUID(),
+      // Same id as payload / X-Telemetry-Delivery so Recent deliveries match the POST.
+      id: deliveryId,
       webhook_id: webhook.id,
       project_id: projectId,
       dedupe_key: dedupeKey,

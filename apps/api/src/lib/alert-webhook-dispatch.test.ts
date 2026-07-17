@@ -293,6 +293,38 @@ describe("sendTestWebhook", () => {
       data: { status: "FAILED" },
     });
   });
+
+  it("persists the same delivery id sent in the payload and header", async () => {
+    const create = vi.fn(async () => ({ id: "log" }));
+    let sentDeliveryId: string | undefined;
+    let payloadDeliveryId: string | undefined;
+    await sendTestWebhook(
+      {
+        projectWebhook: {
+          findFirst: async () => ({
+            id: "wh1",
+            url: "https://hooks.example.com/a",
+            signing_secret: null,
+          }),
+        },
+        alertWebhookDelivery: { create },
+      } as never,
+      "p1",
+      "wh1",
+      {
+        sendImpl: async (input) => {
+          sentDeliveryId = input.deliveryId;
+          payloadDeliveryId = (JSON.parse(input.body) as { deliveryId: string }).deliveryId;
+          return { ok: true, httpStatus: 200, error: null };
+        },
+      }
+    );
+    expect(sentDeliveryId).toBeTruthy();
+    expect(payloadDeliveryId).toBe(sentDeliveryId);
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      data: { id: sentDeliveryId, status: "SUCCESS" },
+    });
+  });
 });
 
 describe("buildAlertWebhookPayload", () => {

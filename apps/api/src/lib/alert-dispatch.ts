@@ -44,17 +44,26 @@ export async function fireProjectAlert(
   const alertEventId = randomUUID();
   const firedAt = new Date();
   try {
-    await prisma.alertEvent.create({
-      data: {
-        id: alertEventId,
-        project_id: payload.projectId,
-        rule: payload.rule,
-        title: payload.title,
-        body: payload.body,
-        href: payload.href,
-        dedupe_key: payload.dedupeKey,
-        fired_at: firedAt,
-      },
+    // AlertEvent + PENDING webhook rows commit together so a failed enqueue
+    // cannot leave a dedupe key that blocks later retries from re-enqueueing.
+    await prisma.$transaction(async (tx) => {
+      await tx.alertEvent.create({
+        data: {
+          id: alertEventId,
+          project_id: payload.projectId,
+          rule: payload.rule,
+          title: payload.title,
+          body: payload.body,
+          href: payload.href,
+          dedupe_key: payload.dedupeKey,
+          fired_at: firedAt,
+        },
+      });
+      await enqueueAlertWebhookDeliveries(tx, {
+        projectId: payload.projectId,
+        alertEventId,
+        dedupeKey: payload.dedupeKey,
+      });
     });
   } catch (e: unknown) {
     if (isUniqueViolation(e)) return false;
@@ -72,13 +81,6 @@ export async function fireProjectAlert(
 
   void notifyProjectMembersByEmail(prisma, payload.projectId, item, {
     roles: [OrgRole.OWNER, OrgRole.EDITOR],
-  });
-
-  // Durable enqueue before return — worker claims PENDING rows (survives process restart).
-  await enqueueAlertWebhookDeliveries(prisma, {
-    projectId: payload.projectId,
-    alertEventId,
-    dedupeKey: payload.dedupeKey,
   });
 
   return true;
