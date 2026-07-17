@@ -11,7 +11,12 @@ import { getProjectNavSummaries } from "../lib/project-nav-summary.js";
 import { loadNavScopeForProject, loadWorkspaceMetaForUser } from "../lib/workspace-meta.js";
 import { buildDashboardBootstrap } from "../lib/dashboard-bootstrap.js";
 import { buildDashboardSessionContext } from "../lib/dashboard-session-context.js";
-import { buildDashboardNotifications } from "../lib/dashboard-notifications.js";
+import {
+  applyNotificationFeedFilters,
+  buildDashboardNotifications,
+  buildOrganizationDashboardNotifications,
+  parseNotificationTypeFilter,
+} from "../lib/dashboard-notifications.js";
 import {
   parseNotificationPreferences,
   validateNotificationPreferencesPatch,
@@ -827,6 +832,20 @@ export async function projectDashboardRoutes(
     if (sessionContext === null) {
       return reply.status(403).send({ error: "Forbidden" });
     }
+    const query = request.query as {
+      scope?: unknown;
+      type?: unknown;
+      projectId?: unknown;
+      unread?: unknown;
+    };
+    const scope = query.scope === "organization" ? "organization" : "project";
+    const typeFilter = parseNotificationTypeFilter(query.type);
+    const filterProjectId =
+      typeof query.projectId === "string" && /^[0-9a-f-]{36}$/i.test(query.projectId.trim())
+        ? query.projectId.trim().toLowerCase()
+        : null;
+    const unreadOnly = query.unread === "1" || query.unread === "true";
+
     const user = await prisma.user.findUnique({
       where: { id: session.userId },
       select: { email: true, notification_preferences: true },
@@ -842,28 +861,81 @@ export async function projectDashboardRoutes(
     if (headerOrg && organizationIds.includes(headerOrg)) {
       organizationIds = [headerOrg];
     }
-    const items = await buildDashboardNotifications(
-      prisma,
-      projectId,
-      sessionContext,
-      preferences,
-      user
-        ? {
-            userId: session.userId,
-            userEmail: user.email,
-            organizationIds,
-          }
-        : undefined
-    );
-    const withRead = await attachNotificationReadState(prisma, session.userId, items);
-    return reply.send({ items: withRead });
+    const buildContext = user
+      ? {
+          userId: session.userId,
+          userEmail: user.email,
+          organizationIds,
+        }
+      : undefined;
+
+    const workspace = await loadWorkspaceMetaForUser(prisma, session.userId, headerOrg);
+    const orgProjects = workspace.projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
+
+    let items =
+      scope === "organization"
+        ? await buildOrganizationDashboardNotifications(
+            prisma,
+            orgProjects,
+            projectId,
+            sessionContext,
+            preferences,
+            buildContext,
+            { mode: "center" }
+          )
+        : await buildDashboardNotifications(
+            prisma,
+            projectId,
+            sessionContext,
+            preferences,
+            buildContext,
+            {
+              mode: "bell",
+              projectMeta: projectId
+                ? orgProjects.find((p) => p.id === projectId) ?? {
+                    id: projectId,
+                    name: "Project",
+                  }
+                : null,
+            }
+          );
+
+    if (filterProjectId) {
+      const allowed = new Set(orgProjects.map((p) => p.id.toLowerCase()));
+      if (!allowed.has(filterProjectId)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+    }
+
+    items = applyNotificationFeedFilters(items, {
+      types: typeFilter,
+      projectId: filterProjectId,
+    });
+
+    let withRead = await attachNotificationReadState(prisma, session.userId, items);
+    if (unreadOnly) {
+      withRead = withRead.filter((item) => item.unread);
+    }
+
+    return reply.send({
+      items: withRead,
+      projects: orgProjects,
+      scope,
+    });
   });
 
   app.post("/meta/notifications/read", async (request, reply) => {
     const session = await requireSessionUser(request, reply);
     if (!session) return;
 
-    const body = (request.body ?? {}) as { ids?: unknown; all?: unknown };
+    const body = (request.body ?? {}) as {
+      ids?: unknown;
+      all?: unknown;
+      scope?: unknown;
+    };
     const sessionContext = await buildDashboardSessionContext(prisma, session, request);
     if (sessionContext === null) {
       return reply.status(403).send({ error: "Forbidden" });
@@ -884,20 +956,39 @@ export async function projectDashboardRoutes(
       if (headerOrg && organizationIds.includes(headerOrg)) {
         organizationIds = [headerOrg];
       }
-      const items = await buildDashboardNotifications(
-        prisma,
-        sessionContext.projectId || null,
-        sessionContext,
-        preferences,
-        user
-          ? {
-              userId: session.userId,
-              userEmail: user.email,
-              organizationIds,
-            }
-          : undefined,
-        { forReadPersistence: true }
-      );
+      const buildContext = user
+        ? {
+            userId: session.userId,
+            userEmail: user.email,
+            organizationIds,
+          }
+        : undefined;
+      const scope = body.scope === "organization" ? "organization" : "project";
+      const workspace = await loadWorkspaceMetaForUser(prisma, session.userId, headerOrg);
+      const orgProjects = workspace.projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+      }));
+      const projectId = sessionContext.projectId || null;
+      const items =
+        scope === "organization"
+          ? await buildOrganizationDashboardNotifications(
+              prisma,
+              orgProjects,
+              projectId,
+              sessionContext,
+              preferences,
+              buildContext,
+              { mode: "center", forReadPersistence: true }
+            )
+          : await buildDashboardNotifications(
+              prisma,
+              projectId,
+              sessionContext,
+              preferences,
+              buildContext,
+              { forReadPersistence: true }
+            );
       await markNotificationsRead(
         prisma,
         session.userId,
