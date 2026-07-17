@@ -446,16 +446,36 @@ export async function projectDashboardRoutes(
         });
       }
 
-      const updated = await prisma.project.update({
-        where: { id: projectId },
-        data: { name: nextName, slug: nextSlug },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          organization_id: true,
-        },
-      });
+      let updated: {
+        id: string;
+        name: string;
+        slug: string;
+        organization_id: string;
+      };
+      try {
+        updated = await prisma.project.update({
+          where: { id: projectId },
+          data: { name: nextName, slug: nextSlug },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organization_id: true,
+          },
+        });
+      } catch (e: unknown) {
+        if (
+          typeof e === "object" &&
+          e !== null &&
+          "code" in e &&
+          (e as { code: string }).code === "P2002"
+        ) {
+          return reply
+            .status(409)
+            .send({ error: "slug already in use in this organization" });
+        }
+        throw e;
+      }
 
       void recordOrganizationAuditEvent(
         prisma,
