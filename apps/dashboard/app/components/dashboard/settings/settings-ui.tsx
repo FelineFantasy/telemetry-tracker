@@ -175,7 +175,7 @@ export function SettingsToggle({
   label?: string;
   disabled?: boolean;
   id?: string;
-} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onChange">) {
   return (
     <button
       id={id}
