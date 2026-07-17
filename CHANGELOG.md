@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.13.1] - 2026-07-17
+
+### Fixed
+
+- **Navigation overlay** — after a workspace/project switch, keep the full-screen loader until the refresh settle hold finishes (not only when the nav scope ack arrives), so list/overview RSC is less likely to flash stale data
+
+---
+
 ## [1.13.0] - 2026-07-17
 
 ### Added
