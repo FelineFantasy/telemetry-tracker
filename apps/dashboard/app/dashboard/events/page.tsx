@@ -212,13 +212,6 @@ export default async function EventsPage({
       <AnalyticsListShell>
         {summary ? <EventsSummaryMetrics summary={summary} /> : null}
 
-        <DeferredAnalyticsSlot<EventsAnalyticsData>
-          apiPath="/api/events/analytics"
-          queryString={summaryQuery.toString()}
-        >
-          {(analytics) => <EventsAnalyticsPanels analytics={analytics} />}
-        </DeferredAnalyticsSlot>
-
         <EventsClientListSection
           path={EVENTS_PATH}
           urlParams={currentParams}
@@ -241,6 +234,13 @@ export default async function EventsPage({
           platforms={filterOptions.platforms}
           releases={filterOptions.releases}
         />
+
+        <DeferredAnalyticsSlot<EventsAnalyticsData>
+          apiPath="/api/events/analytics"
+          queryString={summaryQuery.toString()}
+        >
+          {(analytics) => <EventsAnalyticsPanels analytics={analytics} />}
+        </DeferredAnalyticsSlot>
       </AnalyticsListShell>
     </>
   );

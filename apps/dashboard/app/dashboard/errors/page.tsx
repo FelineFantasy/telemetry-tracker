@@ -298,13 +298,6 @@ export default async function ErrorsListPage({
       <AnalyticsListShell>
         {summary ? <ErrorsSummaryMetrics summary={summary} /> : null}
 
-        <DeferredAnalyticsSlot<ErrorsAnalyticsData>
-          apiPath="/api/errors/analytics"
-          queryString={summaryQuery.toString()}
-        >
-          {(analytics) => <ErrorsAnalyticsPanels analytics={analytics} />}
-        </DeferredAnalyticsSlot>
-
         <ErrorsClientListSection
           path={ERRORS_PATH}
           urlParams={currentParams}
@@ -330,6 +323,13 @@ export default async function ErrorsListPage({
           platforms={options.platforms}
           releases={options.releases}
         />
+
+        <DeferredAnalyticsSlot<ErrorsAnalyticsData>
+          apiPath="/api/errors/analytics"
+          queryString={summaryQuery.toString()}
+        >
+          {(analytics) => <ErrorsAnalyticsPanels analytics={analytics} />}
+        </DeferredAnalyticsSlot>
       </AnalyticsListShell>
     </>
   );

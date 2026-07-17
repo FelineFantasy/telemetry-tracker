@@ -131,19 +131,6 @@ export function SessionsClientListSection({
 
   return (
     <>
-      <DeferredAnalyticsSlot<SessionsAnalyticsData>
-        apiPath="/api/sessions/analytics"
-        queryString={analyticsQueryString}
-      >
-        {(analytics) => (
-          <SessionsAnalyticsPanels
-            analytics={analytics}
-            path={path}
-            currentParams={liveUrlParams}
-          />
-        )}
-      </DeferredAnalyticsSlot>
-
       <SessionsListToolbar
         path={path}
         currentParams={liveUrlParams}
@@ -206,6 +193,19 @@ export function SessionsClientListSection({
         hrefForPage={hrefForPage}
         onPageChange={onPageChange}
       />
+
+      <DeferredAnalyticsSlot<SessionsAnalyticsData>
+        apiPath="/api/sessions/analytics"
+        queryString={analyticsQueryString}
+      >
+        {(analytics) => (
+          <SessionsAnalyticsPanels
+            analytics={analytics}
+            path={path}
+            currentParams={liveUrlParams}
+          />
+        )}
+      </DeferredAnalyticsSlot>
     </>
   );
 }
