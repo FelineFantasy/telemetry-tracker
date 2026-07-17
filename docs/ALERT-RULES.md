@@ -87,4 +87,12 @@ Alerts → **Custom rules**: create, enable/disable, remove; bind opaque destina
 
 ## Milestone slices (v1.15.x)
 
-See child issues under [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493). Prefer small reviewable PRs over a mega-ship.
+Parent vision: [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493). Prefer small reviewable PRs over a mega-ship.
+
+| Slice | Issue |
+| --- | --- |
+| Foundation (this model + ERROR_COUNT + MVP UI) | [#532](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/532) / [PR #531](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/531) |
+| Dashboard multi-condition / edit UX | [#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533) |
+| Additional conditions + scheduled evaluator | [#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534) |
+| Integrate built-in spike/quota into AlertRule | [#535](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/535) |
+| Release v1.15.0 | [#536](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/536) |
