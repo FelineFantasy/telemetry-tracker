@@ -1,2 +1,2 @@
 /** Generated at build time from CHANGELOG (/Users/unjica/Documents/GitHub/telemetry-tracker/CHANGELOG.md). Do not edit manually. */
-export const API_VERSION = "1.14.4";
+export const API_VERSION = "1.15.0";

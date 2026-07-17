@@ -21,6 +21,20 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.0] - 2026-07-17
+
+### Added
+
+- **Alert rules (foundation)** — configurable per-project rules with `Condition[]` (AND), opaque `destinationIds` resolved by Notifications (`project-email` + `ProjectWebhook` ids), Alerts → Custom rules CRUD, and ingest-time evaluation for `ERROR_COUNT` with cooldown dedupe into existing `fireProjectAlert` fan-out ([#532](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/532); parent vision [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); milestone v1.15.x). Rules decide conditions → trigger → bindings; Notifications owns delivery.
+- **Alert Rules docs** — [docs/ALERT-RULES.md](docs/ALERT-RULES.md) separation of concerns, condition model, and destination binding notes; ALERT-WEBHOOKS cross-links updated
+
+### Database
+
+- `AlertRule` table (`conditions` JSON AND-array, `destination_ids` opaque refs); `AlertRuleType.ALERT_RULE` for custom-rule firings (`20260717220000_alert_rules`)
+- `ErrorOccurrence.environment` for accurate alert-rule environment scope (group-level env remains a last-seen tag only) (`20260717223000_error_occurrence_environment`)
+
+---
+
 ## [1.14.4] - 2026-07-17
 
 ### Fixed

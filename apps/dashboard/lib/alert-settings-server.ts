@@ -12,7 +12,8 @@ function isEvent(value: unknown): value is AlertEventRow {
     typeof o.id === "string" &&
     (o.rule === "ERROR_SPIKE" ||
       o.rule === "QUOTA_NEAR" ||
-      o.rule === "QUOTA_EXCEEDED") &&
+      o.rule === "QUOTA_EXCEEDED" ||
+      o.rule === "ALERT_RULE") &&
     typeof o.title === "string" &&
     typeof o.body === "string" &&
     typeof o.firedAt === "string" &&

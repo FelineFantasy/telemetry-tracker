@@ -12,6 +12,7 @@ import { assertIngestPlanOrReply } from "../lib/plan-enforcement.js";
 import { addIngestUnits } from "../lib/usage-meter.js";
 import { notifyNewErrorGroupEmail } from "../lib/notification-email-dispatch.js";
 import { maybeNotifyErrorSpike } from "../lib/error-spike-alert.js";
+import { maybeEvaluateAlertRules } from "../lib/alert-rules.js";
 import { maybeNotifyQuotaAlerts } from "../lib/quota-alert.js";
 import { computeFingerprint, findOrCreateErrorGroup } from "../services/errors.js";
 import { findIngestSession } from "../lib/ingest-session.js";
@@ -29,6 +30,7 @@ import {
   loadProjectPiiDenyKeys,
   loadProjectPiiScrubSettings,
 } from "../lib/project-pii-scrub-cache.js";
+import { normalizeIngestEnvironment } from "../lib/ingest-environment.js";
 
 /**
  * Ingest pipeline (implement in order):
@@ -98,7 +100,9 @@ function sessionContextPatch(
   if (body.device_os !== undefined) patch.device_os = body.device_os ?? null;
   if (body.sdk_version !== undefined) patch.sdk_version = body.sdk_version ?? null;
   if (body.platform !== undefined) patch.platform = body.platform ?? null;
-  if (body.environment !== undefined) patch.environment = body.environment ?? null;
+  if (body.environment !== undefined) {
+    patch.environment = normalizeIngestEnvironment(body.environment);
+  }
   if (body.release !== undefined) patch.release = body.release ?? null;
   return patch;
 }
@@ -224,7 +228,7 @@ export async function ingestRoutes(
           session_id: body.session_id,
           app,
           platform: body.platform ?? null,
-          environment: body.environment ?? null,
+          environment: normalizeIngestEnvironment(body.environment),
           release: body.release ?? null,
           user_id: body.user_id ?? null,
           user_email: scrubbedEmail === undefined ? null : scrubbedEmail,
@@ -294,13 +298,14 @@ export async function ingestRoutes(
     if (!planOk.ok) return reply.status(planOk.status).send(planOk.body);
     const fingerprint = computeFingerprint(body.message, body.stack);
     const platform = body.platform ?? null;
+    const environment = normalizeIngestEnvironment(body.environment);
     const { group: errorGroup, isNew } = await findOrCreateErrorGroup(prisma, {
       projectId,
       fingerprint,
       message: body.message,
       top_stack: body.stack?.split("\n")[0]?.trim() ?? null,
       app,
-      environment: body.environment ?? null,
+      environment,
       release,
       platform,
     });
@@ -310,6 +315,7 @@ export async function ingestRoutes(
         stack: body.stack ?? null,
         release,
         platform,
+        environment,
         context: (body.context ?? undefined) as Prisma.InputJsonValue | undefined,
         session_id: body.session_id ?? null,
         user_id: body.user_id ?? null,
@@ -322,6 +328,7 @@ export async function ingestRoutes(
       void notifyNewErrorGroupEmail(prisma, projectId, errorGroup);
     }
     void maybeNotifyErrorSpike(prisma, projectId);
+    void maybeEvaluateAlertRules(prisma, projectId);
     void maybeNotifyQuotaAlerts(prisma, projectId);
     return reply.status(204).send();
   });
