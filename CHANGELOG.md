@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.14.2] - 2026-07-17
+
+### Added
+
+- **Email alert delivery** — branded templates for error spike, new error, quota near/exceeded, and generic/custom alerts; per-project email recipients (roles + additional addresses) on Alerts → Email recipients; quiet hours apply to email as well as in-app; temporary mute and digest preference hooks in Settings → Notifications ([#499](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/499); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+---
+
 ## [1.14.1] - 2026-07-17
 
 ### Added
