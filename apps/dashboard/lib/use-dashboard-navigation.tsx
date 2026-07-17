@@ -62,6 +62,8 @@ function DashboardNavigationOverlay({ active }: { active: boolean }) {
   );
 }
 
+/** Soft page navigations — keep overlay visible at least this long so fast RSC doesn't skip a paint. */
+const NAV_MIN_HOLD_MS = 280;
 /** Nav already matches via revalidatePath — hold long enough for page RSC refresh. */
 const REFRESH_ALREADY_MATCHED_HOLD_MS = 800;
 const REFRESH_ALREADY_MATCHED_AFTER_TRANSITION_MS = 400;
@@ -104,22 +106,43 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
     scopeSignalRef.current += 1;
   }, []);
 
+  const holdPendingUntilSettled = useCallback((startedAt: number) => {
+    setAsyncPendingCount((n) => n + 1);
+    const tick = () => {
+      const elapsed = performance.now() - startedAt;
+      if (elapsed >= REFRESH_MAX_HOLD_MS) {
+        setAsyncPendingCount((n) => Math.max(0, n - 1));
+        return;
+      }
+      if (transitionPendingRef.current || elapsed < NAV_MIN_HOLD_MS) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      setAsyncPendingCount((n) => Math.max(0, n - 1));
+    };
+    requestAnimationFrame(tick);
+  }, []);
+
   const push = useCallback(
     (href: string) => {
+      const startedAt = performance.now();
+      holdPendingUntilSettled(startedAt);
       startTransition(() => {
         router.push(href);
       });
     },
-    [router]
+    [holdPendingUntilSettled, router]
   );
 
   const replace = useCallback(
     (href: string) => {
+      const startedAt = performance.now();
+      holdPendingUntilSettled(startedAt);
       startTransition(() => {
         router.replace(href);
       });
     },
-    [router]
+    [holdPendingUntilSettled, router]
   );
 
   const replaceSilent = useCallback(
@@ -276,7 +299,10 @@ export function DashboardNavigationScopeAck({
 }
 
 /** Soft-navigate internal dashboard links so the full-screen overlay engages. */
-export function useDashboardNavLinkProps(href: string): {
+export function useDashboardNavLinkProps(
+  href: string,
+  options?: { onNavigate?: () => void }
+): {
   href: string;
   onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
   "aria-disabled"?: boolean;
@@ -301,8 +327,12 @@ export function useDashboardNavLinkProps(href: string): {
       ) {
         return;
       }
-      if (!href.startsWith("/dashboard")) return;
+      if (!href.startsWith("/dashboard")) {
+        options?.onNavigate?.();
+        return;
+      }
       event.preventDefault();
+      options?.onNavigate?.();
       push(href);
     },
   };

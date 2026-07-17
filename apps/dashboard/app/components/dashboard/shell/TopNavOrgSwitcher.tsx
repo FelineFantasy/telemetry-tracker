@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Plus, Users } from "lucide-react";
 import { setDashboardOrganizationId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
-import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
+import { useDashboardNavigation, useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
 import type { OrgOption } from "@/lib/dashboard-workspace-types";
 import {
@@ -33,14 +33,7 @@ export function TopNavOrgSwitcher({
   }, [currentOrganizationId]);
 
   if (organizations.length === 0) {
-    return (
-      <Link
-        href="/dashboard/settings/organization"
-        className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-sm hover:bg-surface"
-      >
-        Create organization
-      </Link>
-    );
+    return <EmptyOrgCreateLink />;
   }
 
   const current =
@@ -123,24 +116,55 @@ export function TopNavOrgSwitcher({
             </Link>
           </p>
           <div className="my-1 h-px bg-border" />
-          <Link
+          <OrgSettingsLink
             href="/dashboard/settings/organization"
-            onClick={close}
+            onNavigate={close}
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" />
             Create organization
-          </Link>
-          <Link
+          </OrgSettingsLink>
+          <OrgSettingsLink
             href="/dashboard/settings/team"
-            onClick={close}
+            onNavigate={close}
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground"
           >
             <Users className="h-3.5 w-3.5" />
             Invite team member
-          </Link>
+          </OrgSettingsLink>
         </div>
       )}
     </DashboardPopover>
+  );
+}
+
+function EmptyOrgCreateLink() {
+  const linkProps = useDashboardNavLinkProps("/dashboard/settings/organization");
+  return (
+    <Link
+      {...linkProps}
+      className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-sm hover:bg-surface"
+    >
+      Create organization
+    </Link>
+  );
+}
+
+function OrgSettingsLink({
+  href,
+  onNavigate,
+  className,
+  children,
+}: {
+  href: string;
+  onNavigate: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const linkProps = useDashboardNavLinkProps(href, { onNavigate });
+  return (
+    <Link {...linkProps} className={className}>
+      {children}
+    </Link>
   );
 }
