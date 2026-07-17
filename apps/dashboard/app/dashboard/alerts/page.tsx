@@ -3,6 +3,10 @@ import {
   fetchProjectAlertEvents,
   fetchProjectAlertSettings,
 } from "@/lib/alert-settings-server";
+import {
+  fetchProjectWebhookDeliveries,
+  fetchProjectWebhooks,
+} from "@/lib/project-webhooks";
 import { fetchProjectPiiScrubSettings, piiScrubSettingsLoadFallback } from "@/lib/pii-scrub-settings-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
@@ -24,9 +28,11 @@ async function loadCanEdit(): Promise<boolean> {
 }
 
 export default async function AlertsPage() {
-  const [settings, events, piiResult, canEdit] = await Promise.all([
+  const [settings, events, webhooks, deliveries, piiResult, canEdit] = await Promise.all([
     fetchProjectAlertSettings(),
     fetchProjectAlertEvents(),
+    fetchProjectWebhooks(),
+    fetchProjectWebhookDeliveries(25),
     fetchProjectPiiScrubSettings(),
     loadCanEdit(),
   ]);
@@ -35,6 +41,8 @@ export default async function AlertsPage() {
     <AlertsClient
       initialSettings={settings}
       initialEvents={events}
+      initialWebhooks={webhooks}
+      initialDeliveries={deliveries}
       initialPiiSettings={
         piiResult.ok ? piiResult.settings : piiScrubSettingsLoadFallback()
       }

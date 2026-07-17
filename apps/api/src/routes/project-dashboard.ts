@@ -1254,6 +1254,144 @@ export async function projectDashboardRoutes(
     });
   });
 
+  app.get("/project/webhooks", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const { listProjectWebhooks } = await import("../lib/alert-webhook-dispatch.js");
+    const webhooks = await listProjectWebhooks(prisma, projectId);
+    return reply.send({ webhooks });
+  });
+
+  app.get("/project/webhook-deliveries", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const q = request.query as { limit?: string; webhookId?: string };
+    const limitRaw = typeof q.limit === "string" ? Number(q.limit) : 25;
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(50, Math.max(1, Math.floor(limitRaw)))
+      : 25;
+    const webhookId =
+      typeof q.webhookId === "string" && q.webhookId.trim().length > 0
+        ? q.webhookId.trim()
+        : undefined;
+    const { listAlertWebhookDeliveries } = await import("../lib/alert-webhook-dispatch.js");
+    const deliveries = await listAlertWebhookDeliveries(prisma, projectId, {
+      limit,
+      webhookId,
+    });
+    return reply.send({ deliveries });
+  });
+
+  app.post("/project/webhooks", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const body = (request.body ?? {}) as {
+      url?: unknown;
+      label?: unknown;
+      enabled?: unknown;
+      withSigningSecret?: unknown;
+    };
+    const { createProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await createProjectWebhook(prisma, projectId, {
+      url: typeof body.url === "string" ? body.url : "",
+      label: typeof body.label === "string" ? body.label : null,
+      enabled: typeof body.enabled === "boolean" ? body.enabled : true,
+      withSigningSecret:
+        typeof body.withSigningSecret === "boolean" ? body.withSigningSecret : true,
+    });
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(201).send({
+      webhook: result.webhook,
+      signingSecret: result.signingSecret,
+    });
+  });
+
+  app.patch("/project/webhooks/:webhookId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { webhookId } = request.params as { webhookId: string };
+    const body = (request.body ?? {}) as {
+      url?: unknown;
+      label?: unknown;
+      enabled?: unknown;
+      rotateSigningSecret?: unknown;
+      clearSigningSecret?: unknown;
+    };
+    const { updateProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await updateProjectWebhook(prisma, projectId, webhookId, {
+      url: typeof body.url === "string" ? body.url : undefined,
+      label:
+        body.label === null
+          ? null
+          : typeof body.label === "string"
+            ? body.label
+            : undefined,
+      enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+      rotateSigningSecret: body.rotateSigningSecret === true,
+      clearSigningSecret: body.clearSigningSecret === true,
+    });
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.send({
+      webhook: result.webhook,
+      signingSecret: result.signingSecret,
+    });
+  });
+
+  app.delete("/project/webhooks/:webhookId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { webhookId } = request.params as { webhookId: string };
+    const { softDeleteProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await softDeleteProjectWebhook(prisma, projectId, webhookId);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(204).send();
+  });
+
+  app.post("/project/webhooks/:webhookId/test", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { webhookId } = request.params as { webhookId: string };
+    const { sendTestWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await sendTestWebhook(prisma, projectId, webhookId);
+    if (!result.ok) {
+      return reply.status(result.status).send({
+        error: result.error,
+        httpStatus: result.httpStatus ?? null,
+      });
+    }
+    return reply.send({ ok: true, httpStatus: result.httpStatus });
+  });
+
   app.get("/project/api-keys", async (request, reply) => {
     const projectId = await resolveReadProjectId(request, reply);
     if (projectId === null) return;

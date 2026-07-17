@@ -16,12 +16,13 @@ Fastify + Prisma + PostgreSQL. Ingest uses **API keys**; dashboard uses **sessio
 
 ## Notifications and alerts
 
-Files: `dashboard-notifications.ts`, `notification-preferences.ts`, `notification-email-dispatch.ts`, `alert-dispatch.ts`, `quota-alert.ts`, `error-spike-alert.ts`, `project-alert-settings.ts`.
+Files: `dashboard-notifications.ts`, `notification-preferences.ts`, `notification-email-dispatch.ts`, `alert-dispatch.ts`, `alert-webhook-dispatch.ts`, `quota-alert.ts`, `error-spike-alert.ts`, `project-alert-settings.ts`.
 
 - **Category mapping**: `categoryForNotificationType` — never route `alert` items to billing or vice versa without updating both build and filter paths.
 - **Dedupe by id**: `quota:near:{projectId}:{YYYY-MM}` and `quota:exceeded:…` keys are shared between session items and `AlertEvent.dedupe_key`. Collisions must use routing-aware dedupe (pass `preferences` into `dedupeNotificationItems`).
 - **Email vs in-app**: `shouldShowInAppNotification` and `shouldSendEmailForCategory` must stay aligned when adding new notification types.
-- **fireProjectAlert**: unique constraint on `dedupe_key` is intentional — do not swallow non-P2002 errors.
+- **fireProjectAlert**: unique constraint on `dedupe_key` is intentional — do not swallow non-P2002 errors. After a successful insert, fan out to email **and** `dispatchAlertWebhooks` (best-effort; must not block alert persistence).
+- **Webhooks**: only `https:` URLs; never return raw URL or signing secret on list/GET (mask URL; secret only on create/rotate). Soft-delete with `deleted_at`. Cap destinations per project (`MAX_PROJECT_WEBHOOKS`).
 - **Alert settings defaults**: changes to `DEFAULT_PROJECT_ALERT_SETTINGS` affect all projects with null/invalid JSON — treat as user-facing.
 
 ## Routes (`src/routes/`)

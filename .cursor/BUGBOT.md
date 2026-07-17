@@ -39,6 +39,8 @@ Recent production bugs lived here — review cross-file carefully:
 
 5. **Alert href**: Persist or derive correct in-app links (`alertEventHref`, `AlertEvent.href`) — error spikes → `/dashboard/errors` or specific group; quota → `/dashboard/settings/billing`.
 
+6. **Alert webhooks**: Outbound `ProjectWebhook` URLs must be HTTPS-only; list APIs must not leak full URLs or signing secrets; delivery log list must mask URLs the same way; `fireProjectAlert` must still succeed if webhook delivery fails.
+
 ### Plan enforcement and ingest
 
 - Rejecting ingest at quota cap must still trigger quota exceeded notification paths when appropriate.

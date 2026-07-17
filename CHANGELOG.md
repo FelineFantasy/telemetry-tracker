@@ -13,11 +13,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Alert webhooks** — configure HTTPS destinations per project on Alerts → Delivery; `fireProjectAlert` POSTs signed JSON (`alert.fired`) with retry; operators can browse delivery status (SUCCESS/FAILED/DEAD) in the same Delivery section ([#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
 ### Fixed
 
 ### Changed
 
 ### Database
+
+- `ProjectWebhook` and `AlertWebhookDelivery` tables for outbound alert webhook destinations and attempt/dead-letter history
 
 ---
 
