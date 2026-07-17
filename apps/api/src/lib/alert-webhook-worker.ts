@@ -204,8 +204,9 @@ async function deliverClaimedAlertWebhook(
     if (completed) {
       return { status: "success", deliveryId: job.id };
     }
-    // HTTP already succeeded — still mark SUCCESS without the lease so the row
-    // cannot stay PROCESSING and be reclaimed for a duplicate POST.
+    // HTTP already succeeded — finalize SUCCESS without the lease (retry +
+    // force-by-id) so the row cannot stay PROCESSING and be reclaimed for a
+    // duplicate POST.
     const finalized = await finalizeAlertWebhookDeliverySuccess(deps.prisma, {
       deliveryId: job.id,
       httpStatus: result.httpStatus,
@@ -213,6 +214,7 @@ async function deliverClaimedAlertWebhook(
     if (finalized) {
       return { status: "success", deliveryId: job.id };
     }
+    // DB unreachable / row deleted — nothing left to reclaim for a duplicate.
     return {
       status: "failed",
       deliveryId: job.id,

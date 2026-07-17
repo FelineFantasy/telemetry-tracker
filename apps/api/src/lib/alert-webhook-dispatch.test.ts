@@ -533,14 +533,22 @@ describe("processNextAlertWebhookDelivery", () => {
     expect(updateMany).toHaveBeenCalledTimes(4);
   });
 
-  it("reports failure only when SUCCESS cannot be finalized after POST", async () => {
+  it("force-terminalizes SUCCESS when complete and scoped finalize miss after POST", async () => {
     const sendImpl = vi.fn(async () => ({ ok: true as const, httpStatus: 200 }));
     const updateMany = vi
       .fn()
       .mockResolvedValueOnce({ count: 0 }) // abandon expired tests
       .mockResolvedValueOnce({ count: 1 }) // renew
       .mockResolvedValueOnce({ count: 0 }) // lease-scoped complete
-      .mockResolvedValueOnce({ count: 0 }); // finalize also missed
+      .mockResolvedValueOnce({ count: 0 }); // PROCESSING-scoped finalize missed
+    const update = vi.fn().mockResolvedValue({
+      id: "d1",
+      status: "SUCCESS",
+      http_status: 200,
+      error: null,
+      lease_owner: null,
+      lease_expires_at: null,
+    });
     const prisma = {
       $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
         fn({
@@ -598,7 +606,7 @@ describe("processNextAlertWebhookDelivery", () => {
           fired_at: new Date("2026-07-17T10:00:00.000Z"),
         }),
       },
-      alertWebhookDelivery: { updateMany },
+      alertWebhookDelivery: { updateMany, update },
     };
     const result = await processNextAlertWebhookDelivery({
       prisma: prisma as never,
@@ -606,11 +614,17 @@ describe("processNextAlertWebhookDelivery", () => {
       now: () => new Date("2026-07-17T12:00:00.000Z"),
       sendImpl,
     });
-    expect(result).toEqual({
-      status: "failed",
-      deliveryId: "d1",
-      terminal: "FAILED",
-      error: "Could not finalize successful delivery",
+    expect(result).toEqual({ status: "success", deliveryId: "d1" });
+    expect(sendImpl).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "d1" },
+      data: {
+        status: "SUCCESS",
+        http_status: 200,
+        error: null,
+        lease_owner: null,
+        lease_expires_at: null,
+      },
     });
   });
 

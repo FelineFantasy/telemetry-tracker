@@ -185,28 +185,56 @@ export async function completeAlertWebhookDelivery(
   return result.count > 0;
 }
 
+/** Retries for post-POST SUCCESS finalize (scoped updateMany + force-by-id). */
+const WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS = 3;
+
 /**
  * After a successful HTTP POST, finalize SUCCESS even if the worker lost its lease.
- * Prevents a stuck PROCESSING row from being reclaimed and POSTed again.
+ * Prefer PROCESSING-scoped updateMany; on miss/transient error, force SUCCESS by id
+ * so the row cannot stay reclaimable PROCESSING and duplicate the POST.
  */
 export async function finalizeAlertWebhookDeliverySuccess(
   prisma: PrismaClient,
   input: { deliveryId: string; httpStatus: number }
 ): Promise<boolean> {
-  const result = await prisma.alertWebhookDelivery.updateMany({
-    where: {
-      id: input.deliveryId,
-      status: AlertWebhookDeliveryStatus.PROCESSING,
-    },
-    data: {
-      status: AlertWebhookDeliveryStatus.SUCCESS,
-      http_status: input.httpStatus,
-      error: null,
-      lease_owner: null,
-      lease_expires_at: null,
-    },
-  });
-  return result.count > 0;
+  const data = {
+    status: AlertWebhookDeliveryStatus.SUCCESS,
+    http_status: input.httpStatus,
+    error: null,
+    lease_owner: null,
+    lease_expires_at: null,
+  };
+
+  for (let attempt = 0; attempt < WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS; attempt++) {
+    try {
+      const result = await prisma.alertWebhookDelivery.updateMany({
+        where: {
+          id: input.deliveryId,
+          status: AlertWebhookDeliveryStatus.PROCESSING,
+        },
+        data,
+      });
+      if (result.count > 0) return true;
+      break; // not PROCESSING (or gone) — fall through to force-by-id
+    } catch {
+      // Transient DB error — retry scoped update before forcing by id.
+    }
+  }
+
+  // Last resort: id-only SUCCESS. Idempotent if already SUCCESS; prevents reclaim
+  // if still PROCESSING (or any other status after a successful HTTP delivery).
+  for (let attempt = 0; attempt < WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS; attempt++) {
+    try {
+      await prisma.alertWebhookDelivery.update({
+        where: { id: input.deliveryId },
+        data,
+      });
+      return true;
+    } catch {
+      // Transient DB error or missing row — retry, then give up.
+    }
+  }
+  return false;
 }
 
 /**
