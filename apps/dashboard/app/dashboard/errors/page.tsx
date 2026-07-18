@@ -151,6 +151,7 @@ export default async function ErrorsListPage({
     trendWindow?: string | string[];
     trendFrom?: string | string[];
     trendTo?: string | string[];
+    metricsUntil?: string | string[];
   }>;
 }) {
   const sp = await searchParams;
