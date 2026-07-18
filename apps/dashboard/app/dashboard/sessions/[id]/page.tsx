@@ -9,6 +9,7 @@ import { formatRelativeTime } from "@/lib/format-time";
 import { formatDurationSec } from "@/lib/format-duration";
 import { countryFlagEmoji, formatSessionDevice, resolveSessionIdentityLabel } from "@/lib/session-display";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { parseDashboardApiResourceId } from "@/lib/dashboard-api-url";
 
 type SessionDetail = {
   id: string;
@@ -33,7 +34,9 @@ type SessionDetail = {
   identity_first_seen_at?: string | null;
 };
 
-async function getSession(id: string): Promise<SessionDetail | null> {
+async function getSession(rawId: string): Promise<SessionDetail | null> {
+  const id = parseDashboardApiResourceId(rawId);
+  if (!id) return null;
   const res = await dashboardApiFetch(`/api/sessions/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) {

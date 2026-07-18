@@ -6,6 +6,7 @@ settings:
 
 overrides:
   vite: 7.3.5
+  shell-quote: '>=1.8.4'
 
 importers:
 
@@ -5034,8 +5035,8 @@ packages:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
 
-  shell-quote@1.8.3:
-    resolution: {integrity: sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==}
+  shell-quote@1.10.0:
+    resolution: {integrity: sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA==}
     engines: {node: '>= 0.4'}
 
   shimmer@1.2.1:
@@ -6356,7 +6357,7 @@ snapshots:
       diff: 7.0.0
       ejs: 3.1.10
       inquirer: 12.11.1(@types/node@22.19.15)
-      shell-quote: 1.8.3
+      shell-quote: 1.10.0
       yargs: 17.7.2
     transitivePeerDependencies:
       - '@types/node'
@@ -10542,7 +10543,7 @@ snapshots:
 
   react-devtools-core@6.1.5:
     dependencies:
-      shell-quote: 1.8.3
+      shell-quote: 1.10.0
       ws: 7.5.10
     transitivePeerDependencies:
       - bufferutil
@@ -10947,7 +10948,7 @@ snapshots:
 
   shebang-regex@3.0.0: {}
 
-  shell-quote@1.8.3: {}
+  shell-quote@1.10.0: {}
 
   shimmer@1.2.1: {}
 

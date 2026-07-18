@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/lib/api-url";
+import { resolveDashboardApiUrl } from "@/lib/dashboard-api-url";
 import { getDashboardOrganizationId } from "@/lib/dashboard-org";
 import { dashboardDebug } from "@/lib/dashboard-debug";
 import {
@@ -42,9 +43,7 @@ export async function dashboardApiFetchFromCookies(
     options?.omitOrganizationHeader ? Promise.resolve(undefined) : getDashboardOrganizationId(),
   ]);
 
-  const url = pathAndQuery.startsWith("http")
-    ? pathAndQuery
-    : `${API_BASE_URL}${pathAndQuery.startsWith("/") ? "" : "/"}${pathAndQuery}`;
+  const url = resolveDashboardApiUrl(pathAndQuery);
 
   dashboardDebug("fetch:cookies", pathAndQuery, {
     hasSession: Boolean(sessionId),
@@ -88,9 +87,7 @@ export async function dashboardApiFetch(
       ? orgOverride.toLowerCase()
       : await getDashboardOrganizationId();
 
-  const url = pathAndQuery.startsWith("http")
-    ? pathAndQuery
-    : `${API_BASE_URL}${pathAndQuery.startsWith("/") ? "" : "/"}${pathAndQuery}`;
+  const url = resolveDashboardApiUrl(pathAndQuery);
 
   dashboardDebug("fetch", pathAndQuery, {
     hasSession: Boolean(sessionId),
