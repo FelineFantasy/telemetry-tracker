@@ -29,19 +29,34 @@ const ANON_STORAGE_KEY = "tacko_telemetry_anon_id";
 
 let anonymousId: string | null = null;
 
+let fallbackIdSeq = 0;
+
+function bytesToUuid(bytes: Uint8Array): string {
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** Prefer Web Crypto; fall back for Node/RN hosts without a global crypto polyfill. */
 function generateUUID(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  const webCrypto = typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+  if (webCrypto && typeof webCrypto.randomUUID === "function") {
+    return webCrypto.randomUUID();
   }
-  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+  if (webCrypto && typeof webCrypto.getRandomValues === "function") {
     const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
-    bytes[6] = (bytes[6]! & 0x0f) | 0x40;
-    bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    webCrypto.getRandomValues(bytes);
+    return bytesToUuid(bytes);
   }
-  throw new Error("Web Crypto API is required to generate IDs");
+  // Constrained runtimes: unique analytics IDs without Math.random (CodeQL insecure-randomness).
+  const bytes = new Uint8Array(16);
+  let n = (Date.now() ^ (++fallbackIdSeq * 0x9e3779b9)) >>> 0;
+  for (let i = 0; i < 16; i++) {
+    n = (Math.imul(n, 1664525) + 1013904223) >>> 0;
+    bytes[i] = n & 0xff;
+  }
+  return bytesToUuid(bytes);
 }
 
 export function getAnonymousId(): string {

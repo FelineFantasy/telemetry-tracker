@@ -50,7 +50,7 @@ function hasBasicEmailShape(email: string): boolean {
   const local = email.slice(0, at);
   const domain = email.slice(at + 1);
   if (!local || !domain) return false;
-  if (local.includes(" ") || domain.includes(" ") || domain.includes("@")) return false;
+  if (/\s/.test(local) || /\s/.test(domain) || domain.includes("@")) return false;
   const dot = domain.lastIndexOf(".");
   return dot > 0 && dot < domain.length - 1;
 }
