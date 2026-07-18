@@ -24,6 +24,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Global Search URL / View all free text** — treat `https://…` / `http://…` tokens as free text (not ignored `https:` filters), and forward API `parsed.freeText` into View all Issues/Events/Sessions links so colon-bearing terms stay aligned with grouped hits ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
 - **Global Search pending submit** — ignore search form submit while dashboard navigation is pending, and only map input Enter to the highlighted hit (result rows use their own activation) ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
 - **Global Search Events View all** — forward free text as Events list `q` (name OR properties, AND across terms) so View all keeps name-only and multi-word hits that `propertiesContains` alone dropped ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search Issues/Sessions View all** — Issues and Sessions list `q` use AND across whitespace terms (Issues: message OR fingerprint; Sessions: identity/device/session fields) so View all multi-word hits match Global Search ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Dashboard Sentry client capture** — re-check `window` inside async product-telemetry callbacks so Vitest teardown cannot throw `window is not defined` after `captureClientException`
 
 ### Changed
 

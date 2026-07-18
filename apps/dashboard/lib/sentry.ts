@@ -35,9 +35,13 @@ export function captureClientException(error: unknown): void {
     void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
   }
   if (typeof window === "undefined") return;
+  // Re-check window inside async callbacks — Vitest/jsdom can tear down
+  // `window` after the synchronous call returns (unhandled rejection otherwise).
   void import("@/lib/product-telemetry").then(({ shouldTrackProductTelemetry }) => {
+    if (typeof window === "undefined" || typeof window.location === "undefined") return;
     if (!shouldTrackProductTelemetry(window.location.pathname)) return;
     void import("@telemetry-tracker/next").then(({ trackError }) => {
+      if (typeof window === "undefined") return;
       const err = error instanceof Error ? error : new Error(String(error));
       trackError(err, { source: "next-error-boundary" });
     });

@@ -1,12 +1,35 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { buildEventWhereSql } from "./list-query-helpers.js";
+import {
+  buildEventWhereSql,
+  freeTextAndMatchSql,
+} from "./list-query-helpers.js";
 import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   const parts = fragment as unknown as { strings: string[]; values: unknown[] };
   return parts.strings.join("?");
 }
+
+describe("freeTextAndMatchSql", () => {
+  it("returns null for blank q", () => {
+    expect(freeTextAndMatchSql("   ", [Prisma.sql`col`])).toBeNull();
+  });
+
+  it("ANDs whitespace terms across OR columns", () => {
+    const sql = freeTextAndMatchSql("foo bar", [
+      Prisma.sql`a`,
+      Prisma.sql`b`,
+    ]);
+    expect(sql).not.toBeNull();
+    const text = prismaSqlText(sql!);
+    expect(text).toContain(" AND ");
+    expect(text).toContain(" OR ");
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain("%foo%");
+    expect(values).toContain("%bar%");
+  });
+});
 
 describe("buildEventWhereSql", () => {
   it("escapes propertiesContains wildcards for ILIKE", () => {

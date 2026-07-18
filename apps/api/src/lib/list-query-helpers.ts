@@ -3,6 +3,26 @@ import { escapeLikePattern } from "./list-query.js";
 import { releaseFilterMatchSql } from "./release-key.js";
 
 /**
+ * Free-text match shared by Global Search View all and list `q` params:
+ * each whitespace term must ILIKE at least one column (OR), AND across terms.
+ */
+export function freeTextAndMatchSql(
+  q: string | undefined | null,
+  columnExprs: Prisma.Sql[]
+): Prisma.Sql | null {
+  const terms = (q ?? "").trim().split(/\s+/).filter(Boolean);
+  if (terms.length === 0 || columnExprs.length === 0) return null;
+  const termClauses = terms.map((term) => {
+    const pat = `%${escapeLikePattern(term)}%`;
+    const ors = columnExprs.map(
+      (col) => Prisma.sql`COALESCE(${col}, '') ILIKE ${pat} ESCAPE '\\'`
+    );
+    return Prisma.sql`(${Prisma.join(ors, " OR ")})`;
+  });
+  return Prisma.join(termClauses, " AND ");
+}
+
+/**
  * Free-text event match (Global Search / Events `q`): each whitespace term must
  * match `name` OR `properties` (ILIKE), AND across terms.
  */
@@ -11,13 +31,7 @@ export function eventFreeTextMatchSql(
   nameCol: Prisma.Sql = Prisma.sql`name`,
   propertiesCol: Prisma.Sql = Prisma.sql`properties::text`
 ): Prisma.Sql | null {
-  const terms = (q ?? "").trim().split(/\s+/).filter(Boolean);
-  if (terms.length === 0) return null;
-  const termClauses = terms.map((term) => {
-    const pat = `%${escapeLikePattern(term)}%`;
-    return Prisma.sql`(COALESCE(${nameCol}, '') ILIKE ${pat} ESCAPE '\\' OR COALESCE(${propertiesCol}, '') ILIKE ${pat} ESCAPE '\\')`;
-  });
-  return Prisma.join(termClauses, " AND ");
+  return freeTextAndMatchSql(q, [nameCol, propertiesCol]);
 }
 
 export function buildEventWhereSql(params: {
