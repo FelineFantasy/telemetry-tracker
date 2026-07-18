@@ -17,9 +17,23 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
-- **Docs staleness pass** — align RELEASE / PRODUCTION-READINESS / ROADMAP / MONITORING with shipped Notifications + Alert Rules, Railway `alert-rules-evaluator` cron (leave `brief-worker` alone), and corrected ops notes (CI does not migrate production; Slack/Discord Delivery shipped)
-
 ### Database
+
+---
+
+## [1.15.8] - 2026-07-18
+
+### Added
+
+- **GitHub CodeQL Advanced** — CI workflow scans `actions` and `javascript-typescript` on pushes/PRs to `develop`/`main`, plus a weekly schedule ([#561](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/561))
+
+---
+
+## [1.15.7] - 2026-07-18
+
+### Changed
+
+- **Docs staleness pass** — align RELEASE / PRODUCTION-READINESS / ROADMAP / MONITORING with shipped Notifications + Alert Rules, Railway `alert-rules-evaluator` cron (leave `brief-worker` alone), and corrected ops notes (CI does not migrate production; Slack/Discord Delivery shipped) ([#556](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/556))
 
 ---
 
