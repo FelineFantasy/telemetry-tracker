@@ -14,6 +14,7 @@ import {
   ruleNeedsScheduledEvaluation,
   runScheduledAlertRuleEvaluation,
   softDeleteAlertRule,
+  tryClaimAlertRuleFire,
   updateAlertRule,
   ALERT_RULES_SCHEDULE_INTERVAL_MINUTES,
   type AlertRulePublic,
@@ -37,6 +38,58 @@ vi.mock("./plan-enforcement.js", () => ({
   getMonthlyIngestUsed: (...args: unknown[]) => getMonthlyIngestUsed(...args),
 }));
 
+/** In-memory last_fired_at store that mirrors tryClaimAlertRuleFire WHERE semantics. */
+function createLastFiredStore(initial: Date | null = null) {
+  let lastFiredAt: Date | null = initial;
+  const updateMany = vi.fn(
+    async (args: {
+      where: {
+        id?: string;
+        deleted_at?: null;
+        last_fired_at?: Date;
+        OR?: Array<
+          { last_fired_at: null } | { last_fired_at: { lte: Date } }
+        >;
+      };
+      data: { last_fired_at: Date | null };
+    }) => {
+      if (args.where.last_fired_at instanceof Date) {
+        if (
+          lastFiredAt === null ||
+          lastFiredAt.getTime() !== args.where.last_fired_at.getTime()
+        ) {
+          return { count: 0 };
+        }
+        lastFiredAt = args.data.last_fired_at;
+        return { count: 1 };
+      }
+      const or = args.where.OR ?? [];
+      const cutoff = or.find(
+        (c): c is { last_fired_at: { lte: Date } } =>
+          typeof c.last_fired_at === "object" &&
+          c.last_fired_at !== null &&
+          "lte" in c.last_fired_at
+      )?.last_fired_at.lte;
+      const eligible =
+        lastFiredAt === null ||
+        (cutoff !== undefined && lastFiredAt.getTime() <= cutoff.getTime());
+      if (!eligible) return { count: 0 };
+      lastFiredAt = args.data.last_fired_at;
+      return { count: 1 };
+    }
+  );
+  return {
+    updateMany,
+    get lastFiredAt() {
+      return lastFiredAt;
+    },
+  };
+}
+
+function claimAlways() {
+  return vi.fn(async () => ({ count: 1 }));
+}
+
 describe("normalizeIngestEnvironment", () => {
   it("trims and caps to match alert-rule environment filters", () => {
     expect(normalizeIngestEnvironment("  production  ")).toBe("production");
@@ -47,12 +100,70 @@ describe("normalizeIngestEnvironment", () => {
 });
 
 describe("alertRuleDedupeKey", () => {
-  it("buckets by cooldown window", () => {
-    const t0 = Date.UTC(2026, 6, 17, 12, 0, 0);
-    const t1 = t0 + 14 * 60 * 1000;
-    const t2 = t0 + 15 * 60 * 1000;
-    expect(alertRuleDedupeKey("r1", 15, t0)).toBe(alertRuleDedupeKey("r1", 15, t1));
-    expect(alertRuleDedupeKey("r1", 15, t0)).not.toBe(alertRuleDedupeKey("r1", 15, t2));
+  it("is unique per claim timestamp for AlertEvent idempotency", () => {
+    const t0 = Date.UTC(2026, 6, 18, 10, 14, 0);
+    const t1 = t0 + 60_000;
+    expect(alertRuleDedupeKey("r1", t0)).toBe("alert:rule:r1:" + t0);
+    expect(alertRuleDedupeKey("r1", t0)).not.toBe(alertRuleDedupeKey("r1", t1));
+  });
+});
+
+describe("tryClaimAlertRuleFire", () => {
+  it("enforces elapsed cooldown across wall-clock bucket boundaries and concurrent claims", async () => {
+    const store = createLastFiredStore();
+    const prisma = { alertRule: { updateMany: store.updateMany } } as never;
+    const cooldownMinutes = 15;
+    // 15-minute wall buckets roll at :00/:15/:30/:45 — 10:14 → 10:15 crosses a bucket.
+    const firstAt = new Date("2026-07-18T10:14:00.000Z");
+    const bucketRollAt = new Date("2026-07-18T10:15:00.000Z");
+    const beforeElapsed = new Date(
+      firstAt.getTime() + cooldownMinutes * 60 * 1000 - 1
+    );
+    const exactlyElapsed = new Date(
+      firstAt.getTime() + cooldownMinutes * 60 * 1000
+    );
+
+    const first = await tryClaimAlertRuleFire(
+      prisma,
+      "r1",
+      cooldownMinutes,
+      firstAt
+    );
+    expect(first).toEqual(firstAt);
+
+    // Concurrent overlapping claim at the same instant must lose.
+    const concurrent = await tryClaimAlertRuleFire(
+      prisma,
+      "r1",
+      cooldownMinutes,
+      firstAt
+    );
+    expect(concurrent).toBeNull();
+
+    // Bucket boundary alone must not allow a re-fire.
+    const acrossBucket = await tryClaimAlertRuleFire(
+      prisma,
+      "r1",
+      cooldownMinutes,
+      bucketRollAt
+    );
+    expect(acrossBucket).toBeNull();
+
+    const stillCooling = await tryClaimAlertRuleFire(
+      prisma,
+      "r1",
+      cooldownMinutes,
+      beforeElapsed
+    );
+    expect(stillCooling).toBeNull();
+
+    const afterCooldown = await tryClaimAlertRuleFire(
+      prisma,
+      "r1",
+      cooldownMinutes,
+      exactlyElapsed
+    );
+    expect(afterCooldown).toEqual(exactlyElapsed);
   });
 });
 
@@ -439,6 +550,7 @@ describe("maybeEvaluateAlertRules (ingest)", () => {
     const prisma = {
       alertRule: {
         findMany: async () => [ruleRow],
+        updateMany: claimAlways(),
       },
       errorOccurrence: { count },
     } as never;
@@ -487,13 +599,46 @@ describe("maybeEvaluateAlertRules (ingest)", () => {
       updated_at: new Date(),
     };
     const prisma = {
-      alertRule: { findMany: async () => [ruleRow] },
+      alertRule: {
+        findMany: async () => [ruleRow],
+        updateMany: claimAlways(),
+      },
       errorOccurrence: { count: async () => 5 },
     } as never;
 
     await maybeEvaluateAlertRules(prisma, "p1");
     expect(fireProjectAlert).toHaveBeenCalledTimes(1);
     warn.mockRestore();
+  });
+
+  it("does not fire when cooldown claim loses (concurrent / still cooling)", async () => {
+    const ruleRow = {
+      id: "rule-1",
+      name: "Prod errors",
+      enabled: true,
+      conditions: [
+        {
+          type: "ERROR_COUNT" as const,
+          threshold: 5,
+          windowMinutes: 15,
+          environment: null,
+        },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const prisma = {
+      alertRule: {
+        findMany: async () => [ruleRow],
+        updateMany: vi.fn(async () => ({ count: 0 })),
+      },
+      errorOccurrence: { count: async () => 12 },
+    } as never;
+
+    await maybeEvaluateAlertRules(prisma, "p1");
+    expect(fireProjectAlert).not.toHaveBeenCalled();
   });
 
   it("does not fire when no supported conditions remain", async () => {
@@ -658,6 +803,7 @@ describe("runScheduledAlertRuleEvaluation", () => {
           .fn()
           .mockResolvedValueOnce([{ project_id: "p1" }])
           .mockResolvedValueOnce([heartbeatRule, quotaRule, errorOnlyRule]),
+        updateMany: claimAlways(),
       },
       project: { findFirst: async () => ({ id: "p1" }) },
       event: { count: async () => 0 },
@@ -707,6 +853,7 @@ describe("runScheduledAlertRuleEvaluation", () => {
           .fn()
           .mockResolvedValueOnce([{ project_id: "p1" }])
           .mockResolvedValueOnce([ruleRow]),
+        updateMany: claimAlways(),
       },
       project: { findFirst: async () => ({ id: "p1" }) },
       event: { count: async () => 3 },
@@ -716,6 +863,48 @@ describe("runScheduledAlertRuleEvaluation", () => {
     expect(result.rulesEvaluated).toBe(1);
     expect(result.rulesFired).toBe(0);
     expect(fireProjectAlert).not.toHaveBeenCalled();
+  });
+
+  it("skips projects whose organization is soft-deleted (ingest parity)", async () => {
+    const heartbeatRule = {
+      id: "rule-hb",
+      name: "Silence",
+      enabled: true,
+      conditions: [
+        { type: "HEARTBEAT" as const, windowMinutes: 15, environment: null },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const findFirst = vi.fn(async () => null);
+    const prisma = {
+      alertRule: {
+        findMany: vi.fn().mockResolvedValueOnce([{ project_id: "p-archived" }]),
+        updateMany: claimAlways(),
+      },
+      project: { findFirst },
+      event: { count: vi.fn(async () => 0) },
+      session: { count: vi.fn(async () => 0) },
+      errorOccurrence: { count: vi.fn(async () => 0) },
+    } as never;
+
+    const result = await runScheduledAlertRuleEvaluation(prisma);
+    expect(findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "p-archived",
+        deleted_at: null,
+        organization: { deleted_at: null },
+      },
+      select: { id: true },
+    });
+    expect(result.projectsScanned).toBe(1);
+    expect(result.rulesEvaluated).toBe(0);
+    expect(result.rulesFired).toBe(0);
+    expect(fireProjectAlert).not.toHaveBeenCalled();
+    // findMany for rules is never reached when the project/org gate fails.
+    expect(prisma.alertRule.findMany).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -748,7 +937,10 @@ describe("evaluateAlertRulesForProject SESSION_DROP / ERROR_RATE", () => {
       .mockResolvedValueOnce(10) // current
       .mockResolvedValueOnce(40); // previous
     const prisma = {
-      alertRule: { findMany: async () => [ruleRow] },
+      alertRule: {
+        findMany: async () => [ruleRow],
+        updateMany: claimAlways(),
+      },
       session: { count: sessionCount },
     } as never;
 
@@ -782,7 +974,10 @@ describe("evaluateAlertRulesForProject SESSION_DROP / ERROR_RATE", () => {
       updated_at: new Date(),
     };
     const prisma = {
-      alertRule: { findMany: async () => [ruleRow] },
+      alertRule: {
+        findMany: async () => [ruleRow],
+        updateMany: claimAlways(),
+      },
       errorOccurrence: { count: async () => 5 },
       session: { count: async () => 10 },
     } as never;

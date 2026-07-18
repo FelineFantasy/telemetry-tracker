@@ -2,7 +2,7 @@
  * Configurable alert rules (#493 / #534).
  *
  * Separation of concerns:
- * - Alert Rules own Condition[] (AND) + opaque destinationIds + cooldown/dedupe.
+ * - Alert Rules own Condition[] (AND) + opaque destinationIds + cooldown.
  * - Notifications (v1.14) own delivery — rules only call fireProjectAlert / enqueue paths.
  * - destinationIds are opaque bindings (well-known "project-email" or ProjectWebhook ids);
  *   providers (Slack/Discord/…) are resolved by Notifications, not stored as rule enums.
@@ -11,7 +11,7 @@
  * - Ingest-triggered (`maybeEvaluateAlertRules`) for error-driven conditions.
  * - Scheduled (`runScheduledAlertRuleEvaluation`) for conditions that are not
  *   naturally ingest-triggered (HEARTBEAT, NO_EVENTS, SESSION_DROP, QUOTA_PERCENT).
- * Both paths share the same AND evaluator, cooldown dedupe, and delivery boundary.
+ * Both paths share the same AND evaluator, last_fired_at cooldown claim, and delivery boundary.
  */
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
@@ -599,15 +599,47 @@ export async function pruneDestinationIdFromAlertRules(
   return updated;
 }
 
-/** Bucket key so the same rule fires at most once per cooldown window. */
-export function alertRuleDedupeKey(
+/**
+ * Idempotency key for AlertEvent after a successful cooldown claim.
+ * Unique per claim timestamp — cooldown itself is enforced via last_fired_at.
+ */
+export function alertRuleDedupeKey(ruleId: string, claimedAtMs: number): string {
+  return `alert:rule:${ruleId}:${claimedAtMs}`;
+}
+
+/**
+ * Atomically claim the right to fire a rule when cooldown has elapsed since
+ * last_fired_at. Concurrent evaluators racing the same rule: at most one wins.
+ * Returns the claim timestamp on success, null when still in cooldown.
+ */
+export async function tryClaimAlertRuleFire(
+  prisma: PrismaClient,
   ruleId: string,
   cooldownMinutes: number,
-  now = Date.now()
-): string {
-  const bucketMs = cooldownMinutes * 60 * 1000;
-  const bucket = Math.floor(now / bucketMs);
-  return `alert:rule:${ruleId}:${cooldownMinutes}:${bucket}`;
+  now = new Date()
+): Promise<Date | null> {
+  const cutoff = new Date(now.getTime() - cooldownMinutes * 60 * 1000);
+  const result = await prisma.alertRule.updateMany({
+    where: {
+      id: ruleId,
+      deleted_at: null,
+      OR: [{ last_fired_at: null }, { last_fired_at: { lte: cutoff } }],
+    },
+    data: { last_fired_at: now },
+  });
+  return result.count === 1 ? now : null;
+}
+
+/** Undo a claim when fireProjectAlert throws before durable enqueue. */
+async function releaseAlertRuleFireClaim(
+  prisma: PrismaClient,
+  ruleId: string,
+  claimedAt: Date
+): Promise<void> {
+  await prisma.alertRule.updateMany({
+    where: { id: ruleId, last_fired_at: claimedAt },
+    data: { last_fired_at: null },
+  });
 }
 
 export function ruleNeedsIngestEvaluation(rule: AlertRulePublic): boolean {
@@ -928,16 +960,28 @@ async function evaluateAlertRule(
     if (result.hrefHint) hrefHints.push(result.hrefHint);
   }
 
-  const dedupeKey = alertRuleDedupeKey(rule.id, rule.cooldownMinutes);
-  return fireProjectAlert(prisma, {
-    projectId,
-    rule: "ALERT_RULE",
-    dedupeKey,
-    title: rule.name,
-    body: `${summaryParts.join("; ")}.`,
-    href: hrefForHints(hrefHints),
-    destinations: resolveDestinationIds(rule.destinationIds),
-  });
+  const claimedAt = await tryClaimAlertRuleFire(
+    prisma,
+    rule.id,
+    rule.cooldownMinutes
+  );
+  if (!claimedAt) return false;
+
+  const dedupeKey = alertRuleDedupeKey(rule.id, claimedAt.getTime());
+  try {
+    return await fireProjectAlert(prisma, {
+      projectId,
+      rule: "ALERT_RULE",
+      dedupeKey,
+      title: rule.name,
+      body: `${summaryParts.join("; ")}.`,
+      href: hrefForHints(hrefHints),
+      destinations: resolveDestinationIds(rule.destinationIds),
+    });
+  } catch (e) {
+    await releaseAlertRuleFireClaim(prisma, rule.id, claimedAt);
+    throw e;
+  }
 }
 
 export type AlertRuleEvaluationPath = "ingest" | "scheduled";
@@ -984,7 +1028,7 @@ export type ScheduledAlertRuleEvaluationResult = {
 
 /**
  * Idempotent scheduled sweep: evaluate rules that include schedule-oriented conditions.
- * Cooldown dedupe keys prevent repeated fires within the same cooldown bucket.
+ * last_fired_at cooldown claims prevent re-fires until cooldownMinutes elapse.
  */
 export async function runScheduledAlertRuleEvaluation(
   prisma: PrismaClient
@@ -998,8 +1042,13 @@ export async function runScheduledAlertRuleEvaluation(
   let rulesEvaluated = 0;
   let rulesFired = 0;
   for (const { project_id: projectId } of projectRows) {
+    // Match ingest auth: skip soft-deleted projects and soft-deleted orgs.
     const project = await prisma.project.findFirst({
-      where: { id: projectId, deleted_at: null },
+      where: {
+        id: projectId,
+        deleted_at: null,
+        organization: { deleted_at: null },
+      },
       select: { id: true },
     });
     if (!project) continue;

@@ -336,8 +336,10 @@ model AlertRule {
   /// Opaque destination ids resolved by Notifications (e.g. "project-email", ProjectWebhook.id).
   /// Rules must not embed provider-specific send logic (no email|slack|discord enums).
   destination_ids  Json      @map("destination_ids")
-  /// Rate limit: at most one fire per cooldown bucket (dedupe key).
+  /// Minimum minutes between successful fires (enforced via last_fired_at claim).
   cooldown_minutes Int       @default(15) @map("cooldown_minutes")
+  /// Set atomically when a fire is claimed; null until the first successful claim.
+  last_fired_at    DateTime? @map("last_fired_at")
   created_at       DateTime  @default(now()) @map("created_at")
   updated_at       DateTime  @updatedAt @map("updated_at")
   deleted_at       DateTime? @map("deleted_at")

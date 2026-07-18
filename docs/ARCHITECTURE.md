@@ -161,7 +161,7 @@ Framework packages add ergonomics (Next.js provider, Node process handlers, RN s
 | Job | Command | Purpose |
 |-----|---------|---------|
 | Retention sweep | `node dist/jobs/run-retention.js` | Delete telemetry older than plan `retentionDays` per project |
-| Alert rules evaluator | `node dist/jobs/run-alert-rules-evaluator.js` | Evaluate schedule-oriented AlertRule conditions (cooldown-deduped → `fireProjectAlert`) |
+| Alert rules evaluator | `node dist/jobs/run-alert-rules-evaluator.js` | Evaluate schedule-oriented AlertRule conditions (`last_fired_at` cooldown → `fireProjectAlert`) |
 
 Implementation: `apps/api/src/jobs/retention.ts`, `apps/api/src/jobs/alert-rules-evaluator.ts`. Open sessions without `ended_at` are not pruned until closed (known limitation).
 

@@ -19,7 +19,8 @@ Built-in spike/quota thresholds on `Project.alert_settings` remain supported unt
 | --- | --- |
 | `conditions` | JSON **array** of condition objects — **AND** semantics (every *known* condition must match) |
 | `destination_ids` | JSON array of **opaque** destination ids (not `email`/`slack`/… provider enums) |
-| `cooldown_minutes` | Dedupe bucket so a rule fires at most once per cooldown window |
+| `cooldown_minutes` | Minimum minutes between successful fires (enforced via `last_fired_at`) |
+| `last_fired_at` | Set atomically on fire claim; null until the first successful claim |
 | `enabled` / `deleted_at` | Toggle and soft-delete |
 
 ### Conditions (`Condition[]`)
@@ -90,7 +91,8 @@ pnpm --filter api alert-rules-evaluator
 
 - One sweep then exit (Railway cron) by default; `--loop` sleeps between ticks.
 - Cadence is configured in **one place**: `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` (default **5**; constant `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` in `apps/api/src/lib/alert-rules.ts`).
-- Evaluation is idempotent within a rule’s cooldown window (`alert:rule:{id}:{cooldown}:{bucket}` dedupe key) — repeated schedules do not re-fire while the bucket is unchanged.
+- Soft-deleted projects and soft-deleted organizations are skipped (same gate as ingest API-key auth).
+- Cooldown is elapsed time since `last_fired_at` (atomic claim so overlapping sweeps cannot double-fire). `alert:rule:{id}:{claimedAtMs}` is only the `AlertEvent` idempotency key after a successful claim.
 - Coexists with ingest evaluation: schedule-only rules are skipped on ingest; ingest-only rules are skipped on the schedule path; mixed rules are evaluated on both paths with full AND semantics.
 
 See [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron).
