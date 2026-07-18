@@ -2,7 +2,13 @@
  * Overview aggregates beyond the core error/event counts.
  */
 import { Prisma } from "@prisma/client";
-import { isUnknownReleaseKey, releaseFilterMatchSql, releasePrismaWhere } from "./release-key.js";
+import {
+  isUnknownReleaseKey,
+  knownReleaseSql,
+  releaseFilterMatchSql,
+  releasePrismaWhere,
+  unknownSessionReleaseMatchSql,
+} from "./release-key.js";
 import type { PrismaClient } from "@prisma/client";
 import {
   overviewChartQuerySince,
@@ -202,14 +208,26 @@ export function overviewEnvironmentSessionCountSql(
         AND ${extra}
         AND ${eventTime}
     )`;
+  // Unwindowed: align Unknown exclusion with Release Health all-time attribution.
+  const knownEventReleaseExists = (extra?: Prisma.Sql) => Prisma.sql`EXISTS (
+      SELECT 1 FROM "Event" e
+      WHERE e."project_id" = s."project_id"
+        AND e."session_id" = s."session_id"
+        AND e."app" = s."app"
+        AND ${knownReleaseSql(Prisma.sql`e."release"`)}
+        ${extra ? Prisma.sql`AND ${extra}` : Prisma.empty}
+    )`;
 
   let envReleaseMatch: Prisma.Sql;
   if (scope.environment && scope.release) {
     if (isUnknownReleaseKey(scope.release)) {
-      envReleaseMatch = Prisma.sql`(
-        s."environment" = ${scope.environment}
-        AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release)}
-      )`;
+      envReleaseMatch = unknownSessionReleaseMatchSql(
+        Prisma.sql`(
+          s."environment" = ${scope.environment}
+          AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release)}
+        )`,
+        knownEventReleaseExists(Prisma.sql`e."environment" = ${scope.environment}`)
+      );
     } else {
     envReleaseMatch = Prisma.sql`(
         (
@@ -249,7 +267,10 @@ export function overviewEnvironmentSessionCountSql(
       )`;
   } else {
     if (isUnknownReleaseKey(scope.release!)) {
-      envReleaseMatch = releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release!);
+      envReleaseMatch = unknownSessionReleaseMatchSql(
+        releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release!),
+        knownEventReleaseExists()
+      );
     } else {
       envReleaseMatch = Prisma.sql`(
         ${releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release!)}
@@ -381,14 +402,26 @@ export async function getSessionDurationSeries(
       AND e."created_at" >= ${querySince}
       ${eventUntilClause}
   )`;
+  // Unwindowed: align Unknown exclusion with Release Health all-time attribution.
+  const knownEventReleaseExists = (extra?: Prisma.Sql) => Prisma.sql`EXISTS (
+    SELECT 1 FROM "Event" e
+    WHERE e."project_id" = s."project_id"
+      AND e."session_id" = s."session_id"
+      AND e."app" = s."app"
+      AND ${knownReleaseSql(Prisma.sql`e."release"`)}
+      ${extra ? Prisma.sql`AND ${extra}` : Prisma.empty}
+  )`;
 
   let envReleaseClause = Prisma.empty;
   if (environment && release) {
     if (isUnknownReleaseKey(release)) {
-      envReleaseClause = Prisma.sql`AND (
-        s."environment" = ${environment}
-        AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, release)}
-      )`;
+      envReleaseClause = Prisma.sql`AND ${unknownSessionReleaseMatchSql(
+        Prisma.sql`(
+          s."environment" = ${environment}
+          AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, release)}
+        )`,
+        knownEventReleaseExists(Prisma.sql`e."environment" = ${environment}`)
+      )}`;
     } else {
     envReleaseClause = Prisma.sql`AND (
       (
@@ -428,7 +461,10 @@ export async function getSessionDurationSeries(
     )`;
   } else if (release) {
     if (isUnknownReleaseKey(release)) {
-      envReleaseClause = Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, release)}`;
+      envReleaseClause = Prisma.sql`AND ${unknownSessionReleaseMatchSql(
+        releaseFilterMatchSql(Prisma.sql`s."release"`, release),
+        knownEventReleaseExists()
+      )}`;
     } else {
       envReleaseClause = Prisma.sql`AND (
       ${releaseFilterMatchSql(Prisma.sql`s."release"`, release)}

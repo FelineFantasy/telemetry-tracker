@@ -2,11 +2,13 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   isUnknownReleaseKey,
+  knownReleaseSql,
   normalizeReleaseKeySql,
   optionalReleaseAndSql,
   releaseFilterMatchSql,
   releaseKeyFromDbValue,
   releasePrismaWhere,
+  unknownSessionReleaseMatchSql,
   UNKNOWN_RELEASE_KEY,
 } from "./release-key.js";
 
@@ -68,6 +70,27 @@ describe("normalizeReleaseKeySql", () => {
     expect(prismaSqlValues(normalizeReleaseKeySql(Prisma.sql`e."release"`))).toContain(
       UNKNOWN_RELEASE_KEY
     );
+  });
+});
+
+describe("knownReleaseSql", () => {
+  it("requires normalized release IS NOT NULL", () => {
+    const text = prismaSqlText(knownReleaseSql(Prisma.sql`e."release"`));
+    expect(text).toContain("CASE");
+    expect(text).toContain("IS NOT NULL");
+  });
+});
+
+describe("unknownSessionReleaseMatchSql", () => {
+  it("requires session Unknown and NOT known-event EXISTS", () => {
+    const sql = unknownSessionReleaseMatchSql(
+      releaseFilterMatchSql(Prisma.sql`s."release"`, UNKNOWN_RELEASE_KEY),
+      Prisma.sql`EXISTS (SELECT 1)`
+    );
+    const text = prismaSqlText(sql);
+    expect(text).toContain("IS NULL");
+    expect(text).toContain("AND NOT");
+    expect(text).toContain("EXISTS");
   });
 });
 

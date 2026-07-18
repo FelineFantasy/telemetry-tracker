@@ -4,7 +4,12 @@
  */
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
-import { isUnknownReleaseKey, releaseFilterMatchSql } from "./release-key.js";
+import {
+  isUnknownReleaseKey,
+  knownReleaseSql,
+  releaseFilterMatchSql,
+  unknownSessionReleaseMatchSql,
+} from "./release-key.js";
 
 export type OverviewSeriesBucket = "hour" | "day" | "week";
 
@@ -202,7 +207,25 @@ function overviewSessionEventExistsSql(
   )`;
 }
 
-function overviewSessionEnvReleaseScopeSql(
+/** Unwindowed known-release EXISTS — aligns Unknown filters with Release Health. */
+function overviewSessionKnownEventReleaseExistsSql(
+  projectId: string,
+  extra?: Prisma.Sql,
+  sessionAlias = "s"
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  return Prisma.sql`EXISTS (
+    SELECT 1 FROM "Event" e
+    WHERE e."project_id" = ${projectId}
+      AND e."session_id" = ${s}."session_id"
+      AND e."app" = ${s}."app"
+      AND ${knownReleaseSql(Prisma.sql`e."release"`)}
+      ${extra ? Prisma.sql`AND ${extra}` : Prisma.empty}
+  )`;
+}
+
+/** @internal Exported for unit tests. */
+export function overviewSessionEnvReleaseScopeSql(
   projectId: string,
   since: Date,
   until: Date,
@@ -213,10 +236,16 @@ function overviewSessionEnvReleaseScopeSql(
     const sessionRelease = releaseFilterMatchSql(Prisma.sql`s."release"`, releaseFilter);
     const eventRelease = releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter);
     if (isUnknownReleaseKey(releaseFilter)) {
-      return Prisma.sql`AND (
-        s."environment" = ${environmentFilter}
-        AND ${sessionRelease}
-      )`;
+      return Prisma.sql`AND ${unknownSessionReleaseMatchSql(
+        Prisma.sql`(
+          s."environment" = ${environmentFilter}
+          AND ${sessionRelease}
+        )`,
+        overviewSessionKnownEventReleaseExistsSql(
+          projectId,
+          Prisma.sql`e."environment" = ${environmentFilter}`
+        )
+      )}`;
     }
     return Prisma.sql`AND (
       (
@@ -272,7 +301,10 @@ function overviewSessionEnvReleaseScopeSql(
   if (releaseFilter) {
     const sessionRelease = releaseFilterMatchSql(Prisma.sql`s."release"`, releaseFilter);
     if (isUnknownReleaseKey(releaseFilter)) {
-      return Prisma.sql`AND ${sessionRelease}`;
+      return Prisma.sql`AND ${unknownSessionReleaseMatchSql(
+        sessionRelease,
+        overviewSessionKnownEventReleaseExistsSql(projectId)
+      )}`;
     }
     return Prisma.sql`AND (
       ${sessionRelease}

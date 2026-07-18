@@ -12,6 +12,7 @@ import {
   sessionFilterSql,
   sessionWindowWithEventScope,
 } from "./sessions-page-summary.js";
+import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   const parts = fragment as unknown as { strings: string[] };
@@ -173,6 +174,32 @@ describe("sessionFilterSql", () => {
     expect(text).toContain('"s"."release"');
     expect(text).toContain('e."environment" = ?');
     expect(text).toContain('TRIM(e."release") = ?');
+  });
+
+  it("excludes sessions with known event releases when filtering Unknown", () => {
+    const text = prismaSqlText(
+      sessionFilterSql("proj-1", { range: {}, release: UNKNOWN_RELEASE_KEY })
+    );
+    expect(text).toContain('IS NULL');
+    expect(text).toContain("AND NOT");
+    expect(text).toContain("EXISTS");
+    expect(text).toContain("IS NOT NULL");
+    // Unwindowed exclusion — no created_at bound on the known-release EXISTS.
+    expect(text).not.toMatch(/AND NOT[\s\S]*e\."created_at"/);
+  });
+
+  it("scopes known-event exclusion by environment for Unknown + environment", () => {
+    const text = prismaSqlText(
+      sessionFilterSql("proj-1", {
+        range: {},
+        environment: "production",
+        release: UNKNOWN_RELEASE_KEY,
+      })
+    );
+    expect(text).toContain('"s"."environment"');
+    expect(text).toContain("AND NOT");
+    expect(text).toContain('e."environment" = ?');
+    expect(text).toContain("IS NOT NULL");
   });
 
   it("bounds matching events to the metrics window when provided", () => {

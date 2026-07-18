@@ -5,7 +5,9 @@ import {
   generateOverviewChartBuckets,
   overviewChartQuerySince,
   overviewSessionBucketEnvironmentExistsSql,
+  overviewSessionEnvReleaseScopeSql,
 } from "./overview-timeseries.js";
+import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   return fragment.strings.reduce(
@@ -64,5 +66,36 @@ describe("overviewSessionBucketEnvironmentExistsSql", () => {
     expect(text).toContain('e."app" = "s"."app"');
     expect(text).toContain('e."created_at" >=');
     expect(text).toContain('e."created_at" <=');
+  });
+});
+
+describe("overviewSessionEnvReleaseScopeSql", () => {
+  const since = new Date("2026-03-01T00:00:00.000Z");
+  const until = new Date("2026-03-15T00:00:00.000Z");
+
+  it("excludes sessions with known event releases when filtering Unknown", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql("proj_1", since, until, undefined, UNKNOWN_RELEASE_KEY)
+    );
+    expect(text).toContain("AND NOT");
+    expect(text).toContain("IS NOT NULL");
+    expect(text).toContain("EXISTS");
+    expect(text).not.toMatch(/AND NOT[\s\S]*e\."created_at"/);
+  });
+
+  it("scopes known-event exclusion by environment for Unknown + environment", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql(
+        "proj_1",
+        since,
+        until,
+        "production",
+        UNKNOWN_RELEASE_KEY
+      )
+    );
+    expect(text).toContain('s."environment"');
+    expect(text).toContain("AND NOT");
+    expect(text).toContain('e."environment"');
+    expect(text).toContain("IS NOT NULL");
   });
 });

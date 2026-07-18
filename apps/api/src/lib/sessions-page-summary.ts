@@ -12,7 +12,12 @@ import { generateOverviewChartBuckets, overviewChartQuerySince } from "./overvie
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 import { cohortSharePct } from "./user-cohort.js";
-import { isUnknownReleaseKey, releaseFilterMatchSql } from "./release-key.js";
+import {
+  isUnknownReleaseKey,
+  knownReleaseSql,
+  releaseFilterMatchSql,
+  unknownSessionReleaseMatchSql,
+} from "./release-key.js";
 
 export const BOUNCE_MAX_DURATION_SECONDS = 10;
 
@@ -330,7 +335,9 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
  * legacy null columns. When both filters are set, a single event must satisfy both
  * (or session columns must both match) — never different events per field.
  *
- * `release=__unknown__` matches null/blank Session.release only (no event fallback).
+ * `release=__unknown__` matches only when Session.release is Unknown and no scoped
+ * event carries a known release (Release Health effective-release alignment).
+ * Known-event exclusion is intentionally unwindowed so deep links match Releases.
  */
 function sessionEnvReleaseMatchSql(
   projectId: string,
@@ -350,10 +357,18 @@ function sessionEnvReleaseMatchSql(
 
   if (f.environment && f.release && sessionReleaseMatch && eventReleaseMatch) {
     if (releaseUnknown) {
-      return Prisma.sql`(
-        ${s}."environment" = ${f.environment}
-        AND ${sessionReleaseMatch}
-      )`;
+      // No eventWindow: same all-time attribution as Release Health.
+      const hasKnownEventRelease = sessionEventExistsSql(projectId, sessionAlias, [
+        Prisma.sql`e."environment" = ${f.environment}`,
+        knownReleaseSql(Prisma.sql`e."release"`),
+      ]);
+      return unknownSessionReleaseMatchSql(
+        Prisma.sql`(
+          ${s}."environment" = ${f.environment}
+          AND ${sessionReleaseMatch}
+        )`,
+        hasKnownEventRelease
+      );
     }
     const bothOnEvent = sessionEventExistsSql(
       projectId,
@@ -402,7 +417,13 @@ function sessionEnvReleaseMatchSql(
   if (!sessionReleaseMatch || !eventReleaseMatch || !f.release) return null;
 
   if (releaseUnknown) {
-    return sessionReleaseMatch;
+    // No eventWindow: same all-time attribution as Release Health.
+    return unknownSessionReleaseMatchSql(
+      sessionReleaseMatch,
+      sessionEventExistsSql(projectId, sessionAlias, [
+        knownReleaseSql(Prisma.sql`e."release"`),
+      ])
+    );
   }
 
   return Prisma.sql`(

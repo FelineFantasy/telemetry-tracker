@@ -41,6 +41,28 @@ export function normalizeReleaseKeySql(columnSql: Prisma.Sql): Prisma.Sql {
   END`;
 }
 
+/**
+ * True when a release column normalizes to a known (non-Unknown) key.
+ * Used to exclude event-fallback sessions from `release=__unknown__` filters.
+ */
+export function knownReleaseSql(columnSql: Prisma.Sql): Prisma.Sql {
+  return Prisma.sql`${normalizeReleaseKeySql(columnSql)} IS NOT NULL`;
+}
+
+/**
+ * Session matches `__unknown__` only when Session.release is Unknown and no scoped
+ * event carries a known release — same effective-release rule as Release Health.
+ */
+export function unknownSessionReleaseMatchSql(
+  sessionReleaseUnknownMatch: Prisma.Sql,
+  knownEventReleaseExists: Prisma.Sql
+): Prisma.Sql {
+  return Prisma.sql`(
+    ${sessionReleaseUnknownMatch}
+    AND NOT ${knownEventReleaseExists}
+  )`;
+}
+
 /** Match a release filter (including `__unknown__`) against a SQL column expression. */
 export function releaseFilterMatchSql(columnSql: Prisma.Sql, release: string): Prisma.Sql {
   if (isUnknownReleaseKey(release)) {

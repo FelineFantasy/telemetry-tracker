@@ -8,6 +8,7 @@ import {
   overviewEnvironmentSessionCountUpperClauses,
   resolveCompareWindow,
 } from "./overview-stats.js";
+import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   return fragment.strings.reduce(
@@ -144,6 +145,40 @@ describe("overviewEnvironmentSessionCountSql", () => {
 
     expect(text).toMatch(/s\."started_at" >= .+ AND s\."started_at" <=/);
     expect(text).toMatch(/e\."created_at" >= .+ AND e\."created_at" <=/);
+  });
+
+  it("excludes sessions with known event releases when filtering Unknown", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain("AND NOT");
+    expect(text).toContain("IS NOT NULL");
+    expect(text).toContain("EXISTS");
+    // Known-release exclusion is unwindowed (no created_at on that EXISTS).
+    expect(text).toMatch(
+      /AND NOT EXISTS \( SELECT 1 FROM "Event" e WHERE e\."project_id" = s\."project_id" AND e\."session_id" = s\."session_id" AND e\."app" = s\."app" AND .+ IS NOT NULL \)/
+    );
+  });
+
+  it("scopes known-event exclusion by environment for Unknown + environment", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."environment" =');
+    expect(text).toContain("AND NOT");
+    expect(text).toContain('e."environment" =');
+    expect(text).toContain("IS NOT NULL");
   });
 });
 
