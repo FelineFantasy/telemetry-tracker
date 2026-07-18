@@ -1,10 +1,13 @@
-import { Prisma } from "@prisma/client";
-import { describe, expect, it } from "vitest";
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { parseGlobalSearchQuery } from "./global-search-query.js";
 import {
+  executeGlobalSearch,
   globalSearchReleaseActivityBounds,
   globalSearchReleaseActivityTimeSql,
   globalSearchSessionEnvReleaseSql,
   globalSearchSessionReleaseSql,
+  hasGlobalSearchTimeSignal,
 } from "./global-search.js";
 import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
@@ -17,6 +20,70 @@ function prismaSqlValues(fragment: Prisma.Sql): unknown[] {
   const parts = fragment as unknown as { values: unknown[] };
   return parts.values;
 }
+
+describe("hasGlobalSearchTimeSignal", () => {
+  const gte = new Date("2026-07-01T00:00:00.000Z");
+  const lte = new Date("2026-07-08T00:00:00.000Z");
+
+  it("is false when no range or metrics windows are set", () => {
+    expect(hasGlobalSearchTimeSignal({ range: {} })).toBe(false);
+  });
+
+  it("is true for parsed range bounds", () => {
+    expect(hasGlobalSearchTimeSignal({ range: { gte } })).toBe(true);
+    expect(hasGlobalSearchTimeSignal({ range: { lte } })).toBe(true);
+  });
+
+  it("is true for route metrics windows when range is empty (all-time / range:none)", () => {
+    expect(
+      hasGlobalSearchTimeSignal({
+        range: {},
+        sessionStartedAt: { gte, lte },
+      })
+    ).toBe(true);
+    expect(
+      hasGlobalSearchTimeSignal({
+        range: {},
+        eventCreatedAt: { gte, lte },
+      })
+    ).toBe(true);
+    expect(
+      hasGlobalSearchTimeSignal({
+        range: {},
+        errorOccurrenceRange: { gte, lte },
+      })
+    ).toBe(true);
+  });
+});
+
+describe("executeGlobalSearch users ordering", () => {
+  it("orders distinct identities by latest session activity, not alphabetically", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+    const gte = new Date("2026-07-01T00:00:00.000Z");
+    const lte = new Date("2026-07-08T00:00:00.000Z");
+
+    await executeGlobalSearch(
+      prisma,
+      "proj-1",
+      parseGlobalSearchQuery("user:alice"),
+      {
+        range: {},
+        sessionStartedAt: { gte, lte },
+        eventCreatedAt: { gte, lte },
+        user: "alice",
+      }
+    );
+
+    const userSql = queryRaw.mock.calls
+      .map((call) => call[0] as Prisma.Sql)
+      .find((sql) => prismaSqlText(sql).includes("DISTINCT ON"));
+    expect(userSql).toBeDefined();
+    const text = prismaSqlText(userSql!);
+    expect(text).toMatch(/ORDER BY started_at DESC\s*LIMIT/i);
+    expect(text).not.toMatch(/ORDER BY identity ASC/i);
+  });
+});
 
 describe("globalSearchReleaseActivityBounds", () => {
   const gte = new Date("2026-07-01T00:00:00.000Z");

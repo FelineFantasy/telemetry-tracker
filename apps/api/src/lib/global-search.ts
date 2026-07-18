@@ -369,6 +369,29 @@ function isSessionOnlyFilterSearch(
   return Boolean(scope.browser || scope.country || scope.device || scope.user);
 }
 
+/**
+ * True when the scope carries a time window — parsed `range`/`from`/`to`, or the
+ * route-built metrics windows (`sessionStartedAt` / `eventCreatedAt` /
+ * `errorOccurrenceRange`) used for Sessions/Events list parity when the range
+ * is open-ended or all-time (`range:all`, invalid `range:none`, etc.).
+ */
+export function hasGlobalSearchTimeSignal(
+  scope: Pick<
+    GlobalSearchScope,
+    "range" | "sessionStartedAt" | "eventCreatedAt" | "errorOccurrenceRange"
+  >
+): boolean {
+  return Boolean(
+    scope.range.gte ||
+      scope.range.lte ||
+      scope.sessionStartedAt ||
+      scope.eventCreatedAt?.gte ||
+      scope.eventCreatedAt?.lte ||
+      scope.errorOccurrenceRange?.gte ||
+      scope.errorOccurrenceRange?.lte
+  );
+}
+
 async function searchErrors(
   prisma: PrismaClient,
   projectId: string,
@@ -428,15 +451,14 @@ async function searchErrors(
   }
 
   // Require some match signal beyond broad list dumps of the whole project.
-  // Time-only queries (`range:` / from/to) are a valid signal — lists are capped.
+  // Time-only queries (`range:` / from/to / metrics windows) are a valid signal.
   if (
     textTerms.length === 0 &&
     !scope.environment &&
     !scope.platform &&
     !scope.release &&
     !scope.appId &&
-    !scope.range.gte &&
-    !scope.range.lte
+    !hasGlobalSearchTimeSignal(scope)
   ) {
     return emptyGroup();
   }
@@ -512,8 +534,7 @@ async function searchEvents(
     !scope.platform &&
     !scope.release &&
     !scope.appId &&
-    !scope.range.gte &&
-    !scope.range.lte
+    !hasGlobalSearchTimeSignal(scope)
   ) {
     return emptyGroup();
   }
@@ -706,11 +727,10 @@ async function searchReleases(
     !scope.environment &&
     !scope.platform &&
     !scope.appId &&
-    !scope.range.gte &&
-    !scope.range.lte
+    !hasGlobalSearchTimeSignal(scope)
   ) {
     // No free text / scope / time signal — avoid dumping all releases.
-    // Time-only (`range:` / from/to) is valid, same as issues/events.
+    // Time-only (`range:` / from/to / metrics windows) is valid, same as issues/events.
     return emptyGroup();
   }
 
@@ -843,12 +863,12 @@ async function searchUsers(
           ELSE 'anonymous'
         END AS identity_kind,
         s."user_email" AS user_email,
-        s."started_at"
+        s."started_at" AS started_at
       FROM "Session" s
       WHERE ${Prisma.join(parts, " AND ")}
       ORDER BY identity, s."started_at" DESC
     ) u
-    ORDER BY identity ASC
+    ORDER BY started_at DESC
     LIMIT ${fetchLimit}
   `);
 
