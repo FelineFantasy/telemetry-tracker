@@ -65,6 +65,32 @@ function hasOccurrenceScope(f: Pick<ErrorListFilterInput, "release" | "platform"
   return Boolean(f.release || f.platform);
 }
 
+/**
+ * Prisma `ErrorOccurrence` where for issue-detail includes (and similar).
+ * Uses `releasePrismaWhere` so `release=__unknown__` matches null / blank / sentinel.
+ *
+ * Prefer `listScopedOccurrenceIdsForGroupId` when a release filter is set — Prisma
+ * cannot express `TRIM(column)`, so padded / whitespace-only DB values need SQL.
+ */
+export function buildErrorOccurrenceScopeWhere(scope: {
+  release?: string;
+  platform?: string;
+  gte?: Date;
+  lte?: Date;
+}): Prisma.ErrorOccurrenceWhereInput {
+  const where: Prisma.ErrorOccurrenceWhereInput = {
+    ...(scope.platform ? { platform: scope.platform } : {}),
+    ...releasePrismaWhere(scope.release),
+  };
+  if (scope.gte || scope.lte) {
+    where.created_at = {
+      ...(scope.gte ? { gte: scope.gte } : {}),
+      ...(scope.lte ? { lte: scope.lte } : {}),
+    };
+  }
+  return where;
+}
+
 /** Omitted → default; invalid when present → validation fails (400). */
 export function parseErrorListSortParam(
   value: string | undefined
@@ -701,6 +727,31 @@ export async function fetchScopedOccurrenceSummaryForGroupId(
     first_seen: row?.first_seen ?? null,
     last_seen: row?.last_seen ?? null,
   };
+}
+
+/** Newest occurrence ids under the same release/platform/window SQL as scoped KPIs. */
+export async function listScopedOccurrenceIdsForGroupId(
+  prisma: PrismaClient,
+  errorGroupId: string,
+  projectId: string,
+  scope: { release?: string; platform?: string; gte?: Date; lte?: Date },
+  take = 50
+): Promise<string[]> {
+  if (!hasOccurrenceScope(scope) && !scope.gte && !scope.lte) return [];
+  const scopeClause = occurrenceScopeSql(scope);
+  const timeClause = occurrenceCreatedAtBoundsSql(scope);
+  const rows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+    SELECT o.id
+    FROM "ErrorOccurrence" o
+    INNER JOIN "ErrorGroup" eg ON eg.id = o.error_group_id
+    WHERE o.error_group_id = ${errorGroupId}
+      AND eg.project_id = ${projectId}
+      ${scopeClause}
+      ${timeClause}
+    ORDER BY o.created_at DESC
+    LIMIT ${take}
+  `);
+  return rows.map((r) => String(r.id));
 }
 
 export async function listErrorGroupsPrisma(

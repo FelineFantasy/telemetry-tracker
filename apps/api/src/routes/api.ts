@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
+  buildErrorOccurrenceScopeWhere,
   fetchImpactMetricsForGroupId,
   fetchMetricsForGroupIds,
   fetchScopedOccurrenceSummaryForGroupId,
@@ -9,6 +10,7 @@ import {
   isAggregateSort,
   listErrorGroupsAggregated,
   listErrorGroupsPrisma,
+  listScopedOccurrenceIdsForGroupId,
   parseErrorListOrderParam,
   parseErrorListSortParam,
   parseTrendWindowParam,
@@ -941,18 +943,27 @@ export async function apiRoutes(
     const applyScopedMetrics = Boolean(
       platform || release || windowGte || windowLte
     );
-    const occurrenceWhere = {
+    // Release filters need SQL TRIM / Unknown matching (same as scoped KPIs).
+    // Resolve matching ids first, then load rows via Prisma include.
+    const occurrenceScopeFilter = {
       ...(platform ? { platform } : {}),
       ...(release ? { release } : {}),
-      ...(windowGte || windowLte
-        ? {
-            created_at: {
-              ...(windowGte ? { gte: windowGte } : {}),
-              ...(windowLte ? { lte: windowLte } : {}),
-            },
-          }
-        : {}),
+      ...(windowGte ? { gte: windowGte } : {}),
+      ...(windowLte ? { lte: windowLte } : {}),
     };
+    const occurrenceWhere = release
+      ? {
+          id: {
+            in: await listScopedOccurrenceIdsForGroupId(
+              prisma,
+              id,
+              projectId,
+              occurrenceScopeFilter,
+              50
+            ),
+          },
+        }
+      : buildErrorOccurrenceScopeWhere(occurrenceScopeFilter);
 
     const group = await prisma.errorGroup.findFirst({
       where: whereErrorGroupById(id, projectId),
