@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.4] - 2026-07-19
+
+### Fixed
+
+- **Dependabot high alerts** — resolve high-severity transitive dependency alerts via lockfile upgrades and pnpm overrides: `next` (≥15.5.18), `ws` (7.5.11 / 8.21.1), `defu` (≥6.1.5), `lodash` (4.18.1), and `effect` (≥3.20.0) ([#581](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/581))
+
+---
+
 ## [1.16.3] - 2026-07-19
 
 ### Fixed
