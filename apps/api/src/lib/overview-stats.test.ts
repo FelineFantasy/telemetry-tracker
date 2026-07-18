@@ -156,16 +156,13 @@ describe("overviewEnvironmentSessionCountSql", () => {
     });
     const text = normalizeSql(prismaSqlText(sql));
 
-    expect(text).toContain("AND NOT");
-    expect(text).toContain("IS NOT NULL");
-    expect(text).toContain("EXISTS");
-    // Known-release exclusion is unwindowed (no created_at on that EXISTS).
-    expect(text).toMatch(
-      /AND NOT EXISTS \( SELECT 1 FROM "Event" e WHERE e\."project_id" = s\."project_id" AND e\."session_id" = s\."session_id" AND e\."app" = s\."app" AND .+ IS NOT NULL \)/
-    );
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
   });
 
-  it("uses unwindowed event fallback for known release filters", () => {
+  it("uses latest-event effective release for known release filters", () => {
     const sql = overviewEnvironmentSessionCountSql({
       projectId: "proj_1",
       since,
@@ -174,15 +171,15 @@ describe("overviewEnvironmentSessionCountSql", () => {
     });
     const text = normalizeSql(prismaSqlText(sql));
 
-    expect(text).toContain("EXISTS");
-    expect(text).toContain('s."release" IS NULL');
-    // Known-release event fallback has no created_at (matches Release Health).
-    expect(text).not.toMatch(
-      /s\."release" IS NULL AND EXISTS \([\s\S]*e\."created_at"/
-    );
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    // Blank/sentinel session releases normalize to NULL (not only SQL NULL).
+    expect(text).toContain("TRIM");
+    expect(text).not.toContain('s."release" IS NULL');
   });
 
-  it("uses unwindowed event fallback for known release + environment", () => {
+  it("uses latest-event effective release for known release + environment", () => {
     const sql = overviewEnvironmentSessionCountSql({
       projectId: "proj_1",
       since,
@@ -193,10 +190,8 @@ describe("overviewEnvironmentSessionCountSql", () => {
     const text = normalizeSql(prismaSqlText(sql));
 
     expect(text).toContain('e."environment" =');
-    expect(text).toContain("EXISTS");
-    expect(text).not.toMatch(
-      /s\."release" IS NULL AND EXISTS \([\s\S]*e\."created_at"/
-    );
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
   });
 
   it("scopes known-event exclusion by environment for Unknown + environment", () => {
@@ -210,12 +205,12 @@ describe("overviewEnvironmentSessionCountSql", () => {
     const text = normalizeSql(prismaSqlText(sql));
 
     expect(text).toContain('s."environment" =');
-    expect(text).toContain("AND NOT");
     expect(text).toContain('e."environment" =');
-    expect(text).toContain("IS NOT NULL");
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
   });
 
-  it("scopes event-release fallback by platform when platform + release are set", () => {
+  it("scopes latest-event fallback by platform when platform + release are set", () => {
     const sql = overviewEnvironmentSessionCountSql({
       projectId: "proj_1",
       since,
@@ -227,8 +222,8 @@ describe("overviewEnvironmentSessionCountSql", () => {
 
     expect(text).toContain('s."platform" =');
     expect(text).toContain('e."platform" =');
-    expect(text).toContain("EXISTS");
-    expect(text).toContain('s."release" IS NULL');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
   });
 
   it("scopes known-event exclusion by platform for Unknown + platform", () => {
@@ -243,8 +238,8 @@ describe("overviewEnvironmentSessionCountSql", () => {
 
     expect(text).toContain('s."platform" =');
     expect(text).toContain('e."platform" =');
-    expect(text).toContain("AND NOT");
-    expect(text).toContain("IS NOT NULL");
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
   });
 });
 

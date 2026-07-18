@@ -8,6 +8,8 @@ import {
   releaseFilterMatchSql,
   releaseKeyFromDbValue,
   releasePrismaWhere,
+  sessionEffectiveReleaseFilterSql,
+  sessionEffectiveReleaseKeySql,
   unknownSessionReleaseMatchSql,
   UNKNOWN_RELEASE_KEY,
 } from "./release-key.js";
@@ -91,6 +93,57 @@ describe("unknownSessionReleaseMatchSql", () => {
     expect(text).toContain("IS NULL");
     expect(text).toContain("AND NOT");
     expect(text).toContain("EXISTS");
+  });
+});
+
+describe("sessionEffectiveReleaseKeySql", () => {
+  it("COALESCE session normalize with latest known event release", () => {
+    const text = prismaSqlText(sessionEffectiveReleaseKeySql("proj-1", "s"));
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    expect(text).toContain("IS NOT NULL");
+    expect(prismaSqlValues(sessionEffectiveReleaseKeySql("proj-1", "s"))).toContain("proj-1");
+  });
+
+  it("scopes event subquery by environment and platform", () => {
+    const text = prismaSqlText(
+      sessionEffectiveReleaseKeySql("proj-1", "s", {
+        environment: "production",
+        platform: "ios",
+      })
+    );
+    expect(text).toContain('e."environment" = ?');
+    expect(text).toContain('e."platform" = ?');
+  });
+});
+
+describe("sessionEffectiveReleaseFilterSql", () => {
+  it("equals effective key for known releases", () => {
+    const sql = sessionEffectiveReleaseFilterSql("proj-1", "s", "1.2.0");
+    const text = prismaSqlText(sql);
+    expect(text).toContain("COALESCE");
+    expect(text).toContain(" = ");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(prismaSqlValues(sql)).toContain("1.2.0");
+  });
+
+  it("treats blank/whitespace/sentinel session releases as Unknown via normalize", () => {
+    const text = prismaSqlText(sessionEffectiveReleaseFilterSql("proj-1", "s", "1.2.0"));
+    // Session side of COALESCE must normalize blank/sentinel to NULL (not only SQL NULL).
+    expect(text).toContain("TRIM");
+    expect(prismaSqlValues(sessionEffectiveReleaseFilterSql("proj-1", "s", "1.2.0"))).toContain(
+      UNKNOWN_RELEASE_KEY
+    );
+  });
+
+  it("IS NULL for Unknown filter", () => {
+    const text = prismaSqlText(
+      sessionEffectiveReleaseFilterSql("proj-1", "s", UNKNOWN_RELEASE_KEY)
+    );
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
   });
 });
 

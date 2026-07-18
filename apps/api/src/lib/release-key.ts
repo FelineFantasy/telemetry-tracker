@@ -77,6 +77,65 @@ export function releaseFilterMatchSql(columnSql: Prisma.Sql, release: string): P
   return Prisma.sql`TRIM(${columnSql}) = ${key}`;
 }
 
+/** Optional env/platform constraints for event-release attribution. */
+export type SessionEffectiveReleaseScope = {
+  environment?: string;
+  platform?: string;
+};
+
+/**
+ * Prefer Session.release; when Unknown (null / blank / `__unknown__`), fall back to the
+ * latest known Event.release for the same session over all time.
+ * Matches Release Health session KPI attribution.
+ */
+export function sessionEffectiveReleaseKeySql(
+  projectId: string,
+  sessionAlias: string,
+  scope: SessionEffectiveReleaseScope = {}
+): Prisma.Sql {
+  const s = Prisma.raw(`"${sessionAlias}"`);
+  const eventParts: Prisma.Sql[] = [
+    Prisma.sql`e."project_id" = ${projectId}`,
+    Prisma.sql`e."session_id" = ${s}."session_id"`,
+    Prisma.sql`e."app" = ${s}."app"`,
+    // Prefer a known (non-Unknown) event release when Session.release is blank.
+    knownReleaseSql(Prisma.sql`e."release"`),
+  ];
+  if (scope.environment) {
+    eventParts.push(Prisma.sql`e."environment" = ${scope.environment}`);
+  }
+  if (scope.platform) {
+    eventParts.push(Prisma.sql`e."platform" = ${scope.platform}`);
+  }
+  return Prisma.sql`COALESCE(
+    ${normalizeReleaseKeySql(Prisma.sql`${s}."release"`)},
+    (
+      SELECT ${normalizeReleaseKeySql(Prisma.sql`e."release"`)}
+      FROM "Event" e
+      WHERE ${Prisma.join(eventParts, " AND ")}
+      ORDER BY e."created_at" DESC
+      LIMIT 1
+    )
+  )`;
+}
+
+/**
+ * `release=` filter using the same effective-release rule as Release Health:
+ * known keys match `COALESCE(session, latest known event)`; Unknown matches when that is NULL.
+ */
+export function sessionEffectiveReleaseFilterSql(
+  projectId: string,
+  sessionAlias: string,
+  release: string,
+  scope: SessionEffectiveReleaseScope = {}
+): Prisma.Sql {
+  const effective = sessionEffectiveReleaseKeySql(projectId, sessionAlias, scope);
+  if (isUnknownReleaseKey(release)) {
+    return Prisma.sql`${effective} IS NULL`;
+  }
+  return Prisma.sql`${effective} = ${release.trim()}`;
+}
+
 /** `AND <match>` when release is set; otherwise empty. */
 export function optionalReleaseAndSql(columnSql: Prisma.Sql, release?: string | null): Prisma.Sql {
   if (!release) return Prisma.empty;

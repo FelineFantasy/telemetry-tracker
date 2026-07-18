@@ -121,6 +121,7 @@ import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
 } from "../lib/read-project-request.js";
+import { releasePrismaWhere } from "../lib/release-key.js";
 import {
   EVENT_SORT_SQL,
   eventListOrderBy,
@@ -312,7 +313,7 @@ export async function apiRoutes(
       ...(appFilter ? { app: appFilter } : {}),
       ...(environment ? { environment } : {}),
       ...(platform ? { platform } : {}),
-      ...(release ? { release } : {}),
+      ...releasePrismaWhere(release),
     };
     const errorGroupWhere = {
       ...whereErrorGroupProject(projectId),
@@ -409,14 +410,40 @@ export async function apiRoutes(
             orderBy: errorGroupOrderBy,
             include: { _count: { select: { occurrences_list: true } } },
           }),
-      prisma.event.groupBy({
-        by: ["name"],
-        where: eventWhere,
-        _count: { name: true },
-        orderBy: eventGroupByOrderBy,
-        skip: eventsSkip,
-        take: listPageSize,
-      }),
+      // Release filters need TRIM / Unknown SQL matching (Prisma equality diverges).
+      release
+        ? prisma
+            .$queryRaw<{ name: string; c: bigint }[]>(Prisma.sql`
+              SELECT e."name" AS name, COUNT(*)::bigint AS c
+              FROM "Event" e
+              WHERE ${eventListWhereSql}
+              GROUP BY e."name"
+              ORDER BY ${
+                topEvSortParsed.sort === "count"
+                  ? topEvOrderParsed.order === "asc"
+                    ? Prisma.sql`COUNT(*) ASC, e."name" ASC`
+                    : Prisma.sql`COUNT(*) DESC, e."name" ASC`
+                  : topEvOrderParsed.order === "asc"
+                    ? Prisma.sql`e."name" ASC`
+                    : Prisma.sql`e."name" DESC`
+              }
+              OFFSET ${eventsSkip}
+              LIMIT ${listPageSize}
+            `)
+            .then((rows) =>
+              rows.map((row) => ({
+                name: row.name,
+                _count: { name: Number(row.c) },
+              }))
+            )
+        : prisma.event.groupBy({
+            by: ["name"],
+            where: eventWhere,
+            _count: { name: true },
+            orderBy: eventGroupByOrderBy,
+            skip: eventsSkip,
+            take: listPageSize,
+          }),
       getOverviewTimeSeries(
         prisma,
         projectId,

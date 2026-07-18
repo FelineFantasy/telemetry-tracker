@@ -13,6 +13,7 @@ import { resolveCompareWindow } from "./overview-stats.js";
 import {
   isUnknownReleaseKey,
   normalizeReleaseKeySql,
+  sessionEffectiveReleaseKeySql,
   UNKNOWN_RELEASE_KEY,
 } from "./release-key.js";
 
@@ -199,42 +200,6 @@ function sessionScopeSql(alias: string, f: ReleasesFilterInput, projectId: strin
   return eventScopeSql(alias, f, projectId);
 }
 
-/**
- * Prefer Session.release; when blank, fall back to the latest non-blank Event.release
- * for the same session over all time (no metrics-window bound). Sessions/Overview
- * `release=` filters use the same unwindowed event fallback so deep-link counts match.
- */
-function sessionEffectiveReleaseKeySql(
-  sessionAlias: string,
-  f: ReleasesFilterInput,
-  projectId: string
-): Prisma.Sql {
-  const s = Prisma.raw(`"${sessionAlias}"`);
-  const eventParts: Prisma.Sql[] = [
-    Prisma.sql`e."project_id" = ${projectId}`,
-    Prisma.sql`e."session_id" = ${s}."session_id"`,
-    Prisma.sql`e."app" = ${s}."app"`,
-    // Prefer a known (non-Unknown) event release when Session.release is blank.
-    Prisma.sql`${normalizeReleaseKeySql(Prisma.sql`e."release"`)} IS NOT NULL`,
-  ];
-  if (f.environment) {
-    eventParts.push(Prisma.sql`e."environment" = ${f.environment}`);
-  }
-  if (f.platform) {
-    eventParts.push(Prisma.sql`e."platform" = ${f.platform}`);
-  }
-  return Prisma.sql`COALESCE(
-    ${normalizeReleaseKeySql(Prisma.sql`${s}."release"`)},
-    (
-      SELECT ${normalizeReleaseKeySql(Prisma.sql`e."release"`)}
-      FROM "Event" e
-      WHERE ${Prisma.join(eventParts, " AND ")}
-      ORDER BY e."created_at" DESC
-      LIMIT 1
-    )
-  )`;
-}
-
 function errorOccurrenceScopeSql(
   eoAlias: string,
   egAlias: string,
@@ -343,7 +308,10 @@ export async function fetchReleasesPageSummary(
   const sessionScope = sessionScopeSql("s", filter, projectId);
   const errorScope = errorOccurrenceScopeSql("eo", "eg", filter, projectId);
   const eventReleaseKey = normalizeReleaseKeySql(Prisma.sql`e."release"`);
-  const sessionReleaseKey = sessionEffectiveReleaseKeySql("s", filter, projectId);
+  const sessionReleaseKey = sessionEffectiveReleaseKeySql(projectId, "s", {
+    environment: filter.environment,
+    platform: filter.platform,
+  });
   const errorReleaseKey = normalizeReleaseKeySql(Prisma.sql`eo."release"`);
   const identity = sessionUserIdentityExpr("s");
 

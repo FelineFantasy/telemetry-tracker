@@ -5,10 +5,8 @@
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import {
-  isUnknownReleaseKey,
-  knownReleaseSql,
   releaseFilterMatchSql,
-  unknownSessionReleaseMatchSql,
+  sessionEffectiveReleaseFilterSql,
 } from "./release-key.js";
 
 export type OverviewSeriesBucket = "hour" | "day" | "week";
@@ -188,49 +186,6 @@ export function overviewSessionBucketEnvironmentExistsSql(
   )`;
 }
 
-/** Unwindowed event EXISTS — aligns known-release filters with Release Health. */
-function overviewSessionEventExistsUnwindowedSql(
-  projectId: string,
-  extra: Prisma.Sql,
-  platformFilter?: string,
-  sessionAlias = "s"
-): Prisma.Sql {
-  const s = Prisma.raw(`"${sessionAlias}"`);
-  const platformClause = platformFilter
-    ? Prisma.sql`AND e."platform" = ${platformFilter}`
-    : Prisma.empty;
-  return Prisma.sql`EXISTS (
-    SELECT 1 FROM "Event" e
-    WHERE e."project_id" = ${projectId}
-      AND e."session_id" = ${s}."session_id"
-      AND e."app" = ${s}."app"
-      AND ${extra}
-      ${platformClause}
-  )`;
-}
-
-/** Unwindowed known-release EXISTS — aligns Unknown filters with Release Health. */
-function overviewSessionKnownEventReleaseExistsSql(
-  projectId: string,
-  extra?: Prisma.Sql,
-  platformFilter?: string,
-  sessionAlias = "s"
-): Prisma.Sql {
-  const s = Prisma.raw(`"${sessionAlias}"`);
-  const platformClause = platformFilter
-    ? Prisma.sql`AND e."platform" = ${platformFilter}`
-    : Prisma.empty;
-  return Prisma.sql`EXISTS (
-    SELECT 1 FROM "Event" e
-    WHERE e."project_id" = ${projectId}
-      AND e."session_id" = ${s}."session_id"
-      AND e."app" = ${s}."app"
-      AND ${knownReleaseSql(Prisma.sql`e."release"`)}
-      ${extra ? Prisma.sql`AND ${extra}` : Prisma.empty}
-      ${platformClause}
-  )`;
-}
-
 /** @internal Exported for unit tests. */
 export function overviewSessionEnvReleaseScopeSql(
   projectId: string,
@@ -241,46 +196,13 @@ export function overviewSessionEnvReleaseScopeSql(
   platformFilter?: string
 ): Prisma.Sql {
   if (environmentFilter && releaseFilter) {
-    const sessionRelease = releaseFilterMatchSql(Prisma.sql`s."release"`, releaseFilter);
-    const eventRelease = releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter);
-    if (isUnknownReleaseKey(releaseFilter)) {
-      return Prisma.sql`AND ${unknownSessionReleaseMatchSql(
-        Prisma.sql`(
-          s."environment" = ${environmentFilter}
-          AND ${sessionRelease}
-        )`,
-        overviewSessionKnownEventReleaseExistsSql(
-          projectId,
-          Prisma.sql`e."environment" = ${environmentFilter}`,
-          platformFilter
-        )
-      )}`;
-    }
-    const bothOnEvent = overviewSessionEventExistsUnwindowedSql(
-      projectId,
-      Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`,
-      platformFilter
-    );
+    // Match Release Health: Session.environment must equal the filter (no NULL-env fallback).
     return Prisma.sql`AND (
-      (
-        s."environment" = ${environmentFilter}
-        AND ${sessionRelease}
-      )
-      OR (
-        s."environment" IS NULL
-        AND s."release" IS NULL
-        AND ${bothOnEvent}
-      )
-      OR (
-        s."environment" = ${environmentFilter}
-        AND s."release" IS NULL
-        AND ${bothOnEvent}
-      )
-      OR (
-        s."environment" IS NULL
-        AND ${sessionRelease}
-        AND ${bothOnEvent}
-      )
+      s."environment" = ${environmentFilter}
+      AND ${sessionEffectiveReleaseFilterSql(projectId, "s", releaseFilter, {
+        environment: environmentFilter,
+        platform: platformFilter,
+      })}
     )`;
   }
   if (environmentFilter) {
@@ -298,24 +220,12 @@ export function overviewSessionEnvReleaseScopeSql(
     )`;
   }
   if (releaseFilter) {
-    const sessionRelease = releaseFilterMatchSql(Prisma.sql`s."release"`, releaseFilter);
-    if (isUnknownReleaseKey(releaseFilter)) {
-      return Prisma.sql`AND ${unknownSessionReleaseMatchSql(
-        sessionRelease,
-        overviewSessionKnownEventReleaseExistsSql(projectId, undefined, platformFilter)
-      )}`;
-    }
-    return Prisma.sql`AND (
-      ${sessionRelease}
-      OR (
-        s."release" IS NULL
-        AND ${overviewSessionEventExistsUnwindowedSql(
-          projectId,
-          releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter),
-          platformFilter
-        )}
-      )
-    )`;
+    return Prisma.sql`AND ${sessionEffectiveReleaseFilterSql(
+      projectId,
+      "s",
+      releaseFilter,
+      { platform: platformFilter }
+    )}`;
   }
   return Prisma.empty;
 }

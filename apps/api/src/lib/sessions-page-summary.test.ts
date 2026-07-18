@@ -163,7 +163,7 @@ describe("buildSessionListFilter", () => {
 });
 
 describe("sessionFilterSql", () => {
-  it("prefers session columns with single-event fallback when environment and release are set", () => {
+  it("prefers session environment with effective release when both filters are set", () => {
     const sql = sessionFilterSql("proj-1", {
       range: {},
       environment: "production",
@@ -171,24 +171,27 @@ describe("sessionFilterSql", () => {
     });
     const text = prismaSqlText(sql);
     expect(text).toContain('"s"."environment"');
-    expect(text).toContain('"s"."release"');
+    expect(text).toContain("COALESCE");
     expect(text).toContain('e."environment" = ?');
-    expect(text).toContain('TRIM(e."release") = ?');
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    // No NULL-environment fallback when both filters are set (Release Health parity).
+    expect(text).not.toContain('"s"."environment" IS NULL');
   });
 
   it("excludes sessions with known event releases when filtering Unknown", () => {
     const text = prismaSqlText(
       sessionFilterSql("proj-1", { range: {}, release: UNKNOWN_RELEASE_KEY })
     );
-    expect(text).toContain('IS NULL');
-    expect(text).toContain("AND NOT");
-    expect(text).toContain("EXISTS");
-    expect(text).toContain("IS NOT NULL");
-    // Unwindowed exclusion — no created_at bound on the known-release EXISTS.
-    expect(text).not.toMatch(/AND NOT[\s\S]*e\."created_at"/);
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    // Latest-event subquery is unwindowed (ORDER BY created_at for recency only).
+    expect(text).not.toMatch(/e\."created_at" >=/);
+    expect(text).not.toMatch(/e\."created_at" <=/);
   });
 
-  it("uses unwindowed event fallback for known release filters", () => {
+  it("uses latest-event effective release for known release filters", () => {
     const since = new Date("2026-03-01T00:00:00.000Z");
     const until = new Date("2026-03-15T00:00:00.000Z");
     const text = prismaSqlText(
@@ -198,13 +201,15 @@ describe("sessionFilterSql", () => {
         { gte: since, lte: until }
       )
     );
-    expect(text).toContain('TRIM(e."release") = ?');
-    expect(text).toContain("EXISTS");
-    // Known-release event fallback matches Release Health (all-time, no created_at).
-    expect(text).not.toContain('e."created_at"');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    // Attribution window is all-time — no created_at lower/upper bound on the subquery.
+    expect(text).not.toMatch(/e\."created_at" >=/);
+    expect(text).not.toMatch(/e\."created_at" <=/);
   });
 
-  it("uses unwindowed event fallback for known release + environment", () => {
+  it("uses latest-event effective release for known release + environment", () => {
     const since = new Date("2026-03-01T00:00:00.000Z");
     const until = new Date("2026-03-15T00:00:00.000Z");
     const text = prismaSqlText(
@@ -219,11 +224,13 @@ describe("sessionFilterSql", () => {
       )
     );
     expect(text).toContain('e."environment" = ?');
-    expect(text).toContain('TRIM(e."release") = ?');
-    expect(text).not.toContain('e."created_at"');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).not.toMatch(/e\."created_at" >=/);
+    expect(text).not.toMatch(/e\."created_at" <=/);
   });
 
-  it("scopes event-release fallback by platform when platform + release are set", () => {
+  it("scopes latest-event fallback by platform when platform + release are set", () => {
     const text = prismaSqlText(
       sessionFilterSql("proj-1", {
         range: {},
@@ -233,8 +240,20 @@ describe("sessionFilterSql", () => {
     );
     expect(text).toContain('s."platform" = ?');
     expect(text).toContain('e."platform" = ?');
-    expect(text).toContain('TRIM(e."release") = ?');
-    expect(text).toContain("EXISTS");
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("falls back for blank/whitespace/sentinel session releases on known filters", () => {
+    const sql = sessionFilterSql("proj-1", { range: {}, release: "1.2.0" });
+    const text = prismaSqlText(sql);
+    const values = (sql as unknown as { values: unknown[] }).values;
+    // normalizeReleaseKeySql maps blank/sentinel Session.release to NULL before COALESCE.
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("TRIM");
+    expect(text).toContain(`TRIM("s"."release") = ''`);
+    expect(values).toContain(UNKNOWN_RELEASE_KEY);
+    expect(text).not.toContain('s."release" IS NULL');
   });
 
   it("scopes known-event exclusion by platform for Unknown + platform", () => {
@@ -247,8 +266,8 @@ describe("sessionFilterSql", () => {
     );
     expect(text).toContain('s."platform" = ?');
     expect(text).toContain('e."platform" = ?');
-    expect(text).toContain("AND NOT");
-    expect(text).toContain("IS NOT NULL");
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
   });
 
   it("scopes known-event exclusion by environment for Unknown + environment", () => {
@@ -260,9 +279,9 @@ describe("sessionFilterSql", () => {
       })
     );
     expect(text).toContain('"s"."environment"');
-    expect(text).toContain("AND NOT");
     expect(text).toContain('e."environment" = ?');
-    expect(text).toContain("IS NOT NULL");
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
   });
 
   it("bounds matching events to the metrics window when provided", () => {
