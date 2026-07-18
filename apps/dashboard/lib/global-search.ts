@@ -159,8 +159,9 @@ export function buildUserHitHref(
   return `/dashboard/sessions?${params.toString()}`;
 }
 
+/** View-all list hrefs take API `parsed.freeText` (not raw `q`) so colon-bearing free-text terms are kept. */
 export function buildViewAllErrorsHref(
-  q: string,
+  freeText: string,
   scope: DashboardListScope,
   parsedFilters: Record<string, string>
 ): string {
@@ -174,19 +175,15 @@ export function buildViewAllErrorsHref(
   if (listScope.from) params.set("from", listScope.from);
   if (listScope.to) params.set("to", listScope.to);
   if (listScope.metricsUntil) params.set("metricsUntil", listScope.metricsUntil);
-  const free = q
-    .split(/\s+/)
-    .filter((t) => t && !t.includes(":"))
-    .join(" ");
   const errorFilter = parsedFilters.error;
-  const messageQ = [free, errorFilter].filter(Boolean).join(" ").trim();
+  const messageQ = [freeText.trim(), errorFilter].filter(Boolean).join(" ").trim();
   if (messageQ) params.set("q", messageQ);
   const qs = params.toString();
   return qs ? `/dashboard/errors?${qs}` : "/dashboard/errors";
 }
 
 export function buildViewAllEventsHref(
-  q: string,
+  freeText: string,
   scope: DashboardListScope,
   parsedFilters: Record<string, string>
 ): string {
@@ -202,17 +199,14 @@ export function buildViewAllEventsHref(
   if (listScope.metricsUntil) params.set("metricsUntil", listScope.metricsUntil);
   // Events list `name` is exact; global search uses ILIKE on name + properties.
   // Forward free text as propertiesContains so View all keeps partial matches.
-  const free = q
-    .split(/\s+/)
-    .filter((t) => t && !t.includes(":"))
-    .join(" ");
+  const free = freeText.trim();
   if (free) params.set("propertiesContains", free);
   const qs = params.toString();
   return qs ? `/dashboard/events?${qs}` : "/dashboard/events";
 }
 
 export function buildViewAllSessionsHref(
-  q: string,
+  freeText: string,
   scope: DashboardListScope,
   parsedFilters: Record<string, string>
 ): string {
@@ -227,13 +221,9 @@ export function buildViewAllSessionsHref(
   if (listScope.to) params.set("to", listScope.to);
   if (listScope.metricsUntil) params.set("metricsUntil", listScope.metricsUntil);
   if (parsedFilters.country) params.set("country", parsedFilters.country);
-  const free = q
-    .split(/\s+/)
-    .filter((t) => t && !t.includes(":"))
-    .join(" ");
   // Sessions list has no dedicated device= param; fold device into `q` (ILIKE device fields).
   const sessionQ = [
-    free,
+    freeText.trim(),
     parsedFilters.user,
     parsedFilters.browser,
     parsedFilters.device,

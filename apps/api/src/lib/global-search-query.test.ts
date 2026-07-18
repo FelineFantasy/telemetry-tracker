@@ -43,6 +43,26 @@ describe("parseGlobalSearchQuery", () => {
     expect(parsed.filters).toEqual({});
   });
 
+  it("treats URL tokens as free text, not ignored https: filters", () => {
+    const parsed = parseGlobalSearchQuery(
+      "checkout https://example.com/path http://api.test/v1"
+    );
+    expect(parsed.freeTextTerms).toEqual([
+      "checkout",
+      "https://example.com/path",
+      "http://api.test/v1",
+    ]);
+    expect(parsed.ignoredKeys).toEqual([]);
+    expect(parsed.filters).toEqual({});
+  });
+
+  it("keeps supported filters when the value is a URL", () => {
+    const parsed = parseGlobalSearchQuery("error:https://cdn.example/stack.js");
+    expect(parsed.freeTextTerms).toEqual([]);
+    expect(parsed.filters).toEqual({ error: "https://cdn.example/stack.js" });
+    expect(parsed.ignoredKeys).toEqual([]);
+  });
+
   it("treats malformed key tokens as free text", () => {
     const parsed = parseGlobalSearchQuery(":bare 1foo:bar");
     expect(parsed.freeTextTerms).toEqual([":bare", "1foo:bar"]);

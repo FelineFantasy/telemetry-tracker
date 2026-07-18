@@ -113,14 +113,14 @@ describe("global search link helpers", () => {
 
   it("builds view-all list hrefs from free text + filters", () => {
     const filters = { environment: "production", error: "TypeError" };
-    expect(buildViewAllErrorsHref("checkout error:TypeError", scope, filters)).toContain(
+    expect(buildViewAllErrorsHref("checkout", scope, filters)).toContain(
       "q=checkout+TypeError"
     );
     expect(buildViewAllEventsHref("checkout_started", scope, {})).toContain(
       "propertiesContains=checkout_started"
     );
     expect(
-      buildViewAllSessionsHref("abc user:u1 browser:safari", scope, {
+      buildViewAllSessionsHref("abc", scope, {
         user: "u1",
         browser: "safari",
         country: "SI",
@@ -132,6 +132,19 @@ describe("global search link helpers", () => {
         device: "mobile",
       })
     ).toContain("q=abc+mobile");
+  });
+
+  it("preserves colon-bearing free text in view-all links", () => {
+    const free = "https://example.com/checkout 1foo:bar";
+    expect(buildViewAllErrorsHref(free, scope, {})).toContain(
+      "q=https%3A%2F%2Fexample.com%2Fcheckout+1foo%3Abar"
+    );
+    expect(buildViewAllEventsHref(free, scope, {})).toContain(
+      "propertiesContains=https%3A%2F%2Fexample.com%2Fcheckout+1foo%3Abar"
+    );
+    expect(buildViewAllSessionsHref(free, scope, {})).toContain(
+      "q=https%3A%2F%2Fexample.com%2Fcheckout+1foo%3Abar"
+    );
   });
 
   it("merges parsed filters into hit deep links", () => {

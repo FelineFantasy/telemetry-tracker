@@ -50,6 +50,7 @@ function tokenizeSearchQuery(raw: string): string[] {
  *
  * - `key:value` → structured filter when `key` is supported
  * - unrecognized `key:value` → ignored (listed in `ignoredKeys`); not free text
+ * - URL-like tokens (`https://…`, `http://…`) → free text (not unknown filters)
  * - other tokens → free text
  * - bare `key:` with empty value is ignored (empty filters are omitted)
  */
@@ -74,6 +75,12 @@ export function parseGlobalSearchQuery(q: string | null | undefined): ParsedGlob
       continue;
     }
     if (!FILTER_KEY_SET.has(key)) {
+      // Schemes like `https://host/path` parse as key=`https`, value=`//host/path`.
+      // Keep them as free text so messages/properties/stacks can match the URL.
+      if (value.startsWith("//")) {
+        freeTextTerms.push(token);
+        continue;
+      }
       if (!seenIgnored.has(key)) {
         seenIgnored.add(key);
         ignoredKeys.push(key);

@@ -147,9 +147,9 @@ export function GlobalSearchClient({
 
   const viewAll = result
     ? {
-        errors: buildViewAllErrorsHref(result.q, scope, result.parsed.filters),
-        events: buildViewAllEventsHref(result.q, scope, result.parsed.filters),
-        sessions: buildViewAllSessionsHref(result.q, scope, result.parsed.filters),
+        errors: buildViewAllErrorsHref(result.parsed.freeText, scope, result.parsed.filters),
+        events: buildViewAllEventsHref(result.parsed.freeText, scope, result.parsed.filters),
+        sessions: buildViewAllSessionsHref(result.parsed.freeText, scope, result.parsed.filters),
         releases: buildViewAllReleasesHref(scope, result.parsed.filters),
       }
     : null;
