@@ -17,15 +17,27 @@ Built-in spike/quota thresholds on `Project.alert_settings` remain supported unt
 
 | Field | Purpose |
 | --- | --- |
-| `conditions` | JSON **array** of condition objects — **AND** semantics (every condition must match) |
+| `conditions` | JSON **array** of condition objects — **AND** semantics (every *known* condition must match) |
 | `destination_ids` | JSON array of **opaque** destination ids (not `email`/`slack`/… provider enums) |
 | `cooldown_minutes` | Dedupe bucket so a rule fires at most once per cooldown window |
 | `enabled` / `deleted_at` | Toggle and soft-delete |
 
 ### Conditions (`Condition[]`)
 
-Only **ERROR_COUNT** is evaluated in this release. Optional `environment` filters on
-`ErrorOccurrence.environment` (set at ingest), not the mutable last-seen tag on `ErrorGroup`.
+Supported kinds (#534):
+
+| Type | Meaning | Path |
+| --- | --- | --- |
+| `ERROR_COUNT` | Error occurrences ≥ threshold in window | Ingest |
+| `ERROR_RATE` | `(errors / sessions) × 100` ≥ threshold percent (requires sessions &gt; 0) | Ingest + scheduled |
+| `SESSION_DROP` | Sessions dropped ≥ percent vs previous equal window | Scheduled |
+| `NEW_ERROR_GROUP` | ≥1 `ErrorGroup` with `first_seen` in window | Ingest |
+| `AFFECTED_USERS` | Distinct non-null `user_id` on occurrences ≥ threshold | Ingest |
+| `QUOTA_PERCENT` | Monthly ingest usage ≥ percent of plan limit | Scheduled |
+| `NO_EVENTS` | Zero `Event` rows in window | Scheduled |
+| `HEARTBEAT` | Zero events, sessions, and error occurrences in window | Scheduled |
+
+Optional `environment` (where present) filters ingest/environment-scoped rows — for errors this is `ErrorOccurrence.environment` (set at ingest), not the mutable last-seen tag on `ErrorGroup`.
 
 ```json
 {
@@ -35,14 +47,16 @@ Only **ERROR_COUNT** is evaluated in this release. Optional `environment` filter
       "threshold": 25,
       "windowMinutes": 15,
       "environment": "production"
+    },
+    {
+      "type": "HEARTBEAT",
+      "windowMinutes": 30
     }
   ]
 }
 ```
 
-Multiple conditions are ANDed. Unknown / unimplemented `type` values cause the rule to be skipped (no crash).
-
-Documented for later (not implemented yet): error rate %, session drop, new error group + affected users, quota usage %, heartbeat (no events for N minutes).
+Multiple conditions are ANDed. Unknown / unsupported `type` values are **skipped** (diagnostic log); they never crash evaluation or fail the AND group. If no supported conditions remain after filtering, the rule does not fire.
 
 ### Destinations (opaque ids)
 
@@ -61,7 +75,25 @@ Rules store ids only. Provider awareness lives in Notifications / Delivery chann
 
 ## Evaluation
 
-On successful error ingest, `maybeEvaluateAlertRules` runs alongside the built-in spike/quota hooks. Matching rules call `fireProjectAlert` with `rule: ALERT_RULE` after resolving `destinationIds` → `{ email, webhookIds }` at the Notifications boundary.
+### Ingest-triggered
+
+On successful error ingest, `maybeEvaluateAlertRules` runs alongside the built-in spike/quota hooks for rules that include at least one ingest condition (`ERROR_COUNT`, `ERROR_RATE`, `NEW_ERROR_GROUP`, `AFFECTED_USERS`). Matching rules call `fireProjectAlert` with `rule: ALERT_RULE` after resolving `destinationIds` → `{ email, webhookIds }` at the Notifications boundary.
+
+### Scheduled evaluator
+
+Conditions that are not naturally ingest-triggered (`HEARTBEAT`, `NO_EVENTS`, `SESSION_DROP`, `QUOTA_PERCENT`, and `ERROR_RATE`) are evaluated by the scheduled job:
+
+```bash
+pnpm --filter api alert-rules-evaluator
+# production: node dist/jobs/run-alert-rules-evaluator.js
+```
+
+- One sweep then exit (Railway cron) by default; `--loop` sleeps between ticks.
+- Cadence is configured in **one place**: `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` (default **5**; constant `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` in `apps/api/src/lib/alert-rules.ts`).
+- Evaluation is idempotent within a rule’s cooldown window (`alert:rule:{id}:{cooldown}:{bucket}` dedupe key) — repeated schedules do not re-fire while the bucket is unchanged.
+- Coexists with ingest evaluation: schedule-only rules are skipped on ingest; ingest-only rules are skipped on the schedule path; mixed rules are evaluated on both paths with full AND semantics.
+
+See [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron).
 
 ## API
 
@@ -83,7 +115,7 @@ Editor/owner required for mutations (same as alert settings / webhooks). Cap: `M
 
 ## Dashboard
 
-Alerts → **Custom rules**: create, **edit**, enable/disable, remove; multi-condition editor (AND, up to `MAX_CONDITIONS_PER_RULE`); bind opaque destination ids (email + Delivery channels) with clear copy that Notifications owns delivery. Validation and empty states live in the dashboard form (API remains source of truth for limits).
+Alerts → **Custom rules**: create, **edit**, enable/disable, remove; multi-condition editor (AND, up to `MAX_CONDITIONS_PER_RULE`); bind opaque destination ids (email + Delivery channels) with clear copy that Notifications owns delivery. The form currently authors **`ERROR_COUNT`** conditions; other kinds from the API are listed/summarized and can be toggled or removed (full editor UX for those kinds is follow-up).
 
 ## Milestone slices (v1.15.x)
 
@@ -93,6 +125,6 @@ Parent vision: [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/iss
 | --- | --- |
 | Foundation (this model + ERROR_COUNT + MVP UI) | [#532](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/532) / [PR #531](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/531) |
 | Dashboard multi-condition / edit UX | [#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533) |
-| Additional conditions + scheduled evaluator | [#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534) |
+| Additional conditions + scheduled evaluation | [#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534) |
 | Integrate built-in spike/quota into AlertRule | [#535](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/535) |
 | Release v1.15.0 | [#536](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/536) |

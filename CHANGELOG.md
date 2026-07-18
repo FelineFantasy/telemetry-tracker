@@ -14,10 +14,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Added
 
 - **Alert rules dashboard UX** — edit existing rules, multi-condition (AND) authoring matching the API, clearer opaque destination picker, and validation/empty-state polish on Alerts → Custom rules ([#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+- **Alert rules conditions + scheduled evaluator** — API support for `ERROR_RATE`, `SESSION_DROP`, `NEW_ERROR_GROUP`, `AFFECTED_USERS`, `QUOTA_PERCENT`, `NO_EVENTS`, and `HEARTBEAT`; skip-safe unknown condition types; ingest + scheduled evaluation paths with shared cooldown dedupe into `fireProjectAlert`; cron entrypoint `alert-rules-evaluator` ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
 
 ### Fixed
 
+- **Event ingest environment normalization** — `/event` and `/batch` now trim/cap `environment` like sessions and errors so AlertRule `NO_EVENTS` / `HEARTBEAT` environment filters match stored rows ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534))
+
 ### Changed
+
+- **Alert rules docs / ops** — [docs/ALERT-RULES.md](docs/ALERT-RULES.md) and [docs/RAILWAY.md](docs/RAILWAY.md) document scheduled evaluation cadence (`ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`, default 5)
 
 ### Database
 

@@ -42,6 +42,7 @@ import {
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
+  alertRuleSupportsDashboardEditor,
   createDefaultAlertRuleDraft,
   draftFromAlertRule,
   formatAlertRuleDestinations,
@@ -515,6 +516,12 @@ export function AlertsClient({
                           Stored conditions are invalid or unsupported — edit to
                           fix, or disable/remove.
                         </p>
+                      ) : !alertRuleSupportsDashboardEditor(rule) ? (
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          Includes scheduled/advanced conditions — toggle or
+                          remove here; edit via API until the dashboard editor
+                          supports them.
+                        </p>
                       ) : null}
                     </div>
                     <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
@@ -532,13 +539,15 @@ export function AlertsClient({
                       </div>
                       {canEdit ? (
                         <>
-                          <SettingsBtn
-                            variant="outline"
-                            disabled={rulePending}
-                            onClick={() => beginEditRule(rule)}
-                          >
-                            Edit
-                          </SettingsBtn>
+                          {alertRuleSupportsDashboardEditor(rule) ? (
+                            <SettingsBtn
+                              variant="outline"
+                              disabled={rulePending}
+                              onClick={() => beginEditRule(rule)}
+                            >
+                              Edit
+                            </SettingsBtn>
+                          ) : null}
                           <SettingsBtn
                             variant="ghost"
                             disabled={rulePending}

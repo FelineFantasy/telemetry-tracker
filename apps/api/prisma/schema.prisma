@@ -330,7 +330,8 @@ model AlertRule {
   project          Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
   name             String
   enabled          Boolean   @default(true)
-  /// AND of condition objects. ERROR_COUNT: { type, threshold, windowMinutes, environment? }.
+  /// AND of condition objects (#534): ERROR_COUNT, ERROR_RATE, SESSION_DROP, NEW_ERROR_GROUP,
+  /// AFFECTED_USERS, QUOTA_PERCENT, NO_EVENTS, HEARTBEAT (see docs/ALERT-RULES.md).
   conditions       Json
   /// Opaque destination ids resolved by Notifications (e.g. "project-email", ProjectWebhook.id).
   /// Rules must not embed provider-specific send logic (no email|slack|discord enums).

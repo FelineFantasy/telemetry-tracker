@@ -14,6 +14,7 @@ Deploy **Postgres + API + dashboard** as separate Railway services. Core env var
 | **API** | `apps/api` | **Railpack** (default Node) — **not** Dockerfile |
 | **Dashboard** | **empty** (repo root) | **Dockerfile** (repo root) — **only on this service** |
 | **Retention cron** (optional) | `apps/api` | Cron job |
+| **Alert rules evaluator cron** (optional) | `apps/api` | Cron job (scheduled AlertRule conditions) |
 | **Alert webhook worker** (optional) | `apps/api` | Continuous poll loop (not cron) |
 
 ---
@@ -106,6 +107,37 @@ pnpm --filter api retention                # live sweep (dev DB)
 ```
 
 After `pnpm --filter api build`, production entrypoint: `node dist/jobs/run-retention.js`.
+
+---
+
+## Alert rules evaluator cron
+
+Scheduled evaluation for Alert Rules conditions that are not ingest-triggered (`HEARTBEAT`, `NO_EVENTS`, `SESSION_DROP`, `QUOTA_PERCENT`, and `ERROR_RATE`). Product details: [ALERT-RULES.md](./ALERT-RULES.md).
+
+Cadence is defined in one place: `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` (default **5** minutes) in `apps/api/src/lib/alert-rules.ts`. Match the Railway cron to that value.
+
+### Railway setup (manual)
+
+1. **+ New** → **Empty Service** (e.g. `alert-rules-evaluator`).
+2. **Settings → Source** → **Root Directory** = `apps/api`.
+3. **Settings → Deploy** → **Start Command** = `node dist/jobs/run-alert-rules-evaluator.js`
+   - Use `node …` directly (same reason as retention cron).
+4. **Settings → Cron Schedule** = `*/5 * * * *` (every 5 minutes UTC), or match your `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`.
+5. **Variables** → **`DATABASE_URL`** (same as API). Optional: `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`.
+6. Confirm logs show JSON like:
+
+   ```json
+   {"ok":true,"projectsScanned":1,"rulesEvaluated":2,"rulesFired":0,"intervalMinutes":5,"at":"2026-07-18T12:00:01.234Z"}
+   ```
+
+| Setting | Value |
+|---------|--------|
+| Root Directory | `apps/api` |
+| Start command | `node dist/jobs/run-alert-rules-evaluator.js` |
+| Cron schedule | `*/5 * * * *` (default) |
+| `DATABASE_URL` | Same as API |
+
+Local: `pnpm --filter api alert-rules-evaluator`
 
 ---
 

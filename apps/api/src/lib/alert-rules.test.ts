@@ -2,20 +2,39 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   alertRuleDedupeKey,
   createAlertRule,
+  evaluateAlertRulesForProject,
   MAX_ALERT_RULES,
   maybeEvaluateAlertRules,
+  parseStoredConditions,
   PROJECT_EMAIL_DESTINATION_ID,
   pruneDestinationIdFromAlertRules,
+  resolveAlertRulesScheduleIntervalMinutes,
   resolveDestinationIds,
+  ruleNeedsIngestEvaluation,
+  ruleNeedsScheduledEvaluation,
+  runScheduledAlertRuleEvaluation,
   softDeleteAlertRule,
   updateAlertRule,
+  ALERT_RULES_SCHEDULE_INTERVAL_MINUTES,
+  type AlertRulePublic,
 } from "./alert-rules.js";
 import { normalizeIngestEnvironment } from "./ingest-environment.js";
 
 const fireProjectAlert = vi.fn(async () => true);
+const loadPlanContextForProject = vi.fn(async () => ({
+  planTier: "PRO",
+  limits: { monthlyIngestUnits: 1000 },
+}));
+const getMonthlyIngestUsed = vi.fn(async () => 900);
 
 vi.mock("./alert-dispatch.js", () => ({
   fireProjectAlert: (...args: unknown[]) => fireProjectAlert(...args),
+}));
+
+vi.mock("./plan-enforcement.js", () => ({
+  loadPlanContextForProject: (...args: unknown[]) =>
+    loadPlanContextForProject(...args),
+  getMonthlyIngestUsed: (...args: unknown[]) => getMonthlyIngestUsed(...args),
 }));
 
 describe("normalizeIngestEnvironment", () => {
@@ -49,6 +68,103 @@ describe("resolveDestinationIds", () => {
       webhookIds: ["22222222-2222-2222-2222-222222222222"],
     });
     expect(resolveDestinationIds([])).toEqual({ email: false, webhookIds: [] });
+  });
+});
+
+describe("resolveAlertRulesScheduleIntervalMinutes", () => {
+  it("defaults and clamps env override", () => {
+    expect(resolveAlertRulesScheduleIntervalMinutes({})).toBe(
+      ALERT_RULES_SCHEDULE_INTERVAL_MINUTES
+    );
+    expect(
+      resolveAlertRulesScheduleIntervalMinutes({
+        ALERT_RULES_SCHEDULE_INTERVAL_MINUTES: "15",
+      })
+    ).toBe(15);
+    expect(
+      resolveAlertRulesScheduleIntervalMinutes({
+        ALERT_RULES_SCHEDULE_INTERVAL_MINUTES: "0",
+      })
+    ).toBe(ALERT_RULES_SCHEDULE_INTERVAL_MINUTES);
+  });
+});
+
+describe("parseStoredConditions", () => {
+  it("keeps known conditions and skips unknown types without failing the group", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { conditions, skippedUnknown } = parseStoredConditions([
+      {
+        type: "ERROR_COUNT",
+        threshold: 5,
+        windowMinutes: 15,
+        environment: null,
+      },
+      { type: "UNKNOWN_TYPE", threshold: 1 },
+      {
+        type: "HEARTBEAT",
+        windowMinutes: 30,
+        environment: "production",
+      },
+    ]);
+    expect(skippedUnknown).toBe(1);
+    expect(conditions).toEqual([
+      {
+        type: "ERROR_COUNT",
+        threshold: 5,
+        windowMinutes: 15,
+        environment: null,
+      },
+      {
+        type: "HEARTBEAT",
+        windowMinutes: 30,
+        environment: "production",
+      },
+    ]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe("ruleNeedsIngestEvaluation / ruleNeedsScheduledEvaluation", () => {
+  const base: Omit<AlertRulePublic, "conditions"> = {
+    id: "r1",
+    name: "n",
+    enabled: true,
+    destinationIds: [],
+    cooldownMinutes: 15,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  it("classifies ingest vs scheduled condition types", () => {
+    expect(
+      ruleNeedsIngestEvaluation({
+        ...base,
+        conditions: [
+          { type: "ERROR_COUNT", threshold: 1, windowMinutes: 15, environment: null },
+        ],
+      })
+    ).toBe(true);
+    expect(
+      ruleNeedsScheduledEvaluation({
+        ...base,
+        conditions: [
+          { type: "ERROR_COUNT", threshold: 1, windowMinutes: 15, environment: null },
+        ],
+      })
+    ).toBe(false);
+    expect(
+      ruleNeedsIngestEvaluation({
+        ...base,
+        conditions: [{ type: "HEARTBEAT", windowMinutes: 15, environment: null }],
+      })
+    ).toBe(false);
+    expect(
+      ruleNeedsScheduledEvaluation({
+        ...base,
+        conditions: [{ type: "HEARTBEAT", windowMinutes: 15, environment: null }],
+      })
+    ).toBe(true);
   });
 });
 
@@ -134,6 +250,49 @@ describe("createAlertRule", () => {
       expect(result.rule.name).toBe("Prod spike");
       expect(result.rule.conditions[0]?.environment).toBe("production");
       expect(result.rule.destinationIds).toEqual([PROJECT_EMAIL_DESTINATION_ID]);
+    }
+  });
+
+  it("accepts HEARTBEAT and QUOTA_PERCENT conditions", async () => {
+    const created = {
+      id: "rule-2",
+      name: "Silence",
+      enabled: true,
+      conditions: [
+        { type: "HEARTBEAT" as const, windowMinutes: 30, environment: null },
+        { type: "QUOTA_PERCENT" as const, thresholdPercent: 80 },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID] as string[],
+      cooldown_minutes: 15,
+      created_at: new Date("2026-07-17T00:00:00.000Z"),
+      updated_at: new Date("2026-07-17T00:00:00.000Z"),
+    };
+    const tx = {
+      alertRule: {
+        count: async () => 0,
+        create: async () => created,
+      },
+    };
+    const prisma = {
+      project: { findFirst: async () => ({ id: "p1" }) },
+      projectWebhook: { count: async () => 0 },
+      $transaction: async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx),
+    } as never;
+
+    const result = await createAlertRule(prisma, "p1", {
+      name: "Silence",
+      conditions: [
+        { type: "HEARTBEAT", windowMinutes: 30 },
+        { type: "QUOTA_PERCENT", thresholdPercent: 80 },
+      ],
+      destinationIds: [PROJECT_EMAIL_DESTINATION_ID],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.rule.conditions.map((c) => c.type)).toEqual([
+        "HEARTBEAT",
+        "QUOTA_PERCENT",
+      ]);
     }
   });
 
@@ -250,10 +409,12 @@ describe("pruneDestinationIdFromAlertRules", () => {
   });
 });
 
-describe("maybeEvaluateAlertRules", () => {
+describe("maybeEvaluateAlertRules (ingest)", () => {
   beforeEach(() => {
     fireProjectAlert.mockClear();
     fireProjectAlert.mockResolvedValue(true);
+    loadPlanContextForProject.mockClear();
+    getMonthlyIngestUsed.mockClear();
   });
 
   it("fires when all AND conditions match with destination binding", async () => {
@@ -305,6 +466,88 @@ describe("maybeEvaluateAlertRules", () => {
     );
   });
 
+  it("skips unknown condition types and still evaluates remaining AND conditions", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const ruleRow = {
+      id: "rule-1",
+      name: "Mixed",
+      enabled: true,
+      conditions: [
+        {
+          type: "ERROR_COUNT",
+          threshold: 2,
+          windowMinutes: 15,
+          environment: null,
+        },
+        { type: "UNKNOWN_FUTURE", threshold: 1 },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const prisma = {
+      alertRule: { findMany: async () => [ruleRow] },
+      errorOccurrence: { count: async () => 5 },
+    } as never;
+
+    await maybeEvaluateAlertRules(prisma, "p1");
+    expect(fireProjectAlert).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("does not fire when no supported conditions remain", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const prisma = {
+      alertRule: {
+        findMany: async () => [
+          {
+            id: "rule-unknown",
+            name: "Only unknown",
+            enabled: true,
+            conditions: [{ type: "UNKNOWN_FUTURE", threshold: 1 }],
+            destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+            cooldown_minutes: 15,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        ],
+      },
+      errorOccurrence: { count: vi.fn(async () => 100) },
+    } as never;
+
+    await maybeEvaluateAlertRules(prisma, "p1");
+    expect(fireProjectAlert).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("skips schedule-only rules on the ingest path", async () => {
+    const prisma = {
+      alertRule: {
+        findMany: async () => [
+          {
+            id: "rule-hb",
+            name: "Heartbeat",
+            enabled: true,
+            conditions: [
+              { type: "HEARTBEAT", windowMinutes: 15, environment: null },
+            ],
+            destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+            cooldown_minutes: 15,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        ],
+      },
+      event: { count: vi.fn(async () => 0) },
+      session: { count: vi.fn(async () => 0) },
+      errorOccurrence: { count: vi.fn(async () => 0) },
+    } as never;
+
+    await maybeEvaluateAlertRules(prisma, "p1");
+    expect(fireProjectAlert).not.toHaveBeenCalled();
+  });
+
   it("skips disabled rules and below-threshold counts", async () => {
     const prisma = {
       alertRule: {
@@ -353,29 +596,199 @@ describe("maybeEvaluateAlertRules", () => {
     await maybeEvaluateAlertRules(prisma, "p1");
     expect(fireProjectAlert).not.toHaveBeenCalled();
   });
+});
 
-  it("skips enabled rules whose stored conditions fail validation", async () => {
-    const count = vi.fn(async () => 100);
+describe("runScheduledAlertRuleEvaluation", () => {
+  beforeEach(() => {
+    fireProjectAlert.mockClear();
+    fireProjectAlert.mockResolvedValue(true);
+    loadPlanContextForProject.mockClear();
+    getMonthlyIngestUsed.mockClear();
+    loadPlanContextForProject.mockResolvedValue({
+      planTier: "PRO",
+      limits: { monthlyIngestUnits: 1000 },
+    });
+    getMonthlyIngestUsed.mockResolvedValue(900);
+  });
+
+  it("evaluates HEARTBEAT / QUOTA_PERCENT rules and fires via Notifications", async () => {
+    const heartbeatRule = {
+      id: "rule-hb",
+      name: "Silence",
+      enabled: true,
+      conditions: [
+        { type: "HEARTBEAT" as const, windowMinutes: 15, environment: null },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const quotaRule = {
+      id: "rule-q",
+      name: "Quota",
+      enabled: true,
+      conditions: [{ type: "QUOTA_PERCENT" as const, thresholdPercent: 80 }],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const errorOnlyRule = {
+      id: "rule-err",
+      name: "Errors",
+      enabled: true,
+      conditions: [
+        {
+          type: "ERROR_COUNT" as const,
+          threshold: 1,
+          windowMinutes: 15,
+          environment: null,
+        },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
     const prisma = {
       alertRule: {
-        findMany: async () => [
-          {
-            id: "rule-corrupt",
-            name: "Corrupt",
-            enabled: true,
-            conditions: [{ type: "UNKNOWN_FUTURE", threshold: 1 }],
-            destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
-            cooldown_minutes: 15,
-            created_at: new Date(),
-            updated_at: new Date(),
-          },
-        ],
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([{ project_id: "p1" }])
+          .mockResolvedValueOnce([heartbeatRule, quotaRule, errorOnlyRule]),
       },
-      errorOccurrence: { count },
+      project: { findFirst: async () => ({ id: "p1" }) },
+      event: { count: async () => 0 },
+      session: { count: async () => 0 },
+      errorOccurrence: { count: async () => 0 },
     } as never;
 
-    await maybeEvaluateAlertRules(prisma, "p1");
-    expect(count).not.toHaveBeenCalled();
+    const result = await runScheduledAlertRuleEvaluation(prisma);
+    expect(result.projectsScanned).toBe(1);
+    expect(result.rulesEvaluated).toBe(2);
+    expect(result.rulesFired).toBe(2);
+    expect(fireProjectAlert).toHaveBeenCalledTimes(2);
+    expect(fireProjectAlert).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        rule: "ALERT_RULE",
+        title: "Silence",
+        href: "/dashboard",
+      })
+    );
+    expect(fireProjectAlert).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        rule: "ALERT_RULE",
+        title: "Quota",
+        href: "/dashboard/settings/billing",
+      })
+    );
+  });
+
+  it("does not fire NO_EVENTS when events exist", async () => {
+    const ruleRow = {
+      id: "rule-ne",
+      name: "No events",
+      enabled: true,
+      conditions: [
+        { type: "NO_EVENTS" as const, windowMinutes: 15, environment: null },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const prisma = {
+      alertRule: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([{ project_id: "p1" }])
+          .mockResolvedValueOnce([ruleRow]),
+      },
+      project: { findFirst: async () => ({ id: "p1" }) },
+      event: { count: async () => 3 },
+    } as never;
+
+    const result = await runScheduledAlertRuleEvaluation(prisma);
+    expect(result.rulesEvaluated).toBe(1);
+    expect(result.rulesFired).toBe(0);
     expect(fireProjectAlert).not.toHaveBeenCalled();
+  });
+});
+
+describe("evaluateAlertRulesForProject SESSION_DROP / ERROR_RATE", () => {
+  beforeEach(() => {
+    fireProjectAlert.mockClear();
+    fireProjectAlert.mockResolvedValue(true);
+  });
+
+  it("fires SESSION_DROP when the current window is below the previous window", async () => {
+    const ruleRow = {
+      id: "rule-sd",
+      name: "Drop",
+      enabled: true,
+      conditions: [
+        {
+          type: "SESSION_DROP" as const,
+          dropPercent: 50,
+          windowMinutes: 60,
+          environment: null,
+        },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const sessionCount = vi
+      .fn()
+      .mockResolvedValueOnce(10) // current
+      .mockResolvedValueOnce(40); // previous
+    const prisma = {
+      alertRule: { findMany: async () => [ruleRow] },
+      session: { count: sessionCount },
+    } as never;
+
+    const result = await evaluateAlertRulesForProject(prisma, "p1", "scheduled");
+    expect(result.fired).toBe(1);
+    expect(fireProjectAlert).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({
+        title: "Drop",
+        href: "/dashboard/sessions",
+      })
+    );
+  });
+
+  it("fires ERROR_RATE when errors/sessions exceeds threshold", async () => {
+    const ruleRow = {
+      id: "rule-er",
+      name: "Rate",
+      enabled: true,
+      conditions: [
+        {
+          type: "ERROR_RATE" as const,
+          thresholdPercent: 10,
+          windowMinutes: 15,
+          environment: null,
+        },
+      ],
+      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
+      cooldown_minutes: 15,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const prisma = {
+      alertRule: { findMany: async () => [ruleRow] },
+      errorOccurrence: { count: async () => 5 },
+      session: { count: async () => 10 },
+    } as never;
+
+    const result = await evaluateAlertRulesForProject(prisma, "p1", "ingest");
+    expect(result.fired).toBe(1);
+    expect(fireProjectAlert).toHaveBeenCalledTimes(1);
   });
 });
