@@ -18,8 +18,9 @@ Use this before exposing Telemetry Tracker on the public internet or handing it 
 | Item | Action |
 |------|--------|
 | Database | Managed Postgres with [automated backups and a tested restore procedure](./RAILWAY.md#postgresql-backups-and-restore). |
-| Migrations | Run `pnpm --filter api exec prisma migrate deploy` on every API deploy (CI does this on `main`). |
+| Migrations | Run `pnpm --filter api exec prisma migrate deploy` against **production** after each API deploy that includes schema changes. CI applies migrations only to its own Postgres — not Railway ([RELEASE.md](./RELEASE.md#3-database-migrations-production)). |
 | Retention | Schedule the retention job nightly (see [RAILWAY.md](./RAILWAY.md#retention-cron)). Without it, telemetry grows until manual cleanup. Verify locally with `pnpm --filter api retention -- --dry-run`. |
+| Alert rules evaluator | For schedule-oriented CUSTOM AlertRule conditions (`HEARTBEAT`, `NO_EVENTS`, …), run the `alert-rules-evaluator` cron (see [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron)). Manual Railway wiring — not auto-provisioned. Leave any `brief-worker` service alone. |
 | Alert webhooks | Run the always-on `alert-webhook-worker` (see [RAILWAY.md](./RAILWAY.md#alert-webhook-worker)). Without it, `PENDING` deliveries stay queued after alerts fire. |
 | Health | Set `HEALTH_CHECK_DATABASE=true` on the API so `GET /health` verifies Postgres and reports `database_latency_ms`. Optional `HEALTH_DETAILED=true` adds uptime and Node version. `/health` `version` is set at build from CHANGELOG; override with `TELEMETRY_API_VERSION` only if needed. |
 | Observability | Optional `SENTRY_DSN` on the API for uncaught errors. External uptime on `/health` and dashboard — see [MONITORING.md](./MONITORING.md). Monitor API 5xx, ingest 429 rate, and disk/DB size. `GET /health` reports `"email":"configured"` or `"not_configured"`, plus `version` on every response. |
@@ -65,4 +66,4 @@ Manually verify: login, overview loads, ingest with API key returns 200. Full E2
 
 - Per-project ingest RPS bucket is **in-memory** (single API process). Horizontal scaling needs a shared rate limiter later.
 - Password reset in production requires **`RESEND_API_KEY`** and **`TELEMETRY_EMAIL_FROM`** on the API (see [BILLING.md](./BILLING.md)); without them, admins must share reset links manually. Setup runbook: [BILLING.md → Production setup](./BILLING.md#production-setup-hosted-cloud).
-- Project alert webhooks (HTTPS) for spike/quota events — see [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md). Slack/Discord first-party UIs still planned.
+- Project alert webhooks (HTTPS) and first-party Slack / Discord / Teams / Telegram destinations ship under Alerts → Delivery — see [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md). Configurable Alert Rules: [ALERT-RULES.md](./ALERT-RULES.md).

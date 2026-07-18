@@ -162,6 +162,7 @@ Framework packages add ergonomics (Next.js provider, Node process handlers, RN s
 |-----|---------|---------|
 | Retention sweep | `node dist/jobs/run-retention.js` | Delete telemetry older than plan `retentionDays` per project |
 | Alert rules evaluator | `node dist/jobs/run-alert-rules-evaluator.js` | Evaluate schedule-oriented CUSTOM AlertRule conditions (`last_fired_at` cooldown → `fireProjectAlert`) |
+| Alert webhook worker | `node dist/jobs/run-alert-webhook-worker.js` | Deliver queued `AlertWebhookDelivery` rows (always-on poll loop) |
 | Builtin alert-rules backfill | `node dist/jobs/run-builtin-alert-rules-backfill.js` | Idempotent SYSTEM spike/quota AlertRule rows from `alert_settings` (#535) |
 
 Implementation: `apps/api/src/jobs/retention.ts`, `apps/api/src/jobs/alert-rules-evaluator.ts`. Open sessions without `ended_at` are not pruned until closed (known limitation).
@@ -175,7 +176,7 @@ Implementation: `apps/api/src/jobs/retention.ts`, `apps/api/src/jobs/alert-rules
 | Postgres | Managed DB (Railway, RDS, etc.) |
 | API | Node process (`apps/api`, Railpack on Railway) |
 | Dashboard | Root `Dockerfile` (monorepo build) or `pnpm start` |
-| Cron | Retention job on a schedule |
+| Cron / workers | Retention nightly; optional `alert-rules-evaluator` cron; optional always-on `alert-webhook-worker` |
 
 Details: [DEPLOYMENT.md](../DEPLOYMENT.md), [RAILWAY.md](./RAILWAY.md), [PRODUCTION-READINESS.md](./PRODUCTION-READINESS.md).
 
