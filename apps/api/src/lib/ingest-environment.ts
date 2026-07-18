@@ -1,6 +1,6 @@
 /**
- * Trim + cap environment so ErrorOccurrence values match AlertRule
- * ERROR_COUNT `environment` filters (zod `.trim().max(64)` on conditions).
+ * Trim + cap environment so Event / Session / ErrorOccurrence values match
+ * AlertRule `environment` filters (zod `.trim().max(64)` on conditions).
  */
 export function normalizeIngestEnvironment(
   environment: string | null | undefined

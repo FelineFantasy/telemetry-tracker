@@ -330,13 +330,16 @@ model AlertRule {
   project          Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
   name             String
   enabled          Boolean   @default(true)
-  /// AND of condition objects. ERROR_COUNT: { type, threshold, windowMinutes, environment? }.
+  /// AND of condition objects (#534): ERROR_COUNT, ERROR_RATE, SESSION_DROP, NEW_ERROR_GROUP,
+  /// AFFECTED_USERS, QUOTA_PERCENT, NO_EVENTS, HEARTBEAT (see docs/ALERT-RULES.md).
   conditions       Json
   /// Opaque destination ids resolved by Notifications (e.g. "project-email", ProjectWebhook.id).
   /// Rules must not embed provider-specific send logic (no email|slack|discord enums).
   destination_ids  Json      @map("destination_ids")
-  /// Rate limit: at most one fire per cooldown bucket (dedupe key).
+  /// Minimum minutes between successful fires (enforced via last_fired_at claim).
   cooldown_minutes Int       @default(15) @map("cooldown_minutes")
+  /// Set atomically when a fire is claimed; null until the first successful claim.
+  last_fired_at    DateTime? @map("last_fired_at")
   created_at       DateTime  @default(now()) @map("created_at")
   updated_at       DateTime  @updatedAt @map("updated_at")
   deleted_at       DateTime? @map("deleted_at")

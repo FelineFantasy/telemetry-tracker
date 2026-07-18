@@ -26,6 +26,7 @@ import {
   parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
+import type { AlertRuleCondition, AlertRuleRow } from "@/lib/alert-rules";
 import {
   normalizeProjectPiiScrubSettings,
   type ProjectPiiScrubSettings,
@@ -851,31 +852,12 @@ export async function saveProjectAlertSettingsAction(
   }
 }
 
-export type AlertRuleActionRow = {
-  id: string;
-  name: string;
-  enabled: boolean;
-  conditions: Array<{
-    type: "ERROR_COUNT";
-    threshold: number;
-    windowMinutes: number;
-    environment: string | null;
-  }>;
-  destinationIds: string[];
-  cooldownMinutes: number;
-  createdAt: string;
-  updatedAt: string;
-};
+export type AlertRuleActionRow = AlertRuleRow;
 
 export async function createProjectAlertRuleAction(input: {
   name: string;
   enabled?: boolean;
-  conditions: Array<{
-    type: "ERROR_COUNT";
-    threshold: number;
-    windowMinutes: number;
-    environment?: string | null;
-  }>;
+  conditions: AlertRuleCondition[];
   destinationIds: string[];
   cooldownMinutes?: number;
 }): Promise<{ ok: true; rule: AlertRuleActionRow } | { ok: false; error: string }> {
@@ -904,12 +886,7 @@ export async function updateProjectAlertRuleAction(
   patch: Partial<{
     name: string;
     enabled: boolean;
-    conditions: Array<{
-      type: "ERROR_COUNT";
-      threshold: number;
-      windowMinutes: number;
-      environment?: string | null;
-    }>;
+    conditions: AlertRuleCondition[];
     destinationIds: string[];
     cooldownMinutes: number;
   }>

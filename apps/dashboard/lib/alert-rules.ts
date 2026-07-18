@@ -12,7 +12,16 @@ export const MAX_ERROR_COUNT_THRESHOLD = 10_000;
 export const MIN_ERROR_COUNT_WINDOW_MINUTES = 5;
 export const MAX_ERROR_COUNT_WINDOW_MINUTES = 24 * 60;
 
-export type AlertConditionType = "ERROR_COUNT";
+/** Mirrors API condition kinds (#534). Dashboard editor still authors ERROR_COUNT only. */
+export type AlertConditionType =
+  | "ERROR_COUNT"
+  | "ERROR_RATE"
+  | "SESSION_DROP"
+  | "NEW_ERROR_GROUP"
+  | "AFFECTED_USERS"
+  | "QUOTA_PERCENT"
+  | "NO_EVENTS"
+  | "HEARTBEAT";
 
 export type ErrorCountCondition = {
   type: "ERROR_COUNT";
@@ -21,7 +30,59 @@ export type ErrorCountCondition = {
   environment: string | null;
 };
 
-export type AlertRuleCondition = ErrorCountCondition;
+export type ErrorRateCondition = {
+  type: "ERROR_RATE";
+  thresholdPercent: number;
+  windowMinutes: number;
+  environment: string | null;
+};
+
+export type SessionDropCondition = {
+  type: "SESSION_DROP";
+  dropPercent: number;
+  windowMinutes: number;
+  environment: string | null;
+};
+
+export type NewErrorGroupCondition = {
+  type: "NEW_ERROR_GROUP";
+  windowMinutes: number;
+  environment: string | null;
+};
+
+export type AffectedUsersCondition = {
+  type: "AFFECTED_USERS";
+  threshold: number;
+  windowMinutes: number;
+  environment: string | null;
+};
+
+export type QuotaPercentCondition = {
+  type: "QUOTA_PERCENT";
+  thresholdPercent: number;
+};
+
+export type NoEventsCondition = {
+  type: "NO_EVENTS";
+  windowMinutes: number;
+  environment: string | null;
+};
+
+export type HeartbeatCondition = {
+  type: "HEARTBEAT";
+  windowMinutes: number;
+  environment: string | null;
+};
+
+export type AlertRuleCondition =
+  | ErrorCountCondition
+  | ErrorRateCondition
+  | SessionDropCondition
+  | NewErrorGroupCondition
+  | AffectedUsersCondition
+  | QuotaPercentCondition
+  | NoEventsCondition
+  | HeartbeatCondition;
 
 export type AlertRuleRow = {
   id: string;
@@ -100,17 +161,34 @@ export function createDefaultAlertRuleDraft(): AlertRuleFormDraft {
   };
 }
 
+/**
+ * Dashboard create/edit form currently authors ERROR_COUNT only (#533).
+ * Rules with other condition kinds (#534) remain listable/toggleable/removable.
+ */
+export function alertRuleSupportsDashboardEditor(rule: AlertRuleRow): boolean {
+  if (rule.conditions.length === 0) return true;
+  return rule.conditions.every((c) => c.type === "ERROR_COUNT");
+}
+
 export function draftFromAlertRule(rule: AlertRuleRow): AlertRuleFormDraft {
-  // Preserve empty conditions as-is. API `toPublic` maps unparsable stored JSON
+  // Preserve empty conditions as-is. API `toPublic` maps wholly-unparsable stored JSON
   // to []; do not synthesize a default ERROR_COUNT — that would let an edit that
   // only changes name/cooldown/destinations persist thresholds and re-arm the rule.
-  const conditions = rule.conditions.map((c) =>
-    createEmptyErrorCountCondition({
-      threshold: c.threshold,
-      windowMinutes: c.windowMinutes,
-      environment: c.environment ?? "",
-    })
+  const errorCountConditions = rule.conditions.filter(
+    (c): c is ErrorCountCondition => c.type === "ERROR_COUNT"
   );
+  const conditions =
+    errorCountConditions.length > 0
+      ? errorCountConditions.map((c) =>
+          createEmptyErrorCountCondition({
+            threshold: c.threshold,
+            windowMinutes: c.windowMinutes,
+            environment: c.environment ?? "",
+          })
+        )
+      : rule.conditions.length === 0
+        ? []
+        : [createEmptyErrorCountCondition()];
   return {
     name: rule.name,
     conditions,
@@ -123,8 +201,61 @@ export function conditionTypeLabel(type: AlertConditionType): string {
   switch (type) {
     case "ERROR_COUNT":
       return "Error count";
+    case "ERROR_RATE":
+      return "Error rate";
+    case "SESSION_DROP":
+      return "Session drop";
+    case "NEW_ERROR_GROUP":
+      return "New error group";
+    case "AFFECTED_USERS":
+      return "Affected users";
+    case "QUOTA_PERCENT":
+      return "Quota percent";
+    case "NO_EVENTS":
+      return "No events";
+    case "HEARTBEAT":
+      return "Heartbeat";
     default: {
       const _exhaustive: never = type;
+      return _exhaustive;
+    }
+  }
+}
+
+function formatConditionSummary(c: AlertRuleCondition): string {
+  switch (c.type) {
+    case "ERROR_COUNT": {
+      const env = c.environment ? ` in ${c.environment}` : "";
+      return `≥ ${c.threshold} errors / ${c.windowMinutes}m${env}`;
+    }
+    case "ERROR_RATE": {
+      const env = c.environment ? ` in ${c.environment}` : "";
+      return `≥ ${c.thresholdPercent}% error rate / ${c.windowMinutes}m${env}`;
+    }
+    case "SESSION_DROP": {
+      const env = c.environment ? ` in ${c.environment}` : "";
+      return `≥ ${c.dropPercent}% session drop / ${c.windowMinutes}m${env}`;
+    }
+    case "NEW_ERROR_GROUP": {
+      const env = c.environment ? ` in ${c.environment}` : "";
+      return `new error group / ${c.windowMinutes}m${env}`;
+    }
+    case "AFFECTED_USERS": {
+      const env = c.environment ? ` in ${c.environment}` : "";
+      return `≥ ${c.threshold} affected users / ${c.windowMinutes}m${env}`;
+    }
+    case "QUOTA_PERCENT":
+      return `≥ ${c.thresholdPercent}% quota`;
+    case "NO_EVENTS": {
+      const env = c.environment ? ` in ${c.environment}` : "";
+      return `no events / ${c.windowMinutes}m${env}`;
+    }
+    case "HEARTBEAT": {
+      const env = c.environment ? ` in ${c.environment}` : "";
+      return `no telemetry / ${c.windowMinutes}m${env}`;
+    }
+    default: {
+      const _exhaustive: never = c;
       return _exhaustive;
     }
   }
@@ -136,15 +267,7 @@ export function formatAlertRuleSummary(rule: AlertRuleRow): string {
     // and must remain visible so editors can disable/remove it.
     return "Invalid or unsupported conditions";
   }
-  return rule.conditions
-    .map((c) => {
-      if (c.type === "ERROR_COUNT") {
-        const env = c.environment ? ` in ${c.environment}` : "";
-        return `≥ ${c.threshold} errors / ${c.windowMinutes}m${env}`;
-      }
-      return c.type;
-    })
-    .join(" AND ");
+  return rule.conditions.map(formatConditionSummary).join(" AND ");
 }
 
 /** Human-readable destination bindings for rule list rows. */
@@ -276,21 +399,58 @@ export function validateAlertRuleDraft(
   };
 }
 
+function isNonNegativeInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isEnvironment(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
 function isCondition(value: unknown): value is AlertRuleCondition {
   if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
-  return (
-    o.type === "ERROR_COUNT" &&
-    typeof o.threshold === "number" &&
-    typeof o.windowMinutes === "number" &&
-    (o.environment === null || typeof o.environment === "string")
-  );
+  switch (o.type) {
+    case "ERROR_COUNT":
+      return (
+        isNonNegativeInt(o.threshold) &&
+        isNonNegativeInt(o.windowMinutes) &&
+        isEnvironment(o.environment)
+      );
+    case "ERROR_RATE":
+      return (
+        isNonNegativeInt(o.thresholdPercent) &&
+        isNonNegativeInt(o.windowMinutes) &&
+        isEnvironment(o.environment)
+      );
+    case "SESSION_DROP":
+      return (
+        isNonNegativeInt(o.dropPercent) &&
+        isNonNegativeInt(o.windowMinutes) &&
+        isEnvironment(o.environment)
+      );
+    case "NEW_ERROR_GROUP":
+      return isNonNegativeInt(o.windowMinutes) && isEnvironment(o.environment);
+    case "AFFECTED_USERS":
+      return (
+        isNonNegativeInt(o.threshold) &&
+        isNonNegativeInt(o.windowMinutes) &&
+        isEnvironment(o.environment)
+      );
+    case "QUOTA_PERCENT":
+      return isNonNegativeInt(o.thresholdPercent);
+    case "NO_EVENTS":
+    case "HEARTBEAT":
+      return isNonNegativeInt(o.windowMinutes) && isEnvironment(o.environment);
+    default:
+      return false;
+  }
 }
 
 export function isAlertRuleRow(value: unknown): value is AlertRuleRow {
   if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
-  // Empty conditions are allowed: API `toPublic` maps unparsable stored JSON to
+  // Empty conditions are allowed: API maps wholly-unparsable stored JSON to
   // [] (evaluation skips those rules). Editors must still see/remove them.
   return (
     typeof o.id === "string" &&

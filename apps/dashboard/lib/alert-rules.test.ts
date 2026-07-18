@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  alertRuleSupportsDashboardEditor,
   createDefaultAlertRuleDraft,
   createEmptyErrorCountCondition,
   draftFromAlertRule,
@@ -57,6 +58,18 @@ describe("isAlertRuleRow", () => {
       })
     ).toBe(false);
   });
+
+  it("accepts HEARTBEAT and QUOTA_PERCENT rules from the API", () => {
+    expect(
+      isAlertRuleRow({
+        ...baseRule,
+        conditions: [
+          { type: "HEARTBEAT", windowMinutes: 30, environment: null },
+          { type: "QUOTA_PERCENT", thresholdPercent: 90 },
+        ],
+      })
+    ).toBe(true);
+  });
 });
 
 describe("formatAlertRuleSummary", () => {
@@ -105,6 +118,38 @@ describe("formatAlertRuleSummary", () => {
     expect(formatAlertRuleSummary(rule)).toBe(
       "Invalid or unsupported conditions"
     );
+  });
+
+  it("summarizes scheduled condition types", () => {
+    const rule: AlertRuleRow = {
+      ...baseRule,
+      conditions: [
+        { type: "HEARTBEAT", windowMinutes: 30, environment: null },
+        { type: "QUOTA_PERCENT", thresholdPercent: 80 },
+      ],
+    };
+    expect(formatAlertRuleSummary(rule)).toBe(
+      "no telemetry / 30m AND ≥ 80% quota"
+    );
+    expect(alertRuleSupportsDashboardEditor(rule)).toBe(false);
+  });
+});
+
+describe("alertRuleSupportsDashboardEditor", () => {
+  it("allows ERROR_COUNT-only rules", () => {
+    expect(
+      alertRuleSupportsDashboardEditor({
+        ...baseRule,
+        conditions: [
+          {
+            type: "ERROR_COUNT",
+            threshold: 5,
+            windowMinutes: 15,
+            environment: null,
+          },
+        ],
+      })
+    ).toBe(true);
   });
 });
 

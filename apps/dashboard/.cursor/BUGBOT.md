@@ -18,7 +18,7 @@ Next.js App Router. All data access goes through the Fastify API — **no direct
 
 - Bell ([DashboardNotifications.tsx](../app/components/dashboard/shell/DashboardNotifications.tsx)) renders items from API — type-specific icons/links must handle `alert`, `quota`, `billing`, `issue`, `team`.
 - Notification preferences UI must stay in sync with API categories (`issues`, `billing`, `team`, `alerts`) — adding a category requires both sides.
-- Alerts settings ([AlertsClient.tsx](../app/dashboard/alerts/AlertsClient.tsx)): UI promises (e.g. "Exceeded alerts always fire") must match API behavior in `quota-alert.ts`. Custom rules editor ([AlertRuleEditor.tsx](../app/dashboard/alerts/AlertRuleEditor.tsx)) must treat destinations as opaque ids (no provider send logic); keep unparsable rules (empty `conditions`) visible with edit/disable/remove.
+- Alerts settings ([AlertsClient.tsx](../app/dashboard/alerts/AlertsClient.tsx)): UI promises (e.g. "Exceeded alerts always fire") must match API behavior in `quota-alert.ts`. Custom rules editor ([AlertRuleEditor.tsx](../app/dashboard/alerts/AlertRuleEditor.tsx)) must treat destinations as opaque ids (no provider send logic); keep unparsable rules (empty `conditions`) visible with edit/disable/remove; rules with non-`ERROR_COUNT` conditions (#534) must remain listable/toggleable without forcing the ERROR_COUNT-only editor to rewrite them.
 
 ## Settings and billing
 
