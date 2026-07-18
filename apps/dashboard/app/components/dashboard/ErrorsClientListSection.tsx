@@ -171,12 +171,14 @@ export function ErrorsClientListSection({
                 environment: environment || null,
                 platform: platform || null,
                 release: release || null,
-                range: urlParams.range || null,
-                from: urlParams.from || null,
-                to: urlParams.to || null,
-                // Align detail with Issues list metrics window for unbounded ranges.
+                range: liveUrlParams.range || null,
+                from: liveUrlParams.from || null,
+                to: liveUrlParams.to || null,
+                // Prefer URL/live anchor (deep links); fall back to list API params.
                 metricsUntil:
-                  listParams.metricsUntil || new Date().toISOString(),
+                  liveUrlParams.metricsUntil ||
+                  listParams.metricsUntil ||
+                  new Date().toISOString(),
               })
             }
           />

@@ -183,6 +183,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       compare?: string;
+      metricsUntil?: string;
       errorsPage?: string;
       eventsPage?: string;
       listPageSize?: string;
@@ -209,10 +210,14 @@ export async function apiRoutes(
     const environment = queryString(query.environment);
     const platform = queryString(query.platform);
     const release = queryString(query.release);
+    const metricsUntilRaw = queryString(query.metricsUntil);
+    const metricsAnchor = metricsUntilRaw
+      ? parseErrorsMetricsAnchor(metricsUntilRaw)
+      : until;
     const metricsWindow = isUnselectedTimeRange(timeRange.key)
       ? await resolveUnselectedMetricsWindow(prisma, {
           projectId,
-          until,
+          until: metricsAnchor,
           app: appFilter,
           environment,
           platform,

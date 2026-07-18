@@ -5,7 +5,10 @@ import {
   TableWrap,
   tableDateColumnClass,
 } from "@/app/components/ui/Table";
-import type { ReleaseHealthRow } from "@/lib/releases-summary";
+import {
+  releaseVsPreviousDeltaClass,
+  type ReleaseHealthRow,
+} from "@/lib/releases-summary";
 import { formatPct } from "@/lib/overview-format";
 import {
   buildDashboardScopedListHref,
@@ -21,21 +24,19 @@ function DeltaLine({
   label,
   value,
   kind,
+  /** When true, higher is bad (error rate / errors). Default: higher is good. */
+  invert = false,
 }: {
   label: string;
   value: number | null | undefined;
   kind: "pp" | "pct";
+  invert?: boolean;
 }) {
   if (value == null) return null;
   const sign = value > 0 ? "↑" : value < 0 ? "↓" : "→";
   const abs = Math.abs(value);
   const formatted = kind === "pp" ? `${abs} pp` : `${abs}%`;
-  const tone =
-    value === 0
-      ? "text-muted-foreground"
-      : value > 0
-        ? "text-destructive"
-        : "text-success";
+  const tone = releaseVsPreviousDeltaClass(value, invert);
   return (
     <div className={`text-[11px] tabular-nums ${tone}`}>
       {label} {sign} {formatted}
@@ -104,9 +105,9 @@ export function ReleasesTable({
                   <div className="font-medium text-foreground">{label}</div>
                   {vs ? (
                     <div className="mt-1 space-y-0.5">
-                      <DeltaLine label="Error rate" value={vs.errorRatePp} kind="pp" />
+                      <DeltaLine label="Error rate" value={vs.errorRatePp} kind="pp" invert />
                       <DeltaLine label="Sessions" value={vs.sessionsPct} kind="pct" />
-                      <DeltaLine label="Errors" value={vs.errorsPct} kind="pct" />
+                      <DeltaLine label="Errors" value={vs.errorsPct} kind="pct" invert />
                     </div>
                   ) : null}
                 </td>

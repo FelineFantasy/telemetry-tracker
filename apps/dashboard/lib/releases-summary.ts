@@ -43,6 +43,19 @@ export type ReleasesPageSummary = {
   order: "asc" | "desc";
 };
 
+/**
+ * Semantic vs-previous tone: higher is good by default (sessions/adoption);
+ * pass `invert` for higher-is-bad metrics (error rate / errors).
+ */
+export function releaseVsPreviousDeltaClass(
+  value: number,
+  invert = false
+): string {
+  if (value === 0) return "text-muted-foreground";
+  if (value > 0) return invert ? "text-destructive" : "text-success";
+  return invert ? "text-success" : "text-destructive";
+}
+
 /** Fetch release health KPIs for the dashboard Releases page (#453). */
 export async function fetchReleasesSummary(
   search: URLSearchParams
