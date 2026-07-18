@@ -322,27 +322,53 @@ enum AlertRuleType {
   ALERT_RULE
 }
 
-/// Configurable alert rule (#493). Built-in spike/quota settings remain on Project.alert_settings.
+/// Who authored the rule — SYSTEM rows are migrated from Project.alert_settings (#535).
+enum AlertRuleSource {
+  CUSTOM
+  SYSTEM
+}
+
+/// Built-in kind for SYSTEM AlertRule rows (null for CUSTOM).
+enum AlertRuleSystemKind {
+  ERROR_SPIKE
+  QUOTA_WARNING
+  QUOTA_EXCEEDED
+}
+
+/// Configurable alert rule (#493). Built-in spike/quota live as SYSTEM rows (#535);
+/// Project.alert_settings remains a dual-write compatibility projection (email + legacy readers).
 /// Rules decide conditions → trigger → destination bindings only; Notifications owns delivery.
 model AlertRule {
-  id               String    @id @default(uuid())
-  project_id       String    @map("project_id")
-  project          Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  id               String               @id @default(uuid())
+  project_id       String               @map("project_id")
+  project          Project              @relation(fields: [project_id], references: [id], onDelete: Cascade)
   name             String
-  enabled          Boolean   @default(true)
-  /// AND of condition objects. ERROR_COUNT: { type, threshold, windowMinutes, environment? }.
+  enabled          Boolean              @default(true)
+  source           AlertRuleSource      @default(CUSTOM)
+  /// Set only when source = SYSTEM.
+  system_kind      AlertRuleSystemKind? @map("system_kind")
+  /// Stable idempotent key for SYSTEM rows (e.g. builtin:error_spike). Null for CUSTOM.
+  migration_key    String?              @map("migration_key")
+  /// AND of condition objects (#534): ERROR_COUNT, ERROR_RATE, SESSION_DROP, NEW_ERROR_GROUP,
+  /// AFFECTED_USERS, QUOTA_PERCENT, NO_EVENTS, HEARTBEAT (see docs/ALERT-RULES.md).
   conditions       Json
   /// Opaque destination ids resolved by Notifications (e.g. "project-email", ProjectWebhook.id).
   /// Rules must not embed provider-specific send logic (no email|slack|discord enums).
-  destination_ids  Json      @map("destination_ids")
-  /// Rate limit: at most one fire per cooldown bucket (dedupe key).
-  cooldown_minutes Int       @default(15) @map("cooldown_minutes")
-  created_at       DateTime  @default(now()) @map("created_at")
-  updated_at       DateTime  @updatedAt @map("updated_at")
-  deleted_at       DateTime? @map("deleted_at")
+  /// SYSTEM built-in rows store a placeholder; evaluation uses legacy all-channel fan-out.
+  destination_ids  Json                 @map("destination_ids")
+  /// Minimum minutes between successful fires (enforced via last_fired_at claim).
+  /// SYSTEM spike/quota use legacy AlertEvent dedupe keys instead of this claim path.
+  cooldown_minutes Int                  @default(15) @map("cooldown_minutes")
+  /// Set atomically when a fire is claimed; null until the first successful claim.
+  last_fired_at    DateTime?            @map("last_fired_at")
+  created_at       DateTime             @default(now()) @map("created_at")
+  updated_at       DateTime             @updatedAt @map("updated_at")
+  deleted_at       DateTime?            @map("deleted_at")
 
+  @@unique([project_id, migration_key])
   @@index([project_id, enabled])
   @@index([project_id, deleted_at])
+  @@index([project_id, source])
 }
 
 model AlertEvent {
