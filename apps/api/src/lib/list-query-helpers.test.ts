@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { buildEventWhereSql } from "./list-query-helpers.js";
+import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   const parts = fragment as unknown as { strings: string[]; values: unknown[] };
@@ -16,5 +17,30 @@ describe("buildEventWhereSql", () => {
     expect(prismaSqlText(sql)).toContain("ESCAPE");
     const parts = sql as unknown as { values: unknown[] };
     expect(parts.values).toContain("%100\\%\\_done%");
+  });
+
+  it("matches Unknown via null / blank / sentinel (not exact __unknown__ only)", () => {
+    const sql = buildEventWhereSql({
+      projectId: "proj_1",
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = prismaSqlText(sql);
+    expect(text).toContain("IS NULL");
+    expect(text).toContain("TRIM");
+    expect(text).toContain("OR");
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain("proj_1");
+    expect(values).toContain(UNKNOWN_RELEASE_KEY);
+  });
+
+  it("uses TRIM equality for known releases", () => {
+    const sql = buildEventWhereSql({
+      projectId: "proj_1",
+      release: "  1.2.3  ",
+    });
+    const text = prismaSqlText(sql);
+    expect(text).toContain("TRIM");
+    expect(text).not.toContain("IS NULL");
+    expect((sql as unknown as { values: unknown[] }).values).toContain("1.2.3");
   });
 });

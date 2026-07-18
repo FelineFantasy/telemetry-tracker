@@ -126,7 +126,6 @@ import {
 import { releasePrismaWhere } from "../lib/release-key.js";
 import {
   EVENT_SORT_SQL,
-  eventListOrderBy,
   overviewErrorOrderBy,
   parseEventListSortParam as parseRawEventListSortParam,
   parseListOrderParam,
@@ -1207,57 +1206,31 @@ export async function apiRoutes(
     if (!orderParsed.ok) {
       return reply.status(400).send({ error: "Invalid order" });
     }
-    const eventOrderBy = eventListOrderBy(sortParsed.sort, orderParsed.order);
+    // Always SQL so release=__unknown__ / TRIM match summary KPIs and Release Health.
     const orderDirSql =
       orderParsed.order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-
-    const props = propertiesContains?.trim();
-    if (props) {
-      const whereSql = buildEventWhereSql({
-        projectId,
-        appId,
-        name,
-        environment,
-        platform,
-        release,
-        gte: range.gte,
-        lte: range.lte,
-        propertiesContains: props,
-      });
-      const ob = EVENT_SORT_SQL[sortParsed.sort];
-      const [countRow, rows] = await Promise.all([
-        prisma.$queryRaw<[{ c: bigint }]>(
-          Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`
-        ),
-        prisma.$queryRaw<Record<string, unknown>[]>(
-          Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY ${ob} ${orderDirSql} LIMIT ${pageSize} OFFSET ${skip}`
-        ),
-      ]);
-      const total = Number(countRow[0]?.c ?? 0);
-      return reply.send({ items: rows, total, page, pageSize, view: "raw" });
-    }
-
-    const where: Prisma.EventWhereInput = whereEventProject(projectId);
-    if (appId) where.app = appId;
-    if (name) where.name = name;
-    if (environment) where.environment = environment;
-    if (platform) where.platform = platform;
-    if (release) where.release = release;
-    if (range.gte || range.lte) {
-      where.created_at = {};
-      if (range.gte) where.created_at.gte = range.gte;
-      if (range.lte) where.created_at.lte = range.lte;
-    }
-    const [total, list] = await Promise.all([
-      prisma.event.count({ where }),
-      prisma.event.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: eventOrderBy,
-      }),
+    const whereSql = buildEventWhereSql({
+      projectId,
+      appId,
+      name,
+      environment,
+      platform,
+      release,
+      gte: range.gte,
+      lte: range.lte,
+      propertiesContains: propertiesContains?.trim() || undefined,
+    });
+    const ob = EVENT_SORT_SQL[sortParsed.sort];
+    const [countRow, rows] = await Promise.all([
+      prisma.$queryRaw<[{ c: bigint }]>(
+        Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`
+      ),
+      prisma.$queryRaw<Record<string, unknown>[]>(
+        Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY ${ob} ${orderDirSql} LIMIT ${pageSize} OFFSET ${skip}`
+      ),
     ]);
-    return reply.send({ items: list, total, page, pageSize, view: "raw" });
+    const total = Number(countRow[0]?.c ?? 0);
+    return reply.send({ items: rows, total, page, pageSize, view: "raw" });
   });
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
