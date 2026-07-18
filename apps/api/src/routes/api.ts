@@ -132,6 +132,11 @@ import {
   parseOverviewErrorSortParam,
   parseOverviewTopEventsSortParam,
 } from "../lib/list-sort-params.js";
+import {
+  mergeGlobalSearchScope,
+  parseGlobalSearchQuery,
+} from "../lib/global-search-query.js";
+import { executeGlobalSearch } from "../lib/global-search.js";
 
 const DEFAULT_LIST_PAGE_SIZE = 20;
 const MAX_LIST_PAGE_SIZE = 100;
@@ -1312,6 +1317,51 @@ export async function apiRoutes(
       chartBucket
     );
     return reply.send(summary);
+  });
+
+  app.get("/search", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      q?: string | string[];
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+    };
+    const q = queryString(query.q) ?? "";
+    const parsed = parseGlobalSearchQuery(q);
+    const appId = queryApp(query.app);
+
+    // Date range: structured from/to/range in `q` override URL params when present.
+    const dateQuery =
+      parsed.filters.from || parsed.filters.to || parsed.filters.range
+        ? {
+            range: parsed.filters.range,
+            from: parsed.filters.from,
+            to: parsed.filters.to,
+          }
+        : {
+            range: queryString(query.range),
+            from: queryString(query.from),
+            to: queryString(query.to),
+          };
+    const range = parseCreatedRange(dateQuery, "all");
+
+    const scope = mergeGlobalSearchScope({
+      parsed,
+      appId,
+      environment: queryString(query.environment),
+      platform: queryString(query.platform),
+      release: queryString(query.release),
+      range,
+    });
+
+    const result = await executeGlobalSearch(prisma, projectId, parsed, scope);
+    return reply.send(result);
   });
 
   app.get("/releases/summary", async (request, reply) => {
