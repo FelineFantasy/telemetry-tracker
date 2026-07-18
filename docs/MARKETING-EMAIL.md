@@ -100,6 +100,19 @@ pnpm exec tsx scripts/send-release-email.ts --version=X.Y.Z --previous-version=X
 
 Spot-check one inbox (rendering + unsubscribe link) after manual sends. Note in the GitHub Release: “Product update email sent to N subscribers on YYYY-MM-DD.”
 
+### Brand logo in email clients
+
+Release and notification emails embed the brand mark as a **CID inline attachment** (`cid:tt-brand-logo`), not as a hotlinked URL. That avoids a common Gmail failure mode: Gmail rewrites `<img src>` through Google Image Proxy, and Cloudflare Bot Fight / WAF rules often block that proxy even when `https://telemetry-tracker.com/telemetry-logo.jpg` returns **200** in a browser.
+
+Gotchas:
+
+- Prefer **CID** (current templates) or a CDN outside aggressive bot protection — do not rely on Railway+Cloudflare alone for Gmail-visible images.
+- Set `TELEMETRY_DASHBOARD_ORIGIN` to the **apex** `https://telemetry-tracker.com` (no `www`). `www.telemetry-tracker.com` currently 404s for static assets.
+- Keep the mark small (we ship a 112×112 PNG). Huge JPEGs are unnecessary for a 28×28 header icon.
+- Absolute HTTPS URLs still work for CTAs / unsubscribe; only the logo uses CID.
+
+A public copy also lives at `/email-logo.png` on the dashboard for non-email use.
+
 ### v1.4.2 backfill (one-time)
 
 v1.4.2 shipped the subscriber list and release script but **no automated send ran** — subscribers have not received a product update email yet. Send once when ready (single-version backfill with `--force`, or `--line-close` if composing the whole `1.4.*` line):

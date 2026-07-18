@@ -1,3 +1,5 @@
+import { emailBrandLogoImgTag } from "./email-brand-logo.js";
+
 /** Dashboard-aligned palette (light theme approximations for email clients). */
 const COLORS = {
   background: "#f6f7fb",
@@ -152,7 +154,6 @@ export function buildReleaseEmailBodyHtml(options: {
   const content = changelogMarkdownToHtml(sectionMarkdown, origin);
   const releasesUrl = `${origin}/docs/releases`;
   const dashboardUrl = `${origin}/dashboard/overview`;
-  const logoUrl = `${origin}/telemetry-logo.jpg`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -172,12 +173,16 @@ export function buildReleaseEmailBodyHtml(options: {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;">
-                    <span style="display:inline-flex;align-items:center;gap:10px;">
-                      <img src="${escapeHtml(logoUrl)}" alt="" width="28" height="28" style="display:block;border-radius:8px;" />
-                      <span style="font-size:15px;font-weight:600;letter-spacing:-0.02em;color:${COLORS.foreground};">
-                        Telemetry<span style="color:${COLORS.muted};"> / </span>Tracker
-                      </span>
-                    </span>
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="vertical-align:middle;padding-right:10px;">
+                          ${emailBrandLogoImgTag(28)}
+                        </td>
+                        <td style="vertical-align:middle;font-size:15px;font-weight:600;letter-spacing:-0.02em;color:${COLORS.foreground};">
+                          Telemetry<span style="color:${COLORS.muted};"> / </span>Tracker
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                   <td align="right" style="vertical-align:middle;">
                     <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${COLORS.brandSoft};color:${COLORS.brand};font-size:12px;font-weight:600;letter-spacing:0.02em;">${escapeHtml(versionLabel)}</span>
