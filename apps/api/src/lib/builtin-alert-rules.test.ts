@@ -100,8 +100,10 @@ describe("mergeSettingsFromBuiltinRules", () => {
     expect(merged.email).toEqual(base.email);
   });
 
-  it("keeps base spike/quota when SYSTEM conditions are invalid", () => {
-    const base = settings({});
+  it("disables spike when SYSTEM conditions are invalid (inert fallback)", () => {
+    const base = settings({
+      errorSpike: { enabled: true, threshold: 25, windowMinutes: 15 },
+    });
     const merged = mergeSettingsFromBuiltinRules(base, [
       {
         system_kind: "ERROR_SPIKE",
@@ -109,7 +111,25 @@ describe("mergeSettingsFromBuiltinRules", () => {
         conditions: [{ type: "HEARTBEAT", windowMinutes: 15 }],
       },
     ]);
-    expect(merged.errorSpike).toEqual(base.errorSpike);
+    expect(merged.errorSpike).toEqual({
+      enabled: false,
+      threshold: 25,
+      windowMinutes: 15,
+    });
+  });
+
+  it("disables quota warning when SYSTEM conditions are invalid", () => {
+    const base = settings({
+      quota: { enabled: true, nearPercent: 90 },
+    });
+    const merged = mergeSettingsFromBuiltinRules(base, [
+      {
+        system_kind: "QUOTA_WARNING",
+        enabled: true,
+        conditions: [{ type: "BUILTIN_QUOTA_WARNING", thresholdPercent: 10 }],
+      },
+    ]);
+    expect(merged.quota).toEqual({ enabled: false, nearPercent: 90 });
   });
 });
 

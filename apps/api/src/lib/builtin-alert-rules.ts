@@ -187,6 +187,10 @@ function quotaWarningFromConditions(
 /**
  * Overlay SYSTEM rule state onto alert_settings for spike/quota fields.
  * Email settings always come from the JSON projection.
+ *
+ * When a SYSTEM spike/quota-warning row exists but `conditions` cannot be
+ * parsed, degrade to inert (`enabled: false`) rather than leaving stale
+ * Project.alert_settings values that may still fire.
  */
 export function mergeSettingsFromBuiltinRules(
   base: ProjectAlertSettings,
@@ -201,10 +205,10 @@ export function mergeSettingsFromBuiltinRules(
   for (const rule of rules) {
     if (rule.system_kind === "ERROR_SPIKE") {
       const parsed = errorSpikeFromConditions(rule.enabled, rule.conditions);
-      if (parsed) errorSpike = parsed;
+      errorSpike = parsed ?? { ...errorSpike, enabled: false };
     } else if (rule.system_kind === "QUOTA_WARNING") {
       const parsed = quotaWarningFromConditions(rule.enabled, rule.conditions);
-      if (parsed) quota = parsed;
+      quota = parsed ?? { ...quota, enabled: false };
     }
   }
   return { errorSpike, quota, email: base.email };
