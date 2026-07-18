@@ -13,6 +13,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Database
+
+---
+
+## [1.15.2] - 2026-07-18
+
+### Added
+
 - **Alert rules built-in integration** — error-spike and quota alerts are system-managed `AlertRule` rows (`source=SYSTEM`, stable `migration_key`); idempotent ensure/backfill from `alert_settings`; dual-write via alert-settings API; custom CRUD/evaluators skip SYSTEM so delivery stays on `fireProjectAlert` with legacy dedupe keys ([#535](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/535); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
 - **Alert rules dashboard UX** — edit existing rules, multi-condition (AND) authoring matching the API, clearer opaque destination picker, and validation/empty-state polish on Alerts → Custom rules ([#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
 - **Alert rules conditions + scheduled evaluator** — API support for `ERROR_RATE`, `SESSION_DROP`, `NEW_ERROR_GROUP`, `AFFECTED_USERS`, `QUOTA_PERCENT`, `NO_EVENTS`, and `HEARTBEAT`; skip-safe unknown condition types; ingest + scheduled evaluation paths with shared `last_fired_at` cooldown into `fireProjectAlert`; cron entrypoint `alert-rules-evaluator` ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
