@@ -7,11 +7,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (X.Y.Z) to send"
+        description: "Closing release tag (X.Y.Z) — last intended release of the minor line"
         required: true
       previous_version:
-        description: "Previous tag (X.Y.Z) for bump check; omit for first tag"
+        description: "Last emailed / previous minor final (X.Y.Z); changelog starts after this"
         required: false
+      line_close:
+        description: "Send product email for the whole minor line (all X.Y.* since previous_version)"
+        type: boolean
+        default: true
 
 concurrency:
   group: release-email-${{ github.event_name == 'workflow_dispatch' && format('manual-{0}', inputs.version) || github.ref }}
@@ -41,10 +45,17 @@ jobs:
         env:
           DISPATCH_VERSION: ${{ inputs.version }}
           DISPATCH_PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          DISPATCH_LINE_CLOSE: ${{ inputs.line_close }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             CURRENT="$DISPATCH_VERSION"
             PREVIOUS="$DISPATCH_PREVIOUS_VERSION"
+            # workflow_dispatch boolean inputs are the strings "true" / "false"
+            if [ "$DISPATCH_LINE_CLOSE" = "true" ]; then
+              LINE_CLOSE=true
+            else
+              LINE_CLOSE=false
+            fi
           else
             CURRENT="${GITHUB_REF_NAME#v}"
             if ! [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -56,6 +67,8 @@ jobs:
               | grep -v "^${GITHUB_REF_NAME}$" \
               | head -1 \
               | sed 's/^v//')
+            # Tag push never auto-sends; operators dispatch with line_close when closing a line
+            LINE_CLOSE=false
           fi
           if ! [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid release version: ${CURRENT}" >&2
@@ -63,7 +76,8 @@ jobs:
           fi
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
-          echo "Release ${CURRENT} (previous: ${PREVIOUS:-none})"
+          echo "line_close=$LINE_CLOSE" >> "$GITHUB_OUTPUT"
+          echo "Release ${CURRENT} (previous: ${PREVIOUS:-none}; line_close: ${LINE_CLOSE})"
 
       - name: Ensure CHANGELOG at release version
         env:
@@ -83,16 +97,20 @@ jobs:
           echo "Could not find CHANGELOG section for ${RELEASE_CURRENT} on tag or main" >&2
           exit 1
 
-      - name: Check minor/major bump
+      - name: Check line-close / bump policy
         id: bump
         working-directory: apps/api
         env:
           RELEASE_CURRENT: ${{ steps.tags.outputs.current }}
           RELEASE_PREVIOUS: ${{ steps.tags.outputs.previous }}
+          RELEASE_LINE_CLOSE: ${{ steps.tags.outputs.line_close }}
         run: |
           ARGS=(--current="$RELEASE_CURRENT")
           if [ -n "$RELEASE_PREVIOUS" ]; then
             ARGS+=(--previous="$RELEASE_PREVIOUS")
+          fi
+          if [ "$RELEASE_LINE_CLOSE" = "true" ]; then
+            ARGS+=(--line-close)
           fi
           BUMP=$(pnpm exec tsx scripts/check-release-email-bump.ts "${ARGS[@]}")
           echo "should_send=$(node -e "console.log(JSON.parse(process.argv[1]).send)" "$BUMP")" >> "$GITHUB_OUTPUT"
@@ -109,14 +127,18 @@ jobs:
           TELEMETRY_DASHBOARD_ORIGIN: ${{ secrets.TELEMETRY_DASHBOARD_ORIGIN }}
           RELEASE_CURRENT: ${{ steps.tags.outputs.current }}
           RELEASE_PREVIOUS: ${{ steps.tags.outputs.previous }}
+          RELEASE_LINE_CLOSE: ${{ steps.tags.outputs.line_close }}
         run: |
           ARGS=(--version="$RELEASE_CURRENT")
           if [ -n "$RELEASE_PREVIOUS" ]; then
             ARGS+=(--previous-version="$RELEASE_PREVIOUS")
           fi
+          if [ "$RELEASE_LINE_CLOSE" = "true" ]; then
+            ARGS+=(--line-close)
+          fi
           pnpm exec tsx scripts/send-release-email.ts "${ARGS[@]}"
 
-      - name: Skip patch-only release
+      - name: Skip under product-email policy
         if: steps.bump.outputs.should_send != 'true'
         env:
           SKIP_REASON: ${{ steps.bump.outputs.reason }}
