@@ -87,8 +87,8 @@ Releases are **milestone-driven**:
 - **Stacked / multi-PR features:** the final integration PR that lands the feature on `develop` must run the **full API + dashboard** test suites (not a subset). Prefer one green CI pass on that integration PR before release promotion.
 - **Assign feature PRs to a milestone** whenever possible (active product line or patch-line milestone) so shipped work stays auditable.
 - **Prefer one production smoke-test pass** (health, migrations, critical paths for the milestone — see [Post-deploy verification](#post-deploy-verification) and `scripts/smoke-production.sh` / notification channel checks) **before closing a milestone**.
-- **Taxonomy:** **milestones** = release lines (e.g. `v1.14.x — Notifications`); **parent issues** = long-lived vision/roadmap; **child issues** = implementation that ships inside a milestone. Closing a milestone does **not** require closing the parent vision issue.
-  - Example: Notifications parent vision is [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); children (#225, #508, #499, #223, #224, #500, …) ship under the `v1.14.x` milestone while #492 stays open as the living roadmap.
+- **Taxonomy:** **milestones** = release lines (e.g. `v1.14.x — Notifications`); **parent issues** = long-lived vision/roadmap; **child issues** = implementation that ships inside a milestone. Closing a milestone does **not** require closing the parent vision issue — parents **should stay open** as living roadmap even after children merge.
+  - Example: Notifications parent [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492) and Alert Rules parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); children (#225, #508, #532–#535, …) ship under their milestones while the parent remains the scope source of truth.
 
 ---
 
@@ -188,6 +188,7 @@ Production uses **three Railway services** (+ optional workers/cron):
 | API | `apps/api` | Railpack (not Dockerfile) |
 | Dashboard | repo root (empty) | Dockerfile |
 | Retention cron (optional) | `apps/api` | Cron → `node dist/jobs/run-retention.js` |
+| Alert rules evaluator cron (optional) | `apps/api` | Cron → `node dist/jobs/run-alert-rules-evaluator.js` |
 | Alert webhook worker (optional) | `apps/api` | Always-on → `node dist/jobs/run-alert-webhook-worker.js` |
 
 ### 1. Trigger deploy
@@ -261,7 +262,17 @@ node dist/jobs/run-retention.js
 
 Same `DATABASE_URL` as the API. See [RAILWAY.md](./RAILWAY.md#retention-cron).
 
-### 6. Alert webhook worker
+### 6. Alert rules evaluator cron
+
+If CUSTOM Alert Rules use schedule-oriented conditions (`HEARTBEAT`, `NO_EVENTS`, `SESSION_DROP`, `QUOTA_PERCENT`, scheduled `ERROR_RATE`), add a Railway cron (manual wiring — not auto-provisioned):
+
+```bash
+node dist/jobs/run-alert-rules-evaluator.js
+```
+
+Default schedule `*/5 * * * *` (match `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`). Same `DATABASE_URL` as the API. Do **not** repurpose or alter any `brief-worker` service. See [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron) and [ALERT-RULES.md](./ALERT-RULES.md).
+
+### 7. Alert webhook worker
 
 If alert webhooks are enabled, keep a continuous worker running (not cron):
 

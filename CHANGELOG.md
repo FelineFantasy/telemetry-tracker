@@ -17,6 +17,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
+- **Docs staleness pass** — align RELEASE / PRODUCTION-READINESS / ROADMAP / MONITORING with shipped Notifications + Alert Rules, Railway `alert-rules-evaluator` cron (leave `brief-worker` alone), and corrected ops notes (CI does not migrate production; Slack/Discord Delivery shipped)
+
 ### Database
 
 ---
