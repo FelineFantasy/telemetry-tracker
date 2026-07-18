@@ -25,7 +25,8 @@
   },
   "pnpm": {
     "overrides": {
-      "vite": "7.3.5"
+      "vite": "7.3.5",
+      "shell-quote": ">=1.8.4"
     }
   },
   "engines": {
