@@ -6,6 +6,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import type { ErrorListFilterInput } from "./errors-list-query.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 
 export type ErrorsPageSummary = {
   window: {
@@ -97,7 +98,7 @@ export function buildErrorGroupScopeSql(
     const gte = f.range.gte ?? f.occurrenceCountRange?.gte;
     const lte = f.range.lte ?? f.occurrenceCountRange?.lte;
     const scopeParts: Prisma.Sql[] = [];
-    if (f.release) scopeParts.push(Prisma.sql`rel."release" = ${f.release}`);
+    if (f.release) scopeParts.push(releaseFilterMatchSql(Prisma.sql`rel."release"`, f.release));
     if (f.platform) scopeParts.push(Prisma.sql`rel."platform" = ${f.platform}`);
     if (gte) scopeParts.push(Prisma.sql`rel."created_at" >= ${gte}`);
     if (lte) scopeParts.push(Prisma.sql`rel."created_at" <= ${lte}`);
@@ -162,7 +163,7 @@ export function buildEventSessionScopeSql(
       FROM "ErrorOccurrence" seo
       INNER JOIN "ErrorGroup" seg ON seg."id" = seo."error_group_id"
       WHERE ${buildErrorGroupScopeSql(f, projectId, "seg")}
-        ${f.release ? Prisma.sql`AND seo."release" = ${f.release}` : Prisma.empty}
+        ${f.release ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`seo."release"`, f.release)}` : Prisma.empty}
         ${f.platform ? Prisma.sql`AND seo."platform" = ${f.platform}` : Prisma.empty}
         AND seo."created_at" >= ${previousSince}
         AND seo."created_at" <= ${until}
@@ -197,11 +198,11 @@ export async function fetchErrorsPageSummary(
   const eventParts: Prisma.Sql[] = [Prisma.sql`e."project_id" = ${projectId}`];
   if (f.appId) eventParts.push(Prisma.sql`e."app" = ${f.appId}`);
   if (f.environment) eventParts.push(Prisma.sql`e."environment" = ${f.environment}`);
-  if (f.release) eventParts.push(Prisma.sql`e."release" = ${f.release}`);
+  if (f.release) eventParts.push(releaseFilterMatchSql(Prisma.sql`e."release"`, f.release));
   if (f.platform) eventParts.push(Prisma.sql`e."platform" = ${f.platform}`);
   const eventFilter = Prisma.join(eventParts, " AND ");
   const occurrenceScopeParts: Prisma.Sql[] = [];
-  if (f.release) occurrenceScopeParts.push(Prisma.sql`eo."release" = ${f.release}`);
+  if (f.release) occurrenceScopeParts.push(releaseFilterMatchSql(Prisma.sql`eo."release"`, f.release));
   if (f.platform) occurrenceScopeParts.push(Prisma.sql`eo."platform" = ${f.platform}`);
   // Prisma.join throws on an empty array — only join when release/platform filters exist.
   const occurrenceReleaseClause =

@@ -23,6 +23,11 @@ describe("resolveScopedQueryValue", () => {
     expect(resolveScopedQueryValue("", ["production"])).toBeNull();
     expect(resolveScopedQueryValue(undefined, ["production"])).toBeNull();
   });
+
+  it("always allows the Unknown release sentinel", () => {
+    expect(resolveScopedQueryValue("__unknown__", [])).toBe("__unknown__");
+    expect(resolveScopedQueryValue("__unknown__", ["1.0.0"])).toBe("__unknown__");
+  });
 });
 
 describe("buildErrorGroupDetailHref", () => {
@@ -63,6 +68,15 @@ describe("buildDashboardScopedListHref", () => {
         release: "1.0.0",
       })
     ).toBe("/dashboard/events?app=web&environment=production&platform=web&release=1.0.0");
+  });
+
+  it("preserves the Unknown release sentinel", () => {
+    expect(
+      buildDashboardScopedListHref("/dashboard/errors", {
+        release: "__unknown__",
+        range: "7d",
+      })
+    ).toBe("/dashboard/errors?release=__unknown__&range=7d");
   });
 });
 

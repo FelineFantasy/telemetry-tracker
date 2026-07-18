@@ -12,6 +12,7 @@ import { generateOverviewChartBuckets, overviewChartQuerySince } from "./overvie
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 import { cohortSharePct } from "./user-cohort.js";
+import { isUnknownReleaseKey, releaseFilterMatchSql } from "./release-key.js";
 
 export const BOUNCE_MAX_DURATION_SECONDS = 10;
 
@@ -319,7 +320,7 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
     eventClauses.push(Prisma.sql`e."environment" = ${f.environment}`);
   }
   if (f.release) {
-    eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
+    eventClauses.push(releaseFilterMatchSql(Prisma.sql`e."release"`, f.release));
   }
   return eventClauses;
 }
@@ -328,6 +329,8 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
  * Prefer Session.environment / Session.release; fall back to matching events for
  * legacy null columns. When both filters are set, a single event must satisfy both
  * (or session columns must both match) — never different events per field.
+ *
+ * `release=__unknown__` matches null/blank Session.release only (no event fallback).
  */
 function sessionEnvReleaseMatchSql(
   projectId: string,
@@ -337,21 +340,31 @@ function sessionEnvReleaseMatchSql(
 ): Prisma.Sql | null {
   if (!f.environment && !f.release) return null;
   const s = Prisma.raw(`"${sessionAlias}"`);
+  const releaseUnknown = f.release ? isUnknownReleaseKey(f.release) : false;
+  const sessionReleaseMatch = f.release
+    ? releaseFilterMatchSql(Prisma.sql`${s}."release"`, f.release)
+    : null;
+  const eventReleaseMatch = f.release
+    ? releaseFilterMatchSql(Prisma.sql`e."release"`, f.release)
+    : null;
 
-  if (f.environment && f.release) {
+  if (f.environment && f.release && sessionReleaseMatch && eventReleaseMatch) {
+    if (releaseUnknown) {
+      return Prisma.sql`(
+        ${s}."environment" = ${f.environment}
+        AND ${sessionReleaseMatch}
+      )`;
+    }
     const bothOnEvent = sessionEventExistsSql(
       projectId,
       sessionAlias,
-      [
-        Prisma.sql`e."environment" = ${f.environment}`,
-        Prisma.sql`e."release" = ${f.release}`,
-      ],
+      [Prisma.sql`e."environment" = ${f.environment}`, eventReleaseMatch],
       eventWindow
     );
     return Prisma.sql`(
       (
         ${s}."environment" = ${f.environment}
-        AND ${s}."release" = ${f.release}
+        AND ${sessionReleaseMatch}
       )
       OR (
         ${s}."environment" IS NULL
@@ -365,7 +378,7 @@ function sessionEnvReleaseMatchSql(
       )
       OR (
         ${s}."environment" IS NULL
-        AND ${s}."release" = ${f.release}
+        AND ${sessionReleaseMatch}
         AND ${bothOnEvent}
       )
     )`;
@@ -386,16 +399,17 @@ function sessionEnvReleaseMatchSql(
     )`;
   }
 
+  if (!sessionReleaseMatch || !eventReleaseMatch || !f.release) return null;
+
+  if (releaseUnknown) {
+    return sessionReleaseMatch;
+  }
+
   return Prisma.sql`(
-    ${s}."release" = ${f.release}
+    ${sessionReleaseMatch}
     OR (
       ${s}."release" IS NULL
-      AND ${sessionEventExistsSql(
-        projectId,
-        sessionAlias,
-        [Prisma.sql`e."release" = ${f.release}`],
-        eventWindow
-      )}
+      AND ${sessionEventExistsSql(projectId, sessionAlias, [eventReleaseMatch], eventWindow)}
     )
   )`;
 }

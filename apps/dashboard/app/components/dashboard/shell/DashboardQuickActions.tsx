@@ -37,7 +37,7 @@ const ACTIONS: Action[] = [
   { id: "dashboard", label: "Create dashboard", icon: LayoutDashboard, comingSoon: true },
   { id: "alert", label: "Create alert", icon: Bell, href: "/dashboard/alerts" },
   { id: "flag", label: "Create feature flag", icon: Flag, comingSoon: true },
-  { id: "release", label: "Track release", icon: GitBranch, comingSoon: true },
+  { id: "release", label: "Track release", icon: GitBranch, href: "/dashboard/releases" },
   { id: "export", label: "Export report", icon: BarChart3, comingSoon: true },
 ];
 

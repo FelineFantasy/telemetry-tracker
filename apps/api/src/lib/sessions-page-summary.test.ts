@@ -171,7 +171,8 @@ describe("sessionFilterSql", () => {
     const text = prismaSqlText(sql);
     expect(text).toContain('"s"."environment"');
     expect(text).toContain('"s"."release"');
-    expect(text).toContain('e."environment" = ? AND e."release" = ?');
+    expect(text).toContain('e."environment" = ?');
+    expect(text).toContain('TRIM(e."release") = ?');
   });
 
   it("bounds matching events to the metrics window when provided", () => {

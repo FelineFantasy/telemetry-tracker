@@ -15,6 +15,7 @@ import {
   FilterSubmitBtn,
   FilterSubmitWrap,
 } from "@/app/components/dashboard/list-filters-ui";
+import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
@@ -134,10 +135,7 @@ export function ErrorsListToolbar({
   );
 
   const releaseOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "", label: "Any" },
-      ...releases.map((e) => ({ value: e, label: e })),
-    ],
+    () => releaseFilterSelectOptions(releases),
     [releases]
   );
 

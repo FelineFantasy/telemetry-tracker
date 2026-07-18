@@ -13,7 +13,7 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
   { href: "/dashboard/traces", label: "Traces", enabled: false, comingSoon: true },
   { href: "/dashboard/logs", label: "Logs", enabled: false, comingSoon: true },
   { href: "/dashboard/performance", label: "Performance", enabled: true },
-  { href: "/dashboard/releases", label: "Releases", enabled: false, comingSoon: true },
+  { href: "/dashboard/releases", label: "Releases", enabled: true },
   { href: "/dashboard/alerts", label: "Alerts", enabled: true },
   { href: "/dashboard/notifications", label: "Notifications", enabled: true },
   { href: "/dashboard/flags", label: "Flags", enabled: false, comingSoon: true },

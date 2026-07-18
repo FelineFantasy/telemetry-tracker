@@ -17,6 +17,7 @@ import {
   buildSessionListFilter,
   type SessionListFilterInput,
 } from "./sessions-page-summary.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 
 export const REQUEST_EVENT_NAME = "$request";
 export const REQUEST_APDEX_THRESHOLD_MS = 300;
@@ -83,7 +84,7 @@ function eventScopeSql(scope: Scope): Prisma.Sql {
   if (scope.app) parts.push(Prisma.sql`e."app" = ${scope.app}`);
   if (scope.environment) parts.push(Prisma.sql`e."environment" = ${scope.environment}`);
   if (scope.platform) parts.push(Prisma.sql`e."platform" = ${scope.platform}`);
-  if (scope.release) parts.push(Prisma.sql`e."release" = ${scope.release}`);
+  if (scope.release) parts.push(releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release));
   return Prisma.join(parts, " AND ");
 }
 
@@ -340,7 +341,7 @@ function overviewErrorGroupsWindowClauses(
     ? Prisma.sql`AND eo."platform" = ${scope.platform}`
     : Prisma.empty;
   const releaseClause = scope.release
-    ? Prisma.sql`AND eo."release" = ${scope.release}`
+    ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`eo."release"`, scope.release)}`
     : Prisma.empty;
   return Prisma.sql`
     eg."project_id" = ${projectId}

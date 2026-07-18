@@ -18,6 +18,7 @@ import {
   overviewChartQuerySince,
   type OverviewSeriesBucket,
 } from "./overview-timeseries.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 
 export const ERRORS_TOP_TYPES_LIMIT = 5;
@@ -161,7 +162,7 @@ export async function fetchErrorsAnalytics(
   const occurrenceFilter = buildErrorOccurrenceFilterSql(f, projectId);
   const typeExpr = errorTypeSqlExpression("eg");
   const occurrenceScopeParts: Prisma.Sql[] = [];
-  if (f.release) occurrenceScopeParts.push(Prisma.sql`eo."release" = ${f.release}`);
+  if (f.release) occurrenceScopeParts.push(releaseFilterMatchSql(Prisma.sql`eo."release"`, f.release));
   if (f.platform) occurrenceScopeParts.push(Prisma.sql`eo."platform" = ${f.platform}`);
   const releaseClause =
     occurrenceScopeParts.length > 0

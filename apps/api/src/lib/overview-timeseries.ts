@@ -4,6 +4,7 @@
  */
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
+import { isUnknownReleaseKey, releaseFilterMatchSql } from "./release-key.js";
 
 export type OverviewSeriesBucket = "hour" | "day" | "week";
 
@@ -143,7 +144,7 @@ async function queryEventBuckets(
     ? Prisma.sql`AND e."platform" = ${platformFilter}`
     : Prisma.empty;
   const releaseClause = releaseFilter
-    ? Prisma.sql`AND e."release" = ${releaseFilter}`
+    ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter)}`
     : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT
@@ -209,10 +210,18 @@ function overviewSessionEnvReleaseScopeSql(
   releaseFilter?: string
 ): Prisma.Sql {
   if (environmentFilter && releaseFilter) {
+    const sessionRelease = releaseFilterMatchSql(Prisma.sql`s."release"`, releaseFilter);
+    const eventRelease = releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter);
+    if (isUnknownReleaseKey(releaseFilter)) {
+      return Prisma.sql`AND (
+        s."environment" = ${environmentFilter}
+        AND ${sessionRelease}
+      )`;
+    }
     return Prisma.sql`AND (
       (
         s."environment" = ${environmentFilter}
-        AND s."release" = ${releaseFilter}
+        AND ${sessionRelease}
       )
       OR (
         s."environment" IS NULL
@@ -221,7 +230,7 @@ function overviewSessionEnvReleaseScopeSql(
           projectId,
           since,
           until,
-          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
+          Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
         )}
       )
       OR (
@@ -231,17 +240,17 @@ function overviewSessionEnvReleaseScopeSql(
           projectId,
           since,
           until,
-          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
+          Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
         )}
       )
       OR (
         s."environment" IS NULL
-        AND s."release" = ${releaseFilter}
+        AND ${sessionRelease}
         AND ${overviewSessionEventExistsSql(
           projectId,
           since,
           until,
-          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
+          Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
         )}
       )
     )`;
@@ -261,15 +270,19 @@ function overviewSessionEnvReleaseScopeSql(
     )`;
   }
   if (releaseFilter) {
+    const sessionRelease = releaseFilterMatchSql(Prisma.sql`s."release"`, releaseFilter);
+    if (isUnknownReleaseKey(releaseFilter)) {
+      return Prisma.sql`AND ${sessionRelease}`;
+    }
     return Prisma.sql`AND (
-      s."release" = ${releaseFilter}
+      ${sessionRelease}
       OR (
         s."release" IS NULL
         AND ${overviewSessionEventExistsSql(
           projectId,
           since,
           until,
-          Prisma.sql`e."release" = ${releaseFilter}`
+          releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter)
         )}
       )
     )`;
@@ -335,7 +348,7 @@ async function queryErrorBuckets(
     ? Prisma.sql`AND eo."platform" = ${platformFilter}`
     : Prisma.empty;
   const releaseClause = releaseFilter
-    ? Prisma.sql`AND eo."release" = ${releaseFilter}`
+    ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`eo."release"`, releaseFilter)}`
     : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT

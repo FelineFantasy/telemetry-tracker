@@ -12,6 +12,7 @@ import { parseErrorTypeFromMessage } from "./error-type.js";
 import {
   generateOverviewChartBuckets,
 } from "./overview-timeseries.js";
+import { releaseFilterMatchSql, releasePrismaWhere } from "./release-key.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 
 export const ERROR_LIST_SORTS = [
@@ -54,7 +55,7 @@ export type ErrorListFilterInput = {
 /** Occurrence-level filters (release / platform) used for EXISTS + aggregate scoping. */
 function occurrenceScopeSql(f: Pick<ErrorListFilterInput, "release" | "platform">): Prisma.Sql {
   const parts: Prisma.Sql[] = [];
-  if (f.release) parts.push(Prisma.sql`o.release = ${f.release}`);
+  if (f.release) parts.push(releaseFilterMatchSql(Prisma.sql`o.release`, f.release));
   if (f.platform) parts.push(Prisma.sql`o.platform = ${f.platform}`);
   if (parts.length === 0) return Prisma.empty;
   return Prisma.sql`AND ${Prisma.join(parts, " AND ")}`;
@@ -151,7 +152,7 @@ export function buildErrorGroupWhereInput(
     const bounds = occurrenceWindowBounds(f);
     where.occurrences_list = {
       some: {
-        ...(f.release ? { release: f.release } : {}),
+        ...releasePrismaWhere(f.release),
         ...(f.platform ? { platform: f.platform } : {}),
         ...(bounds.gte || bounds.lte
           ? {
@@ -271,7 +272,7 @@ function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
   if (hasOccurrenceScope(f)) {
     const bounds = occurrenceWindowBounds(f);
     const scopeParts: Prisma.Sql[] = [];
-    if (f.release) scopeParts.push(Prisma.sql`rel.release = ${f.release}`);
+    if (f.release) scopeParts.push(releaseFilterMatchSql(Prisma.sql`rel.release`, f.release));
     if (f.platform) scopeParts.push(Prisma.sql`rel.platform = ${f.platform}`);
     if (bounds.gte) scopeParts.push(Prisma.sql`rel.created_at >= ${bounds.gte}`);
     if (bounds.lte) scopeParts.push(Prisma.sql`rel.created_at <= ${bounds.lte}`);

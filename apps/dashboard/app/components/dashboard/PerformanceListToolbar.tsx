@@ -17,6 +17,7 @@ import {
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
+import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 
 type Props = {
   path: string;
@@ -75,10 +76,7 @@ export function PerformanceListToolbar({
     [platforms]
   );
   const releaseOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "", label: "Any" },
-      ...releases.map((e) => ({ value: e, label: e })),
-    ],
+    () => releaseFilterSelectOptions(releases),
     [releases]
   );
 

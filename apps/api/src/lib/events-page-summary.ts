@@ -6,6 +6,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import type { EventListFilterInput } from "./events-list-query.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 
 export type EventsPageSummary = {
   window: {
@@ -108,7 +109,7 @@ export async function fetchEventsPageSummary(
   if (f.name) parts.push(Prisma.sql`e."name" = ${f.name}`);
   if (f.environment) parts.push(Prisma.sql`e."environment" = ${f.environment}`);
   if (f.platform) parts.push(Prisma.sql`e."platform" = ${f.platform}`);
-  if (f.release) parts.push(Prisma.sql`e."release" = ${f.release}`);
+  if (f.release) parts.push(releaseFilterMatchSql(Prisma.sql`e."release"`, f.release));
   if (f.propertiesContains?.trim()) {
     const pat = `%${escapeLikePattern(f.propertiesContains.trim())}%`;
     parts.push(Prisma.sql`e."properties"::text ILIKE ${pat} ESCAPE '\\'`);

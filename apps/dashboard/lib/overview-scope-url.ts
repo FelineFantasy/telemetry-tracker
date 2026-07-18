@@ -1,5 +1,8 @@
 /** URL helpers for overview scope (app, environment, platform, release, compare). */
 
+/** Explicit sentinel for null/blank release values (Release Health #453). */
+export const UNKNOWN_RELEASE_KEY = "__unknown__";
+
 export type OverviewCompareParam = "previous" | "week-ago";
 
 export function parseOverviewCompare(raw: string | undefined): OverviewCompareParam {
@@ -22,8 +25,23 @@ export function resolveScopedQueryValue(
   allowed: readonly string[]
 ): string | null {
   const value = raw?.trim() ?? "";
-  if (value === "" || !allowed.includes(value)) return null;
+  if (value === "") return null;
+  // Always allow the Unknown release sentinel so Issues deep links are not stripped.
+  if (value === UNKNOWN_RELEASE_KEY) return UNKNOWN_RELEASE_KEY;
+  if (!allowed.includes(value)) return null;
   return value;
+}
+
+/** Release filter options including the explicit Unknown bucket (#453). */
+export function releaseFilterSelectOptions(
+  releases: readonly string[]
+): Array<{ value: string; label: string }> {
+  const known = releases.filter((r) => r !== UNKNOWN_RELEASE_KEY);
+  return [
+    { value: "", label: "Any" },
+    { value: UNKNOWN_RELEASE_KEY, label: "Unknown" },
+    ...known.map((e) => ({ value: e, label: e })),
+  ];
 }
 
 /** Preserve dashboard scope when switching top-level dashboard tabs. */

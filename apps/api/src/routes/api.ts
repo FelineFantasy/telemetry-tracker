@@ -50,6 +50,14 @@ import {
   resolvePerformanceSummaryWindow,
 } from "../lib/performance-page-summary.js";
 import {
+  buildReleasesFilter,
+  fetchReleasesPageSummary,
+  parseReleasesMetricsAnchor,
+  parseReleasesOrderParam,
+  parseReleasesSortParam,
+  resolveReleasesSummaryWindow,
+} from "../lib/releases-page-summary.js";
+import {
   attachLatestEventIds,
   fetchSparklinesForEventNames,
   listEventNamesGrouped,
@@ -1256,6 +1264,52 @@ export async function apiRoutes(
       projectId,
       window,
       chartBucket
+    );
+    return reply.send(summary);
+  });
+
+  app.get("/releases/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      metricsUntil?: string;
+      sort?: string;
+      order?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseReleasesMetricsAnchor(queryString(query.metricsUntil));
+    const sortParsed = parseReleasesSortParam(queryString(query.sort));
+    if (!sortParsed.ok) {
+      return reply.code(400).send({ error: "Invalid sort" });
+    }
+    const orderParsed = parseReleasesOrderParam(queryString(query.order));
+    if (!orderParsed.ok) {
+      return reply.code(400).send({ error: "Invalid order" });
+    }
+
+    const filter = buildReleasesFilter({
+      appId,
+      platform,
+      environment,
+      range,
+    });
+    const window = resolveReleasesSummaryWindow(range, metricsAnchor);
+    const summary = await fetchReleasesPageSummary(
+      prisma,
+      filter,
+      projectId,
+      window,
+      sortParsed.sort,
+      orderParsed.order
     );
     return reply.send(summary);
   });
