@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.3] - 2026-07-18
+
+### Fixed
+
+- **Production smoke billing portal probe** — `scripts/smoke-production.sh` sends `-d '{}'` with `Content-Type: application/json` on `POST …/billing/portal` so Fastify no longer rejects an empty body (Sentry `FastifyError` during v1.15.2 smoke) ([#547](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/547))
+
+---
+
 ## [1.15.2] - 2026-07-18
 
 ### Added
