@@ -17,13 +17,14 @@ vi.mock("./db.js", () => ({
     project: {
       findFirst: vi.fn(async () => ({
         organization_id: "org-1",
-        organization: {
-          plan_tier: "FREE",
-          stripe_customer_id: null,
-          stripe_subscription_status: null,
-          stripe_current_period_end: null,
-          deleted_at: null,
-        },
+      })),
+    },
+    organization: {
+      findFirst: vi.fn(async () => ({
+        plan_tier: "FREE",
+        stripe_customer_id: null,
+        stripe_subscription_status: null,
+        stripe_current_period_end: null,
       })),
     },
     usageMonthly: {
