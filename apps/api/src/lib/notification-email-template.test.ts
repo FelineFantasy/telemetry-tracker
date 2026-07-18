@@ -70,6 +70,7 @@ describe("buildNotificationEmailHtml", () => {
     expect(html).toContain(`${ORIGIN}/dashboard/errors`);
     expect(html).toContain("View errors");
     expect(html).toContain("Manage notification preferences");
+    expect(html).toContain('src="cid:tt-brand-logo"');
   });
 
   it("escapes HTML in title and body", () => {

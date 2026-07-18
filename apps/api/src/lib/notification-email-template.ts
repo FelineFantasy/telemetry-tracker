@@ -1,5 +1,6 @@
 import type { AlertRuleType } from "@prisma/client";
 import type { DashboardNotificationItem } from "./dashboard-notifications.js";
+import { emailBrandLogoImgTag } from "./email-brand-logo.js";
 
 /** Dashboard-aligned palette (light theme approximations for email clients). */
 const COLORS = {
@@ -180,7 +181,6 @@ export function buildNotificationEmailHtml(options: {
   }
   const origin = dashboardOrigin?.replace(/\/$/, "") ?? null;
   const link = absoluteHref(item.href, origin);
-  const logoUrl = origin ? `${origin}/telemetry-logo.jpg` : null;
   const prefsUrl = origin ? `${origin}/dashboard/settings/notifications` : null;
   const projectLine = projectName?.trim()
     ? `<p style="margin:0 0 16px;font-size:13px;color:${COLORS.muted};">Project · <strong style="color:${COLORS.foreground};font-weight:600;">${escapeHtml(projectName.trim())}</strong></p>`
@@ -216,16 +216,16 @@ export function buildNotificationEmailHtml(options: {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;">
-                    <span style="display:inline-flex;align-items:center;gap:10px;">
-                      ${
-                        logoUrl
-                          ? `<img src="${escapeHtml(logoUrl)}" alt="" width="28" height="28" style="display:block;border-radius:8px;" />`
-                          : ""
-                      }
-                      <span style="font-size:15px;font-weight:600;letter-spacing:-0.02em;color:${COLORS.foreground};">
-                        Telemetry<span style="color:${COLORS.muted};"> / </span>Tracker
-                      </span>
-                    </span>
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="vertical-align:middle;padding-right:10px;">
+                          ${emailBrandLogoImgTag(28)}
+                        </td>
+                        <td style="vertical-align:middle;font-size:15px;font-weight:600;letter-spacing:-0.02em;color:${COLORS.foreground};">
+                          Telemetry<span style="color:${COLORS.muted};"> / </span>Tracker
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                   <td align="right" style="vertical-align:middle;">
                     <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${meta.badgeBg};color:${meta.badgeFg};font-size:12px;font-weight:600;letter-spacing:0.02em;">${escapeHtml(meta.badge)}</span>
