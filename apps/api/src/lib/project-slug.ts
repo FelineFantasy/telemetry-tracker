@@ -14,11 +14,11 @@ function trimDashes(value: string): string {
 }
 
 export function slugifyProjectName(name: string): string {
-  const s = trimDashes(
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .slice(0, MAX_SLUG_LEN)
+  // Trim separators before length clamp so a leading "-" does not consume a
+  // character of the 64-char budget (matches pre-CodeQL slash-trim behavior).
+  const s = trimDashes(name.toLowerCase().replace(/[^a-z0-9]+/g, "-")).slice(
+    0,
+    MAX_SLUG_LEN
   );
   return s || "project";
 }
