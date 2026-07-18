@@ -137,7 +137,8 @@ export function buildReleaseHitHref(
 
 export function buildUserHitHref(
   hit: GlobalSearchUserHit,
-  scope: DashboardListScope
+  scope: DashboardListScope,
+  parsedFilters: Record<string, string> = {}
 ): string {
   const params = new URLSearchParams();
   if (scope.app) params.set("app", scope.app);
@@ -148,7 +149,13 @@ export function buildUserHitHref(
   if (scope.from) params.set("from", scope.from);
   if (scope.to) params.set("to", scope.to);
   if (scope.metricsUntil) params.set("metricsUntil", scope.metricsUntil);
-  params.set("q", hit.identity);
+  if (parsedFilters.country) params.set("country", parsedFilters.country);
+  // Sessions list has no browser=/device= params; fold into `q` like View all.
+  const sessionQ = [hit.identity, parsedFilters.browser, parsedFilters.device]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  params.set("q", sessionQ || hit.identity);
   return `/dashboard/sessions?${params.toString()}`;
 }
 
@@ -269,7 +276,11 @@ export function flattenSearchResults(
     items.push({ kind: "release", hit, href: buildReleaseHitHref(hit, linkScope) });
   }
   for (const hit of result.groups.users.items) {
-    items.push({ kind: "user", hit, href: buildUserHitHref(hit, linkScope) });
+    items.push({
+      kind: "user",
+      hit,
+      href: buildUserHitHref(hit, linkScope, result.parsed.filters),
+    });
   }
   return items;
 }

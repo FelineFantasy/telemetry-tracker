@@ -14,6 +14,7 @@ import {
   releaseKeyFromDbValue,
   UNKNOWN_RELEASE_KEY,
 } from "./release-key.js";
+import { sessionEnvReleaseMatchSql } from "./sessions-page-summary.js";
 import {
   deviceFilterPatterns,
   hasGlobalSearchWork,
@@ -34,6 +35,21 @@ export type GlobalSearchScope = {
   error?: string;
   user?: string;
   range: { gte?: Date; lte?: Date };
+  /**
+   * Session/user `started_at` bounds — always set for Sessions-list parity
+   * (`resolveSessionListStartedAtBounds` + `metricsUntil` anchor).
+   */
+  sessionStartedAt?: { gte: Date; lte: Date };
+  /**
+   * Event `created_at` bounds — Sessions/Events list parity for open-ended ranges
+   * (`enrichEventListFilterForMetrics` / ~7d when range is all-time).
+   */
+  eventCreatedAt?: { gte?: Date; lte?: Date };
+  /**
+   * ErrorOccurrence time bounds when release/platform scope is active
+   * (`occurrenceCountRange` for open-ended Issues list).
+   */
+  errorOccurrenceRange?: { gte?: Date; lte?: Date };
 };
 
 export type GlobalSearchErrorHit = {
@@ -150,6 +166,40 @@ function deviceMatchSql(
 
 type SearchTableAlias = "eg" | "e" | "s";
 
+/**
+ * Session/user env+release filter — same effective-release / NULL-env rules as
+ * the Sessions list (`sessionEnvReleaseMatchSql`).
+ */
+export function globalSearchSessionEnvReleaseSql(
+  projectId: string,
+  scope: Pick<
+    GlobalSearchScope,
+    "release" | "environment" | "platform" | "sessionStartedAt"
+  >
+): Prisma.Sql | null {
+  return sessionEnvReleaseMatchSql(
+    projectId,
+    "s",
+    {
+      environment: scope.environment,
+      release: scope.release,
+      platform: scope.platform,
+    },
+    scope.sessionStartedAt
+      ? { gte: scope.sessionStartedAt.gte, lte: scope.sessionStartedAt.lte }
+      : undefined
+  );
+}
+
+/** @deprecated Prefer {@link globalSearchSessionEnvReleaseSql}; kept for release-only tests. */
+export function globalSearchSessionReleaseSql(
+  projectId: string,
+  scope: Pick<GlobalSearchScope, "release" | "environment" | "platform">
+): Prisma.Sql | null {
+  if (!scope.release) return null;
+  return globalSearchSessionEnvReleaseSql(projectId, scope);
+}
+
 function baseScopeParts(
   projectId: string,
   scope: GlobalSearchScope,
@@ -200,20 +250,45 @@ function baseScopeParts(
 
   const parts: Prisma.Sql[] = [Prisma.sql`${projectCol} = ${projectId}`];
   if (scope.appId) parts.push(Prisma.sql`${appCol} = ${scope.appId}`);
-  if (scope.environment) {
-    parts.push(Prisma.sql`${envCol} = ${scope.environment}`);
+
+  if (tableAlias === "s") {
+    // Sessions list parity: effective release + NULL-env event fallback.
+    const envRelease = globalSearchSessionEnvReleaseSql(projectId, {
+      environment: scope.environment,
+      release: opts.includeRelease === false ? undefined : scope.release,
+      platform: scope.platform,
+      sessionStartedAt: scope.sessionStartedAt,
+    });
+    if (envRelease) parts.push(envRelease);
+  } else {
+    if (scope.environment) {
+      parts.push(Prisma.sql`${envCol} = ${scope.environment}`);
+    }
+    if (scope.release && opts.includeRelease !== false) {
+      parts.push(releaseFilterMatchSql(releaseCol, scope.release));
+    }
   }
+
   if (scope.platform) {
     parts.push(Prisma.sql`${platformCol} = ${scope.platform}`);
   }
-  if (scope.release && opts.includeRelease !== false) {
-    parts.push(releaseFilterMatchSql(releaseCol, scope.release));
-  }
-  if (scope.range.gte) {
-    parts.push(Prisma.sql`${timeCol} >= ${scope.range.gte}`);
-  }
-  if (scope.range.lte) {
-    parts.push(Prisma.sql`${timeCol} <= ${scope.range.lte}`);
+  if (opts.timeColumn === "started_at" && scope.sessionStartedAt) {
+    parts.push(Prisma.sql`${timeCol} >= ${scope.sessionStartedAt.gte}`);
+    parts.push(Prisma.sql`${timeCol} <= ${scope.sessionStartedAt.lte}`);
+  } else if (opts.timeColumn === "created_at" && scope.eventCreatedAt) {
+    if (scope.eventCreatedAt.gte) {
+      parts.push(Prisma.sql`${timeCol} >= ${scope.eventCreatedAt.gte}`);
+    }
+    if (scope.eventCreatedAt.lte) {
+      parts.push(Prisma.sql`${timeCol} <= ${scope.eventCreatedAt.lte}`);
+    }
+  } else {
+    if (scope.range.gte) {
+      parts.push(Prisma.sql`${timeCol} >= ${scope.range.gte}`);
+    }
+    if (scope.range.lte) {
+      parts.push(Prisma.sql`${timeCol} <= ${scope.range.lte}`);
+    }
   }
   return parts;
 }
@@ -253,9 +328,8 @@ async function searchErrors(
   ]);
   if (textSql) parts.push(textSql);
 
-  const hasOccurrenceScope = Boolean(
-    scope.release || scope.platform || scope.range.gte || scope.range.lte
-  );
+  // Issues list: release/platform → occurrence EXISTS; time-only → ErrorGroup.last_seen.
+  const hasOccurrenceScope = Boolean(scope.release || scope.platform);
   if (hasOccurrenceScope) {
     const scopeParts: Prisma.Sql[] = [];
     if (scope.release) {
@@ -264,11 +338,12 @@ async function searchErrors(
     if (scope.platform) {
       scopeParts.push(Prisma.sql`rel."platform" = ${scope.platform}`);
     }
-    if (scope.range.gte) {
-      scopeParts.push(Prisma.sql`rel."created_at" >= ${scope.range.gte}`);
+    const bounds = scope.errorOccurrenceRange ?? scope.range;
+    if (bounds.gte) {
+      scopeParts.push(Prisma.sql`rel."created_at" >= ${bounds.gte}`);
     }
-    if (scope.range.lte) {
-      scopeParts.push(Prisma.sql`rel."created_at" <= ${scope.range.lte}`);
+    if (bounds.lte) {
+      scopeParts.push(Prisma.sql`rel."created_at" <= ${bounds.lte}`);
     }
     parts.push(Prisma.sql`EXISTS (
       SELECT 1 FROM "ErrorOccurrence" rel
@@ -276,16 +351,24 @@ async function searchErrors(
         AND ${Prisma.join(scopeParts, " AND ")}
     )`);
   } else {
-    // No occurrence scope — still allow last_seen bounds only when present (none here).
+    if (scope.range.gte) {
+      parts.push(Prisma.sql`eg."last_seen" >= ${scope.range.gte}`);
+    }
+    if (scope.range.lte) {
+      parts.push(Prisma.sql`eg."last_seen" <= ${scope.range.lte}`);
+    }
   }
 
   // Require some match signal beyond broad list dumps of the whole project.
+  // Time-only queries (`range:` / from/to) are a valid signal — lists are capped.
   if (
     textTerms.length === 0 &&
     !scope.environment &&
     !scope.platform &&
     !scope.release &&
-    !scope.appId
+    !scope.appId &&
+    !scope.range.gte &&
+    !scope.range.lte
   ) {
     return emptyGroup();
   }
@@ -360,7 +443,9 @@ async function searchEvents(
     !scope.environment &&
     !scope.platform &&
     !scope.release &&
-    !scope.appId
+    !scope.appId &&
+    !scope.range.gte &&
+    !scope.range.lte
   ) {
     return emptyGroup();
   }
@@ -548,8 +633,13 @@ async function searchReleases(
       )`;
     });
     whereParts.push(Prisma.join(termClauses, " AND "));
-  } else if (!scope.release) {
-    // No free text and no release filter — avoid dumping all releases.
+  } else if (
+    !scope.release &&
+    !scope.environment &&
+    !scope.platform &&
+    !scope.appId
+  ) {
+    // No free text and no scoping filter — avoid dumping all releases.
     return emptyGroup();
   }
 

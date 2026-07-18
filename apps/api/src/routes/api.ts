@@ -1331,6 +1331,7 @@ export async function apiRoutes(
       platform?: string;
       environment?: string;
       release?: string;
+      metricsUntil?: string;
     };
     const q = queryString(query.q) ?? "";
     const parsed = parseGlobalSearchQuery(q);
@@ -1350,15 +1351,43 @@ export async function apiRoutes(
             to: queryString(query.to),
           };
     const range = parseCreatedRange(dateQuery, "all");
-
-    const scope = mergeGlobalSearchScope({
-      parsed,
-      appId,
-      environment: queryString(query.environment),
-      platform: queryString(query.platform),
-      release: queryString(query.release),
+    // Sessions/users: same open-ended anchoring as Sessions list (metricsUntil → ~7d).
+    const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
+    const sessionStartedAt = resolveSessionListStartedAtBounds(range, metricsAnchor);
+    // Events: same open-ended ~7d window as Events list (`enrichEventListFilterForMetrics`).
+    const eventsMetrics = enrichEventListFilterForMetrics(
+      { range },
       range,
-    });
+      metricsAnchor
+    );
+    const eventCreatedAt = {
+      gte: range.gte ?? eventsMetrics.eventCountRange?.gte,
+      lte: range.lte ?? eventsMetrics.eventCountRange?.lte,
+    };
+    // Issues: occurrence window when release/platform scoped (open-ended → metrics window).
+    const errorsMetrics = enrichErrorListFilterForMetrics(
+      { range, status: "all" },
+      range,
+      metricsAnchor
+    );
+    const errorOccurrenceRange = {
+      gte: range.gte ?? errorsMetrics.occurrenceCountRange?.gte,
+      lte: range.lte ?? errorsMetrics.occurrenceCountRange?.lte,
+    };
+
+    const scope = {
+      ...mergeGlobalSearchScope({
+        parsed,
+        appId,
+        environment: queryString(query.environment),
+        platform: queryString(query.platform),
+        release: queryString(query.release),
+        range,
+      }),
+      sessionStartedAt,
+      eventCreatedAt,
+      errorOccurrenceRange,
+    };
 
     const result = await executeGlobalSearch(prisma, projectId, parsed, scope);
     return reply.send(result);

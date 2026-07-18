@@ -96,6 +96,21 @@ describe("global search link helpers", () => {
     expect(href).toContain("q=user_123");
   });
 
+  it("forwards session filters on user hit deep links", () => {
+    const href = buildUserHitHref(
+      {
+        identity: "user_123",
+        identityKind: "user",
+        title: "user_123",
+        subtitle: null,
+      },
+      scope,
+      { browser: "safari", country: "SI", device: "mobile" }
+    );
+    expect(href).toContain("country=SI");
+    expect(href).toContain("q=user_123+safari+mobile");
+  });
+
   it("builds view-all list hrefs from free text + filters", () => {
     const filters = { environment: "production", error: "TypeError" };
     expect(buildViewAllErrorsHref("checkout error:TypeError", scope, filters)).toContain(

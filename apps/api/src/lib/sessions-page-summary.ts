@@ -339,7 +339,7 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
  * set, Session.environment must match (no NULL-env fallback) — same as Releases.
  * Environment-only event fallback remains scoped to `eventWindow`.
  */
-function sessionEnvReleaseMatchSql(
+export function sessionEnvReleaseMatchSql(
   projectId: string,
   sessionAlias: string,
   f: Pick<SessionListFilterInput, "environment" | "release" | "platform">,

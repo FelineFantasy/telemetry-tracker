@@ -92,7 +92,7 @@ export function GlobalSearchClient({
 
   useEffect(() => {
     setActiveIndex(0);
-  }, [result?.q]);
+  }, [result?.q, result?.emptyQuery, flat.length]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -122,24 +122,24 @@ export function GlobalSearchClient({
   const onKeyDown = useCallback(
     (e: ReactKeyboardEvent) => {
       if (e.key === "ArrowDown") {
+        if (isPending || flat.length === 0) return;
         e.preventDefault();
-        if (flat.length === 0) return;
         setActiveIndex((i) => (i + 1) % flat.length);
       } else if (e.key === "ArrowUp") {
+        if (isPending || flat.length === 0) return;
         e.preventDefault();
-        if (flat.length === 0) return;
         setActiveIndex((i) => (i - 1 + flat.length) % flat.length);
-      } else if (
-        e.key === "Enter" &&
-        flat.length > 0 &&
-        e.target instanceof HTMLElement &&
-        e.target.tagName !== "INPUT"
-      ) {
-        e.preventDefault();
-        openActive();
+      } else if (e.key === "Enter" && flat.length > 0 && !isPending) {
+        // With results for the current query, Enter opens the highlighted hit
+        // (including when focus is in the search input). Edited queries still submit.
+        const searchedQ = (result?.q ?? initialQuery).trim();
+        if (query.trim() === searchedQ) {
+          e.preventDefault();
+          openActive();
+        }
       }
     },
-    [flat.length, openActive]
+    [flat.length, initialQuery, isPending, openActive, query, result?.q]
   );
 
   const hitCount = result ? totalSearchHitCount(result) : 0;
@@ -255,11 +255,23 @@ export function GlobalSearchClient({
 
       {loadError ? (
         <EmptyState title="Search failed" message={loadError} />
-      ) : !result || result.emptyQuery ? (
+      ) : !result ? (
         <EmptyState
           title="Search this project"
           message="Enter a query to search across issues, events, sessions, releases, and users. Tip: combine free text with filters like environment:production."
         />
+      ) : result.emptyQuery ? (
+        initialQuery.trim() ? (
+          <EmptyState
+            title="Nothing searchable"
+            message={`“${initialQuery.trim()}” has no free text or supported filters. Use plain terms or keys like environment:, release:, browser:, country:, device:, platform:, error:, user:, from:, to:, or range:.`}
+          />
+        ) : (
+          <EmptyState
+            title="Search this project"
+            message="Enter a query to search across issues, events, sessions, releases, and users. Tip: combine free text with filters like environment:production."
+          />
+        )
       ) : hitCount === 0 ? (
         <EmptyState
           title="No matches"
@@ -292,7 +304,7 @@ export function GlobalSearchClient({
                         className="text-[12px] text-muted-foreground hover:text-foreground"
                         onClick={(e) => {
                           e.preventDefault();
-                          push(group.viewAllHref!);
+                          if (!isPending) push(group.viewAllHref!);
                         }}
                       >
                         View all
@@ -315,8 +327,13 @@ export function GlobalSearchClient({
                               ? "bg-surface text-foreground"
                               : "text-muted-foreground hover:bg-surface/60 hover:text-foreground"
                           )}
-                          onMouseEnter={() => setActiveIndex(index)}
-                          onClick={() => push(item.href)}
+                          onMouseEnter={() => {
+                            if (!isPending) setActiveIndex(index);
+                          }}
+                          onClick={() => {
+                            if (!isPending) push(item.href);
+                          }}
+                          disabled={isPending}
                         >
                           <Icon
                             className="mt-0.5 size-4 shrink-0 text-muted-foreground"

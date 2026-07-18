@@ -13,7 +13,11 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Global Search** — project-scoped search across issues, events, sessions, releases, and users (`/dashboard/search`, `GET /api/search`) with free text and `key:value` filters ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+
 ### Fixed
+
+- **Global Search session scope** — align session/user/event/issue hits with list parity: effective-release + NULL-env fallback, `metricsUntil` time windows, Issues time-only via `last_seen`, and keyboard ↑↓/Enter + ignored-only empty state ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
 
 ### Changed
 
