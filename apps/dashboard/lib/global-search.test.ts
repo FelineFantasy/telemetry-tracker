@@ -102,15 +102,58 @@ describe("global search link helpers", () => {
       "q=checkout+TypeError"
     );
     expect(buildViewAllEventsHref("checkout_started", scope, {})).toContain(
-      "name=checkout_started"
+      "propertiesContains=checkout_started"
     );
     expect(
       buildViewAllSessionsHref("abc user:u1 browser:safari", scope, {
         user: "u1",
         browser: "safari",
         country: "SI",
+        device: "mobile",
       })
     ).toMatch(/country=SI/);
+    expect(
+      buildViewAllSessionsHref("abc", scope, {
+        device: "mobile",
+      })
+    ).toContain("q=abc+mobile");
+  });
+
+  it("merges parsed filters into hit deep links", () => {
+    const result: GlobalSearchResult = {
+      q: "checkout environment:staging",
+      parsed: {
+        freeText: "checkout",
+        freeTextTerms: ["checkout"],
+        filters: { environment: "staging" },
+        ignoredKeys: [],
+      },
+      limitPerGroup: 8,
+      emptyQuery: false,
+      groups: {
+        errors: {
+          items: [
+            {
+              id: "e1",
+              title: "err",
+              subtitle: null,
+              app: "web",
+              environment: null,
+              release: null,
+              platform: null,
+              lastSeenAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          truncated: false,
+        },
+        events: { items: [], truncated: false },
+        sessions: { items: [], truncated: false },
+        releases: { items: [], truncated: false },
+        users: { items: [], truncated: false },
+      },
+    };
+    const flat = flattenSearchResults(result, scope);
+    expect(flat[0]?.href).toContain("environment=staging");
   });
 
   it("flattens grouped results for keyboard navigation", () => {

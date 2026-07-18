@@ -237,9 +237,12 @@ async function searchErrors(
     return emptyGroup();
   }
 
-  const parts = baseScopeParts(projectId, scope, "eg", {
-    timeColumn: "last_seen",
-  });
+  // Align with Issues list: release/platform/time scope via ErrorOccurrence EXISTS.
+  const parts: Prisma.Sql[] = [Prisma.sql`eg."project_id" = ${projectId}`];
+  if (scope.appId) parts.push(Prisma.sql`eg."app" = ${scope.appId}`);
+  if (scope.environment) {
+    parts.push(Prisma.sql`eg."environment" = ${scope.environment}`);
+  }
 
   const textTerms = [...parsed.freeTextTerms];
   if (scope.error) textTerms.push(scope.error);
@@ -249,6 +252,32 @@ async function searchErrors(
     Prisma.sql`eg."fingerprint"`,
   ]);
   if (textSql) parts.push(textSql);
+
+  const hasOccurrenceScope = Boolean(
+    scope.release || scope.platform || scope.range.gte || scope.range.lte
+  );
+  if (hasOccurrenceScope) {
+    const scopeParts: Prisma.Sql[] = [];
+    if (scope.release) {
+      scopeParts.push(releaseFilterMatchSql(Prisma.sql`rel."release"`, scope.release));
+    }
+    if (scope.platform) {
+      scopeParts.push(Prisma.sql`rel."platform" = ${scope.platform}`);
+    }
+    if (scope.range.gte) {
+      scopeParts.push(Prisma.sql`rel."created_at" >= ${scope.range.gte}`);
+    }
+    if (scope.range.lte) {
+      scopeParts.push(Prisma.sql`rel."created_at" <= ${scope.range.lte}`);
+    }
+    parts.push(Prisma.sql`EXISTS (
+      SELECT 1 FROM "ErrorOccurrence" rel
+      WHERE rel."error_group_id" = eg."id"
+        AND ${Prisma.join(scopeParts, " AND ")}
+    )`);
+  } else {
+    // No occurrence scope — still allow last_seen bounds only when present (none here).
+  }
 
   // Require some match signal beyond broad list dumps of the whole project.
   if (

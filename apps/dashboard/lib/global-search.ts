@@ -193,11 +193,13 @@ export function buildViewAllEventsHref(
   if (listScope.from) params.set("from", listScope.from);
   if (listScope.to) params.set("to", listScope.to);
   if (listScope.metricsUntil) params.set("metricsUntil", listScope.metricsUntil);
+  // Events list `name` is exact; global search uses ILIKE on name + properties.
+  // Forward free text as propertiesContains so View all keeps partial matches.
   const free = q
     .split(/\s+/)
     .filter((t) => t && !t.includes(":"))
     .join(" ");
-  if (free) params.set("name", free);
+  if (free) params.set("propertiesContains", free);
   const qs = params.toString();
   return qs ? `/dashboard/events?${qs}` : "/dashboard/events";
 }
@@ -222,7 +224,13 @@ export function buildViewAllSessionsHref(
     .split(/\s+/)
     .filter((t) => t && !t.includes(":"))
     .join(" ");
-  const sessionQ = [free, parsedFilters.user, parsedFilters.browser]
+  // Sessions list has no dedicated device= param; fold device into `q` (ILIKE device fields).
+  const sessionQ = [
+    free,
+    parsedFilters.user,
+    parsedFilters.browser,
+    parsedFilters.device,
+  ]
     .filter(Boolean)
     .join(" ")
     .trim();
@@ -245,21 +253,23 @@ export function flattenSearchResults(
   result: GlobalSearchResult,
   scope: DashboardListScope
 ): GlobalSearchResultItem[] {
+  // Merge structured filters from `q` into deep-link scope (query filters win).
+  const linkScope = buildSearchViewAllScope(scope, result.parsed.filters);
   const items: GlobalSearchResultItem[] = [];
   for (const hit of result.groups.errors.items) {
-    items.push({ kind: "error", hit, href: buildErrorHitHref(hit, scope) });
+    items.push({ kind: "error", hit, href: buildErrorHitHref(hit, linkScope) });
   }
   for (const hit of result.groups.events.items) {
-    items.push({ kind: "event", hit, href: buildEventHitHref(hit, scope) });
+    items.push({ kind: "event", hit, href: buildEventHitHref(hit, linkScope) });
   }
   for (const hit of result.groups.sessions.items) {
-    items.push({ kind: "session", hit, href: buildSessionHitHref(hit, scope) });
+    items.push({ kind: "session", hit, href: buildSessionHitHref(hit, linkScope) });
   }
   for (const hit of result.groups.releases.items) {
-    items.push({ kind: "release", hit, href: buildReleaseHitHref(hit, scope) });
+    items.push({ kind: "release", hit, href: buildReleaseHitHref(hit, linkScope) });
   }
   for (const hit of result.groups.users.items) {
-    items.push({ kind: "user", hit, href: buildUserHitHref(hit, scope) });
+    items.push({ kind: "user", hit, href: buildUserHitHref(hit, linkScope) });
   }
   return items;
 }
