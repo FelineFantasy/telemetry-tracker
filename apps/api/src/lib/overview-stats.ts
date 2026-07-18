@@ -2,7 +2,7 @@
  * Overview aggregates beyond the core error/event counts.
  */
 import { Prisma } from "@prisma/client";
-import { isUnknownReleaseKey, releaseFilterMatchSql } from "./release-key.js";
+import { isUnknownReleaseKey, releaseFilterMatchSql, releasePrismaWhere } from "./release-key.js";
 import type { PrismaClient } from "@prisma/client";
 import {
   overviewChartQuerySince,
@@ -74,7 +74,7 @@ function sessionScopeWhere(scope: Scope): Prisma.SessionWhereInput {
   if (scope.app) (where as { app?: string }).app = scope.app;
   if (scope.platform) (where as { platform?: string }).platform = scope.platform;
   if (scope.environment) (where as { environment?: string }).environment = scope.environment;
-  if (scope.release) (where as { release?: string }).release = scope.release;
+  if (scope.release) Object.assign(where, releasePrismaWhere(scope.release));
   return where;
 }
 
@@ -92,7 +92,7 @@ function errorGroupScopeWhere(scope: Scope): Prisma.ErrorGroupWhereInput {
           ? { gte: scope.since, lte: scope.until }
           : { gte: scope.since },
         ...(scope.platform ? { platform: scope.platform } : {}),
-        ...(scope.release ? { release: scope.release } : {}),
+        ...releasePrismaWhere(scope.release),
       },
     };
   } else {

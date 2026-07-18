@@ -36,10 +36,11 @@ function row(partial: Partial<ReleaseHealthRow> & Pick<ReleaseHealthRow, "releas
 }
 
 describe("release-key", () => {
-  it("maps null/blank to Unknown sentinel", () => {
+  it("maps null/blank/sentinel to Unknown sentinel", () => {
     expect(releaseKeyFromDbValue(null)).toBe(UNKNOWN_RELEASE_KEY);
     expect(releaseKeyFromDbValue("")).toBe(UNKNOWN_RELEASE_KEY);
     expect(releaseKeyFromDbValue("  ")).toBe(UNKNOWN_RELEASE_KEY);
+    expect(releaseKeyFromDbValue(UNKNOWN_RELEASE_KEY)).toBe(UNKNOWN_RELEASE_KEY);
     expect(releaseKeyFromDbValue("1.2.3")).toBe("1.2.3");
   });
 

@@ -213,8 +213,8 @@ function sessionEffectiveReleaseKeySql(
     Prisma.sql`e."project_id" = ${projectId}`,
     Prisma.sql`e."session_id" = ${s}."session_id"`,
     Prisma.sql`e."app" = ${s}."app"`,
-    Prisma.sql`e."release" IS NOT NULL`,
-    Prisma.sql`TRIM(e."release") <> ''`,
+    // Prefer a known (non-Unknown) event release when Session.release is blank.
+    Prisma.sql`${normalizeReleaseKeySql(Prisma.sql`e."release"`)} IS NOT NULL`,
   ];
   if (f.environment) {
     eventParts.push(Prisma.sql`e."environment" = ${f.environment}`);
@@ -225,7 +225,7 @@ function sessionEffectiveReleaseKeySql(
   return Prisma.sql`COALESCE(
     ${normalizeReleaseKeySql(Prisma.sql`${s}."release"`)},
     (
-      SELECT TRIM(e."release")
+      SELECT ${normalizeReleaseKeySql(Prisma.sql`e."release"`)}
       FROM "Event" e
       WHERE ${Prisma.join(eventParts, " AND ")}
       ORDER BY e."created_at" DESC
