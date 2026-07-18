@@ -21,6 +21,18 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.6] - 2026-07-18
+
+### Fixed
+
+- **Settings Field label association** — `Field` and `SettingsToggle` wire `htmlFor` / `id` so settings labels activate their controls (alerts, notifications, preferences, labs) ([#460](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/460))
+
+### Changed
+
+- **Product update email on line close** — send when finishing the last intended release of a minor (`vX.Y.*`), summarizing the whole line since the previous product email; do not auto-send on the first `.0` of the next milestone. Workflow `line_close` + `--line-close` compose full-minor CHANGELOG; mid-line patches stay skip ([#553](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/553); [docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md), [docs/RELEASE.md](docs/RELEASE.md))
+
+---
+
 ## [1.15.5] - 2026-07-18
 
 ### Changed
