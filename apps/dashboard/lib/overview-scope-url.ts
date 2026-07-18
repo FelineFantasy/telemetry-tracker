@@ -54,6 +54,11 @@ export type DashboardListScope = {
   to?: string | null;
   /** When set, list/KPI pages apply the Issues ~7d metrics window for unbounded ranges. */
   metricsUntil?: string | null;
+  /**
+   * With metricsUntil, issue detail uses this exact Overview metrics window
+   * instead of the Issues-list ~7d path. Not forwarded on list deep links.
+   */
+  metricsSince?: string | null;
 };
 
 function appendDashboardListScope(params: URLSearchParams, scope: DashboardListScope): void {
@@ -64,6 +69,7 @@ function appendDashboardListScope(params: URLSearchParams, scope: DashboardListS
   if (scope.range) params.set("range", scope.range);
   if (scope.from) params.set("from", scope.from);
   if (scope.to) params.set("to", scope.to);
+  if (scope.metricsSince) params.set("metricsSince", scope.metricsSince);
   if (scope.metricsUntil) params.set("metricsUntil", scope.metricsUntil);
 }
 

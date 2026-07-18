@@ -451,6 +451,19 @@ export default async function OverviewPage({
     kpiSparklines: overviewResult.kpiSparklines ?? emptySparklines(),
   };
 
+  // Open-ended Overview → issue detail: pass the exact metrics window so detail
+  // matches KPIs (metricsUntil alone would select the Issues ~7d path).
+  const issueDetailScope =
+    isUnselectedTimeRange(parsedRange.key) &&
+    overviewData.metricsSince &&
+    (overviewData.metricsUntil || pageMetricsUntil)
+      ? {
+          ...listScope,
+          metricsSince: overviewData.metricsSince,
+          metricsUntil: overviewData.metricsUntil || pageMetricsUntil,
+        }
+      : listScope;
+
   const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
   const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
@@ -562,7 +575,7 @@ export default async function OverviewPage({
         <OverviewTopErrorsPanel
           groups={(overviewData.metricsTopErrorGroups ?? []).map((group) => ({
             ...group,
-            href: buildErrorGroupDetailHref(group.id, listScope),
+            href: buildErrorGroupDetailHref(group.id, issueDetailScope),
           }))}
           rangeLabel={displayRangeLabel}
           errorsHref={buildDashboardScopedListHref("/dashboard/errors", listScope)}
@@ -642,7 +655,7 @@ export default async function OverviewPage({
               }) => (
                 <OverviewListItem
                   key={g.id}
-                  href={buildErrorGroupDetailHref(g.id, listScope)}
+                  href={buildErrorGroupDetailHref(g.id, issueDetailScope)}
                   title={g.message}
                   titleClassName="font-medium text-destructive"
                   badges={<Badge>{g.app}</Badge>}

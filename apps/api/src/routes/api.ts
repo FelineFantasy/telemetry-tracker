@@ -368,6 +368,15 @@ export async function apiRoutes(
             to: queryString(query.to),
           }
         : { range: timeRange.key }),
+      // Open-ended Overview KPIs use metricsWindow; forward the exact window so
+      // issue detail does not take the Issues ~7d metricsUntil-only path or
+      // re-anchor to a fresh "now".
+      ...(isUnselectedTimeRange(timeRange.key)
+        ? {
+            metricsSince: metricsWindow.gte.toISOString(),
+            metricsUntil: metricsWindow.lte.toISOString(),
+          }
+        : {}),
     };
 
     const [
@@ -883,6 +892,7 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       metricsUntil?: string;
+      metricsSince?: string;
     };
     const appFilter = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -890,14 +900,31 @@ export async function apiRoutes(
     const release = queryString(query.release);
     const rangeKey = queryString(query.range);
     const metricsUntilRaw = queryString(query.metricsUntil);
+    const metricsSinceRaw = queryString(query.metricsSince);
     const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
-    // Issues list passes metricsUntil (~7d). Overview range=none/all uses the same
-    // resolveUnselectedMetricsWindow as Overview KPIs / scoped error list.
-    const useIssuesMetricsWindow = Boolean(metricsUntilRaw);
+    // Issues list passes metricsUntil only (~7d). Overview open-ended drills pass
+    // metricsSince+metricsUntil for the exact resolveUnselectedMetricsWindow.
+    // Legacy Overview range=none/all without metricsUntil still uses that helper.
+    const parseIsoDate = (raw: string | undefined): Date | undefined => {
+      if (!raw) return undefined;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    };
+    const explicitMetricsSince = parseIsoDate(metricsSinceRaw);
+    const explicitMetricsUntil = parseIsoDate(metricsUntilRaw);
+    const explicitOverviewWindow =
+      explicitMetricsSince &&
+      explicitMetricsUntil &&
+      explicitMetricsSince.getTime() < explicitMetricsUntil.getTime()
+        ? { gte: explicitMetricsSince, lte: explicitMetricsUntil }
+        : undefined;
+    const useIssuesMetricsWindow =
+      Boolean(metricsUntilRaw) && !explicitOverviewWindow;
     const isOverviewUnselected =
       !hasFromTo &&
       (rangeKey === "none" || rangeKey === "all") &&
-      !useIssuesMetricsWindow;
+      !useIssuesMetricsWindow &&
+      !explicitOverviewWindow;
     const hasBoundedPreset =
       hasFromTo || Boolean(rangeKey && rangeKey !== "all" && rangeKey !== "none");
     const listRange = parseCreatedRange(query, "all");
@@ -905,7 +932,10 @@ export async function apiRoutes(
 
     let windowGte: Date | undefined;
     let windowLte: Date | undefined;
-    if (isOverviewUnselected) {
+    if (explicitOverviewWindow) {
+      windowGte = explicitOverviewWindow.gte;
+      windowLte = explicitOverviewWindow.lte;
+    } else if (isOverviewUnselected) {
       const metricsWindow = await resolveUnselectedMetricsWindow(prisma, {
         projectId,
         until: metricsAnchor,

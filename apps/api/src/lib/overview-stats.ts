@@ -865,6 +865,13 @@ export type ErrorDetailLinkScope = Pick<
   range?: string;
   from?: string;
   to?: string;
+  /** Open-ended KPI/list window end — keeps issue detail aligned with Overview. */
+  metricsUntil?: string;
+  /**
+   * When set with metricsUntil, issue detail uses this exact window (Overview KPIs)
+   * instead of the Issues-list ~7d metricsUntil-only path.
+   */
+  metricsSince?: string;
 };
 
 export function errorGroupDetailHref(
@@ -879,6 +886,8 @@ export function errorGroupDetailHref(
   if (scope.range) params.set("range", scope.range);
   if (scope.from) params.set("from", scope.from);
   if (scope.to) params.set("to", scope.to);
+  if (scope.metricsSince) params.set("metricsSince", scope.metricsSince);
+  if (scope.metricsUntil) params.set("metricsUntil", scope.metricsUntil);
   const q = params.toString();
   return q ? `/dashboard/errors/${id}?${q}` : `/dashboard/errors/${id}`;
 }

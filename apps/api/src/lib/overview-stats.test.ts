@@ -365,6 +365,31 @@ describe("errorGroupDetailHref", () => {
     ).toBe("/dashboard/errors/eg_1?app=web&platform=ios&range=none");
   });
 
+  it("includes metricsUntil for open-ended KPI window deep links", () => {
+    expect(
+      errorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
+
+  it("includes metricsSince with metricsUntil for Overview exact-window deep links", () => {
+    expect(
+      errorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsSince: "2026-03-08T12:00:00.000Z",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsSince=2026-03-08T12%3A00%3A00.000Z&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
+
   it("omits query string when no scope filters are set", () => {
     expect(errorGroupDetailHref("eg_1", {})).toBe("/dashboard/errors/eg_1");
   });

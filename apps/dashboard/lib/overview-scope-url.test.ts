@@ -57,6 +57,31 @@ describe("buildErrorGroupDetailHref", () => {
       })
     ).toBe("/dashboard/errors/eg_1?app=web&platform=ios&range=7d");
   });
+
+  it("includes metricsUntil for open-ended detail deep links", () => {
+    expect(
+      buildErrorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
+
+  it("includes metricsSince with metricsUntil for Overview exact-window deep links", () => {
+    expect(
+      buildErrorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsSince: "2026-03-08T12:00:00.000Z",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsSince=2026-03-08T12%3A00%3A00.000Z&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
 });
 
 describe("buildDashboardScopedListHref", () => {
