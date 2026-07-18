@@ -23,6 +23,22 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.5] - 2026-07-18
+
+### Changed
+
+- **Dependency security bumps** — Dependabot group update: `fastify` 5.8.5, `next` 15.5.18, `postcss` 8.5.10, `vitest` 3.2.6, plus transitive `fast-uri` / `picomatch` ([#551](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/551))
+
+---
+
+## [1.15.4] - 2026-07-18
+
+### Changed
+
+- **Vite dependency alignment** — pin `vite@7.3.5` via root `pnpm.overrides` (Dependabot bump from 7.3.2) so the monorepo resolves a single patched Vite ([#545](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/545))
+
+---
+
 ## [1.15.3] - 2026-07-18
 
 ### Fixed
