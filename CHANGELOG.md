@@ -21,6 +21,21 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.0] - 2026-07-18
+
+### Added
+
+- **Releases Health** — enable `/dashboard/releases` (nav + Quick Action) with per-release sessions, active users, events, errors, adoption share, and error rate; environment/platform/date-range filters; sort by recency/adoption/errors/error rate; vs-previous-release deltas (Unknown excluded from the comparison chain); deep links to Issues/Events/Sessions ([#453](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/453); [#568](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/568); milestone v1.16.x — Release Intelligence)
+- **`GET /api/releases/summary`** — aggregates release health KPIs including an explicit **Unknown** bucket in the adoption denominator
+- **`release=__unknown__` filter** — URL allow-list, list/overview filters with TRIM matching, and Unknown option in release pickers so deep links never rely on an empty `release=` param
+
+### Fixed
+
+- **Release filter attribution** — align Unknown and known-release filters across Prisma/SQL lists, Overview KPIs/active users, issue-detail occurrences, and event-release fallback (platform-scoped; all-time for known releases; exclude event-fallback sessions from Unknown)
+- **metricsUntil deep links** — honor and preserve `metricsUntil` across Overview, Release Health links, list toolbars, and nav tab switches so open-ended KPI windows stay consistent
+
+---
+
 ## [1.15.9] - 2026-07-18
 
 ### Fixed
