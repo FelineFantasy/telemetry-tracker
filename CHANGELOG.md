@@ -21,6 +21,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.3] - 2026-07-19
+
+### Fixed
+
+- **CodeQL high alerts** — prefer Web Crypto for client UUID generation (non-`Math.random` fallback), replace polynomial email/slug regexes with linear checks, and correct smoke-test email assertion anchors ([#578](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/578))
+- **Project slug trim order** — trim leading/trailing separators before the length clamp so a leading dash does not steal a character from the 64-char budget ([#578](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/578))
+
+---
+
 ## [1.16.2] - 2026-07-19
 
 ### Fixed
