@@ -229,12 +229,36 @@ describe("validateAlertRuleDraft", () => {
 });
 
 describe("draftFromAlertRule", () => {
-  it("seeds a default condition when the rule has none", () => {
+  it("preserves empty conditions (does not synthesize defaults)", () => {
     const draft = draftFromAlertRule({
       ...baseRule,
       conditions: [],
     });
+    expect(draft.conditions).toEqual([]);
+    expect(draft.name).toBe(baseRule.name);
+    expect(draft.destinationIds).toEqual(baseRule.destinationIds);
+    expect(draft.cooldownMinutes).toBe(baseRule.cooldownMinutes);
+  });
+
+  it("maps stored ERROR_COUNT conditions into draft rows", () => {
+    const draft = draftFromAlertRule({
+      ...baseRule,
+      conditions: [
+        {
+          type: "ERROR_COUNT",
+          threshold: 10,
+          windowMinutes: 5,
+          environment: "production",
+        },
+      ],
+    });
     expect(draft.conditions).toHaveLength(1);
-    expect(draft.conditions[0]?.type).toBe("ERROR_COUNT");
+    expect(draft.conditions[0]).toMatchObject({
+      type: "ERROR_COUNT",
+      threshold: 10,
+      windowMinutes: 5,
+      environment: "production",
+    });
+    expect(draft.conditions[0]?.key).toMatch(/^cond-/);
   });
 });

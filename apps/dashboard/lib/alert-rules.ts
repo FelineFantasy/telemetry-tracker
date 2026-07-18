@@ -101,16 +101,16 @@ export function createDefaultAlertRuleDraft(): AlertRuleFormDraft {
 }
 
 export function draftFromAlertRule(rule: AlertRuleRow): AlertRuleFormDraft {
-  const conditions =
-    rule.conditions.length > 0
-      ? rule.conditions.map((c) =>
-          createEmptyErrorCountCondition({
-            threshold: c.threshold,
-            windowMinutes: c.windowMinutes,
-            environment: c.environment ?? "",
-          })
-        )
-      : [createEmptyErrorCountCondition()];
+  // Preserve empty conditions as-is. API `toPublic` maps unparsable stored JSON
+  // to []; do not synthesize a default ERROR_COUNT — that would let an edit that
+  // only changes name/cooldown/destinations persist thresholds and re-arm the rule.
+  const conditions = rule.conditions.map((c) =>
+    createEmptyErrorCountCondition({
+      threshold: c.threshold,
+      windowMinutes: c.windowMinutes,
+      environment: c.environment ?? "",
+    })
+  );
   return {
     name: rule.name,
     conditions,

@@ -348,10 +348,16 @@ export function AlertsClient({
         return;
       }
       setWebhooks((prev) => prev.filter((w) => w.id !== id));
-      setRuleDraft((prev) => ({
-        ...prev,
-        destinationIds: prev.destinationIds.filter((wid) => wid !== id),
-      }));
+      // Create mode: drop the deleted id from the draft so create cannot bind it.
+      // Edit mode: leave destinationIds alone — silent pruning would PATCH-drop
+      // bindings on Save even when the user only changed name/thresholds/cooldown.
+      // Orphans remain visible in AlertRuleEditor for an explicit uncheck.
+      if (!editingRuleId) {
+        setRuleDraft((prev) => ({
+          ...prev,
+          destinationIds: prev.destinationIds.filter((wid) => wid !== id),
+        }));
+      }
       setLastSigningSecret((prev) => (prev?.webhookId === id ? null : prev));
       toast.success("Webhook removed");
       router.refresh();

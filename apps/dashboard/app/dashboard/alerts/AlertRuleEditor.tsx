@@ -115,6 +115,13 @@ export function AlertRuleEditor({
         hint={`Every condition must match. Up to ${MAX_ALERT_RULE_CONDITIONS} conditions. Only error count is evaluated today — more kinds ship later.`}
       >
         <div className="flex flex-col gap-3">
+          {draft.conditions.length === 0 ? (
+            <p className="text-[12px] text-destructive" role="status">
+              {mode === "edit"
+                ? "Stored conditions are invalid or unsupported. Add at least one condition before saving — defaults are not applied automatically."
+                : "Add at least one condition."}
+            </p>
+          ) : null}
           {draft.conditions.map((condition, index) => (
             <div key={condition.key}>
               {index > 0 ? (
