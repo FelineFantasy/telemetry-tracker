@@ -8,7 +8,12 @@ import {
 import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
 import { type SessionsTableRow } from "@/app/components/dashboard/SessionsTable";
 import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import {
+  appendListTimeRangeToParams,
+  isUnselectedTimeRange,
+  parseListTimeRangeOrDefault,
+  resolveMetricsUntilIso,
+} from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -143,9 +148,11 @@ export default async function SessionsPage({
   if (order) apiQuery.set("order", order);
   if (chartBucket) apiQuery.set("chartBucket", chartBucket);
 
-  const pageAnchor = new Date();
   if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+    apiQuery.set(
+      "metricsUntil",
+      resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    );
   }
 
   const summaryQuery = new URLSearchParams(apiQuery);

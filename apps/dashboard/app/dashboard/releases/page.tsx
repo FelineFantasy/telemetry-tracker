@@ -12,6 +12,7 @@ import {
   appendListTimeRangeToParams,
   isUnselectedTimeRange,
   parseListTimeRangeOrDefault,
+  resolveMetricsUntilIso,
 } from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 import type { DashboardListScope } from "@/lib/overview-scope-url";
@@ -92,9 +93,11 @@ export default async function ReleasesPage({
   apiQuery.set("sort", sort);
   apiQuery.set("order", order);
 
-  const pageAnchor = new Date();
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
 
   let summary: Awaited<ReturnType<typeof fetchReleasesSummary>> = null;
@@ -135,9 +138,7 @@ export default async function ReleasesPage({
     range: firstQueryValue(sp.range) ?? null,
     from: from || null,
     to: to || null,
-    ...(isUnselectedTimeRange(timeRange.key)
-      ? { metricsUntil: pageAnchor.toISOString() }
-      : {}),
+    ...(pageAnchorIso ? { metricsUntil: pageAnchorIso } : {}),
   };
 
   return (

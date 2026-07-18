@@ -78,6 +78,18 @@ describe("buildDashboardScopedListHref", () => {
       })
     ).toBe("/dashboard/errors?release=__unknown__&range=7d");
   });
+
+  it("preserves metricsUntil for open-ended deep links", () => {
+    expect(
+      buildDashboardScopedListHref("/dashboard/sessions", {
+        release: "1.2.0",
+        range: "none",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/sessions?release=1.2.0&range=none&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
 });
 
 describe("buildEventListHref", () => {

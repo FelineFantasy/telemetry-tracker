@@ -10,7 +10,7 @@ import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { fetchPerformanceSummary } from "@/lib/performance-summary";
 import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, resolveMetricsUntilIso } from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 
 const PERFORMANCE_PATH = "/dashboard/performance";
@@ -99,9 +99,11 @@ export default async function PerformancePage({
   if (release) apiQuery.set("release", release);
   if (chartBucket) apiQuery.set("chartBucket", chartBucket);
 
-  const pageAnchor = new Date();
   if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+    apiQuery.set(
+      "metricsUntil",
+      resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    );
   }
 
   let summary: Awaited<ReturnType<typeof fetchPerformanceSummary>> = null;

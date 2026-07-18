@@ -231,6 +231,22 @@ export function isUnselectedTimeRange(key: string): boolean {
   return key === "none" || key === "all";
 }
 
+/**
+ * Resolve metricsUntil for open-ended list/KPI windows.
+ * Honors a valid ISO (or Date-parseable) URL param from deep links; otherwise uses `now`.
+ */
+export function resolveMetricsUntilIso(
+  raw: string | undefined | null,
+  now: Date = new Date()
+): string {
+  const trimmed = raw?.trim();
+  if (trimmed) {
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return now.toISOString();
+}
+
 export function buildUnselectedTimeRange(now: Date = new Date()): ParsedTimeRange {
   return {
     key: "none",

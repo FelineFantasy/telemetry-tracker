@@ -175,7 +175,8 @@ export function ErrorsClientListSection({
                 from: urlParams.from || null,
                 to: urlParams.to || null,
                 // Align detail with Issues list metrics window for unbounded ranges.
-                metricsUntil: new Date().toISOString(),
+                metricsUntil:
+                  listParams.metricsUntil || new Date().toISOString(),
               })
             }
           />

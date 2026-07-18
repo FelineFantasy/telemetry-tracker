@@ -4,6 +4,7 @@ import {
   buildUnselectedTimeRange,
   hasExplicitTimeRangeQuery,
   listTimeRangeHiddenFields,
+  resolveMetricsUntilIso,
 } from "./time-range";
 import { redirectHrefIfMissingTimeRange, mergeDashboardUrlParams } from "./list-filters-url";
 
@@ -48,5 +49,19 @@ describe("listTimeRangeHiddenFields", () => {
   it("preserves no-date filter for GET filter forms", () => {
     const range = buildUnselectedTimeRange();
     expect(listTimeRangeHiddenFields(range)).toEqual({ range: "none" });
+  });
+});
+
+describe("resolveMetricsUntilIso", () => {
+  it("honors a valid ISO metricsUntil from the URL", () => {
+    const iso = "2026-03-15T12:00:00.000Z";
+    expect(resolveMetricsUntilIso(iso)).toBe(iso);
+  });
+
+  it("falls back to now when missing or invalid", () => {
+    const now = new Date("2026-07-18T10:00:00.000Z");
+    expect(resolveMetricsUntilIso(undefined, now)).toBe(now.toISOString());
+    expect(resolveMetricsUntilIso("", now)).toBe(now.toISOString());
+    expect(resolveMetricsUntilIso("not-a-date", now)).toBe(now.toISOString());
   });
 });

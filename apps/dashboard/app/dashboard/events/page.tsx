@@ -5,7 +5,12 @@ import { EventsSummaryMetrics, type EventsPageSummary } from "@/app/components/d
 import { DeferredEventsAnalytics } from "@/app/components/dashboard/DeferredEventsAnalytics";
 import { type EventsTableRow } from "@/app/components/dashboard/EventsTable";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import {
+  appendListTimeRangeToParams,
+  isUnselectedTimeRange,
+  parseListTimeRangeOrDefault,
+  resolveMetricsUntilIso,
+} from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -92,7 +97,6 @@ export default async function EventsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const pageAnchor = new Date();
   const currentParams = buildEventsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(EVENTS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
@@ -135,7 +139,10 @@ export default async function EventsPage({
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
   if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+    apiQuery.set(
+      "metricsUntil",
+      resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    );
   }
 
   const summaryQuery = new URLSearchParams(apiQuery);

@@ -4,7 +4,7 @@ import { ErrorsClientListSection } from "@/app/components/dashboard/ErrorsClient
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
 import { DeferredErrorsAnalytics } from "@/app/components/dashboard/DeferredErrorsAnalytics";
 import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
+import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault, resolveMetricsUntilIso } from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -154,7 +154,6 @@ export default async function ErrorsListPage({
   }>;
 }) {
   const sp = await searchParams;
-  const pageAnchor = new Date();
   const currentParams = buildErrorsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(ERRORS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
@@ -207,7 +206,10 @@ export default async function ErrorsListPage({
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
   if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+    apiQuery.set(
+      "metricsUntil",
+      resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    );
   }
 
   const summaryQuery = new URLSearchParams(apiQuery);
