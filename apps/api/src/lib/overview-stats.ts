@@ -2,6 +2,7 @@
  * Overview aggregates beyond the core error/event counts.
  */
 import { Prisma } from "@prisma/client";
+import { sessionUserIdentityExpr } from "./brief-snapshot-sql.js";
 import {
   releaseFilterMatchSql,
   releasePrismaWhere,
@@ -184,19 +185,17 @@ export function overviewEnvironmentSessionCountUpperClauses(
 }
 
 /**
- * Assembles the env/release session COUNT SQL used by {@link countSessions}.
- * @internal Exported for unit tests (regression: missing AND on upper bounds).
+ * Env/release match for Overview session-scoped KPIs (sessions + active users).
+ * Release uses the same effective-release rule as Release Health.
  */
-export function overviewEnvironmentSessionCountSql(
+function overviewEnvReleaseSessionMatchSql(
   scope: Scope,
   exclusiveUntil?: Date
 ): Prisma.Sql {
-  const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
-  const platformClause = scope.platform
-    ? Prisma.sql`AND s."platform" = ${scope.platform}`
-    : Prisma.empty;
-  const { session: sessionUpperClause, event: eventUpperClause } =
-    overviewEnvironmentSessionCountUpperClauses(scope, exclusiveUntil);
+  const { event: eventUpperClause } = overviewEnvironmentSessionCountUpperClauses(
+    scope,
+    exclusiveUntil
+  );
   const eventTime = Prisma.sql`e."created_at" >= ${scope.since} ${eventUpperClause}`;
   const eventExists = (extra: Prisma.Sql) => Prisma.sql`EXISTS (
       SELECT 1 FROM "Event" e
@@ -211,7 +210,6 @@ export function overviewEnvironmentSessionCountSql(
     platform: scope.platform,
   };
 
-  let envReleaseMatch: Prisma.Sql;
   if (scope.environment && scope.release) {
     const effectiveRelease = sessionEffectiveReleaseFilterSql(
       scope.projectId,
@@ -220,29 +218,80 @@ export function overviewEnvironmentSessionCountSql(
       releaseScope
     );
     // Match Release Health: Session.environment must equal the filter (no NULL-env fallback).
-    envReleaseMatch = Prisma.sql`(
+    return Prisma.sql`(
         s."environment" = ${scope.environment}
         AND ${effectiveRelease}
       )`;
-  } else if (scope.environment) {
-    envReleaseMatch = Prisma.sql`(
+  }
+  if (scope.environment) {
+    return Prisma.sql`(
         s."environment" = ${scope.environment}
         OR (
           s."environment" IS NULL
           AND ${eventExists(Prisma.sql`e."environment" = ${scope.environment}`)}
         )
       )`;
-  } else {
-    envReleaseMatch = sessionEffectiveReleaseFilterSql(
-      scope.projectId,
-      "s",
-      scope.release!,
-      { platform: scope.platform }
-    );
   }
+  return sessionEffectiveReleaseFilterSql(
+    scope.projectId,
+    "s",
+    scope.release!,
+    { platform: scope.platform }
+  );
+}
+
+/**
+ * Assembles the env/release session COUNT SQL used by {@link countSessions}.
+ * @internal Exported for unit tests (regression: missing AND on upper bounds).
+ */
+export function overviewEnvironmentSessionCountSql(
+  scope: Scope,
+  exclusiveUntil?: Date
+): Prisma.Sql {
+  const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+  const platformClause = scope.platform
+    ? Prisma.sql`AND s."platform" = ${scope.platform}`
+    : Prisma.empty;
+  const { session: sessionUpperClause } = overviewEnvironmentSessionCountUpperClauses(
+    scope,
+    exclusiveUntil
+  );
+  const envReleaseMatch = overviewEnvReleaseSessionMatchSql(scope, exclusiveUntil);
 
   return Prisma.sql`
       SELECT COUNT(*)::bigint AS c
+      FROM "Session" s
+      WHERE s."project_id" = ${scope.projectId}
+        AND s."started_at" >= ${scope.since}
+        ${sessionUpperClause}
+        ${appClause}
+        ${platformClause}
+        AND ${envReleaseMatch}
+    `;
+}
+
+/**
+ * Distinct session identities for a release-scoped Overview window.
+ * Matches Release Health active-user attribution (effective session release).
+ * @internal Exported for unit tests.
+ */
+export function overviewReleaseActiveUsersCountSql(
+  scope: Scope,
+  exclusiveUntil?: Date
+): Prisma.Sql {
+  const appClause = scope.app ? Prisma.sql`AND s."app" = ${scope.app}` : Prisma.empty;
+  const platformClause = scope.platform
+    ? Prisma.sql`AND s."platform" = ${scope.platform}`
+    : Prisma.empty;
+  const { session: sessionUpperClause } = overviewEnvironmentSessionCountUpperClauses(
+    scope,
+    exclusiveUntil
+  );
+  const envReleaseMatch = overviewEnvReleaseSessionMatchSql(scope, exclusiveUntil);
+  const identity = sessionUserIdentityExpr("s");
+
+  return Prisma.sql`
+      SELECT COUNT(DISTINCT ${identity})::bigint AS c
       FROM "Session" s
       WHERE s."project_id" = ${scope.projectId}
         AND s."started_at" >= ${scope.since}
@@ -279,8 +328,16 @@ export async function countSessions(
 export async function countActiveUsers(
   prisma: PrismaClient,
   scope: Scope,
-  until?: Date
+  exclusiveUntil?: Date
 ): Promise<number> {
+  // Align with session KPIs / Release Health when release= is set.
+  if (scope.release) {
+    const rows = await prisma.$queryRaw<[{ c: bigint }]>(
+      overviewReleaseActiveUsersCountSql(scope, exclusiveUntil)
+    );
+    return Number(rows[0]?.c ?? 0);
+  }
+
   const appClause = scope.app ? Prisma.sql`AND e."app" = ${scope.app}` : Prisma.empty;
   const envClause = scope.environment
     ? Prisma.sql`AND e."environment" = ${scope.environment}`
@@ -288,13 +345,12 @@ export async function countActiveUsers(
   const platformClause = scope.platform
     ? Prisma.sql`AND e."platform" = ${scope.platform}`
     : Prisma.empty;
-  const releaseClause = scope.release
-    ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release)}`
-    : Prisma.empty;
   const untilClause =
-    until === undefined
-      ? Prisma.empty
-      : Prisma.sql`AND e."created_at" < ${until}`;
+    exclusiveUntil !== undefined
+      ? Prisma.sql`AND e."created_at" < ${exclusiveUntil}`
+      : scope.until
+        ? Prisma.sql`AND e."created_at" <= ${scope.until}`
+        : Prisma.empty;
 
   const rows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
     SELECT COUNT(*)::bigint AS c FROM (
@@ -307,7 +363,6 @@ export async function countActiveUsers(
         ${appClause}
         ${envClause}
         ${platformClause}
-        ${releaseClause}
     ) t
   `);
   return Number(rows[0]?.c ?? 0);
@@ -609,7 +664,27 @@ export async function getOverviewActiveUsersPair(
     platform,
     release,
   } = params;
-  const filters = eventFilterSql(projectId, app, environment, platform, release);
+
+  // Release scope: distinct session identities with effective-release attribution
+  // (same rule as session KPIs / Release Health).
+  if (release) {
+    const scope: Scope = {
+      projectId,
+      since,
+      until,
+      app,
+      environment,
+      platform,
+      release,
+    };
+    const [current, previous] = await Promise.all([
+      countActiveUsers(prisma, scope),
+      countActiveUsers(prisma, { ...scope, since: previousSince }, previousUntil),
+    ]);
+    return { current, previous };
+  }
+
+  const filters = eventFilterSql(projectId, app, environment, platform);
 
   const rows = await prisma.$queryRaw<[{ active_users: bigint; active_users_previous: bigint }]>(
     Prisma.sql`

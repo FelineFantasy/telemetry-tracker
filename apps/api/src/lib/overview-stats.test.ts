@@ -6,6 +6,7 @@ import {
   errorGroupDetailHref,
   overviewEnvironmentSessionCountSql,
   overviewEnvironmentSessionCountUpperClauses,
+  overviewReleaseActiveUsersCountSql,
   resolveCompareWindow,
 } from "./overview-stats.js";
 import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
@@ -240,6 +241,97 @@ describe("overviewEnvironmentSessionCountSql", () => {
     expect(text).toContain('e."platform" =');
     expect(text).toContain("COALESCE");
     expect(text).toContain("IS NULL");
+  });
+});
+
+describe("overviewReleaseActiveUsersCountSql", () => {
+  const since = new Date("2026-07-16T02:00:00.000Z");
+  const until = new Date("2026-07-17T02:00:00.000Z");
+
+  it("uses session effective release (not Event.release) for known filters", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('FROM "Session" s');
+    expect(text).toContain("COUNT(DISTINCT");
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    // Session identities — not Event.release-only event-row counting.
+    expect(text).not.toContain('COALESCE(e."user_id", e."anonymous_id")');
+    expect(text).toContain('"s"."user_id"');
+    expect(text).toContain('"s"."anonymous_id"');
+  });
+
+  it("uses effective release IS NULL for Unknown filters", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('FROM "Session" s');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("matches Release Health env + release: session environment + effective release", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."environment" =');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("scopes latest-event fallback by platform when platform + release are set", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      platform: "ios",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."platform" =');
+    expect(text).toContain('e."platform" =');
+    expect(text).toContain("COALESCE");
+  });
+
+  it("shares the same effective-release predicate shape as session counts", () => {
+    const scope = {
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      platform: "ios",
+      release: "1.2.0",
+    };
+    const sessionsText = normalizeSql(prismaSqlText(overviewEnvironmentSessionCountSql(scope)));
+    const usersText = normalizeSql(prismaSqlText(overviewReleaseActiveUsersCountSql(scope)));
+
+    // Both must apply the same COALESCE(session, latest known event) filter.
+    expect(usersText).toContain("COALESCE");
+    expect(sessionsText).toContain("COALESCE");
+    expect(usersText).toContain('s."environment" =');
+    expect(sessionsText).toContain('s."environment" =');
+    expect(usersText).toContain('e."platform" =');
+    expect(sessionsText).toContain('e."platform" =');
   });
 });
 
