@@ -9,8 +9,8 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { fetchPerformanceSummary } from "@/lib/performance-summary";
-import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import { redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
+import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, resolveMetricsUntilIso } from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 
 const PERFORMANCE_PATH = "/dashboard/performance";
@@ -44,6 +44,7 @@ function buildPerformanceParamsRecord(sp: Record<string, string | string[] | und
     "range",
     "from",
     "to",
+    "metricsUntil",
     "environment",
     "platform",
     "release",
@@ -72,7 +73,7 @@ export default async function PerformancePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const currentParams = buildPerformanceParamsRecord(sp);
+  let currentParams = buildPerformanceParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(PERFORMANCE_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
@@ -87,6 +88,23 @@ export default async function PerformancePage({
     "all"
   );
 
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    PERFORMANCE_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  if (pageAnchorIso) {
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
+  }
+
   const apiQuery = new URLSearchParams();
   if (appFilter) apiQuery.set("app", appFilter);
   appendListTimeRangeToParams(apiQuery, timeRange, from, to);
@@ -99,9 +117,8 @@ export default async function PerformancePage({
   if (release) apiQuery.set("release", release);
   if (chartBucket) apiQuery.set("chartBucket", chartBucket);
 
-  const pageAnchor = new Date();
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
 
   let summary: Awaited<ReturnType<typeof fetchPerformanceSummary>> = null;

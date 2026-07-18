@@ -4,8 +4,13 @@ import { EventsClientListSection } from "@/app/components/dashboard/EventsClient
 import { EventsSummaryMetrics, type EventsPageSummary } from "@/app/components/dashboard/EventsSummaryMetrics";
 import { DeferredEventsAnalytics } from "@/app/components/dashboard/DeferredEventsAnalytics";
 import { type EventsTableRow } from "@/app/components/dashboard/EventsTable";
-import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
+import {
+  appendListTimeRangeToParams,
+  isUnselectedTimeRange,
+  parseListTimeRangeOrDefault,
+  resolveMetricsUntilIso,
+} from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -70,6 +75,7 @@ function buildEventsParamsRecord(sp: Record<string, string | string[] | undefine
     "range",
     "from",
     "to",
+    "metricsUntil",
     "name",
     "environment",
     "platform",
@@ -92,8 +98,7 @@ export default async function EventsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const pageAnchor = new Date();
-  const currentParams = buildEventsParamsRecord(sp);
+  let currentParams = buildEventsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(EVENTS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
@@ -115,6 +120,23 @@ export default async function EventsPage({
     "all"
   );
 
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    EVENTS_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  if (pageAnchorIso) {
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
+  }
+
   const apiQuery = new URLSearchParams();
   if (appFilter) apiQuery.set("app", appFilter);
   apiQuery.set("page", String(page));
@@ -134,8 +156,8 @@ export default async function EventsPage({
   if (propertiesContains) apiQuery.set("propertiesContains", propertiesContains);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
 
   const summaryQuery = new URLSearchParams(apiQuery);

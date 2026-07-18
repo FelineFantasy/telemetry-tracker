@@ -12,6 +12,10 @@ import { generateOverviewChartBuckets, overviewChartQuerySince } from "./overvie
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 import { cohortSharePct } from "./user-cohort.js";
+import {
+  releaseFilterMatchSql,
+  sessionEffectiveReleaseFilterSql,
+} from "./release-key.js";
 
 export const BOUNCE_MAX_DURATION_SECONDS = 10;
 
@@ -319,55 +323,42 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
     eventClauses.push(Prisma.sql`e."environment" = ${f.environment}`);
   }
   if (f.release) {
-    eventClauses.push(Prisma.sql`e."release" = ${f.release}`);
+    eventClauses.push(releaseFilterMatchSql(Prisma.sql`e."release"`, f.release));
   }
   return eventClauses;
 }
 
 /**
  * Prefer Session.environment / Session.release; fall back to matching events for
- * legacy null columns. When both filters are set, a single event must satisfy both
- * (or session columns must both match) — never different events per field.
+ * legacy null environment columns.
+ *
+ * When `release=` is set (known or Unknown), attribution uses Release Health's
+ * `COALESCE(session.release, latest known event.release)` over all time (blank /
+ * whitespace / `__unknown__` session releases count as Unknown). Platform scopes
+ * the event subquery the same way Release Health does. When environment is also
+ * set, Session.environment must match (no NULL-env fallback) — same as Releases.
+ * Environment-only event fallback remains scoped to `eventWindow`.
  */
 function sessionEnvReleaseMatchSql(
   projectId: string,
   sessionAlias: string,
-  f: Pick<SessionListFilterInput, "environment" | "release">,
+  f: Pick<SessionListFilterInput, "environment" | "release" | "platform">,
   eventWindow?: SessionEventWindow
 ): Prisma.Sql | null {
   if (!f.environment && !f.release) return null;
   const s = Prisma.raw(`"${sessionAlias}"`);
 
   if (f.environment && f.release) {
-    const bothOnEvent = sessionEventExistsSql(
+    const effectiveRelease = sessionEffectiveReleaseFilterSql(
       projectId,
       sessionAlias,
-      [
-        Prisma.sql`e."environment" = ${f.environment}`,
-        Prisma.sql`e."release" = ${f.release}`,
-      ],
-      eventWindow
+      f.release,
+      { environment: f.environment, platform: f.platform }
     );
+    // Match Release Health: Session.environment must equal the filter (no NULL-env fallback).
     return Prisma.sql`(
-      (
-        ${s}."environment" = ${f.environment}
-        AND ${s}."release" = ${f.release}
-      )
-      OR (
-        ${s}."environment" IS NULL
-        AND ${s}."release" IS NULL
-        AND ${bothOnEvent}
-      )
-      OR (
-        ${s}."environment" = ${f.environment}
-        AND ${s}."release" IS NULL
-        AND ${bothOnEvent}
-      )
-      OR (
-        ${s}."environment" IS NULL
-        AND ${s}."release" = ${f.release}
-        AND ${bothOnEvent}
-      )
+      ${s}."environment" = ${f.environment}
+      AND ${effectiveRelease}
     )`;
   }
 
@@ -386,18 +377,15 @@ function sessionEnvReleaseMatchSql(
     )`;
   }
 
-  return Prisma.sql`(
-    ${s}."release" = ${f.release}
-    OR (
-      ${s}."release" IS NULL
-      AND ${sessionEventExistsSql(
-        projectId,
-        sessionAlias,
-        [Prisma.sql`e."release" = ${f.release}`],
-        eventWindow
-      )}
-    )
-  )`;
+  if (!f.release) return null;
+
+  // Same all-time effective-release rule as Release Health (known or Unknown).
+  return sessionEffectiveReleaseFilterSql(
+    projectId,
+    sessionAlias,
+    f.release,
+    { platform: f.platform }
+  );
 }
 
 function sessionEnvReleaseScopeSql(

@@ -1,9 +1,15 @@
 import {
   DEFAULT_DASHBOARD_TIME_RANGE,
   hasExplicitTimeRangeQuery,
+  isUnselectedTimeRange,
 } from "./time-range";
 
-/** API-only query keys never written to the dashboard URL. */
+/**
+ * API-only query keys stripped from list state before URL merge.
+ * `metricsUntil` is reattached for open-ended ranges from the URL first, else
+ * from list/API params (SSR seed / deep link) so Apply and client nav keep the
+ * KPI window. `view` is never written to the dashboard URL from list state.
+ */
 const API_ONLY_URL_KEYS = new Set(["metricsUntil", "view"]);
 
 /** Merge URL-backed params for history updates and shareable links. */
@@ -14,6 +20,11 @@ export function mergeDashboardUrlParams(
   const merged = { ...urlParams, ...listParams };
   for (const key of API_ONLY_URL_KEYS) {
     delete merged[key];
+  }
+  const rangeKey = merged.range ?? "";
+  const metricsUntil = urlParams.metricsUntil || listParams.metricsUntil;
+  if (metricsUntil && isUnselectedTimeRange(rangeKey)) {
+    merged.metricsUntil = metricsUntil;
   }
   return merged;
 }
@@ -62,6 +73,24 @@ export function redirectHrefIfMissingTimeRange(
     from: null,
     to: null,
   });
+}
+
+/**
+ * Canonicalize metricsUntil in the URL for open-ended windows (so nav tabs /
+ * Apply share the SSR KPI anchor). Strip it on bounded presets.
+ */
+export function redirectHrefForMetricsUntil(
+  path: string,
+  current: Record<string, string>,
+  rangeKey: string,
+  openEndedAnchor: string | null | undefined
+): string | null {
+  if (isUnselectedTimeRange(rangeKey)) {
+    if (!openEndedAnchor || current.metricsUntil) return null;
+    return mergeListQuery(path, current, { metricsUntil: openEndedAnchor });
+  }
+  if (!current.metricsUntil) return null;
+  return mergeListQuery(path, current, { metricsUntil: null });
 }
 
 /** @deprecated Use parseListTimeRangeOrDefault from @/lib/time-range */

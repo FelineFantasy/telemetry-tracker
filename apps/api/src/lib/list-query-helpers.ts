@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 
 export function buildEventWhereSql(params: {
   projectId: string;
@@ -17,7 +18,7 @@ export function buildEventWhereSql(params: {
   if (params.name) parts.push(Prisma.sql`name = ${params.name}`);
   if (params.environment) parts.push(Prisma.sql`environment = ${params.environment}`);
   if (params.platform) parts.push(Prisma.sql`platform = ${params.platform}`);
-  if (params.release) parts.push(Prisma.sql`release = ${params.release}`);
+  if (params.release) parts.push(releaseFilterMatchSql(Prisma.sql`release`, params.release));
   if (params.gte) parts.push(Prisma.sql`created_at >= ${params.gte}`);
   if (params.lte) parts.push(Prisma.sql`created_at <= ${params.lte}`);
   if (params.propertiesContains?.trim()) {

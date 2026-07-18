@@ -231,6 +231,22 @@ export function isUnselectedTimeRange(key: string): boolean {
   return key === "none" || key === "all";
 }
 
+/**
+ * Resolve metricsUntil for open-ended list/KPI windows.
+ * Honors a valid ISO (or Date-parseable) URL param from deep links; otherwise uses `now`.
+ */
+export function resolveMetricsUntilIso(
+  raw: string | undefined | null,
+  now: Date = new Date()
+): string {
+  const trimmed = raw?.trim();
+  if (trimmed) {
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return now.toISOString();
+}
+
 export function buildUnselectedTimeRange(now: Date = new Date()): ParsedTimeRange {
   return {
     key: "none",
@@ -425,13 +441,28 @@ export function timeRangeHiddenFields(
   return { [keys.range]: range.key };
 }
 
-/** Hidden GET fields to preserve the active list time filter in filter forms. */
+/**
+ * Hidden GET fields to preserve the active list time filter in filter forms.
+ * For open-ended ranges, also forwards `metricsUntil` when present so Apply
+ * does not re-anchor KPI windows to "now".
+ */
 export function listTimeRangeHiddenFields(
   range: ParsedTimeRange,
   fromParam?: string,
-  toParam?: string
+  toParam?: string,
+  metricsUntil?: string | null
 ): Record<string, string> {
-  return timeRangeHiddenFields(range, DEFAULT_TIME_RANGE_QUERY_KEYS, fromParam, toParam);
+  const fields = timeRangeHiddenFields(
+    range,
+    DEFAULT_TIME_RANGE_QUERY_KEYS,
+    fromParam,
+    toParam
+  );
+  const anchor = metricsUntil?.trim();
+  if (isUnselectedTimeRange(range.key) && anchor) {
+    fields.metricsUntil = anchor;
+  }
+  return fields;
 }
 
 export function trendTimeRangeHiddenFields(

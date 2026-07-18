@@ -5,7 +5,9 @@ import {
   generateOverviewChartBuckets,
   overviewChartQuerySince,
   overviewSessionBucketEnvironmentExistsSql,
+  overviewSessionEnvReleaseScopeSql,
 } from "./overview-timeseries.js";
+import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   return fragment.strings.reduce(
@@ -64,5 +66,91 @@ describe("overviewSessionBucketEnvironmentExistsSql", () => {
     expect(text).toContain('e."app" = "s"."app"');
     expect(text).toContain('e."created_at" >=');
     expect(text).toContain('e."created_at" <=');
+  });
+});
+
+describe("overviewSessionEnvReleaseScopeSql", () => {
+  const since = new Date("2026-03-01T00:00:00.000Z");
+  const until = new Date("2026-03-15T00:00:00.000Z");
+
+  it("excludes sessions with known event releases when filtering Unknown", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql("proj_1", since, until, undefined, UNKNOWN_RELEASE_KEY)
+    );
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).not.toMatch(/e\."created_at" >=/);
+    expect(text).not.toMatch(/e\."created_at" <=/);
+  });
+
+  it("uses latest-event effective release for known release filters", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql("proj_1", since, until, undefined, "1.2.0")
+    );
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    expect(text).not.toContain('s."release" IS NULL');
+    expect(text).not.toMatch(/e\."created_at" >=/);
+    expect(text).not.toMatch(/e\."created_at" <=/);
+  });
+
+  it("uses latest-event effective release for known release + environment", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql("proj_1", since, until, "production", "1.2.0")
+    );
+    expect(text).toContain('e."environment"');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("scopes known-event exclusion by environment for Unknown + environment", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql(
+        "proj_1",
+        since,
+        until,
+        "production",
+        UNKNOWN_RELEASE_KEY
+      )
+    );
+    expect(text).toContain('s."environment"');
+    expect(text).toContain('e."environment"');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+  });
+
+  it("scopes latest-event fallback by platform when platform + release are set", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql(
+        "proj_1",
+        since,
+        until,
+        undefined,
+        "1.2.0",
+        "ios"
+      )
+    );
+    expect(text).toContain('e."platform"');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).not.toContain('s."release" IS NULL');
+  });
+
+  it("scopes known-event exclusion by platform for Unknown + platform", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql(
+        "proj_1",
+        since,
+        until,
+        undefined,
+        UNKNOWN_RELEASE_KEY,
+        "android"
+      )
+    );
+    expect(text).toContain('e."platform"');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
   });
 });

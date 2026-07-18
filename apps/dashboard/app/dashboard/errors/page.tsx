@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { ErrorsClientListSection } from "@/app/components/dashboard/ErrorsClientListSection";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
 import { DeferredErrorsAnalytics } from "@/app/components/dashboard/DeferredErrorsAnalytics";
-import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
+import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
+import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault, resolveMetricsUntilIso } from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -92,6 +92,7 @@ function buildErrorsParamsRecord(sp: {
   range?: string | string[];
   from?: string | string[];
   to?: string | string[];
+  metricsUntil?: string | string[];
   environment?: string | string[];
   platform?: string | string[];
   release?: string | string[];
@@ -111,6 +112,7 @@ function buildErrorsParamsRecord(sp: {
     "range",
     "from",
     "to",
+    "metricsUntil",
     "environment",
     "platform",
     "release",
@@ -151,11 +153,11 @@ export default async function ErrorsListPage({
     trendWindow?: string | string[];
     trendFrom?: string | string[];
     trendTo?: string | string[];
+    metricsUntil?: string | string[];
   }>;
 }) {
   const sp = await searchParams;
-  const pageAnchor = new Date();
-  const currentParams = buildErrorsParamsRecord(sp);
+  let currentParams = buildErrorsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(ERRORS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
@@ -178,6 +180,23 @@ export default async function ErrorsListPage({
     },
     "all"
   );
+
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    ERRORS_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  if (pageAnchorIso) {
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
+  }
 
   const apiQuery = new URLSearchParams();
   if (appFilter) apiQuery.set("app", appFilter);
@@ -206,8 +225,8 @@ export default async function ErrorsListPage({
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
 
   const summaryQuery = new URLSearchParams(apiQuery);

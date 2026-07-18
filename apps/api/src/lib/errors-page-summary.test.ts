@@ -265,7 +265,7 @@ describe("fetchErrorsPageSummary", () => {
 
     const sql = queryRaw.mock.calls[0]?.[0] as Prisma.Sql;
     const text = prismaSqlText(sql);
-    expect(text).toContain('eo."release" = ?');
+    expect(text).toContain('TRIM(eo."release") = ?');
     expect(text).toContain('eo."platform" = ?');
   });
 });
