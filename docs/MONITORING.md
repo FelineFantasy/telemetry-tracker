@@ -15,6 +15,7 @@ GitHub issue [#93](https://github.com/Telemetry-Tracker/telemetry-tracker/issues
 | **Ingest quota pressure** | Railway API logs / metrics — `429` responses | Sustained 429 rate above baseline |
 | **API 5xx** | Sentry + Railway deploy logs | Any 5xx spike after deploy |
 | **Retention cron** | Railway `retention-cron` service — last run exited 0 | Failed run, stuck deployment, or missing `"ok":true` in logs |
+| **Alert rules evaluator** | Railway `alert-rules-evaluator` cron — last run exited 0 | Failed/stuck run, or missing `"ok":true` (scheduled CUSTOM rules will not fire) |
 | **Alert webhook worker** | Railway `alert-webhook-worker` — continuous idle/processing JSON | Crash loop, missing `"ok":true`, or growing `PENDING` deliveries |
 | **Database backups** | Railway Postgres → Backups tab | Backup job failed or backups disabled |
 
@@ -123,8 +124,9 @@ In the Railway project:
 1. **Deploy notifications** — enable for API and dashboard services (failed build/deploy).
 2. **Postgres** — confirm daily backups; review backup failure emails from Railway.
 3. **Retention cron** — after each scheduled run, confirm deployment status **Completed** (exited) and log line `"ok":true`. See [RAILWAY.md](./RAILWAY.md#retention-cron).
-4. **Alert webhook worker** — confirm the service stays **Online** and logs `"status":"idle"` (or processing). See [RAILWAY.md](./RAILWAY.md#alert-webhook-worker).
-4. **Metrics** — watch CPU/memory and HTTP error rates in the service Metrics tab; tune plan if ingest volume grows.
+4. **Alert rules evaluator** — after each cron tick, confirm **Completed** and `"ok":true` (manual Railway service; leave `brief-worker` alone). See [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron).
+5. **Alert webhook worker** — confirm the service stays **Online** and logs `"status":"idle"` (or processing). See [RAILWAY.md](./RAILWAY.md#alert-webhook-worker).
+6. **Metrics** — watch CPU/memory and HTTP error rates in the service Metrics tab; tune plan if ingest volume grows.
 
 ---
 

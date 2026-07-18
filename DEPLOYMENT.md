@@ -139,9 +139,10 @@ For a full register → ingest → billing flow, use `scripts/smoke-production.s
 
 | Doc | Contents |
 |-----|----------|
-| [docs/RAILWAY.md](docs/RAILWAY.md) | Railway services, env, cron, troubleshooting |
+| [docs/RAILWAY.md](docs/RAILWAY.md) | Railway services, env, cron (retention + alert-rules-evaluator), alert-webhook-worker, troubleshooting |
 | [docs/BILLING.md](docs/BILLING.md) | Stripe + Resend (optional) |
 | [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) | Go-live checklist |
 | [docs/RELEASE.md](docs/RELEASE.md) | Tags, GitHub Releases, deploy runbook |
+| [docs/ALERT-RULES.md](docs/ALERT-RULES.md) | Alert Rules conditions, SYSTEM built-ins, evaluator cron |
 | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) | Plans, ingest auth, rate limits |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview for contributors |

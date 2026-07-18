@@ -255,9 +255,12 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 |-------|-----|
 | Architecture overview | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Product roadmap milestones | [docs/ROADMAP.md](docs/ROADMAP.md) |
+| Alert rules | [docs/ALERT-RULES.md](docs/ALERT-RULES.md) |
+| Alert webhooks / delivery | [docs/ALERT-WEBHOOKS.md](docs/ALERT-WEBHOOKS.md) |
 | Deploy (overview) | [DEPLOYMENT.md](DEPLOYMENT.md) |
 | Railway setup & troubleshooting | [docs/RAILWAY.md](docs/RAILWAY.md) |
 | Stripe & Resend (optional) | [docs/BILLING.md](docs/BILLING.md) |
+| Product update emails | [docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md) |
 | Production checklist | [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) |
 | Releases & deploy runbook | [docs/RELEASE.md](docs/RELEASE.md) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |

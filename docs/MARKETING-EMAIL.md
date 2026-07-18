@@ -43,7 +43,7 @@ Product update emails celebrate a **finished** minor line — not the first tag 
 
 Examples:
 
-- Closing out **`v1.15.x`** at `v1.15.4` with `previous_version=1.14.4` → **send** about **1.15** (all `1.15.0`…`1.15.4` notes).
+- Closing out **`v1.15.x`** at `v1.15.5` with `previous_version=1.14.4` → **send** about **1.15** (all `1.15.0`…`1.15.5` notes).
 - Tagging **`v1.16.0`** to open the next milestone → **skip** (tag push does not email).
 - Mid-line **`v1.15.3`** Dependabot → **skip**.
 
@@ -90,9 +90,9 @@ Store these in the GitHub **`production`** environment. Finalize `CHANGELOG.md` 
 cd apps/api
 # Preferred — close out a minor line:
 pnpm exec tsx scripts/send-release-email.ts --dry-run \
-  --version=1.15.4 --previous-version=1.14.4 --line-close
+  --version=1.15.5 --previous-version=1.14.4 --line-close
 pnpm exec tsx scripts/send-release-email.ts \
-  --version=1.15.4 --previous-version=1.14.4 --line-close
+  --version=1.15.5 --previous-version=1.14.4 --line-close
 
 # Exceptional single-version PATCH (not full line):
 pnpm exec tsx scripts/send-release-email.ts --version=X.Y.Z --previous-version=X.Y.Z-1 --force
@@ -120,9 +120,9 @@ Requires Resend (`RESEND_API_KEY`, `TELEMETRY_EMAIL_FROM`) and `TELEMETRY_DASHBO
 cd apps/api
 pnpm exec tsx scripts/send-release-email.ts --help
 pnpm exec tsx scripts/send-release-email.ts --dry-run \
-  --version=1.15.4 --previous-version=1.14.4 --line-close
+  --version=1.15.5 --previous-version=1.14.4 --line-close
 pnpm exec tsx scripts/send-release-email.ts \
-  --version=1.15.4 --previous-version=1.14.4 --line-close
+  --version=1.15.5 --previous-version=1.14.4 --line-close
 ```
 
 - `--version=X.Y.Z` is the closing release tag (CHANGELOG anchor). Required for a live send; omit only with `--dry-run` to preview `[Unreleased]`.
