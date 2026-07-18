@@ -81,6 +81,7 @@ function buildEventsParamsRecord(sp: Record<string, string | string[] | undefine
     "platform",
     "release",
     "propertiesContains",
+    "q",
     "sort",
     "order",
   ] as const;
@@ -146,6 +147,7 @@ export default async function EventsPage({
   const platform = firstQueryValue(sp.platform);
   const release = firstQueryValue(sp.release);
   const propertiesContains = firstQueryValue(sp.propertiesContains);
+  const q = firstQueryValue(sp.q);
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
   appendListTimeRangeToParams(apiQuery, timeRange, from, to);
@@ -154,6 +156,7 @@ export default async function EventsPage({
   if (platform) apiQuery.set("platform", platform);
   if (release) apiQuery.set("release", release);
   if (propertiesContains) apiQuery.set("propertiesContains", propertiesContains);
+  if (q) apiQuery.set("q", q);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
   if (pageAnchorIso) {
@@ -246,6 +249,7 @@ export default async function EventsPage({
           platform={platform ?? ""}
           release={release ?? ""}
           propertiesContains={propertiesContains ?? ""}
+          q={q ?? ""}
           sort={effectiveSort}
           order={effectiveOrder}
           environments={filterOptions.environments}

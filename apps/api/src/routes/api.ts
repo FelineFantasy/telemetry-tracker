@@ -1086,6 +1086,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       metricsUntil?: string;
     };
     const appId = queryApp(query.app);
@@ -1094,6 +1095,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
 
@@ -1104,6 +1106,7 @@ export async function apiRoutes(
       platform,
       release,
       propertiesContains,
+      q,
       range,
     };
 
@@ -1125,6 +1128,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       metricsUntil?: string;
     };
     const appId = queryApp(query.app);
@@ -1133,6 +1137,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
 
@@ -1143,6 +1148,7 @@ export async function apiRoutes(
       platform,
       release,
       propertiesContains,
+      q,
       range,
     };
 
@@ -1167,6 +1173,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       sort?: string;
       order?: string;
       view?: string;
@@ -1181,6 +1188,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const view = queryString(query.view) ?? "grouped";
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
@@ -1202,6 +1210,7 @@ export async function apiRoutes(
         platform,
         release,
         propertiesContains,
+        q,
         range,
       };
       const metricsFilter = enrichEventListFilterForMetrics(filter, range, metricsAnchor);
@@ -1254,6 +1263,7 @@ export async function apiRoutes(
       gte: range.gte,
       lte: range.lte,
       propertiesContains: propertiesContains?.trim() || undefined,
+      q: q?.trim() || undefined,
     });
     const ob = EVENT_SORT_SQL[sortParsed.sort];
     const [countRow, rows] = await Promise.all([

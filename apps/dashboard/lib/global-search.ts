@@ -197,10 +197,9 @@ export function buildViewAllEventsHref(
   if (listScope.from) params.set("from", listScope.from);
   if (listScope.to) params.set("to", listScope.to);
   if (listScope.metricsUntil) params.set("metricsUntil", listScope.metricsUntil);
-  // Events list `name` is exact; global search uses ILIKE on name + properties.
-  // Forward free text as propertiesContains so View all keeps partial matches.
+  // Events list `q` matches Global Search: each term ILIKE on name OR properties (AND).
   const free = freeText.trim();
-  if (free) params.set("propertiesContains", free);
+  if (free) params.set("q", free);
   const qs = params.toString();
   return qs ? `/dashboard/events?${qs}` : "/dashboard/events";
 }

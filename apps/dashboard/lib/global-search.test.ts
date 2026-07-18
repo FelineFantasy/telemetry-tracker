@@ -117,7 +117,7 @@ describe("global search link helpers", () => {
       "q=checkout+TypeError"
     );
     expect(buildViewAllEventsHref("checkout_started", scope, {})).toContain(
-      "propertiesContains=checkout_started"
+      "q=checkout_started"
     );
     expect(
       buildViewAllSessionsHref("abc", scope, {
@@ -140,11 +140,17 @@ describe("global search link helpers", () => {
       "q=https%3A%2F%2Fexample.com%2Fcheckout+1foo%3Abar"
     );
     expect(buildViewAllEventsHref(free, scope, {})).toContain(
-      "propertiesContains=https%3A%2F%2Fexample.com%2Fcheckout+1foo%3Abar"
+      "q=https%3A%2F%2Fexample.com%2Fcheckout+1foo%3Abar"
     );
     expect(buildViewAllSessionsHref(free, scope, {})).toContain(
       "q=https%3A%2F%2Fexample.com%2Fcheckout+1foo%3Abar"
     );
+  });
+
+  it("forwards multi-word Events View all as q (not propertiesContains)", () => {
+    const href = buildViewAllEventsHref("checkout started", scope, {});
+    expect(href).toContain("q=checkout+started");
+    expect(href).not.toContain("propertiesContains=");
   });
 
   it("merges parsed filters into hit deep links", () => {

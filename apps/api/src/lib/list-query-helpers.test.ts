@@ -19,6 +19,20 @@ describe("buildEventWhereSql", () => {
     expect(parts.values).toContain("%100\\%\\_done%");
   });
 
+  it("applies free-text q as AND of name OR properties terms", () => {
+    const sql = buildEventWhereSql({
+      projectId: "proj_1",
+      q: "checkout started",
+    });
+    const text = prismaSqlText(sql);
+    expect(text).toContain("ILIKE");
+    expect(text).toContain(" OR ");
+    expect(text).toContain(" AND ");
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain("%checkout%");
+    expect(values).toContain("%started%");
+  });
+
   it("matches Unknown via null / blank / sentinel (not exact __unknown__ only)", () => {
     const sql = buildEventWhereSql({
       projectId: "proj_1",
