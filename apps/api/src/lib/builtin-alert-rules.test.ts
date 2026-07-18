@@ -39,10 +39,9 @@ describe("builtinSpecsFromSettings", () => {
     });
     expect(specs[0].conditions).toEqual([
       {
-        type: "ERROR_COUNT",
+        type: "BUILTIN_ERROR_SPIKE",
         threshold: 10,
         windowMinutes: 30,
-        environment: null,
       },
     ]);
     expect(specs[1]).toMatchObject({
@@ -50,7 +49,7 @@ describe("builtinSpecsFromSettings", () => {
       enabled: false,
     });
     expect(specs[1].conditions).toEqual([
-      { type: "QUOTA_PERCENT", thresholdPercent: 80 },
+      { type: "BUILTIN_QUOTA_WARNING", thresholdPercent: 80 },
     ]);
     expect(specs[2]).toMatchObject({
       systemKind: "QUOTA_EXCEEDED",
@@ -58,7 +57,7 @@ describe("builtinSpecsFromSettings", () => {
       migrationKey: BUILTIN_MIGRATION_KEYS.QUOTA_EXCEEDED,
     });
     expect(specs[2].conditions).toEqual([
-      { type: "QUOTA_PERCENT", thresholdPercent: 100 },
+      { type: "BUILTIN_QUOTA_EXCEEDED" },
     ]);
   });
 });
@@ -75,22 +74,21 @@ describe("mergeSettingsFromBuiltinRules", () => {
         enabled: false,
         conditions: [
           {
-            type: "ERROR_COUNT",
+            type: "BUILTIN_ERROR_SPIKE",
             threshold: 40,
             windowMinutes: 20,
-            environment: null,
           },
         ],
       },
       {
         system_kind: "QUOTA_WARNING",
         enabled: true,
-        conditions: [{ type: "QUOTA_PERCENT", thresholdPercent: 75 }],
+        conditions: [{ type: "BUILTIN_QUOTA_WARNING", thresholdPercent: 75 }],
       },
       {
         system_kind: "QUOTA_EXCEEDED",
         enabled: true,
-        conditions: [{ type: "QUOTA_PERCENT", thresholdPercent: 100 }],
+        conditions: [{ type: "BUILTIN_QUOTA_EXCEEDED" }],
       },
     ]);
     expect(merged.errorSpike).toEqual({
@@ -220,10 +218,9 @@ describe("ensureBuiltinAlertRules", () => {
     );
     expect(spike?.conditions).toEqual([
       {
-        type: "ERROR_COUNT",
+        type: "BUILTIN_ERROR_SPIKE",
         threshold: 50,
         windowMinutes: 60,
-        environment: null,
       },
     ]);
   });

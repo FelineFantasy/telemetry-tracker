@@ -17,9 +17,11 @@ Built-in error-spike and quota alerts are **system-managed `AlertRule` rows** (`
 
 | Built-in control | `system_kind` | `migration_key` | Condition representation | Fire (`AlertEvent.rule`) | Dedupe |
 | --- | --- | --- | --- | --- | --- |
-| Error spike | `ERROR_SPIKE` | `builtin:error_spike` | `ERROR_COUNT` (threshold, windowMinutes, env=null) | `ERROR_SPIKE` | `alert:error_spike:{projectId}:{windowMinutes}:{bucket}` |
-| Quota warning | `QUOTA_WARNING` | `builtin:quota_warning` | `QUOTA_PERCENT` (nearPercent) | `QUOTA_NEAR` | `quota:near:{projectId}:{YYYY-MM}` |
-| Quota exceeded | `QUOTA_EXCEEDED` | `builtin:quota_exceeded` | `QUOTA_PERCENT` (100) | `QUOTA_EXCEEDED` | `quota:exceeded:{projectId}:{YYYY-MM}` |
+| Error spike | `ERROR_SPIKE` | `builtin:error_spike` | `BUILTIN_ERROR_SPIKE` (threshold, windowMinutes) | `ERROR_SPIKE` | `alert:error_spike:{projectId}:{windowMinutes}:{bucket}` |
+| Quota warning | `QUOTA_WARNING` | `builtin:quota_warning` | `BUILTIN_QUOTA_WARNING` (nearPercent) | `QUOTA_NEAR` | `quota:near:{projectId}:{YYYY-MM}` |
+| Quota exceeded | `QUOTA_EXCEEDED` | `builtin:quota_exceeded` | `BUILTIN_QUOTA_EXCEEDED` | `QUOTA_EXCEEDED` | `quota:exceeded:{projectId}:{YYYY-MM}` |
+
+`BUILTIN_*` condition types are intentionally **not** evaluated by the custom AlertRule engine (unknown → skipped). That keeps mixed-version pods from firing SYSTEM rows as `ALERT_RULE` with different dedupe keys.
 
 ### What maps directly vs special handling
 
@@ -42,19 +44,20 @@ Built-in error-spike and quota alerts are **system-managed `AlertRule` rows** (`
 
 ### Migration / rollout
 
-1. Deploy schema migration `20260718140000_alert_rule_system_builtin` (`source`, `system_kind`, `migration_key`).
-2. Optional explicit backfill (idempotent):
+1. Deploy schema migration `20260718140000_alert_rule_system_builtin` (`source`, `system_kind`, `migration_key`) **with this API version** (CUSTOM-only list/evaluator filters).
+2. Prefer finishing the API rollout before mass-creating SYSTEM rows. SYSTEM conditions use `BUILTIN_*` types that older evaluators **skip** as unknown, so mixed-deploy dual-fire via `ALERT_RULE` is avoided even if rows appear early.
+3. Optional explicit backfill (idempotent) after pods are on this version:
 
 ```bash
 pnpm --filter api builtin-alert-rules-backfill
 pnpm --filter api builtin-alert-rules-backfill -- --dry-run
 ```
 
-3. Lazy ensure also runs on alert-settings GET/PATCH and built-in evaluators — safe if the job is delayed.
-4. Mixed deploy: old instances still fire from `alert_settings` with the **same** dedupe keys; new instances fire from SYSTEM rules with the same keys → `AlertEvent` unique constraint prevents duplicate notifications.
-5. Rollback: re-deploy previous API; SYSTEM rows are inert for old code; `alert_settings` JSON still holds thresholds.
-6. Failed projects: backfill logs `FAIL project=…` and increments `failures`; re-run is safe.
-7. Follow-up: remove spike/quota fields from `alert_settings` once dual-write is no longer needed (track separately; parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493) stays open).
+4. SYSTEM rows are also created/updated on `PATCH /api/project/alert-settings` (dual-write). Reads do **not** create rows (avoids clobbering concurrent writes).
+5. Mixed deploy: old instances fire from `alert_settings` with legacy dedupe keys; new instances prefer SYSTEM rows when present, same keys → `AlertEvent` unique constraint prevents duplicate notifications for the built-in path.
+6. Rollback: re-deploy previous API; SYSTEM rows are skipped by old custom evaluators (`BUILTIN_*` unknown); `alert_settings` JSON still holds thresholds.
+7. Failed projects: backfill logs `FAIL project=…` and increments `failures`; re-run is safe.
+8. Follow-up: remove spike/quota fields from `alert_settings` once dual-write is no longer needed (track separately; parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493) stays open).
 
 ## Model
 

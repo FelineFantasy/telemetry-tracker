@@ -8,7 +8,12 @@
  * through fireProjectAlert with legacy AlertRuleType + dedupe keys so migration cannot
  * re-fire already-sent alerts and custom evaluators cannot double-notify.
  *
+ * SYSTEM condition `type` values are `BUILTIN_*` (not ERROR_COUNT / QUOTA_PERCENT) so older
+ * API pods that list all AlertRule rows skip them as unknown — preventing dual-fire with
+ * `ALERT_RULE` + `alert:rule:…` keys during mixed deploy.
+ *
  * Custom alert-rules CRUD / ingest+scheduled evaluators skip SYSTEM rows.
+ * ensure/upsert runs on alert-settings PATCH and explicit backfill only (not on every read).
  */
 import { randomUUID } from "node:crypto";
 import type { AlertRuleSystemKind, Prisma, PrismaClient } from "@prisma/client";
@@ -20,6 +25,13 @@ import {
 
 /** Placeholder binding; SYSTEM evaluators omit destinations → legacy all-channel fan-out. */
 const SYSTEM_DESTINATION_PLACEHOLDER = "project-email";
+
+/** Condition types unknown to CUSTOM evaluators — mixed-deploy safe. */
+export const BUILTIN_CONDITION_TYPES = {
+  ERROR_SPIKE: "BUILTIN_ERROR_SPIKE",
+  QUOTA_WARNING: "BUILTIN_QUOTA_WARNING",
+  QUOTA_EXCEEDED: "BUILTIN_QUOTA_EXCEEDED",
+} as const;
 
 export const BUILTIN_MIGRATION_KEYS = {
   ERROR_SPIKE: "builtin:error_spike",
@@ -45,6 +57,15 @@ type BuiltinSpec = {
   conditions: Prisma.InputJsonValue;
 };
 
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code: string }).code === "P2002"
+  );
+}
+
 function errorSpikeSpec(settings: ProjectAlertSettings): BuiltinSpec {
   const { enabled, threshold, windowMinutes } = settings.errorSpike;
   return {
@@ -55,10 +76,9 @@ function errorSpikeSpec(settings: ProjectAlertSettings): BuiltinSpec {
     cooldownMinutes: windowMinutes,
     conditions: [
       {
-        type: "ERROR_COUNT",
+        type: BUILTIN_CONDITION_TYPES.ERROR_SPIKE,
         threshold,
         windowMinutes,
-        environment: null,
       },
     ],
   };
@@ -75,7 +95,7 @@ function quotaWarningSpec(settings: ProjectAlertSettings): BuiltinSpec {
     cooldownMinutes: 60,
     conditions: [
       {
-        type: "QUOTA_PERCENT",
+        type: BUILTIN_CONDITION_TYPES.QUOTA_WARNING,
         thresholdPercent: nearPercent,
       },
     ],
@@ -92,8 +112,7 @@ function quotaExceededSpec(): BuiltinSpec {
     cooldownMinutes: 60,
     conditions: [
       {
-        type: "QUOTA_PERCENT",
-        thresholdPercent: 100,
+        type: BUILTIN_CONDITION_TYPES.QUOTA_EXCEEDED,
       },
     ],
   };
@@ -112,11 +131,10 @@ function errorSpikeFromConditions(
 ): ProjectAlertSettings["errorSpike"] | null {
   if (!Array.isArray(conditions) || conditions.length === 0) return null;
   const c = conditions[0];
-  if (
-    typeof c !== "object" ||
-    c === null ||
-    (c as { type?: unknown }).type !== "ERROR_COUNT"
-  ) {
+  if (typeof c !== "object" || c === null) return null;
+  const type = (c as { type?: unknown }).type;
+  // Accept BUILTIN_* (current) and legacy ERROR_COUNT if a row was written early.
+  if (type !== BUILTIN_CONDITION_TYPES.ERROR_SPIKE && type !== "ERROR_COUNT") {
     return null;
   }
   const threshold = (c as { threshold?: unknown }).threshold;
@@ -146,10 +164,11 @@ function quotaWarningFromConditions(
 ): ProjectAlertSettings["quota"] | null {
   if (!Array.isArray(conditions) || conditions.length === 0) return null;
   const c = conditions[0];
+  if (typeof c !== "object" || c === null) return null;
+  const type = (c as { type?: unknown }).type;
   if (
-    typeof c !== "object" ||
-    c === null ||
-    (c as { type?: unknown }).type !== "QUOTA_PERCENT"
+    type !== BUILTIN_CONDITION_TYPES.QUOTA_WARNING &&
+    type !== "QUOTA_PERCENT"
   ) {
     return null;
   }
@@ -231,21 +250,47 @@ async function upsertBuiltinSpec(
       });
       return "updated";
     }
-    await prisma.alertRule.create({
-      data: {
-        id: randomUUID(),
-        project_id: projectId,
-        name: spec.name,
-        enabled: spec.enabled,
-        source: "SYSTEM",
-        system_kind: spec.systemKind,
-        migration_key: spec.migrationKey,
-        conditions: spec.conditions,
-        destination_ids: destinationIds,
-        cooldown_minutes: spec.cooldownMinutes,
-      },
-    });
-    return "created";
+    try {
+      await prisma.alertRule.create({
+        data: {
+          id: randomUUID(),
+          project_id: projectId,
+          name: spec.name,
+          enabled: spec.enabled,
+          source: "SYSTEM",
+          system_kind: spec.systemKind,
+          migration_key: spec.migrationKey,
+          conditions: spec.conditions,
+          destination_ids: destinationIds,
+          cooldown_minutes: spec.cooldownMinutes,
+        },
+      });
+      return "created";
+    } catch (e: unknown) {
+      // Concurrent ensure raced on (project_id, migration_key) — treat as update path.
+      if (!isUniqueViolation(e)) throw e;
+      const raced = await prisma.alertRule.findFirst({
+        where: {
+          project_id: projectId,
+          migration_key: spec.migrationKey,
+        },
+      });
+      if (!raced) throw e;
+      await prisma.alertRule.update({
+        where: { id: raced.id },
+        data: {
+          name: spec.name,
+          enabled: spec.enabled,
+          source: "SYSTEM",
+          system_kind: spec.systemKind,
+          conditions: spec.conditions,
+          destination_ids: destinationIds,
+          cooldown_minutes: spec.cooldownMinutes,
+          deleted_at: null,
+        },
+      });
+      return "updated";
+    }
   }
 
   const same =
@@ -275,7 +320,8 @@ async function upsertBuiltinSpec(
 
 /**
  * Idempotently create/update the three SYSTEM rules for a project from settings.
- * Safe to call on every alert-settings read/write and during backfill.
+ * Call from alert-settings PATCH and the backfill job — not on every settings read
+ * (avoids clobbering concurrent writes and avoids creating rows during mixed deploy reads).
  */
 export async function ensureBuiltinAlertRules(
   prisma: PrismaClient | Prisma.TransactionClient,
@@ -312,8 +358,8 @@ export async function saveProjectAlertSettings(
 }
 
 /**
- * Load settings with SYSTEM AlertRule as canonical for spike/quota.
- * Ensures SYSTEM rows exist (lazy migration for mixed deploy / new projects).
+ * Load settings with SYSTEM AlertRule as canonical for spike/quota when present.
+ * Does not create SYSTEM rows (use PATCH or backfill). Falls back to alert_settings JSON.
  */
 export async function loadProjectAlertSettingsCanonical(
   prisma: PrismaClient,
@@ -328,7 +374,6 @@ export async function loadProjectAlertSettingsCanonical(
   }
 
   const fromJson = parseProjectAlertSettings(row.alert_settings);
-  await ensureBuiltinAlertRules(prisma, projectId, fromJson);
 
   const systemRules = await prisma.alertRule.findMany({
     where: {
@@ -342,6 +387,10 @@ export async function loadProjectAlertSettingsCanonical(
       conditions: true,
     },
   });
+
+  if (systemRules.length === 0) {
+    return fromJson;
+  }
 
   return mergeSettingsFromBuiltinRules(fromJson, systemRules);
 }
