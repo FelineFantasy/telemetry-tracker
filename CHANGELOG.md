@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.8] - 2026-07-18
+
+### Added
+
+- **GitHub CodeQL Advanced** — CI workflow scans `actions` and `javascript-typescript` on pushes/PRs to `develop`/`main`, plus a weekly schedule ([#561](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/561))
+
+---
+
 ## [1.15.7] - 2026-07-18
 
 ### Changed
