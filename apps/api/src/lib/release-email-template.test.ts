@@ -106,7 +106,8 @@ describe("buildReleaseEmailBodyHtml", () => {
     expect(html).toContain("v1.9.0");
     expect(html).toContain("Release notes");
     expect(html).toContain("Open dashboard");
-    expect(html).toContain("telemetry-logo.jpg");
+    expect(html).toContain('src="cid:tt-brand-logo"');
+    expect(html).not.toContain("telemetry-logo.jpg");
   });
 });
 
