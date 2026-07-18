@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
 import { preferenceCookiesAllowedFromCookies, preferenceCookiesDeniedMessage } from "@/lib/cookie-consent-server";
 import { dashboardApiFetch, type DashboardApiFetchOptions } from "@/lib/dashboard-api";
+import { parseDashboardApiResourceId } from "@/lib/dashboard-api-url";
 import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
 import {
   fetchDashboardOrganizationsPayload,
@@ -662,7 +663,11 @@ export async function setErrorResolvedAction(
   errorGroupId: string,
   resolved: boolean
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const res = await dashboardApiFetch(`/api/errors/${errorGroupId}`, {
+  const id = parseDashboardApiResourceId(errorGroupId);
+  if (!id) {
+    return { ok: false, error: "Invalid error group id" };
+  }
+  const res = await dashboardApiFetch(`/api/errors/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resolved }),
@@ -671,7 +676,7 @@ export async function setErrorResolvedAction(
     const t = await res.text();
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
-  revalidatePath(`/dashboard/errors/${errorGroupId}`);
+  revalidatePath(`/dashboard/errors/${encodeURIComponent(id)}`);
   revalidatePath("/dashboard/errors");
   return { ok: true };
 }
