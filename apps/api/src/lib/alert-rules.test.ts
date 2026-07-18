@@ -440,6 +440,7 @@ describe("updateAlertRule / softDeleteAlertRule", () => {
       project_id: "p1",
       name: "Prod spike",
       enabled: true,
+      source: "CUSTOM" as const,
       conditions: [
         {
           type: "ERROR_COUNT" as const,
@@ -469,13 +470,48 @@ describe("updateAlertRule / softDeleteAlertRule", () => {
     if (result.ok) expect(result.rule.enabled).toBe(false);
   });
 
-  it("soft-deletes a rule", async () => {
+  it("rejects updates to SYSTEM rules", async () => {
     const prisma = {
       alertRule: {
+        findFirst: async () => ({
+          id: "sys-1",
+          project_id: "p1",
+          source: "SYSTEM",
+          deleted_at: null,
+        }),
+      },
+    } as never;
+    const result = await updateAlertRule(prisma, "p1", "sys-1", { enabled: false });
+    expect(result).toEqual({
+      ok: false,
+      error: "System-managed alert rules are edited via project alert settings",
+      status: 403,
+    });
+  });
+
+  it("soft-deletes a custom rule", async () => {
+    const prisma = {
+      alertRule: {
+        findFirst: async () => ({ id: "rule-1", source: "CUSTOM" }),
         updateMany: async () => ({ count: 1 }),
       },
     } as never;
     expect(await softDeleteAlertRule(prisma, "p1", "rule-1")).toEqual({ ok: true });
+  });
+
+  it("rejects delete of SYSTEM rules", async () => {
+    const prisma = {
+      alertRule: {
+        findFirst: async () => ({ id: "sys-1", source: "SYSTEM" }),
+        updateMany: vi.fn(),
+      },
+    } as never;
+    expect(await softDeleteAlertRule(prisma, "p1", "sys-1")).toEqual({
+      ok: false,
+      error: "System-managed alert rules cannot be deleted",
+      status: 403,
+    });
+    expect(prisma.alertRule.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -487,6 +523,7 @@ describe("pruneDestinationIdFromAlertRules", () => {
         findMany: async () => [
           {
             id: "rule-1",
+            source: "CUSTOM",
             destination_ids: [
               PROJECT_EMAIL_DESTINATION_ID,
               "22222222-2222-2222-2222-222222222222",
@@ -495,7 +532,13 @@ describe("pruneDestinationIdFromAlertRules", () => {
           },
           {
             id: "rule-2",
+            source: "CUSTOM",
             destination_ids: [],
+          },
+          {
+            id: "sys-1",
+            source: "SYSTEM",
+            destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
           },
         ],
         update,
