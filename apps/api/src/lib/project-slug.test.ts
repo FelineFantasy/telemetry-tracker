@@ -6,6 +6,12 @@ describe("slugifyProjectName", () => {
     expect(slugifyProjectName("My Cool App!")).toBe("my-cool-app");
     expect(slugifyProjectName("  ---  ")).toBe("project");
   });
+
+  it("trims leading separators before the 64-char clamp", () => {
+    const letters = "a".repeat(64);
+    expect(slugifyProjectName(`!!!${letters}`)).toBe(letters);
+    expect(slugifyProjectName(`!!!${letters}z`)).toBe(letters);
+  });
 });
 
 describe("ensureUniqueProjectSlug", () => {
