@@ -101,6 +101,7 @@ export function GlobalSearchClient({
   const onSubmit = useCallback(
     (e: FormEvent) => {
       e.preventDefault();
+      if (isPending) return;
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(hiddenScope)) {
         if (v) params.set(k, v);
@@ -110,7 +111,7 @@ export function GlobalSearchClient({
       const qs = params.toString();
       push(qs ? `/dashboard/search?${qs}` : "/dashboard/search");
     },
-    [hiddenScope, push, query]
+    [hiddenScope, isPending, push, query]
   );
 
   const openActive = useCallback(() => {
@@ -130,10 +131,11 @@ export function GlobalSearchClient({
         e.preventDefault();
         setActiveIndex((i) => (i - 1 + flat.length) % flat.length);
       } else if (e.key === "Enter" && flat.length > 0 && !isPending) {
-        // With results for the current query, Enter opens the highlighted hit
-        // (including when focus is in the search input). Edited queries still submit.
+        // From the search input only: Enter opens the highlighted hit when the query
+        // still matches the last search. Result rows activate via their own button.
+        // Edited queries fall through to form submit.
         const searchedQ = (result?.q ?? initialQuery).trim();
-        if (query.trim() === searchedQ) {
+        if (query.trim() === searchedQ && e.target === inputRef.current) {
           e.preventDefault();
           openActive();
         }

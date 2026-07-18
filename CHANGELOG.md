@@ -22,6 +22,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Global Search time-only + users ranking** — treat route metrics windows as a valid search signal (so open-ended/`range:all` time-only queries return events/issues/releases consistently with sessions), and rank user hits by latest session activity instead of identity A–Z ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
 - **Global Search issues metrics window** — time-only issue hits (no release/platform) apply `errorOccurrenceRange` to `last_seen`, matching the ~7d metrics window used for events/sessions when nav range is all-time ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
 - **Global Search URL / View all free text** — treat `https://…` / `http://…` tokens as free text (not ignored `https:` filters), and forward API `parsed.freeText` into View all Issues/Events/Sessions links so colon-bearing terms stay aligned with grouped hits ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search pending submit** — ignore search form submit while dashboard navigation is pending, and only map input Enter to the highlighted hit (result rows use their own activation) ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
 
 ### Changed
 
