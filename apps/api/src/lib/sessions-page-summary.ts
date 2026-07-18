@@ -338,12 +338,14 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
  * When `release=` is set (known or Unknown), event-release attribution is
  * intentionally unwindowed so Sessions deep links match Release Health's
  * `COALESCE(session.release, latest known event.release)` over all time.
+ * When `platform=` is also set, event-release EXISTS clauses constrain
+ * `e.platform` the same way Release Health does.
  * Environment-only event fallback remains scoped to `eventWindow`.
  */
 function sessionEnvReleaseMatchSql(
   projectId: string,
   sessionAlias: string,
-  f: Pick<SessionListFilterInput, "environment" | "release">,
+  f: Pick<SessionListFilterInput, "environment" | "release" | "platform">,
   eventWindow?: SessionEventWindow
 ): Prisma.Sql | null {
   if (!f.environment && !f.release) return null;
@@ -355,6 +357,10 @@ function sessionEnvReleaseMatchSql(
   const eventReleaseMatch = f.release
     ? releaseFilterMatchSql(Prisma.sql`e."release"`, f.release)
     : null;
+  // Align event-release fallback with Release Health platform scoping.
+  const platformEventClauses = f.platform
+    ? [Prisma.sql`e."platform" = ${f.platform}`]
+    : [];
 
   if (f.environment && f.release && sessionReleaseMatch && eventReleaseMatch) {
     if (releaseUnknown) {
@@ -362,6 +368,7 @@ function sessionEnvReleaseMatchSql(
       const hasKnownEventRelease = sessionEventExistsSql(projectId, sessionAlias, [
         Prisma.sql`e."environment" = ${f.environment}`,
         knownReleaseSql(Prisma.sql`e."release"`),
+        ...platformEventClauses,
       ]);
       return unknownSessionReleaseMatchSql(
         Prisma.sql`(
@@ -375,6 +382,7 @@ function sessionEnvReleaseMatchSql(
     const bothOnEvent = sessionEventExistsSql(projectId, sessionAlias, [
       Prisma.sql`e."environment" = ${f.environment}`,
       eventReleaseMatch,
+      ...platformEventClauses,
     ]);
     return Prisma.sql`(
       (
@@ -422,6 +430,7 @@ function sessionEnvReleaseMatchSql(
       sessionReleaseMatch,
       sessionEventExistsSql(projectId, sessionAlias, [
         knownReleaseSql(Prisma.sql`e."release"`),
+        ...platformEventClauses,
       ])
     );
   }
@@ -431,7 +440,10 @@ function sessionEnvReleaseMatchSql(
     ${sessionReleaseMatch}
     OR (
       ${s}."release" IS NULL
-      AND ${sessionEventExistsSql(projectId, sessionAlias, [eventReleaseMatch])}
+      AND ${sessionEventExistsSql(projectId, sessionAlias, [
+        eventReleaseMatch,
+        ...platformEventClauses,
+      ])}
     )
   )`;
 }

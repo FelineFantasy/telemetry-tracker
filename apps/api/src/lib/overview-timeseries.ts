@@ -192,15 +192,20 @@ export function overviewSessionBucketEnvironmentExistsSql(
 function overviewSessionEventExistsUnwindowedSql(
   projectId: string,
   extra: Prisma.Sql,
+  platformFilter?: string,
   sessionAlias = "s"
 ): Prisma.Sql {
   const s = Prisma.raw(`"${sessionAlias}"`);
+  const platformClause = platformFilter
+    ? Prisma.sql`AND e."platform" = ${platformFilter}`
+    : Prisma.empty;
   return Prisma.sql`EXISTS (
     SELECT 1 FROM "Event" e
     WHERE e."project_id" = ${projectId}
       AND e."session_id" = ${s}."session_id"
       AND e."app" = ${s}."app"
       AND ${extra}
+      ${platformClause}
   )`;
 }
 
@@ -208,9 +213,13 @@ function overviewSessionEventExistsUnwindowedSql(
 function overviewSessionKnownEventReleaseExistsSql(
   projectId: string,
   extra?: Prisma.Sql,
+  platformFilter?: string,
   sessionAlias = "s"
 ): Prisma.Sql {
   const s = Prisma.raw(`"${sessionAlias}"`);
+  const platformClause = platformFilter
+    ? Prisma.sql`AND e."platform" = ${platformFilter}`
+    : Prisma.empty;
   return Prisma.sql`EXISTS (
     SELECT 1 FROM "Event" e
     WHERE e."project_id" = ${projectId}
@@ -218,6 +227,7 @@ function overviewSessionKnownEventReleaseExistsSql(
       AND e."app" = ${s}."app"
       AND ${knownReleaseSql(Prisma.sql`e."release"`)}
       ${extra ? Prisma.sql`AND ${extra}` : Prisma.empty}
+      ${platformClause}
   )`;
 }
 
@@ -227,7 +237,8 @@ export function overviewSessionEnvReleaseScopeSql(
   since: Date,
   until: Date,
   environmentFilter?: string,
-  releaseFilter?: string
+  releaseFilter?: string,
+  platformFilter?: string
 ): Prisma.Sql {
   if (environmentFilter && releaseFilter) {
     const sessionRelease = releaseFilterMatchSql(Prisma.sql`s."release"`, releaseFilter);
@@ -240,13 +251,15 @@ export function overviewSessionEnvReleaseScopeSql(
         )`,
         overviewSessionKnownEventReleaseExistsSql(
           projectId,
-          Prisma.sql`e."environment" = ${environmentFilter}`
+          Prisma.sql`e."environment" = ${environmentFilter}`,
+          platformFilter
         )
       )}`;
     }
     const bothOnEvent = overviewSessionEventExistsUnwindowedSql(
       projectId,
-      Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
+      Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`,
+      platformFilter
     );
     return Prisma.sql`AND (
       (
@@ -289,7 +302,7 @@ export function overviewSessionEnvReleaseScopeSql(
     if (isUnknownReleaseKey(releaseFilter)) {
       return Prisma.sql`AND ${unknownSessionReleaseMatchSql(
         sessionRelease,
-        overviewSessionKnownEventReleaseExistsSql(projectId)
+        overviewSessionKnownEventReleaseExistsSql(projectId, undefined, platformFilter)
       )}`;
     }
     return Prisma.sql`AND (
@@ -298,7 +311,8 @@ export function overviewSessionEnvReleaseScopeSql(
         s."release" IS NULL
         AND ${overviewSessionEventExistsUnwindowedSql(
           projectId,
-          releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter)
+          releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter),
+          platformFilter
         )}
       )
     )`;
@@ -326,7 +340,8 @@ async function querySessionBuckets(
     since,
     until,
     environmentFilter,
-    releaseFilter
+    releaseFilter,
+    platformFilter
   );
   const trunc = bucket === "week" ? "week" : bucket;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`

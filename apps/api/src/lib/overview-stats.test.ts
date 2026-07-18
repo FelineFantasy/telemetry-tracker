@@ -214,6 +214,38 @@ describe("overviewEnvironmentSessionCountSql", () => {
     expect(text).toContain('e."environment" =');
     expect(text).toContain("IS NOT NULL");
   });
+
+  it("scopes event-release fallback by platform when platform + release are set", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      platform: "ios",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."platform" =');
+    expect(text).toContain('e."platform" =');
+    expect(text).toContain("EXISTS");
+    expect(text).toContain('s."release" IS NULL');
+  });
+
+  it("scopes known-event exclusion by platform for Unknown + platform", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      platform: "android",
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."platform" =');
+    expect(text).toContain('e."platform" =');
+    expect(text).toContain("AND NOT");
+    expect(text).toContain("IS NOT NULL");
+  });
 });
 
 describe("errorGroupDetailHref", () => {

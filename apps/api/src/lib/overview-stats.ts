@@ -197,6 +197,10 @@ export function overviewEnvironmentSessionCountSql(
   const platformClause = scope.platform
     ? Prisma.sql`AND s."platform" = ${scope.platform}`
     : Prisma.empty;
+  // Align event-release fallback with Release Health platform scoping.
+  const eventPlatformClause = scope.platform
+    ? Prisma.sql`AND e."platform" = ${scope.platform}`
+    : Prisma.empty;
   const { session: sessionUpperClause, event: eventUpperClause } =
     overviewEnvironmentSessionCountUpperClauses(scope, exclusiveUntil);
   const eventTime = Prisma.sql`e."created_at" >= ${scope.since} ${eventUpperClause}`;
@@ -215,6 +219,7 @@ export function overviewEnvironmentSessionCountSql(
         AND e."session_id" = s."session_id"
         AND e."app" = s."app"
         AND ${extra}
+        ${eventPlatformClause}
     )`;
   const knownEventReleaseExists = (extra?: Prisma.Sql) => Prisma.sql`EXISTS (
       SELECT 1 FROM "Event" e
@@ -223,6 +228,7 @@ export function overviewEnvironmentSessionCountSql(
         AND e."app" = s."app"
         AND ${knownReleaseSql(Prisma.sql`e."release"`)}
         ${extra ? Prisma.sql`AND ${extra}` : Prisma.empty}
+        ${eventPlatformClause}
     )`;
 
   let envReleaseMatch: Prisma.Sql;
@@ -394,6 +400,10 @@ export async function getSessionDurationSeries(
   const querySince = overviewChartQuerySince(since, queryUntil, bucket);
   const appClause = app ? Prisma.sql`AND s."app" = ${app}` : Prisma.empty;
   const platformClause = platform ? Prisma.sql`AND s."platform" = ${platform}` : Prisma.empty;
+  // Align event-release fallback with Release Health platform scoping.
+  const eventPlatformClause = platform
+    ? Prisma.sql`AND e."platform" = ${platform}`
+    : Prisma.empty;
   const eventUntilClause = until
     ? Prisma.sql`AND e."created_at" <= ${until}`
     : Prisma.empty;
@@ -413,6 +423,7 @@ export async function getSessionDurationSeries(
       AND e."session_id" = s."session_id"
       AND e."app" = s."app"
       AND ${extra}
+      ${eventPlatformClause}
   )`;
   const knownEventReleaseExists = (extra?: Prisma.Sql) => Prisma.sql`EXISTS (
     SELECT 1 FROM "Event" e
@@ -421,6 +432,7 @@ export async function getSessionDurationSeries(
       AND e."app" = s."app"
       AND ${knownReleaseSql(Prisma.sql`e."release"`)}
       ${extra ? Prisma.sql`AND ${extra}` : Prisma.empty}
+      ${eventPlatformClause}
   )`;
 
   let envReleaseClause = Prisma.empty;

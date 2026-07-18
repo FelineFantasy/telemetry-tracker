@@ -116,4 +116,37 @@ describe("overviewSessionEnvReleaseScopeSql", () => {
     expect(text).toContain('e."environment"');
     expect(text).toContain("IS NOT NULL");
   });
+
+  it("scopes event-release fallback by platform when platform + release are set", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql(
+        "proj_1",
+        since,
+        until,
+        undefined,
+        "1.2.0",
+        "ios"
+      )
+    );
+    expect(text).toContain('e."platform"');
+    expect(text).toContain("EXISTS");
+    expect(text).toContain('s."release" IS NULL');
+    expect(text).not.toContain('e."created_at"');
+  });
+
+  it("scopes known-event exclusion by platform for Unknown + platform", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql(
+        "proj_1",
+        since,
+        until,
+        undefined,
+        UNKNOWN_RELEASE_KEY,
+        "android"
+      )
+    );
+    expect(text).toContain('e."platform"');
+    expect(text).toContain("AND NOT");
+    expect(text).toContain("IS NOT NULL");
+  });
 });

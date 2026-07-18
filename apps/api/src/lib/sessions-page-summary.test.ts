@@ -223,6 +223,34 @@ describe("sessionFilterSql", () => {
     expect(text).not.toContain('e."created_at"');
   });
 
+  it("scopes event-release fallback by platform when platform + release are set", () => {
+    const text = prismaSqlText(
+      sessionFilterSql("proj-1", {
+        range: {},
+        platform: "ios",
+        release: "1.2.0",
+      })
+    );
+    expect(text).toContain('s."platform" = ?');
+    expect(text).toContain('e."platform" = ?');
+    expect(text).toContain('TRIM(e."release") = ?');
+    expect(text).toContain("EXISTS");
+  });
+
+  it("scopes known-event exclusion by platform for Unknown + platform", () => {
+    const text = prismaSqlText(
+      sessionFilterSql("proj-1", {
+        range: {},
+        platform: "android",
+        release: UNKNOWN_RELEASE_KEY,
+      })
+    );
+    expect(text).toContain('s."platform" = ?');
+    expect(text).toContain('e."platform" = ?');
+    expect(text).toContain("AND NOT");
+    expect(text).toContain("IS NOT NULL");
+  });
+
   it("scopes known-event exclusion by environment for Unknown + environment", () => {
     const text = prismaSqlText(
       sessionFilterSql("proj-1", {
