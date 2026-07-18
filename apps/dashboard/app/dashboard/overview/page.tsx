@@ -31,7 +31,7 @@ import {
   OverviewRecentSessionsPanel,
   OverviewTopErrorsPanel,
 } from "@/app/components/dashboard/overview/OverviewBreakdownGrid";
-import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
+import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
@@ -254,7 +254,7 @@ export default async function OverviewPage({
     from: firstQueryValue(params.from),
     to: firstQueryValue(params.to),
   };
-  const currentOverviewParams = buildOverviewParamsRecord(params);
+  let currentOverviewParams = buildOverviewParamsRecord(params);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(
     OVERVIEW_PATH,
     currentOverviewParams
@@ -274,6 +274,23 @@ export default async function OverviewPage({
   const pageMetricsUntil = isUnselectedTimeRange(parsedRange.key)
     ? resolveMetricsUntilIso(firstQueryValue(params.metricsUntil))
     : undefined;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    OVERVIEW_PATH,
+    currentOverviewParams,
+    parsedRange.key,
+    pageMetricsUntil
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  // Align client nav with the API: set anchor for open-ended ranges, clear stale ones.
+  if (pageMetricsUntil) {
+    currentOverviewParams = {
+      ...currentOverviewParams,
+      metricsUntil: pageMetricsUntil,
+    };
+  } else if (currentOverviewParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentOverviewParams;
+    currentOverviewParams = withoutMetricsUntil;
+  }
   const rawApp = firstQueryValue(params.app)?.trim() || null;
   const rawEnvironment = firstQueryValue(params.environment)?.trim() || null;
   const rawPlatform = firstQueryValue(params.platform)?.trim() || null;

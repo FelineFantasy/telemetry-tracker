@@ -7,7 +7,7 @@ import {
 } from "@/app/components/dashboard/SessionsSummaryMetrics";
 import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
 import { type SessionsTableRow } from "@/app/components/dashboard/SessionsTable";
-import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
+import { redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import {
   appendListTimeRangeToParams,
   isUnselectedTimeRange,
@@ -107,7 +107,7 @@ export default async function SessionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const currentParams = buildSessionsParamsRecord(sp);
+  let currentParams = buildSessionsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(SESSIONS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
@@ -126,6 +126,23 @@ export default async function SessionsPage({
     },
     "all"
   );
+
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    SESSIONS_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  if (pageAnchorIso) {
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
+  }
 
   const apiQuery = new URLSearchParams();
   if (appFilter) apiQuery.set("app", appFilter);
@@ -149,11 +166,8 @@ export default async function SessionsPage({
   if (order) apiQuery.set("order", order);
   if (chartBucket) apiQuery.set("chartBucket", chartBucket);
 
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set(
-      "metricsUntil",
-      resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
-    );
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
 
   const summaryQuery = new URLSearchParams(apiQuery);

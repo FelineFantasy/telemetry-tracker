@@ -7,7 +7,7 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { ErrorState } from "@/app/components/ErrorState";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 import { fetchReleasesSummary } from "@/lib/releases-summary";
-import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
+import { redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import {
   appendListTimeRangeToParams,
   isUnselectedTimeRange,
@@ -65,7 +65,7 @@ export default async function ReleasesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const currentParams = buildReleasesParamsRecord(sp);
+  let currentParams = buildReleasesParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(RELEASES_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
 
@@ -97,8 +97,19 @@ export default async function ReleasesPage({
   const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
     ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
     : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    RELEASES_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
   if (pageAnchorIso) {
     apiQuery.set("metricsUntil", pageAnchorIso);
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
   }
 
   let summary: Awaited<ReturnType<typeof fetchReleasesSummary>> = null;

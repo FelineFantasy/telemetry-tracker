@@ -103,7 +103,10 @@ export function ReleasesTable({
               <tr key={row.releaseKey}>
                 <td>
                   <div className="font-medium text-foreground">{label}</div>
-                  {vs ? (
+                  {vs &&
+                  (vs.errorRatePp != null ||
+                    vs.sessionsPct != null ||
+                    vs.errorsPct != null) ? (
                     <div className="mt-1 space-y-0.5">
                       <DeltaLine label="Error rate" value={vs.errorRatePp} kind="pp" invert />
                       <DeltaLine label="Sessions" value={vs.sessionsPct} kind="pct" />
