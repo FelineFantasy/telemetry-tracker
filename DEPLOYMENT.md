@@ -109,6 +109,8 @@ This repo does **not** ship a single Docker Compose stack for all three producti
 
 **Retention:** schedule the retention job nightly so old telemetry is pruned — see [docs/RAILWAY.md](docs/RAILWAY.md#retention-cron) or run `node dist/jobs/run-retention.js` from `apps/api` on your scheduler.
 
+**Alert rules evaluator (optional):** for `HEARTBEAT` / `NO_EVENTS` / `SESSION_DROP` / `QUOTA_PERCENT` (and scheduled `ERROR_RATE`) conditions, schedule `node dist/jobs/run-alert-rules-evaluator.js` every 5 minutes — see [docs/RAILWAY.md](docs/RAILWAY.md#alert-rules-evaluator-cron) and [docs/ALERT-RULES.md](docs/ALERT-RULES.md).
+
 **Source maps in CI:** upload `.map` files after each release with the [upload-source-maps GitHub Action](.github/actions/upload-source-maps). Set `base_api_url` to your public API URL (`API_URL` on the dashboard). Details: [docs/source-maps.md](docs/source-maps.md#github-action-workflow-example).
 
 ---

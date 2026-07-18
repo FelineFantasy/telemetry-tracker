@@ -26,6 +26,7 @@ import {
   parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
+import type { AlertRuleCondition, AlertRuleRow } from "@/lib/alert-rules";
 import {
   normalizeProjectPiiScrubSettings,
   type ProjectPiiScrubSettings,
@@ -849,6 +850,82 @@ export async function saveProjectAlertSettingsAction(
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }
+}
+
+export type AlertRuleActionRow = AlertRuleRow;
+
+export async function createProjectAlertRuleAction(input: {
+  name: string;
+  enabled?: boolean;
+  conditions: AlertRuleCondition[];
+  destinationIds: string[];
+  cooldownMinutes?: number;
+}): Promise<{ ok: true; rule: AlertRuleActionRow } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch("/api/project/alert-rules", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { rule?: AlertRuleActionRow };
+    if (!data.rule) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return { ok: true, rule: data.rule };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function updateProjectAlertRuleAction(
+  ruleId: string,
+  patch: Partial<{
+    name: string;
+    enabled: boolean;
+    conditions: AlertRuleCondition[];
+    destinationIds: string[];
+    cooldownMinutes: number;
+  }>
+): Promise<{ ok: true; rule: AlertRuleActionRow } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/alert-rules/${encodeURIComponent(ruleId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { rule?: AlertRuleActionRow };
+    if (!data.rule) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return { ok: true, rule: data.rule };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function deleteProjectAlertRuleAction(
+  ruleId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/alert-rules/${encodeURIComponent(ruleId)}`,
+    { method: "DELETE" }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  revalidatePath("/dashboard/alerts");
+  return { ok: true };
 }
 
 export type ProjectWebhookActionRow = {

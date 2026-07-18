@@ -4,6 +4,18 @@ import type { DashboardNotificationItem } from "./dashboard-notifications.js";
 import { notifyProjectMembersByEmail } from "./notification-email-dispatch.js";
 import { enqueueAlertWebhookDeliveries } from "./alert-webhook-dispatch.js";
 
+export type AlertFireDestinations = {
+  /**
+   * When false, skip email fan-out. Default true (legacy built-in alerts).
+   */
+  email?: boolean;
+  /**
+   * When set, only enqueue these ProjectWebhook ids (empty = no webhooks).
+   * When omitted, enqueue all enabled project webhooks (legacy behavior).
+   */
+  webhookIds?: string[];
+};
+
 export type AlertFirePayload = {
   projectId: string;
   rule: AlertRuleType;
@@ -11,6 +23,7 @@ export type AlertFirePayload = {
   title: string;
   body: string;
   href: string | null;
+  destinations?: AlertFireDestinations;
 };
 
 function isUniqueViolation(e: unknown): boolean {
@@ -27,6 +40,7 @@ export function alertEventHref(rule: AlertRuleType, stored: string | null): stri
   if (stored) return stored;
   switch (rule) {
     case "ERROR_SPIKE":
+    case "ALERT_RULE":
       return "/dashboard/errors";
     case "QUOTA_NEAR":
     case "QUOTA_EXCEEDED":
@@ -63,6 +77,7 @@ export async function fireProjectAlert(
         projectId: payload.projectId,
         alertEventId,
         dedupeKey: payload.dedupeKey,
+        webhookIds: payload.destinations?.webhookIds,
       });
     });
   } catch (e: unknown) {
@@ -79,9 +94,12 @@ export async function fireProjectAlert(
     href: payload.href,
   };
 
-  void notifyProjectMembersByEmail(prisma, payload.projectId, item, {
-    rule: payload.rule,
-  });
+  const sendEmail = payload.destinations?.email !== false;
+  if (sendEmail) {
+    void notifyProjectMembersByEmail(prisma, payload.projectId, item, {
+      rule: payload.rule,
+    });
+  }
 
   return true;
 }

@@ -26,6 +26,7 @@ High-level map of **Telemetry Tracker** for contributors. For RBAC details see [
 - **Ingest** (SDKs → API): authenticated with **project API keys** (`tt_live_…`).
 - **Dashboard** (browser → API): authenticated with **user sessions** (email/password); the UI never talks to Postgres directly.
 - **Retention cron**: scheduled job runs `run-retention.ts` against the same database (see [RAILWAY.md](./RAILWAY.md#retention-cron)).
+- **Alert rules evaluator cron** (optional): scheduled job runs `run-alert-rules-evaluator.ts` for non-ingest **CUSTOM** AlertRule conditions (see [ALERT-RULES.md](./ALERT-RULES.md) and [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron)). Built-in spike/quota are SYSTEM AlertRule rows evaluated on ingest via `maybeNotifyErrorSpike` / `maybeNotifyQuotaAlerts`.
 
 ---
 
@@ -160,8 +161,10 @@ Framework packages add ergonomics (Next.js provider, Node process handlers, RN s
 | Job | Command | Purpose |
 |-----|---------|---------|
 | Retention sweep | `node dist/jobs/run-retention.js` | Delete telemetry older than plan `retentionDays` per project |
+| Alert rules evaluator | `node dist/jobs/run-alert-rules-evaluator.js` | Evaluate schedule-oriented CUSTOM AlertRule conditions (`last_fired_at` cooldown → `fireProjectAlert`) |
+| Builtin alert-rules backfill | `node dist/jobs/run-builtin-alert-rules-backfill.js` | Idempotent SYSTEM spike/quota AlertRule rows from `alert_settings` (#535) |
 
-Implementation: `apps/api/src/jobs/retention.ts`. Open sessions without `ended_at` are not pruned until closed (known limitation).
+Implementation: `apps/api/src/jobs/retention.ts`, `apps/api/src/jobs/alert-rules-evaluator.ts`. Open sessions without `ended_at` are not pruned until closed (known limitation).
 
 ---
 

@@ -81,6 +81,15 @@ Releases are **milestone-driven**:
 
 **Hotfixes** on production: branch from **`main`**, fix, merge to **`main`**, tag a **patch** version, then merge **`main` → `develop`** so branches stay aligned. Assign PRs and release PRs to a milestone per [Milestones vs hotfixes](#milestones-vs-hotfixes-audit-trail).
 
+### Process notes (merge hygiene & milestones)
+
+- **Do not merge release PRs** (`develop` → `main`, or hotfix → `main`) until **all required checks are green** (`build`, and on `develop` also `bugbot-review` / `maintainer-review` as configured).
+- **Stacked / multi-PR features:** the final integration PR that lands the feature on `develop` must run the **full API + dashboard** test suites (not a subset). Prefer one green CI pass on that integration PR before release promotion.
+- **Assign feature PRs to a milestone** whenever possible (active product line or patch-line milestone) so shipped work stays auditable.
+- **Prefer one production smoke-test pass** (health, migrations, critical paths for the milestone — see [Post-deploy verification](#post-deploy-verification) and `scripts/smoke-production.sh` / notification channel checks) **before closing a milestone**.
+- **Taxonomy:** **milestones** = release lines (e.g. `v1.14.x — Notifications`); **parent issues** = long-lived vision/roadmap; **child issues** = implementation that ships inside a milestone. Closing a milestone does **not** require closing the parent vision issue.
+  - Example: Notifications parent vision is [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); children (#225, #508, #499, #223, #224, #500, …) ship under the `v1.14.x` milestone while #492 stays open as the living roadmap.
+
 ---
 
 ## Milestones vs hotfixes (audit trail)

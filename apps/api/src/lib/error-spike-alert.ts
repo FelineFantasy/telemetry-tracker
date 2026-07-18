@@ -1,23 +1,16 @@
 import type { PrismaClient } from "@prisma/client";
 import {
   errorSpikeDedupeKey,
-  parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "./project-alert-settings.js";
 import { fireProjectAlert } from "./alert-dispatch.js";
+import { loadProjectAlertSettingsCanonical } from "./builtin-alert-rules.js";
 
 export async function loadProjectAlertSettings(
   prisma: PrismaClient,
   projectId: string
 ): Promise<ProjectAlertSettings> {
-  const row = await prisma.project.findFirst({
-    where: { id: projectId, deleted_at: null },
-    select: { alert_settings: true },
-  });
-  if (!row) {
-    return parseProjectAlertSettings(null);
-  }
-  return parseProjectAlertSettings(row.alert_settings);
+  return loadProjectAlertSettingsCanonical(prisma, projectId);
 }
 
 export async function maybeNotifyErrorSpike(

@@ -3,6 +3,7 @@ import {
   fetchProjectAlertEvents,
   fetchProjectAlertSettings,
 } from "@/lib/alert-settings-server";
+import { fetchProjectAlertRules } from "@/lib/alert-rules-server";
 import {
   fetchProjectWebhookDeliveries,
   fetchProjectWebhooks,
@@ -28,19 +29,22 @@ async function loadCanEdit(): Promise<boolean> {
 }
 
 export default async function AlertsPage() {
-  const [settings, events, webhooks, deliveries, piiResult, canEdit] = await Promise.all([
-    fetchProjectAlertSettings(),
-    fetchProjectAlertEvents(),
-    fetchProjectWebhooks(),
-    fetchProjectWebhookDeliveries(25),
-    fetchProjectPiiScrubSettings(),
-    loadCanEdit(),
-  ]);
+  const [settings, events, rules, webhooks, deliveries, piiResult, canEdit] =
+    await Promise.all([
+      fetchProjectAlertSettings(),
+      fetchProjectAlertEvents(),
+      fetchProjectAlertRules(),
+      fetchProjectWebhooks(),
+      fetchProjectWebhookDeliveries(25),
+      fetchProjectPiiScrubSettings(),
+      loadCanEdit(),
+    ]);
 
   return (
     <AlertsClient
       initialSettings={settings}
       initialEvents={events}
+      initialRules={rules}
       initialWebhooks={webhooks}
       initialDeliveries={deliveries}
       initialPiiSettings={

@@ -11,6 +11,8 @@
     "test": "NODE_ENV=test vitest run",
     "test:watch": "NODE_ENV=test vitest",
     "retention": "tsx src/jobs/run-retention.ts",
+    "alert-rules-evaluator": "tsx src/jobs/run-alert-rules-evaluator.ts",
+    "builtin-alert-rules-backfill": "tsx src/jobs/run-builtin-alert-rules-backfill.ts",
     "pii-scrub-backfill": "tsx src/jobs/run-pii-scrub-backfill.ts",
     "brief-worker": "tsx src/jobs/run-brief-worker.ts",
     "alert-webhook-worker": "tsx src/jobs/run-alert-webhook-worker.ts",
@@ -23,7 +25,7 @@
     "@jridgewell/trace-mapping": "^0.3.31",
     "@prisma/client": "^6.1.0",
     "@sentry/node": "^9.15.0",
-    "fastify": "^5.1.0",
+    "fastify": "^5.8.5",
     "stripe": "^22.0.2",
     "zod": "^3.23.8"
   },
@@ -32,6 +34,6 @@
     "prisma": "^6.1.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^3.0.5"
+    "vitest": "^3.2.6"
   }
 }

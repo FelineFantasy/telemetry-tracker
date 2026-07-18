@@ -13,13 +13,86 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
-- **Slack alert notifications** — add Slack Incoming Webhook destinations on Alerts → Delivery; worker POSTs Slack Block Kit–compatible JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Slack connected when an enabled Slack destination exists ([#223](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/223); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); builds on [#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225))
-- **Discord alert notifications** — add Discord webhook destinations on Alerts → Delivery; worker POSTs embed JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Discord connected when an enabled Discord destination exists ([#224](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/224); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
-- **Telegram and Microsoft Teams alert channels** — add Teams Incoming Webhook and Telegram Bot API (`sendMessage` + chat id) destinations on Alerts → Delivery; Integrations catalog marks each connected when an enabled destination exists ([#500](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/500); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
-
 ### Fixed
 
 ### Changed
+
+### Database
+
+---
+
+## [1.15.3] - 2026-07-18
+
+### Fixed
+
+- **Production smoke billing portal probe** — `scripts/smoke-production.sh` sends `-d '{}'` with `Content-Type: application/json` on `POST …/billing/portal` so Fastify no longer rejects an empty body (Sentry `FastifyError` during v1.15.2 smoke) ([#547](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/547))
+
+---
+
+## [1.15.2] - 2026-07-18
+
+### Added
+
+- **Alert rules built-in integration** — error-spike and quota alerts are system-managed `AlertRule` rows (`source=SYSTEM`, stable `migration_key`); idempotent ensure/backfill from `alert_settings`; dual-write via alert-settings API; custom CRUD/evaluators skip SYSTEM so delivery stays on `fireProjectAlert` with legacy dedupe keys ([#535](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/535); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+- **Alert rules dashboard UX** — edit existing rules, multi-condition (AND) authoring matching the API, clearer opaque destination picker, and validation/empty-state polish on Alerts → Custom rules ([#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+- **Alert rules conditions + scheduled evaluator** — API support for `ERROR_RATE`, `SESSION_DROP`, `NEW_ERROR_GROUP`, `AFFECTED_USERS`, `QUOTA_PERCENT`, `NO_EVENTS`, and `HEARTBEAT`; skip-safe unknown condition types; ingest + scheduled evaluation paths with shared `last_fired_at` cooldown into `fireProjectAlert`; cron entrypoint `alert-rules-evaluator` ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+
+### Fixed
+
+- **Event ingest environment normalization** — `/event` and `/batch` now trim/cap `environment` like sessions and errors so AlertRule `NO_EVENTS` / `HEARTBEAT` environment filters match stored rows ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534))
+- **Alert rule cooldown** — fires are gated by elapsed time since `last_fired_at` (atomic claim), not wall-clock dedupe buckets, so scheduled conditions cannot re-fire when a cooldown bucket rolls ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534))
+- **Scheduled alert-rules org gate** — evaluator skips soft-deleted projects and soft-deleted organizations, matching ingest API-key auth ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534))
+
+### Changed
+
+- **Alert rules docs / ops** — [docs/ALERT-RULES.md](docs/ALERT-RULES.md) and [docs/RAILWAY.md](docs/RAILWAY.md) document scheduled evaluation cadence (`ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`, default 5); built-in spike/quota migration and dual-write noted in ALERT-RULES
+
+### Database
+
+- `AlertRule.source` / `system_kind` / `migration_key` for system-managed built-in rules (`20260718140000_alert_rule_system_builtin`)
+- `AlertRule.last_fired_at` for concurrency-safe cooldown claims (`20260718120000_alert_rule_last_fired_at`)
+
+## [1.15.1] - 2026-07-17
+
+### Fixed
+
+- **Marketing reserved email domains** — reject RFC/example reserved domains (e.g. `example.com`, `*.test`) on marketing subscribe, and skip those addresses when sending product update emails so Resend 422s no longer abort release broadcasts ([#539](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/539))
+
+---
+
+## [1.15.0] - 2026-07-17
+
+### Added
+
+- **Alert rules (foundation)** — configurable per-project rules with `Condition[]` (AND), opaque `destinationIds` resolved by Notifications (`project-email` + `ProjectWebhook` ids), Alerts → Custom rules CRUD, and ingest-time evaluation for `ERROR_COUNT` with cooldown dedupe into existing `fireProjectAlert` fan-out ([#532](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/532); parent vision [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); milestone v1.15.x). Rules decide conditions → trigger → bindings; Notifications owns delivery.
+- **Alert Rules docs** — [docs/ALERT-RULES.md](docs/ALERT-RULES.md) separation of concerns, condition model, and destination binding notes; ALERT-WEBHOOKS cross-links updated
+
+### Database
+
+- `AlertRule` table (`conditions` JSON AND-array, `destination_ids` opaque refs); `AlertRuleType.ALERT_RULE` for custom-rule firings (`20260717220000_alert_rules`)
+- `ErrorOccurrence.environment` for accurate alert-rule environment scope (group-level env remains a last-seen tag only) (`20260717223000_error_occurrence_environment`)
+
+---
+
+## [1.14.4] - 2026-07-17
+
+### Fixed
+
+- **Alert webhook delivery on Node 24** — pinned HTTPS `lookup` now returns an address array when Node requests `{ all: true }`, fixing `Invalid IP address: undefined` delivery failures
+
+### Changed
+
+- **Release process** — document merge-only-when-required-checks-are-green and milestone close-out notes ([#526](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/526))
+
+---
+
+## [1.14.3] - 2026-07-17
+
+### Added
+
+- **Slack alert notifications** — add Slack Incoming Webhook destinations on Alerts → Delivery; worker POSTs Slack Block Kit–compatible JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Slack connected when an enabled Slack destination exists ([#223](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/223); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); builds on [#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225))
+- **Discord alert notifications** — add Discord webhook destinations on Alerts → Delivery; worker POSTs embed JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Discord connected when an enabled Discord destination exists ([#224](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/224); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+- **Telegram and Microsoft Teams alert channels** — add Teams Incoming Webhook and Telegram Bot API (`sendMessage` + chat id) destinations on Alerts → Delivery; Integrations catalog marks each connected when an enabled destination exists ([#500](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/500); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
 
 ### Database
 

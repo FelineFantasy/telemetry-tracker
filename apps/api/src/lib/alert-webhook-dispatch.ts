@@ -394,6 +394,44 @@ export function pickPinnedWebhookAddress(addresses: WebhookDnsAddress[]): Webhoo
   return addresses.find((a) => a.family === 4) ?? addresses[0]!;
 }
 
+/**
+ * Custom `https.request` / `net.connect` `lookup` that returns a pre-validated IP
+ * without calling system DNS again (closes DNS-rebinding TOCTOU).
+ *
+ * Node 24+ often invokes lookup with `{ all: true }` and expects
+ * `callback(null, LookupAddress[])`. Older call sites use the single-address form
+ * `callback(null, address, family)`. Both must be handled or deliveries fail with
+ * `Invalid IP address: undefined`.
+ */
+export function createPinnedWebhookLookup(pinned: WebhookDnsAddress): (
+  hostname: string,
+  options: unknown,
+  callback?: (
+    err: NodeJS.ErrnoException | null,
+    address: string | Array<{ address: string; family: number }>,
+    family?: number
+  ) => void
+) => void {
+  return (_hostname, options, callback) => {
+    const cb =
+      typeof options === "function"
+        ? (options as NonNullable<typeof callback>)
+        : callback;
+    if (!cb) return;
+
+    const all =
+      typeof options === "object" &&
+      options !== null &&
+      (options as { all?: boolean }).all === true;
+
+    if (all) {
+      cb(null, [{ address: pinned.address, family: pinned.family }]);
+      return;
+    }
+    cb(null, pinned.address, pinned.family);
+  };
+}
+
 export function maskWebhookUrl(url: string): string {
   try {
     const parsed = new URL(url);
@@ -756,6 +794,8 @@ export async function softDeleteProjectWebhook(
   if (result.count === 0) {
     return { ok: false, error: "Webhook not found", status: 404 };
   }
+  const { pruneDestinationIdFromAlertRules } = await import("./alert-rules.js");
+  await pruneDestinationIdFromAlertRules(prisma, projectId, webhookId);
   return { ok: true };
 }
 
@@ -763,6 +803,11 @@ export type EnqueueAlertWebhookInput = {
   projectId: string;
   alertEventId: string;
   dedupeKey: string;
+  /**
+   * When set, only these webhook ids (must still be enabled + belonging to project).
+   * Empty array skips webhook fan-out. When omitted, all enabled project webhooks.
+   */
+  webhookIds?: string[];
 };
 
 /**
@@ -773,11 +818,17 @@ export async function enqueueAlertWebhookDeliveries(
   prisma: PrismaClient | Prisma.TransactionClient,
   input: EnqueueAlertWebhookInput
 ): Promise<number> {
+  if (input.webhookIds !== undefined && input.webhookIds.length === 0) {
+    return 0;
+  }
   const webhooks = await prisma.projectWebhook.findMany({
     where: {
       project_id: input.projectId,
       deleted_at: null,
       enabled: true,
+      ...(input.webhookIds !== undefined
+        ? { id: { in: input.webhookIds } }
+        : {}),
     },
     select: { id: true },
   });
@@ -948,9 +999,8 @@ export async function postWebhookOnce(
         servername: parsed.hostname,
         timeout: WEBHOOK_FETCH_TIMEOUT_MS,
         // Pin connect to the address we validated — do not call system DNS again.
-        lookup: (_hostname, _opts, callback) => {
-          callback(null, pinned.address, pinned.family);
-        },
+        // Must handle Node 24+ `{ all: true }` (array callback) and single-address form.
+        lookup: createPinnedWebhookLookup(pinned),
       },
       (res) => {
         const status = res.statusCode ?? 0;

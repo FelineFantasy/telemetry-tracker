@@ -4,10 +4,12 @@ import {
   buildMarketingUnsubscribeUrl,
   generateMarketingUnsubscribeToken,
   hashMarketingUnsubscribeToken,
+  isValidMarketingEmail,
 } from "../src/lib/marketing-subscriber.js";
 import { sendTransactionalEmail, isTransactionalEmailConfigured } from "../src/lib/email.js";
 import { isMinorOrMajorBump } from "../src/lib/release-email-semver.js";
 import {
+  emptyReleaseEmailAudienceMessage,
   isReleaseEmailBroadcastComplete,
   loadReleaseEmailSentSubscriberIds,
   pendingReleaseEmailRecipients,
@@ -148,20 +150,29 @@ async function main() {
     return;
   }
 
-  const subscribers = await prisma.marketingSubscriber.findMany({
+  const allSubscribers = await prisma.marketingSubscriber.findMany({
     where: { unsubscribed_at: null },
     select: { id: true, email: true, unsubscribe_token: true },
     orderBy: { email: "asc" },
   });
 
+  const skippedUndeliverable = allSubscribers.filter((sub) => !isValidMarketingEmail(sub.email));
+  const subscribers = allSubscribers.filter((sub) => isValidMarketingEmail(sub.email));
+  if (skippedUndeliverable.length > 0) {
+    console.warn(
+      `Skipping ${skippedUndeliverable.length} reserved/invalid subscriber address(es): ${skippedUndeliverable
+        .map((sub) => sub.email)
+        .join(", ")}`
+    );
+  }
+
   if (subscribers.length === 0) {
+    const message = emptyReleaseEmailAudienceMessage(allSubscribers.length, { dryRun: DRY_RUN });
     if (DRY_RUN) {
-      console.log("--dry-run: would send to 0 subscriber(s).");
+      console.log(message);
       return;
     }
-    console.error(
-      "No active marketing subscribers. Re-run after subscribers exist; the workflow can be retried safely."
-    );
+    console.error(message);
     process.exit(1);
   }
 

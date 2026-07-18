@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
+  createProjectAlertRuleAction,
   createProjectWebhookAction,
+  deleteProjectAlertRuleAction,
   deleteProjectWebhookAction,
   saveProjectAlertSettingsAction,
   saveProjectPiiScrubSettingsAction,
   testProjectWebhookAction,
+  updateProjectAlertRuleAction,
   updateProjectWebhookAction,
 } from "@/app/dashboard/actions";
 import {
@@ -39,6 +42,18 @@ import {
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
 import {
+  alertRuleSupportsDashboardEditor,
+  createDefaultAlertRuleDraft,
+  draftFromAlertRule,
+  formatAlertRuleDestinations,
+  formatAlertRuleSummary,
+  PROJECT_EMAIL_DESTINATION_ID,
+  validateAlertRuleDraft,
+  type AlertRuleFormDraft,
+  type AlertRuleRow,
+  type DestinationOption,
+} from "@/lib/alert-rules";
+import {
   formatDenyKeysInput,
   normalizeProjectPiiScrubSettings,
   parseDenyKeysInput,
@@ -51,6 +66,7 @@ import type {
   AlertWebhookProvider,
   ProjectWebhookRow,
 } from "@/lib/project-webhooks";
+import { AlertRuleEditor } from "./AlertRuleEditor";
 
 function providerLabel(provider: AlertWebhookProvider): string {
   switch (provider) {
@@ -124,6 +140,7 @@ function deliveryStatusLabel(status: AlertWebhookDeliveryRow["status"]): string 
 export function AlertsClient({
   initialSettings,
   initialEvents,
+  initialRules,
   initialWebhooks,
   initialDeliveries,
   initialPiiSettings,
@@ -132,6 +149,7 @@ export function AlertsClient({
 }: {
   initialSettings: ProjectAlertSettings;
   initialEvents: AlertEventRow[];
+  initialRules: AlertRuleRow[];
   initialWebhooks: ProjectWebhookRow[];
   initialDeliveries: AlertWebhookDeliveryRow[];
   initialPiiSettings: ProjectPiiScrubSettings;
@@ -143,7 +161,9 @@ export function AlertsClient({
   const [pending, startTransition] = useTransition();
   const [piiPending, startPiiTransition] = useTransition();
   const [webhookPending, startWebhookTransition] = useTransition();
+  const [rulePending, startRuleTransition] = useTransition();
   const [settings, setSettings] = useState(initialSettings);
+  const [rules, setRules] = useState(initialRules);
   const [webhooks, setWebhooks] = useState(initialWebhooks);
   const [webhookProvider, setWebhookProvider] =
     useState<AlertWebhookProvider>("GENERIC");
@@ -154,6 +174,10 @@ export function AlertsClient({
     webhookId: string;
     secret: string;
   } | null>(null);
+  const [ruleDraft, setRuleDraft] = useState<AlertRuleFormDraft>(() =>
+    createDefaultAlertRuleDraft()
+  );
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [denyKeysText, setDenyKeysText] = useState(() =>
     formatDenyKeysInput(initialPiiSettings.denyKeys)
   );
@@ -171,6 +195,29 @@ export function AlertsClient({
       prev && initialWebhooks.some((w) => w.id === prev.webhookId) ? prev : null
     );
   }, [initialWebhooks]);
+
+  useEffect(() => {
+    setRules(initialRules);
+  }, [initialRules]);
+
+  const destinationOptions = useMemo((): DestinationOption[] => {
+    return [
+      {
+        id: PROJECT_EMAIL_DESTINATION_ID,
+        label: "Project alert email",
+        kind: "Email",
+        enabled: true,
+      },
+      ...webhooks.map((wh) => ({
+        id: wh.id,
+        label:
+          wh.label?.trim() ||
+          `${providerLabel(wh.provider)} · ${wh.urlMasked}`,
+        kind: providerLabel(wh.provider),
+        enabled: wh.enabled,
+      })),
+    ];
+  }, [webhooks]);
 
   // After router.refresh(), props can recover from a failed load while useState
   // still holds fallback defaults — resync so a later save cannot wipe real keys.
@@ -302,8 +349,101 @@ export function AlertsClient({
         return;
       }
       setWebhooks((prev) => prev.filter((w) => w.id !== id));
+      // Create mode: drop the deleted id from the draft so create cannot bind it.
+      // Edit mode: leave destinationIds alone — silent pruning would PATCH-drop
+      // bindings on Save even when the user only changed name/thresholds/cooldown.
+      // Orphans remain visible in AlertRuleEditor for an explicit uncheck.
+      if (!editingRuleId) {
+        setRuleDraft((prev) => ({
+          ...prev,
+          destinationIds: prev.destinationIds.filter((wid) => wid !== id),
+        }));
+      }
       setLastSigningSecret((prev) => (prev?.webhookId === id ? null : prev));
       toast.success("Webhook removed");
+      router.refresh();
+    });
+  }
+
+  function resetRuleEditor() {
+    setEditingRuleId(null);
+    setRuleDraft(createDefaultAlertRuleDraft());
+  }
+
+  function beginEditRule(rule: AlertRuleRow) {
+    setEditingRuleId(rule.id);
+    // Keep stored destinationIds as-is — do not drop bindings just because the
+    // Delivery list failed to load or is momentarily incomplete.
+    setRuleDraft(draftFromAlertRule(rule));
+  }
+
+  function submitAlertRule() {
+    const validated = validateAlertRuleDraft(ruleDraft);
+    if (!validated.ok) {
+      toast.error(validated.error);
+      return;
+    }
+    const { payload } = validated;
+    startRuleTransition(async () => {
+      if (editingRuleId) {
+        const result = await updateProjectAlertRuleAction(editingRuleId, {
+          name: payload.name,
+          conditions: payload.conditions,
+          destinationIds: payload.destinationIds,
+          cooldownMinutes: payload.cooldownMinutes,
+        });
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        setRules((prev) =>
+          prev.map((r) => (r.id === editingRuleId ? result.rule : r))
+        );
+        resetRuleEditor();
+        toast.success("Alert rule updated");
+        router.refresh();
+        return;
+      }
+      const result = await createProjectAlertRuleAction({
+        name: payload.name,
+        conditions: payload.conditions,
+        destinationIds: payload.destinationIds,
+        cooldownMinutes: payload.cooldownMinutes,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setRules((prev) => [...prev, result.rule]);
+      resetRuleEditor();
+      toast.success("Alert rule created");
+      router.refresh();
+    });
+  }
+
+  function toggleAlertRule(id: string, enabled: boolean) {
+    startRuleTransition(async () => {
+      const result = await updateProjectAlertRuleAction(id, { enabled });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setRules((prev) => prev.map((r) => (r.id === id ? result.rule : r)));
+    });
+  }
+
+  function removeAlertRule(id: string) {
+    startRuleTransition(async () => {
+      const result = await deleteProjectAlertRuleAction(id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setRules((prev) => prev.filter((r) => r.id !== id));
+      if (editingRuleId === id) {
+        resetRuleEditor();
+      }
+      toast.success("Alert rule removed");
       router.refresh();
     });
   }
@@ -325,7 +465,7 @@ export function AlertsClient({
     <>
       <SettingsPageHeader
         title="Alerts"
-        description="Threshold rules for the active project. Fired alerts appear in the notification bell, email configured recipients, and POST to configured webhooks."
+        description="Configurable rules and built-in thresholds for the active project. Fired alerts appear in the notification bell and fan out to the destinations you bind."
         actions={
           canEdit ? (
             <SettingsBtn variant="primary" disabled={!dirty || pending} onClick={save}>
@@ -342,8 +482,121 @@ export function AlertsClient({
         ) : null}
 
         <Section
+          title="Custom rules"
+          description="Rules decide when to fire (AND of conditions) and which opaque destination ids to notify. Delivery (email, Slack, Discord, …) is owned by Notifications — not by the rule."
+        >
+          {rules.length > 0 ? (
+            <ul className="mb-4 divide-y divide-border rounded-md border border-border">
+              {rules.map((rule) => {
+                const isEditing = editingRuleId === rule.id;
+                return (
+                  <li
+                    key={rule.id}
+                    className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-medium text-foreground">
+                        {rule.name}
+                        {isEditing ? (
+                          <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                            editing
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-[12px] text-muted-foreground">
+                        {formatAlertRuleSummary(rule)} · cooldown{" "}
+                        {rule.cooldownMinutes}m ·{" "}
+                        {formatAlertRuleDestinations(
+                          rule.destinationIds,
+                          destinationOptions
+                        )}
+                      </p>
+                      {rule.conditions.length === 0 ? (
+                        <p className="mt-1 text-[12px] text-destructive">
+                          Stored conditions are invalid or unsupported — edit to
+                          fix, or disable/remove.
+                        </p>
+                      ) : !alertRuleSupportsDashboardEditor(rule) ? (
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          Includes scheduled/advanced conditions — toggle or
+                          remove here; edit via API until the dashboard editor
+                          supports them.
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+                      <div
+                        className={
+                          canEdit ? undefined : "pointer-events-none opacity-50"
+                        }
+                      >
+                        <SettingsToggle
+                          on={rule.enabled}
+                          onChange={(enabled) =>
+                            toggleAlertRule(rule.id, enabled)
+                          }
+                        />
+                      </div>
+                      {canEdit ? (
+                        <>
+                          {alertRuleSupportsDashboardEditor(rule) ? (
+                            <SettingsBtn
+                              variant="outline"
+                              disabled={rulePending}
+                              onClick={() => beginEditRule(rule)}
+                            >
+                              Edit
+                            </SettingsBtn>
+                          ) : null}
+                          <SettingsBtn
+                            variant="ghost"
+                            disabled={rulePending}
+                            onClick={() => removeAlertRule(rule.id)}
+                          >
+                            Remove
+                          </SettingsBtn>
+                        </>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="mb-4 rounded-md border border-dashed border-border bg-surface/20 px-4 py-6 text-center">
+              <p className="text-[13px] font-medium text-foreground">
+                No custom rules yet
+              </p>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                Create a rule below to fire when error counts cross a threshold.
+                Built-in spike and quota alerts still work without a custom
+                rule.
+              </p>
+            </div>
+          )}
+
+          {canEdit ? (
+            <div className="rounded-md border border-border bg-surface/10 p-4">
+              <p className="mb-3 text-[13px] font-medium text-foreground">
+                {editingRuleId ? "Edit rule" : "Create rule"}
+              </p>
+              <AlertRuleEditor
+                mode={editingRuleId ? "edit" : "create"}
+                draft={ruleDraft}
+                onChange={setRuleDraft}
+                destinations={destinationOptions}
+                pending={rulePending}
+                onSubmit={submitAlertRule}
+                onCancel={editingRuleId ? resetRuleEditor : undefined}
+                submitLabel={editingRuleId ? "Save changes" : "Create rule"}
+              />
+            </div>
+          ) : null}
+        </Section>
+
+        <Section
           title="Error spike"
-          description="Fire when error occurrences in a rolling window exceed your threshold."
+          description="Built-in system rule: fire when error occurrences in a rolling window exceed your threshold (all environments; fans out to all email recipients and delivery channels). Stored as a system-managed AlertRule — edit here, not under Custom rules."
         >
           <FieldGroup>
             <Field label="Enable error spike alerts" htmlFor="error-spike-toggle">
@@ -405,7 +658,7 @@ export function AlertsClient({
 
         <Section
           title="Ingest quota"
-          description="Warn before monthly ingest limits are reached. Exceeded alerts always fire when ingest is rejected."
+          description="Built-in system rules: warn before monthly ingest limits are reached; exceeded alerts always fire when usage is at or above the limit. Stored as system-managed AlertRules — edit warnings here, not under Custom rules."
         >
           <FieldGroup>
             <Field label="Enable quota warnings" htmlFor="quota-toggle">
