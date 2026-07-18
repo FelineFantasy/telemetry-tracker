@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.5] - 2026-07-18
+
+### Changed
+
+- **Dependency security bumps** — Dependabot group update: `fastify` 5.8.5, `next` 15.5.18, `postcss` 8.5.10, `vitest` 3.2.6, plus transitive `fast-uri` / `picomatch` ([#551](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/551))
+
+---
+
 ## [1.15.4] - 2026-07-18
 
 ### Changed
