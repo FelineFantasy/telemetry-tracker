@@ -163,6 +163,22 @@ describe("buildSessionListFilter", () => {
 });
 
 describe("sessionFilterSql", () => {
+  it("applies multi-word q as AND across session text fields", () => {
+    const sql = sessionFilterSql("proj-1", {
+      range: {},
+      q: "jane Chrome",
+    });
+    const text = prismaSqlText(sql);
+    expect(text).toContain(" AND ");
+    expect(text).toContain(" OR ");
+    expect(text).toContain('"session_id"');
+    expect(text).toContain('"user_id"');
+    expect(text).toContain('"device_browser"');
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain("%jane%");
+    expect(values).toContain("%Chrome%");
+  });
+
   it("prefers session environment with effective release when both filters are set", () => {
     const sql = sessionFilterSql("proj-1", {
       range: {},

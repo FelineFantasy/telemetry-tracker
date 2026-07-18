@@ -4,6 +4,7 @@
 
 import { Prisma, PrismaClient } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
+import { eventFreeTextMatchSql } from "./list-query-helpers.js";
 import type { EventListFilterInput } from "./events-list-query.js";
 import type { ResolvedSummaryWindow } from "./events-page-summary.js";
 import {
@@ -89,6 +90,12 @@ function buildEventAnalyticsFilterSql(f: EventListFilterInput, projectId: string
     const pat = `%${escapeLikePattern(f.propertiesContains.trim())}%`;
     parts.push(Prisma.sql`e."properties"::text ILIKE ${pat} ESCAPE '\\'`);
   }
+  const freeText = eventFreeTextMatchSql(
+    f.q,
+    Prisma.sql`e."name"`,
+    Prisma.sql`e."properties"::text`
+  );
+  if (freeText) parts.push(freeText);
   return Prisma.join(parts, " AND ");
 }
 

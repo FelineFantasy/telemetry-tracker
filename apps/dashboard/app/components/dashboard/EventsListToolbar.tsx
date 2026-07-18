@@ -46,6 +46,7 @@ type Props = {
   platform: string;
   release: string;
   propertiesContains: string;
+  q: string;
   sort: string;
   order: string;
   environments: string[];
@@ -69,6 +70,7 @@ export function EventsListToolbar({
   platform,
   release,
   propertiesContains,
+  q,
   sort,
   order,
   environments,
@@ -140,12 +142,22 @@ export function EventsListToolbar({
 
         <FilterRow>
           <FilterField grow>
+            <FilterLabel>Search</FilterLabel>
+            <FilterInput
+              type="search"
+              name="q"
+              defaultValue={q}
+              placeholder="Name or properties…"
+              autoComplete="off"
+            />
+          </FilterField>
+          <FilterField grow>
             <FilterLabel>Event name</FilterLabel>
             <FilterInput
               type="search"
               name="name"
               defaultValue={name}
-              placeholder="e.g. screen_view"
+              placeholder="Exact name…"
               autoComplete="off"
             />
           </FilterField>

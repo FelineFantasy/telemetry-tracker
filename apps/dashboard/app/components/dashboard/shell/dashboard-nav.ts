@@ -7,6 +7,7 @@ export type DashboardNavItem = {
 
 export const DASHBOARD_NAV: DashboardNavItem[] = [
   { href: "/dashboard/overview", label: "Overview", enabled: true },
+  { href: "/dashboard/search", label: "Search", enabled: true },
   { href: "/dashboard/errors", label: "Issues", enabled: true },
   { href: "/dashboard/events", label: "Events", enabled: true },
   { href: "/dashboard/sessions", label: "Sessions", enabled: true },

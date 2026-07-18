@@ -24,6 +24,7 @@ export async function fetchLatestEventsByName(
     platform?: string;
     release?: string;
     propertiesContains?: string;
+    q?: string;
     names: string[];
   }
 ): Promise<Map<string, LatestEventByNameRow>> {
@@ -37,6 +38,7 @@ export async function fetchLatestEventsByName(
     platform: params.platform,
     release: params.release,
     propertiesContains: params.propertiesContains,
+    q: params.q,
     gte: params.since,
     lte: params.until,
   });

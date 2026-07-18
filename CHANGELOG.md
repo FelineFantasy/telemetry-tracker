@@ -13,7 +13,19 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Global Search** — project-scoped search across issues, events, sessions, releases, and users (`/dashboard/search`, `GET /api/search`) with free text and `key:value` filters ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+
 ### Fixed
+
+- **Global Search session scope** — align session/user/event/issue hits with list parity: effective-release + NULL-env fallback, `metricsUntil` time windows, Issues time-only via `last_seen`, and keyboard ↑↓/Enter + ignored-only empty state ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search releases time window** — release hits require event/session/error activity in the same nav/`range:`/`metricsUntil` window as other groups ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search time-only + users ranking** — treat route metrics windows as a valid search signal (so open-ended/`range:all` time-only queries return events/issues/releases consistently with sessions), and rank user hits by latest session activity instead of identity A–Z ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search issues metrics window** — time-only issue hits (no release/platform) apply `errorOccurrenceRange` to `last_seen`, matching the ~7d metrics window used for events/sessions when nav range is all-time ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search URL / View all free text** — treat `https://…` / `http://…` tokens as free text (not ignored `https:` filters), and forward API `parsed.freeText` into View all Issues/Events/Sessions links so colon-bearing terms stay aligned with grouped hits ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search pending submit** — ignore search form submit while dashboard navigation is pending, and only map input Enter to the highlighted hit (result rows use their own activation) ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search Events View all** — forward free text as Events list `q` (name OR properties, AND across terms) so View all keeps name-only and multi-word hits that `propertiesContains` alone dropped ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search Issues/Sessions View all** — Issues and Sessions list `q` use AND across whitespace terms (Issues: message OR fingerprint; Sessions: identity/device/session fields) so View all multi-word hits match Global Search ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Dashboard Sentry client capture** — re-check `window` inside async product-telemetry callbacks so Vitest teardown cannot throw `window is not defined` after `captureClientException`
 
 ### Changed
 

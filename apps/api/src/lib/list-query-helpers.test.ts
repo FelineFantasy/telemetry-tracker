@@ -1,12 +1,35 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { buildEventWhereSql } from "./list-query-helpers.js";
+import {
+  buildEventWhereSql,
+  freeTextAndMatchSql,
+} from "./list-query-helpers.js";
 import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   const parts = fragment as unknown as { strings: string[]; values: unknown[] };
   return parts.strings.join("?");
 }
+
+describe("freeTextAndMatchSql", () => {
+  it("returns null for blank q", () => {
+    expect(freeTextAndMatchSql("   ", [Prisma.sql`col`])).toBeNull();
+  });
+
+  it("ANDs whitespace terms across OR columns", () => {
+    const sql = freeTextAndMatchSql("foo bar", [
+      Prisma.sql`a`,
+      Prisma.sql`b`,
+    ]);
+    expect(sql).not.toBeNull();
+    const text = prismaSqlText(sql!);
+    expect(text).toContain(" AND ");
+    expect(text).toContain(" OR ");
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain("%foo%");
+    expect(values).toContain("%bar%");
+  });
+});
 
 describe("buildEventWhereSql", () => {
   it("escapes propertiesContains wildcards for ILIKE", () => {
@@ -17,6 +40,20 @@ describe("buildEventWhereSql", () => {
     expect(prismaSqlText(sql)).toContain("ESCAPE");
     const parts = sql as unknown as { values: unknown[] };
     expect(parts.values).toContain("%100\\%\\_done%");
+  });
+
+  it("applies free-text q as AND of name OR properties terms", () => {
+    const sql = buildEventWhereSql({
+      projectId: "proj_1",
+      q: "checkout started",
+    });
+    const text = prismaSqlText(sql);
+    expect(text).toContain("ILIKE");
+    expect(text).toContain(" OR ");
+    expect(text).toContain(" AND ");
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain("%checkout%");
+    expect(values).toContain("%started%");
   });
 
   it("matches Unknown via null / blank / sentinel (not exact __unknown__ only)", () => {

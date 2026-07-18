@@ -3,7 +3,7 @@
  */
 
 import { Prisma, PrismaClient } from "@prisma/client";
-import { escapeLikePattern } from "./list-query.js";
+import { freeTextAndMatchSql } from "./list-query-helpers.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import type { ErrorListFilterInput } from "./errors-list-query.js";
 import { releaseFilterMatchSql } from "./release-key.js";
@@ -88,10 +88,11 @@ export function buildErrorGroupScopeSql(
   const parts: Prisma.Sql[] = [Prisma.sql`${eg}."project_id" = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`${eg}."app" = ${f.appId}`);
   if (f.environment) parts.push(Prisma.sql`${eg}."environment" = ${f.environment}`);
-  if (f.q) {
-    const pat = `%${escapeLikePattern(f.q)}%`;
-    parts.push(Prisma.sql`${eg}."message" ILIKE ${pat} ESCAPE '\\'`);
-  }
+  const textSql = freeTextAndMatchSql(f.q, [
+    Prisma.sql`${eg}."message"`,
+    Prisma.sql`${eg}."fingerprint"`,
+  ]);
+  if (textSql) parts.push(textSql);
   if (f.status === "unresolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NOT NULL`);
   if (f.release || f.platform) {

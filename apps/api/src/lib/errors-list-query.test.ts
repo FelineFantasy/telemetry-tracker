@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
+  buildErrorGroupWhereInput,
   buildErrorOccurrenceScopeWhere,
   listScopedOccurrenceIdsForGroupId,
   parseTrendWindowParam,
@@ -13,6 +14,29 @@ function prismaSqlText(fragment: Prisma.Sql): string {
   const parts = fragment as unknown as { strings: string[]; values: unknown[] };
   return parts.strings.join("?");
 }
+
+describe("buildErrorGroupWhereInput", () => {
+  it("applies multi-word q as AND of message OR fingerprint contains", () => {
+    const where = buildErrorGroupWhereInput(
+      { range: {}, q: "checkout TypeError", status: "all" },
+      "proj-1"
+    );
+    expect(where.AND).toEqual([
+      {
+        OR: [
+          { message: { contains: "checkout", mode: "insensitive" } },
+          { fingerprint: { contains: "checkout", mode: "insensitive" } },
+        ],
+      },
+      {
+        OR: [
+          { message: { contains: "TypeError", mode: "insensitive" } },
+          { fingerprint: { contains: "TypeError", mode: "insensitive" } },
+        ],
+      },
+    ]);
+  });
+});
 
 describe("buildErrorOccurrenceScopeWhere", () => {
   it("returns empty object when no scope is set", () => {
