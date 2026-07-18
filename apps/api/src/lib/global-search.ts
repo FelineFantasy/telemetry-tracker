@@ -12,6 +12,7 @@ import {
   releaseDisplayLabel,
   releaseFilterMatchSql,
   releaseKeyFromDbValue,
+  sessionEffectiveReleaseKeySql,
   UNKNOWN_RELEASE_KEY,
 } from "./release-key.js";
 import { sessionEnvReleaseMatchSql } from "./sessions-page-summary.js";
@@ -198,6 +199,73 @@ export function globalSearchSessionReleaseSql(
 ): Prisma.Sql | null {
   if (!scope.release) return null;
   return globalSearchSessionEnvReleaseSql(projectId, scope);
+}
+
+export type GlobalSearchReleaseActivitySource = "event" | "session" | "error";
+
+/**
+ * Time bounds for release-search activity, aligned with the matching entity group
+ * (`eventCreatedAt` / `sessionStartedAt` / `errorOccurrenceRange`, else `range`).
+ * Missing sides fall back to `sessionStartedAt` (always closed from the search route)
+ * so open-ended `from:` / `range.gte` still share the metricsUntil upper bound.
+ * Empty when no window is set — callers skip the predicate (all-time).
+ */
+export function globalSearchReleaseActivityBounds(
+  source: GlobalSearchReleaseActivitySource,
+  scope: Pick<
+    GlobalSearchScope,
+    "range" | "eventCreatedAt" | "sessionStartedAt" | "errorOccurrenceRange"
+  >
+): { gte?: Date; lte?: Date } {
+  const closedFallback = scope.sessionStartedAt
+    ? {
+        gte: scope.sessionStartedAt.gte,
+        lte: scope.sessionStartedAt.lte,
+      }
+    : { gte: scope.range.gte, lte: scope.range.lte };
+
+  if (source === "event") {
+    return {
+      gte: scope.eventCreatedAt?.gte ?? closedFallback.gte,
+      lte: scope.eventCreatedAt?.lte ?? closedFallback.lte,
+    };
+  }
+  if (source === "session") {
+    return {
+      gte: scope.sessionStartedAt?.gte ?? scope.range.gte,
+      lte: scope.sessionStartedAt?.lte ?? scope.range.lte,
+    };
+  }
+  return {
+    gte: scope.errorOccurrenceRange?.gte ?? closedFallback.gte,
+    lte: scope.errorOccurrenceRange?.lte ?? closedFallback.lte,
+  };
+}
+
+/**
+ * SQL predicate for release activity in the search window.
+ * Events → `created_at`; sessions → `started_at`; errors → occurrence `created_at`
+ * (Release Health KPI activity). Returns null when no bounds are set.
+ */
+export function globalSearchReleaseActivityTimeSql(
+  source: GlobalSearchReleaseActivitySource,
+  scope: Pick<
+    GlobalSearchScope,
+    "range" | "eventCreatedAt" | "sessionStartedAt" | "errorOccurrenceRange"
+  >
+): Prisma.Sql | null {
+  const bounds = globalSearchReleaseActivityBounds(source, scope);
+  if (!bounds.gte && !bounds.lte) return null;
+  const col =
+    source === "event"
+      ? Prisma.sql`e."created_at"`
+      : source === "session"
+        ? Prisma.sql`s."started_at"`
+        : Prisma.sql`eo."created_at"`;
+  const parts: Prisma.Sql[] = [];
+  if (bounds.gte) parts.push(Prisma.sql`${col} >= ${bounds.gte}`);
+  if (bounds.lte) parts.push(Prisma.sql`${col} <= ${bounds.lte}`);
+  return Prisma.join(parts, " AND ");
 }
 
 function baseScopeParts(
@@ -637,14 +705,36 @@ async function searchReleases(
     !scope.release &&
     !scope.environment &&
     !scope.platform &&
-    !scope.appId
+    !scope.appId &&
+    !scope.range.gte &&
+    !scope.range.lte
   ) {
-    // No free text and no scoping filter — avoid dumping all releases.
+    // No free text / scope / time signal — avoid dumping all releases.
+    // Time-only (`range:` / from/to) is valid, same as issues/events.
     return emptyGroup();
   }
 
   const fetchLimit = limit + 1;
   type Row = { release_key: string | null };
+
+  // Activity in the same window as other search groups (Release Health KPI sources).
+  const eventWhere: Prisma.Sql[] = [Prisma.sql`e."project_id" = ${projectId}`];
+  const eventTime = globalSearchReleaseActivityTimeSql("event", scope);
+  if (eventTime) eventWhere.push(eventTime);
+
+  const sessionWhere: Prisma.Sql[] = [Prisma.sql`s."project_id" = ${projectId}`];
+  const sessionTime = globalSearchReleaseActivityTimeSql("session", scope);
+  if (sessionTime) sessionWhere.push(sessionTime);
+
+  const errorWhere: Prisma.Sql[] = [Prisma.sql`eg."project_id" = ${projectId}`];
+  const errorTime = globalSearchReleaseActivityTimeSql("error", scope);
+  if (errorTime) errorWhere.push(errorTime);
+
+  // Session branch: effective release (COALESCE session + latest known event), Release Health parity.
+  const sessionReleaseExpr = sessionEffectiveReleaseKeySql(projectId, "s", {
+    environment: scope.environment,
+    platform: scope.platform,
+  });
 
   const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
     SELECT release_key FROM (
@@ -652,15 +742,17 @@ async function searchReleases(
       FROM (
         SELECT e."project_id", e."app", e."environment", e."platform", e."release"
         FROM "Event" e
-        WHERE e."project_id" = ${projectId}
+        WHERE ${Prisma.join(eventWhere, " AND ")}
         UNION ALL
-        SELECT s."project_id", s."app", s."environment", s."platform", s."release"
+        SELECT s."project_id", s."app", s."environment", s."platform",
+          (${sessionReleaseExpr}) AS "release"
         FROM "Session" s
-        WHERE s."project_id" = ${projectId}
+        WHERE ${Prisma.join(sessionWhere, " AND ")}
         UNION ALL
-        SELECT eg."project_id", eg."app", eg."environment", eg."platform", eg."release"
-        FROM "ErrorGroup" eg
-        WHERE eg."project_id" = ${projectId}
+        SELECT eg."project_id", eg."app", eg."environment", eo."platform", eo."release"
+        FROM "ErrorOccurrence" eo
+        INNER JOIN "ErrorGroup" eg ON eg."id" = eo."error_group_id"
+        WHERE ${Prisma.join(errorWhere, " AND ")}
       ) src
       WHERE ${Prisma.join(whereParts, " AND ")}
     ) keys

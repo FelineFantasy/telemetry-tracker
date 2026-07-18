@@ -18,6 +18,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Fixed
 
 - **Global Search session scope** — align session/user/event/issue hits with list parity: effective-release + NULL-env fallback, `metricsUntil` time windows, Issues time-only via `last_seen`, and keyboard ↑↓/Enter + ignored-only empty state ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Global Search releases time window** — release hits require event/session/error activity in the same nav/`range:`/`metricsUntil` window as other groups ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
 
 ### Changed
 
