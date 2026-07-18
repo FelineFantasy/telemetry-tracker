@@ -52,6 +52,10 @@ export function AlertRuleEditor({
   const channelOptions = destinations.filter(
     (d) => d.id !== PROJECT_EMAIL_DESTINATION_ID
   );
+  const knownChannelIds = new Set(channelOptions.map((d) => d.id));
+  const orphanDestinationIds = draft.destinationIds.filter(
+    (id) => id !== PROJECT_EMAIL_DESTINATION_ID && !knownChannelIds.has(id)
+  );
   const canAddCondition = draft.conditions.length < MAX_ALERT_RULE_CONDITIONS;
 
   function updateCondition(
@@ -252,7 +256,7 @@ export function AlertRuleEditor({
             </span>
           </label>
 
-          {channelOptions.length === 0 ? (
+          {channelOptions.length === 0 && orphanDestinationIds.length === 0 ? (
             <p className="text-[13px] text-muted-foreground">
               No Delivery channels yet. Add Slack, Discord, Teams, Telegram, or a
               webhook under <span className="font-medium">Delivery</span> below,
@@ -285,6 +289,27 @@ export function AlertRuleEditor({
                   </li>
                 );
               })}
+              {orphanDestinationIds.map((id) => (
+                <li key={id}>
+                  <label className="flex items-start gap-2 text-[13px] text-foreground">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked
+                      disabled={pending}
+                      onChange={(e) => toggleDestination(id, e.target.checked)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        Bound destination (not in current Delivery list)
+                      </span>
+                      <span className="block font-mono text-[11px] text-muted-foreground">
+                        keep binding · {id}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              ))}
             </ul>
           )}
           {draft.destinationIds.length === 0 ? (

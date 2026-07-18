@@ -199,17 +199,6 @@ export function AlertsClient({
     setRules(initialRules);
   }, [initialRules]);
 
-  useEffect(() => {
-    setRuleDraft((prev) => ({
-      ...prev,
-      destinationIds: prev.destinationIds.filter(
-        (id) =>
-          id === PROJECT_EMAIL_DESTINATION_ID ||
-          initialWebhooks.some((w) => w.id === id)
-      ),
-    }));
-  }, [initialWebhooks]);
-
   const destinationOptions = useMemo((): DestinationOption[] => {
     return [
       {
@@ -375,13 +364,10 @@ export function AlertsClient({
   }
 
   function beginEditRule(rule: AlertRuleRow) {
-    const draft = draftFromAlertRule(rule);
-    draft.destinationIds = draft.destinationIds.filter(
-      (id) =>
-        id === PROJECT_EMAIL_DESTINATION_ID || webhooks.some((w) => w.id === id)
-    );
     setEditingRuleId(rule.id);
-    setRuleDraft(draft);
+    // Keep stored destinationIds as-is — do not drop bindings just because the
+    // Delivery list failed to load or is momentarily incomplete.
+    setRuleDraft(draftFromAlertRule(rule));
   }
 
   function submitAlertRule() {
