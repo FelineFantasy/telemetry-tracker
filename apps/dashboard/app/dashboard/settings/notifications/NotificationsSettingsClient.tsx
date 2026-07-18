@@ -145,7 +145,7 @@ export function NotificationsSettingsClient({
                 </div>
                 <SettingsToggle
                   on={prefs.channels[c.id]}
-                  onChange={(v) => setChannel(c.id, v)}
+                  onChange={() => setChannel(c.id, !prefs.channels[c.id])}
                 />
               </div>
             ))}
@@ -188,7 +188,7 @@ export function NotificationsSettingsClient({
                           >
                             <SettingsToggle
                               on={channelOn && routeOn}
-                              onChange={(v) => setRoute(cat.id, c.id, v)}
+                              onChange={() => setRoute(cat.id, c.id, !routeOn)}
                             />
                           </div>
                         </td>
@@ -209,10 +209,10 @@ export function NotificationsSettingsClient({
             <Field label="Enable quiet hours">
               <SettingsToggle
                 on={prefs.quietHours.enabled}
-                onChange={(enabled) =>
+                onChange={() =>
                   setPrefs((current) => ({
                     ...current,
-                    quietHours: { ...current.quietHours, enabled },
+                    quietHours: { ...current.quietHours, enabled: !current.quietHours.enabled },
                   }))
                 }
                 label="Mute non-critical notifications"
