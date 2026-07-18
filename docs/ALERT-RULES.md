@@ -11,7 +11,50 @@ Configurable notification rules per project ([#493](https://github.com/Telemetry
 
 Rules **must not** embed provider-specific send paths. On match they call into existing dispatch (`fireProjectAlert`), which resolves destination ids to email and/or `ProjectWebhook` deliveries.
 
-Built-in spike/quota thresholds on `Project.alert_settings` remain supported until a later integration slice migrates them into `AlertRule` rows.
+## Built-in spike / quota (#535)
+
+Built-in error-spike and quota alerts are **system-managed `AlertRule` rows** (`source=SYSTEM`), not a forever-parallel path.
+
+| Built-in control | `system_kind` | `migration_key` | Condition representation | Fire (`AlertEvent.rule`) | Dedupe |
+| --- | --- | --- | --- | --- | --- |
+| Error spike | `ERROR_SPIKE` | `builtin:error_spike` | `ERROR_COUNT` (threshold, windowMinutes, env=null) | `ERROR_SPIKE` | `alert:error_spike:{projectId}:{windowMinutes}:{bucket}` |
+| Quota warning | `QUOTA_WARNING` | `builtin:quota_warning` | `QUOTA_PERCENT` (nearPercent) | `QUOTA_NEAR` | `quota:near:{projectId}:{YYYY-MM}` |
+| Quota exceeded | `QUOTA_EXCEEDED` | `builtin:quota_exceeded` | `QUOTA_PERCENT` (100) | `QUOTA_EXCEEDED` | `quota:exceeded:{projectId}:{YYYY-MM}` |
+
+### What maps directly vs special handling
+
+| Setting | Maps to |
+| --- | --- |
+| `errorSpike.enabled` / `threshold` / `windowMinutes` | SYSTEM `ERROR_SPIKE` rule |
+| `quota.enabled` / `nearPercent` | SYSTEM `QUOTA_WARNING` rule |
+| Quota exceeded | Always-on SYSTEM `QUOTA_EXCEEDED` (not toggled by `quota.enabled`) |
+| Email recipients / roles | Still on `Project.alert_settings.email` (not an AlertRule condition) |
+| Destinations | Built-in fires **omit** `destinations` → legacy “email + all enabled webhooks”. SYSTEM rows store a `project-email` placeholder only. |
+| Cooldown | Spike/quota use **legacy AlertEvent dedupe keys**, not `last_fired_at` claims (preserves pre-migration idempotency) |
+
+### Dual-write (transitional)
+
+- **Canonical for spike/quota thresholds:** SYSTEM `AlertRule` rows.
+- **Projection:** `Project.alert_settings` JSON is still written on PATCH and read for email settings / mixed-version readers.
+- **Dashboard UX model:** built-in Error spike / Ingest quota controls edit SYSTEM rules via `PATCH /api/project/alert-settings` (dual-write). Custom rules UI lists **CUSTOM** rules only.
+- **Custom CRUD** rejects PATCH/DELETE on SYSTEM rules (403). SYSTEM rows do not count toward `MAX_ALERT_RULES`.
+- **Custom evaluators** (`maybeEvaluateAlertRules` / scheduled job) skip `source=SYSTEM` so they cannot double-fire with `ALERT_RULE` + `alert:rule:…` keys.
+
+### Migration / rollout
+
+1. Deploy schema migration `20260718140000_alert_rule_system_builtin` (`source`, `system_kind`, `migration_key`).
+2. Optional explicit backfill (idempotent):
+
+```bash
+pnpm --filter api builtin-alert-rules-backfill
+pnpm --filter api builtin-alert-rules-backfill -- --dry-run
+```
+
+3. Lazy ensure also runs on alert-settings GET/PATCH and built-in evaluators — safe if the job is delayed.
+4. Mixed deploy: old instances still fire from `alert_settings` with the **same** dedupe keys; new instances fire from SYSTEM rules with the same keys → `AlertEvent` unique constraint prevents duplicate notifications.
+5. Rollback: re-deploy previous API; SYSTEM rows are inert for old code; `alert_settings` JSON still holds thresholds.
+6. Failed projects: backfill logs `FAIL project=…` and increments `failures`; re-run is safe.
+7. Follow-up: remove spike/quota fields from `alert_settings` once dual-write is no longer needed (track separately; parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493) stays open).
 
 ## Model
 
@@ -19,8 +62,10 @@ Built-in spike/quota thresholds on `Project.alert_settings` remain supported unt
 | --- | --- |
 | `conditions` | JSON **array** of condition objects — **AND** semantics (every *known* condition must match) |
 | `destination_ids` | JSON array of **opaque** destination ids (not `email`/`slack`/… provider enums) |
-| `cooldown_minutes` | Minimum minutes between successful fires (enforced via `last_fired_at`) |
+| `cooldown_minutes` | Minimum minutes between successful fires (enforced via `last_fired_at` for CUSTOM rules) |
 | `last_fired_at` | Set atomically on fire claim; null until the first successful claim |
+| `source` | `CUSTOM` (user) or `SYSTEM` (built-in spike/quota) |
+| `system_kind` / `migration_key` | SYSTEM identity; unique per `(project_id, migration_key)` |
 | `enabled` / `deleted_at` | Toggle and soft-delete |
 
 ### Conditions (`Condition[]`)
@@ -78,11 +123,17 @@ Rules store ids only. Provider awareness lives in Notifications / Delivery chann
 
 ### Ingest-triggered
 
-On successful error ingest, `maybeEvaluateAlertRules` runs alongside the built-in spike/quota hooks for rules that include at least one ingest condition (`ERROR_COUNT`, `ERROR_RATE`, `NEW_ERROR_GROUP`, `AFFECTED_USERS`). Matching rules call `fireProjectAlert` with `rule: ALERT_RULE` after resolving `destinationIds` → `{ email, webhookIds }` at the Notifications boundary.
+On successful error ingest:
+
+1. `maybeNotifyErrorSpike` — SYSTEM error-spike rule (legacy `ERROR_SPIKE` + dedupe)
+2. `maybeEvaluateAlertRules` — CUSTOM rules with ingest conditions
+3. `maybeNotifyQuotaAlerts` — SYSTEM quota rules (legacy `QUOTA_*` + monthly dedupe)
+
+Matching **custom** rules call `fireProjectAlert` with `rule: ALERT_RULE` after resolving `destinationIds` → `{ email, webhookIds }` at the Notifications boundary.
 
 ### Scheduled evaluator
 
-Conditions that are not naturally ingest-triggered (`HEARTBEAT`, `NO_EVENTS`, `SESSION_DROP`, `QUOTA_PERCENT`, and `ERROR_RATE`) are evaluated by the scheduled job:
+Conditions that are not naturally ingest-triggered (`HEARTBEAT`, `NO_EVENTS`, `SESSION_DROP`, `QUOTA_PERCENT`, and `ERROR_RATE`) are evaluated by the scheduled job for **CUSTOM** rules only:
 
 ```bash
 pnpm --filter api alert-rules-evaluator
@@ -101,6 +152,7 @@ See [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron).
 
 - `GET/POST /api/project/alert-rules`
 - `PATCH/DELETE /api/project/alert-rules/:ruleId`
+- `GET/PATCH /api/project/alert-settings` — built-in spike/quota (+ email); dual-writes SYSTEM rules
 
 Create body shape:
 
@@ -113,11 +165,13 @@ Create body shape:
 }
 ```
 
-Editor/owner required for mutations (same as alert settings / webhooks). Cap: `MAX_ALERT_RULES` (20) per project.
+Editor/owner required for mutations (same as alert settings / webhooks). Cap: `MAX_ALERT_RULES` (20) **CUSTOM** rules per project.
 
 ## Dashboard
 
 Alerts → **Custom rules**: create, **edit**, enable/disable, remove; multi-condition editor (AND, up to `MAX_CONDITIONS_PER_RULE`); bind opaque destination ids (email + Delivery channels) with clear copy that Notifications owns delivery. The form currently authors **`ERROR_COUNT`** conditions; other kinds from the API are listed/summarized and can be toggled or removed (full editor UX for those kinds is follow-up).
+
+Alerts → **Error spike** / **Ingest quota**: edit SYSTEM AlertRule rows via alert-settings (not listed under Custom rules).
 
 ## Milestone slices (v1.15.x)
 

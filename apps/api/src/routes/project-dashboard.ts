@@ -1266,15 +1266,16 @@ export async function projectDashboardRoutes(
     const { validateProjectAlertSettingsPatch } = await import(
       "../lib/project-alert-settings.js"
     );
+    const { saveProjectAlertSettings } = await import(
+      "../lib/builtin-alert-rules.js"
+    );
     const previous = await loadProjectAlertSettings(prisma, projectId);
     const validated = validateProjectAlertSettingsPatch(request.body, previous);
     if (!validated.ok) {
       return reply.status(400).send({ error: validated.error });
     }
-    await prisma.project.update({
-      where: { id: projectId },
-      data: { alert_settings: validated.settings as object },
-    });
+    // Dual-write: alert_settings JSON + SYSTEM AlertRule rows (#535).
+    await saveProjectAlertSettings(prisma, projectId, validated.settings);
     return reply.send({ settings: validated.settings });
   });
 

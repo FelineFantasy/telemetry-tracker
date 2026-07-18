@@ -596,7 +596,7 @@ export function AlertsClient({
 
         <Section
           title="Error spike"
-          description="Built-in shortcut: fire when error occurrences in a rolling window exceed your threshold (all environments; fans out to all email recipients and delivery channels)."
+          description="Built-in system rule: fire when error occurrences in a rolling window exceed your threshold (all environments; fans out to all email recipients and delivery channels). Stored as a system-managed AlertRule — edit here, not under Custom rules."
         >
           <FieldGroup>
             <Field label="Enable error spike alerts">
@@ -655,7 +655,7 @@ export function AlertsClient({
 
         <Section
           title="Ingest quota"
-          description="Warn before monthly ingest limits are reached. Exceeded alerts always fire when ingest is rejected."
+          description="Built-in system rules: warn before monthly ingest limits are reached; exceeded alerts always fire when usage is at or above the limit. Stored as system-managed AlertRules — edit warnings here, not under Custom rules."
         >
           <FieldGroup>
             <Field label="Enable quota warnings">

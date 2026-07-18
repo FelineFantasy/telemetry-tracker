@@ -1,11 +1,13 @@
 /**
- * Configurable alert rules (#493 / #534).
+ * Configurable alert rules (#493 / #534 / #535).
  *
  * Separation of concerns:
  * - Alert Rules own Condition[] (AND) + opaque destinationIds + cooldown.
  * - Notifications (v1.14) own delivery — rules only call fireProjectAlert / enqueue paths.
  * - destinationIds are opaque bindings (well-known "project-email" or ProjectWebhook ids);
  *   providers (Slack/Discord/…) are resolved by Notifications, not stored as rule enums.
+ * - Built-in spike/quota are SYSTEM AlertRule rows (#535); custom CRUD/evaluators skip them.
+ *   Built-in evaluators keep legacy AlertEvent.rule + dedupe keys via fireProjectAlert.
  *
  * Evaluation paths:
  * - Ingest-triggered (`maybeEvaluateAlertRules`) for error-driven conditions.
@@ -422,8 +424,9 @@ export async function listAlertRules(
   prisma: PrismaClient,
   projectId: string
 ): Promise<AlertRulePublic[]> {
+  // SYSTEM built-in rows are managed via alert-settings — exclude from custom CRUD list.
   const rows = await prisma.alertRule.findMany({
-    where: { project_id: projectId, deleted_at: null },
+    where: { project_id: projectId, deleted_at: null, source: "CUSTOM" },
     orderBy: { created_at: "asc" },
   });
   return rows.map(toPublic);
@@ -465,7 +468,7 @@ export async function createAlertRule(
     const row = await prisma.$transaction(
       async (tx) => {
         const count = await tx.alertRule.count({
-          where: { project_id: projectId, deleted_at: null },
+          where: { project_id: projectId, deleted_at: null, source: "CUSTOM" },
         });
         if (count >= MAX_ALERT_RULES) {
           const err = new Error("MAX_ALERT_RULES") as Error & { code: string };
@@ -478,6 +481,7 @@ export async function createAlertRule(
             project_id: projectId,
             name: parsed.data.name,
             enabled: parsed.data.enabled,
+            source: "CUSTOM",
             conditions,
             destination_ids: parsed.data.destinationIds,
             cooldown_minutes: parsed.data.cooldownMinutes,
@@ -511,7 +515,7 @@ export async function updateAlertRule(
   body: unknown
 ): Promise<
   | { ok: true; rule: AlertRulePublic }
-  | { ok: false; error: string; status: 400 | 404 }
+  | { ok: false; error: string; status: 400 | 403 | 404 }
 > {
   const parsed = patchBodySchema.safeParse(body);
   if (!parsed.success) {
@@ -523,6 +527,13 @@ export async function updateAlertRule(
   });
   if (!existing) {
     return { ok: false, error: "Alert rule not found", status: 404 };
+  }
+  if (existing.source === "SYSTEM") {
+    return {
+      ok: false,
+      error: "System-managed alert rules are edited via project alert settings",
+      status: 403,
+    };
   }
 
   if (parsed.data.destinationIds) {
@@ -560,9 +571,27 @@ export async function softDeleteAlertRule(
   prisma: PrismaClient,
   projectId: string,
   ruleId: string
-): Promise<{ ok: true } | { ok: false; error: string; status: 404 }> {
-  const result = await prisma.alertRule.updateMany({
+): Promise<
+  | { ok: true }
+  | { ok: false; error: string; status: 403 | 404 }
+> {
+  const existing = await prisma.alertRule.findFirst({
     where: { id: ruleId, project_id: projectId, deleted_at: null },
+    select: { id: true, source: true },
+  });
+  if (!existing) {
+    return { ok: false, error: "Alert rule not found", status: 404 };
+  }
+  if (existing.source === "SYSTEM") {
+    return {
+      ok: false,
+      error: "System-managed alert rules cannot be deleted",
+      status: 403,
+    };
+  }
+
+  const result = await prisma.alertRule.updateMany({
+    where: { id: ruleId, project_id: projectId, deleted_at: null, source: "CUSTOM" },
     data: { deleted_at: new Date(), enabled: false },
   });
   if (result.count === 0) {
@@ -582,10 +611,12 @@ export async function pruneDestinationIdFromAlertRules(
   if (destinationId === PROJECT_EMAIL_DESTINATION_ID) return 0;
   const rules = await prisma.alertRule.findMany({
     where: { project_id: projectId, deleted_at: null },
-    select: { id: true, destination_ids: true },
+    select: { id: true, destination_ids: true, source: true },
   });
   let updated = 0;
   for (const rule of rules) {
+    // SYSTEM rows use a destination placeholder; do not mutate them here.
+    if (rule.source === "SYSTEM") continue;
     const parsed = destinationIdsSchema.safeParse(rule.destination_ids);
     if (!parsed.success) continue;
     if (!parsed.data.includes(destinationId)) continue;
@@ -1034,7 +1065,7 @@ export async function runScheduledAlertRuleEvaluation(
   prisma: PrismaClient
 ): Promise<ScheduledAlertRuleEvaluationResult> {
   const projectRows = await prisma.alertRule.findMany({
-    where: { deleted_at: null, enabled: true },
+    where: { deleted_at: null, enabled: true, source: "CUSTOM" },
     select: { project_id: true },
     distinct: ["project_id"],
   });
