@@ -178,12 +178,12 @@ Alerts → **Error spike** / **Ingest quota**: edit SYSTEM AlertRule rows via al
 
 ## Milestone slices (v1.15.x)
 
-Parent vision: [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493). Prefer small reviewable PRs over a mega-ship.
+Parent vision: [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493) (prefer leaving parent open as living roadmap). Milestone line shipped through at least **v1.15.5**; prefer small reviewable PRs over a mega-ship.
 
-| Slice | Issue |
-| --- | --- |
-| Foundation (this model + ERROR_COUNT + MVP UI) | [#532](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/532) / [PR #531](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/531) |
-| Dashboard multi-condition / edit UX | [#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533) |
-| Additional conditions + scheduled evaluation | [#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534) |
-| Integrate built-in spike/quota into AlertRule | [#535](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/535) |
-| Release v1.15.0 | [#536](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/536) |
+| Slice | Issue | Status |
+| --- | --- | --- |
+| Foundation (this model + ERROR_COUNT + MVP UI) | [#532](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/532) / [PR #531](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/531) | Shipped (v1.15.0) |
+| Dashboard multi-condition / edit UX | [#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533) | Shipped (v1.15.2) |
+| Additional conditions + scheduled evaluation | [#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534) | Shipped (v1.15.2) |
+| Integrate built-in spike/quota into AlertRule | [#535](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/535) | Shipped (v1.15.2) |
+| Release v1.15.0 | [#536](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/536) | Shipped |

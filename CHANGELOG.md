@@ -18,6 +18,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Changed
 
 - **Product update email on line close** — send when finishing the last intended release of a minor (`vX.Y.*`), summarizing the whole line since the previous product email; do not auto-send on the first `.0` of the next milestone. Workflow `line_close` + `--line-close` compose full-minor CHANGELOG; mid-line patches stay skip ([docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md), [docs/RELEASE.md](docs/RELEASE.md))
+- **Docs staleness pass** — align RELEASE / PRODUCTION-READINESS / ROADMAP / MONITORING with shipped Notifications + Alert Rules, Railway `alert-rules-evaluator` cron (leave `brief-worker` alone), and corrected ops notes (CI does not migrate production; Slack/Discord Delivery shipped)
 
 ### Database
 

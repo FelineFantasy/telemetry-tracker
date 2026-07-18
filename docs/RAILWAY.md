@@ -116,6 +116,8 @@ Scheduled evaluation for Alert Rules conditions that are not ingest-triggered (`
 
 Cadence is defined in one place: `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` (default **5** minutes) in `apps/api/src/lib/alert-rules.ts`. Match the Railway cron to that value.
 
+This service is **not** auto-provisioned — add it manually in Railway when you use schedule-oriented CUSTOM rules. Do **not** repurpose or change any existing `brief-worker` service.
+
 ### Railway setup (manual)
 
 1. **+ New** → **Empty Service** (e.g. `alert-rules-evaluator`).

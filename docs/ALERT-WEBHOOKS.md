@@ -116,10 +116,8 @@ shown once when the webhook is created.
 
 ## Related
 
-- Parent notifications vision: GitHub #492
+- Parent notifications vision: GitHub #492 (v1.14.x — shipped; parent may remain open as living roadmap)
 - Generic HTTPS webhooks: #225
-- Slack first-party: #223
-- Discord first-party: #224
-- Telegram / Microsoft Teams: #500
+- Slack / Discord / Telegram / Teams destinations: #223, #224, #500 (shipped)
 - In-product Notification Center: #508
-- Configurable alert rules engine: #493 (priority 2) — rules bind opaque destination ids; this doc owns channel delivery
+- Configurable alert rules: #493 / [ALERT-RULES.md](./ALERT-RULES.md) (v1.15.x — shipped; rules bind opaque destination ids; this doc owns channel delivery)
