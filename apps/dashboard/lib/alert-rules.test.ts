@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  createDefaultAlertRuleDraft,
+  createEmptyErrorCountCondition,
+  draftFromAlertRule,
+  formatAlertRuleDestinations,
   formatAlertRuleSummary,
   isAlertRuleRow,
+  MAX_ALERT_RULE_CONDITIONS,
+  PROJECT_EMAIL_DESTINATION_ID,
+  validateAlertRuleDraft,
   type AlertRuleRow,
 } from "./alert-rules";
 
@@ -70,10 +77,188 @@ describe("formatAlertRuleSummary", () => {
     );
   });
 
+  it("joins multiple conditions with AND", () => {
+    const rule: AlertRuleRow = {
+      ...baseRule,
+      conditions: [
+        {
+          type: "ERROR_COUNT",
+          threshold: 10,
+          windowMinutes: 5,
+          environment: "production",
+        },
+        {
+          type: "ERROR_COUNT",
+          threshold: 50,
+          windowMinutes: 60,
+          environment: null,
+        },
+      ],
+    };
+    expect(formatAlertRuleSummary(rule)).toBe(
+      "≥ 10 errors / 5m in production AND ≥ 50 errors / 60m"
+    );
+  });
+
   it("labels empty conditions as invalid/unsupported", () => {
     const rule: AlertRuleRow = { ...baseRule, conditions: [] };
     expect(formatAlertRuleSummary(rule)).toBe(
       "Invalid or unsupported conditions"
     );
+  });
+});
+
+describe("formatAlertRuleDestinations", () => {
+  it("lists email and channel kinds", () => {
+    expect(
+      formatAlertRuleDestinations(
+        [PROJECT_EMAIL_DESTINATION_ID, "wh-1"],
+        [
+          {
+            id: PROJECT_EMAIL_DESTINATION_ID,
+            label: "Project alert email",
+            kind: "Email",
+            enabled: true,
+          },
+          {
+            id: "wh-1",
+            label: "#ops",
+            kind: "Slack",
+            enabled: true,
+          },
+        ]
+      )
+    ).toBe("project email · Slack");
+  });
+
+  it("marks disabled and missing bindings", () => {
+    expect(
+      formatAlertRuleDestinations(["wh-1", "wh-missing"], [
+        {
+          id: "wh-1",
+          label: "ops",
+          kind: "Discord",
+          enabled: false,
+        },
+      ])
+    ).toBe("Discord (disabled) · 1 missing binding");
+  });
+});
+
+describe("validateAlertRuleDraft", () => {
+  it("accepts a default draft with email destination", () => {
+    const draft = createDefaultAlertRuleDraft();
+    draft.name = "Prod spike";
+    const result = validateAlertRuleDraft(draft);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.conditions).toHaveLength(1);
+      expect(result.payload.destinationIds).toEqual([
+        PROJECT_EMAIL_DESTINATION_ID,
+      ]);
+    }
+  });
+
+  it("requires name, conditions, and destinations", () => {
+    expect(validateAlertRuleDraft(createDefaultAlertRuleDraft()).ok).toBe(
+      false
+    );
+    expect(
+      validateAlertRuleDraft({
+        ...createDefaultAlertRuleDraft(),
+        name: "x",
+        destinationIds: [],
+      }).ok
+    ).toBe(false);
+    expect(
+      validateAlertRuleDraft({
+        ...createDefaultAlertRuleDraft(),
+        name: "x",
+        conditions: [],
+      }).ok
+    ).toBe(false);
+  });
+
+  it("accepts multiple ERROR_COUNT conditions", () => {
+    const draft = createDefaultAlertRuleDraft();
+    draft.name = "Multi";
+    draft.conditions = [
+      createEmptyErrorCountCondition({
+        threshold: 10,
+        windowMinutes: 15,
+        environment: "production",
+      }),
+      createEmptyErrorCountCondition({
+        threshold: 100,
+        windowMinutes: 60,
+        environment: "",
+      }),
+    ];
+    const result = validateAlertRuleDraft(draft);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.conditions).toEqual([
+        {
+          type: "ERROR_COUNT",
+          threshold: 10,
+          windowMinutes: 15,
+          environment: "production",
+        },
+        {
+          type: "ERROR_COUNT",
+          threshold: 100,
+          windowMinutes: 60,
+          environment: null,
+        },
+      ]);
+    }
+  });
+
+  it("rejects more than MAX_ALERT_RULE_CONDITIONS", () => {
+    const draft = createDefaultAlertRuleDraft();
+    draft.name = "Too many";
+    draft.conditions = Array.from({ length: MAX_ALERT_RULE_CONDITIONS + 1 }, () =>
+      createEmptyErrorCountCondition()
+    );
+    const result = validateAlertRuleDraft(draft);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/At most/);
+    }
+  });
+});
+
+describe("draftFromAlertRule", () => {
+  it("preserves empty conditions (does not synthesize defaults)", () => {
+    const draft = draftFromAlertRule({
+      ...baseRule,
+      conditions: [],
+    });
+    expect(draft.conditions).toEqual([]);
+    expect(draft.name).toBe(baseRule.name);
+    expect(draft.destinationIds).toEqual(baseRule.destinationIds);
+    expect(draft.cooldownMinutes).toBe(baseRule.cooldownMinutes);
+  });
+
+  it("maps stored ERROR_COUNT conditions into draft rows", () => {
+    const draft = draftFromAlertRule({
+      ...baseRule,
+      conditions: [
+        {
+          type: "ERROR_COUNT",
+          threshold: 10,
+          windowMinutes: 5,
+          environment: "production",
+        },
+      ],
+    });
+    expect(draft.conditions).toHaveLength(1);
+    expect(draft.conditions[0]).toMatchObject({
+      type: "ERROR_COUNT",
+      threshold: 10,
+      windowMinutes: 5,
+      environment: "production",
+    });
+    expect(draft.conditions[0]?.key).toMatch(/^cond-/);
   });
 });

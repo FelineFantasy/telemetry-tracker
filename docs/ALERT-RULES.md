@@ -83,7 +83,7 @@ Editor/owner required for mutations (same as alert settings / webhooks). Cap: `M
 
 ## Dashboard
 
-Alerts → **Custom rules**: create, enable/disable, remove; bind opaque destination ids (email + Delivery channels). Multi-condition editor UX is a follow-up slice — the API already accepts `conditions[]`.
+Alerts → **Custom rules**: create, **edit**, enable/disable, remove; multi-condition editor (AND, up to `MAX_CONDITIONS_PER_RULE`); bind opaque destination ids (email + Delivery channels) with clear copy that Notifications owns delivery. Validation and empty states live in the dashboard form (API remains source of truth for limits).
 
 ## Milestone slices (v1.15.x)
 

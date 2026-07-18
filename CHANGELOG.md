@@ -13,6 +13,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Alert rules dashboard UX** — edit existing rules, multi-condition (AND) authoring matching the API, clearer opaque destination picker, and validation/empty-state polish on Alerts → Custom rules ([#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+
 ### Fixed
 
 ### Changed
