@@ -35,7 +35,7 @@ describe("redirectHrefIfMissingTimeRange", () => {
 });
 
 describe("mergeDashboardUrlParams", () => {
-  it("drops API-only keys from merged params", () => {
+  it("drops API-only keys from list params unless already in the URL", () => {
     expect(
       mergeDashboardUrlParams(
         { range: "24h", page: "1" },
@@ -43,12 +43,43 @@ describe("mergeDashboardUrlParams", () => {
       )
     ).toEqual({ range: "24h", page: "2", sort: "duration" });
   });
+
+  it("preserves metricsUntil from the URL for deep links", () => {
+    expect(
+      mergeDashboardUrlParams(
+        { range: "none", metricsUntil: "2026-03-15T12:00:00.000Z" },
+        { page: "2", sort: "duration", metricsUntil: "2026-07-18T10:00:00.000Z" }
+      )
+    ).toEqual({
+      range: "none",
+      page: "2",
+      sort: "duration",
+      metricsUntil: "2026-03-15T12:00:00.000Z",
+    });
+  });
 });
 
 describe("listTimeRangeHiddenFields", () => {
   it("preserves no-date filter for GET filter forms", () => {
     const range = buildUnselectedTimeRange();
     expect(listTimeRangeHiddenFields(range)).toEqual({ range: "none" });
+  });
+
+  it("forwards metricsUntil for open-ended ranges when present", () => {
+    const range = buildUnselectedTimeRange();
+    const iso = "2026-03-15T12:00:00.000Z";
+    expect(listTimeRangeHiddenFields(range, undefined, undefined, iso)).toEqual({
+      range: "none",
+      metricsUntil: iso,
+    });
+  });
+
+  it("omits metricsUntil for closed presets", () => {
+    const range = buildUnselectedTimeRange();
+    const closed = { ...range, key: "24h" as const };
+    expect(
+      listTimeRangeHiddenFields(closed, undefined, undefined, "2026-03-15T12:00:00.000Z")
+    ).toEqual({ range: "24h" });
   });
 });
 

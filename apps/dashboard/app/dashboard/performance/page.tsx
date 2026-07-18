@@ -44,6 +44,7 @@ function buildPerformanceParamsRecord(sp: Record<string, string | string[] | und
     "range",
     "from",
     "to",
+    "metricsUntil",
     "environment",
     "platform",
     "release",

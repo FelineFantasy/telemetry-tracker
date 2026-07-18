@@ -45,6 +45,7 @@ function buildReleasesParamsRecord(sp: Record<string, string | string[] | undefi
     "range",
     "from",
     "to",
+    "metricsUntil",
     "environment",
     "platform",
     "sort",

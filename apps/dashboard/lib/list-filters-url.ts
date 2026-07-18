@@ -3,7 +3,11 @@ import {
   hasExplicitTimeRangeQuery,
 } from "./time-range";
 
-/** API-only query keys never written to the dashboard URL. */
+/**
+ * API-only query keys never written to the dashboard URL from list state.
+ * `metricsUntil` may still be restored from `urlParams` when already present
+ * (deep links / filter Apply); it is not invented from API list params.
+ */
 const API_ONLY_URL_KEYS = new Set(["metricsUntil", "view"]);
 
 /** Merge URL-backed params for history updates and shareable links. */
@@ -14,6 +18,9 @@ export function mergeDashboardUrlParams(
   const merged = { ...urlParams, ...listParams };
   for (const key of API_ONLY_URL_KEYS) {
     delete merged[key];
+  }
+  if (urlParams.metricsUntil) {
+    merged.metricsUntil = urlParams.metricsUntil;
   }
   return merged;
 }

@@ -92,6 +92,7 @@ function buildErrorsParamsRecord(sp: {
   range?: string | string[];
   from?: string | string[];
   to?: string | string[];
+  metricsUntil?: string | string[];
   environment?: string | string[];
   platform?: string | string[];
   release?: string | string[];
@@ -111,6 +112,7 @@ function buildErrorsParamsRecord(sp: {
     "range",
     "from",
     "to",
+    "metricsUntil",
     "environment",
     "platform",
     "release",

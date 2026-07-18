@@ -58,7 +58,12 @@ export function ReleasesListToolbar({
 }: Props) {
   const fieldIds = useId();
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
-  const timeHidden = listTimeRangeHiddenFields(timeRange, fromParam, toParam);
+  const timeHidden = listTimeRangeHiddenFields(
+    timeRange,
+    fromParam,
+    toParam,
+    currentParams.metricsUntil
+  );
   const pickerRange = {
     key: timeRange.key,
     label: timeRange.label,

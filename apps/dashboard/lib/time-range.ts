@@ -441,13 +441,28 @@ export function timeRangeHiddenFields(
   return { [keys.range]: range.key };
 }
 
-/** Hidden GET fields to preserve the active list time filter in filter forms. */
+/**
+ * Hidden GET fields to preserve the active list time filter in filter forms.
+ * For open-ended ranges, also forwards `metricsUntil` when present so Apply
+ * does not re-anchor KPI windows to "now".
+ */
 export function listTimeRangeHiddenFields(
   range: ParsedTimeRange,
   fromParam?: string,
-  toParam?: string
+  toParam?: string,
+  metricsUntil?: string | null
 ): Record<string, string> {
-  return timeRangeHiddenFields(range, DEFAULT_TIME_RANGE_QUERY_KEYS, fromParam, toParam);
+  const fields = timeRangeHiddenFields(
+    range,
+    DEFAULT_TIME_RANGE_QUERY_KEYS,
+    fromParam,
+    toParam
+  );
+  const anchor = metricsUntil?.trim();
+  if (isUnselectedTimeRange(range.key) && anchor) {
+    fields.metricsUntil = anchor;
+  }
+  return fields;
 }
 
 export function trendTimeRangeHiddenFields(

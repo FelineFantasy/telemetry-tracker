@@ -75,6 +75,7 @@ function buildEventsParamsRecord(sp: Record<string, string | string[] | undefine
     "range",
     "from",
     "to",
+    "metricsUntil",
     "name",
     "environment",
     "platform",

@@ -95,7 +95,12 @@ export function ErrorsListToolbar({
   const fieldIds = useId();
 
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
-  const timeHidden = listTimeRangeHiddenFields(timeRange, fromParam, toParam);
+  const timeHidden = listTimeRangeHiddenFields(
+    timeRange,
+    fromParam,
+    toParam,
+    currentParams.metricsUntil
+  );
   const trendHidden = trendTimeRangeHiddenFields(
     trendTimeRange,
     trendFromParam,

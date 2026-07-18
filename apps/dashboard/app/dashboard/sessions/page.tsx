@@ -83,6 +83,7 @@ function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefi
     "range",
     "from",
     "to",
+    "metricsUntil",
     "q",
     "environment",
     "release",
