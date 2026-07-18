@@ -21,6 +21,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.2] - 2026-07-19
+
+### Fixed
+
+- **Dashboard API SSRF hardening** — restrict `dashboardApiFetch` to relative `/api` paths on `API_BASE_URL` and validate error group ids before path interpolation ([#574](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/574); CodeQL #12)
+- **shell-quote CVE-2026-9277** — pin transitive `shell-quote` to `>=1.8.4` via pnpm override for Dependabot alert #38 ([#575](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/575))
+
+---
+
 ## [1.16.1] - 2026-07-19
 
 ### Added
