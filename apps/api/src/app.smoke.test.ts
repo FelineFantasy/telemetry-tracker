@@ -23,7 +23,7 @@ describe("API smoke", () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body) as { ok: boolean; email: string; version: string };
     expect(body.ok).toBe(true);
-    expect(body.email).toMatch(/^configured|not_configured$/);
+    expect(body.email).toMatch(/^(configured|not_configured)$/);
     expect(body.version).toBeTruthy();
   });
 
