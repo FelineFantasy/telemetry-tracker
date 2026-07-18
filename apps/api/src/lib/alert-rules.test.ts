@@ -866,18 +866,6 @@ describe("runScheduledAlertRuleEvaluation", () => {
   });
 
   it("skips projects whose organization is soft-deleted (ingest parity)", async () => {
-    const heartbeatRule = {
-      id: "rule-hb",
-      name: "Silence",
-      enabled: true,
-      conditions: [
-        { type: "HEARTBEAT" as const, windowMinutes: 15, environment: null },
-      ],
-      destination_ids: [PROJECT_EMAIL_DESTINATION_ID],
-      cooldown_minutes: 15,
-      created_at: new Date(),
-      updated_at: new Date(),
-    };
     const findFirst = vi.fn(async () => null);
     const prisma = {
       alertRule: {
