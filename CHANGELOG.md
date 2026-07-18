@@ -21,6 +21,19 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.1] - 2026-07-19
+
+### Added
+
+- **Global Search** — project-scoped search across issues, events, sessions, releases, and users (`/dashboard/search`, `GET /api/search`) with free text and `key:value` filters; grouped results (8 per group), keyboard navigation, ignored-key feedback, and View all deep links ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494); [#571](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/571); milestone v1.16.x — Release Intelligence)
+
+### Fixed
+
+- **Global Search list parity** — align hits and View all with Issues/Events/Sessions filters: effective-release + NULL-env fallback, `metricsUntil` / nav time windows, release activity window, recent-user ranking, URL tokens as free text, AND multi-word `q`, and pending-nav submit guard ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Dashboard Sentry client capture** — re-check `window` inside async product-telemetry callbacks so Vitest teardown cannot throw `window is not defined` after `captureClientException`
+
+---
+
 ## [1.16.0] - 2026-07-18
 
 ### Added

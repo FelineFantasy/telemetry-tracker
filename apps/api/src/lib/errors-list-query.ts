@@ -6,7 +6,7 @@
  */
 
 import { Prisma, PrismaClient } from "@prisma/client";
-import { escapeLikePattern } from "./list-query.js";
+import { freeTextAndMatchSql } from "./list-query-helpers.js";
 import { parseTimeRangeQuery } from "./time-range.js";
 import { parseErrorTypeFromMessage } from "./error-type.js";
 import {
@@ -45,6 +45,7 @@ export type ErrorListFilterInput = {
   environment?: string;
   release?: string;
   platform?: string;
+  /** Free text: each term matches message OR fingerprint (AND across terms). */
   q?: string;
   range: { gte?: Date; lte?: Date };
   /** When list range is all-time, counts use this window (aligned with summary KPIs). */
@@ -170,7 +171,15 @@ export function buildErrorGroupWhereInput(
   const where: Prisma.ErrorGroupWhereInput = { project_id: projectId };
   if (f.appId) where.app = f.appId;
   if (f.environment) where.environment = f.environment;
-  if (f.q) where.message = { contains: f.q, mode: "insensitive" };
+  const qTerms = (f.q ?? "").trim().split(/\s+/).filter(Boolean);
+  if (qTerms.length > 0) {
+    where.AND = qTerms.map((term) => ({
+      OR: [
+        { message: { contains: term, mode: "insensitive" as const } },
+        { fingerprint: { contains: term, mode: "insensitive" as const } },
+      ],
+    }));
+  }
   if (f.status === "unresolved") where.resolved_at = null;
   if (f.status === "resolved") where.resolved_at = { not: null };
   if (hasOccurrenceScope(f)) {
@@ -289,10 +298,11 @@ function buildWhereSql(f: ErrorListFilterInput, projectId: string): Prisma.Sql {
   const parts: Prisma.Sql[] = [Prisma.sql`eg.project_id = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`eg.app = ${f.appId}`);
   if (f.environment) parts.push(Prisma.sql`eg.environment = ${f.environment}`);
-  if (f.q) {
-    const pat = `%${escapeLikePattern(f.q)}%`;
-    parts.push(Prisma.sql`eg.message ILIKE ${pat} ESCAPE '\\'`);
-  }
+  const textSql = freeTextAndMatchSql(f.q, [
+    Prisma.sql`eg.message`,
+    Prisma.sql`eg.fingerprint`,
+  ]);
+  if (textSql) parts.push(textSql);
   if (f.status === "unresolved") parts.push(Prisma.sql`eg.resolved_at IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`eg.resolved_at IS NOT NULL`);
   if (hasOccurrenceScope(f)) {

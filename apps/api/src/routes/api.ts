@@ -132,6 +132,11 @@ import {
   parseOverviewErrorSortParam,
   parseOverviewTopEventsSortParam,
 } from "../lib/list-sort-params.js";
+import {
+  mergeGlobalSearchScope,
+  parseGlobalSearchQuery,
+} from "../lib/global-search-query.js";
+import { executeGlobalSearch } from "../lib/global-search.js";
 
 const DEFAULT_LIST_PAGE_SIZE = 20;
 const MAX_LIST_PAGE_SIZE = 100;
@@ -1081,6 +1086,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       metricsUntil?: string;
     };
     const appId = queryApp(query.app);
@@ -1089,6 +1095,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
 
@@ -1099,6 +1106,7 @@ export async function apiRoutes(
       platform,
       release,
       propertiesContains,
+      q,
       range,
     };
 
@@ -1120,6 +1128,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       metricsUntil?: string;
     };
     const appId = queryApp(query.app);
@@ -1128,6 +1137,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
 
@@ -1138,6 +1148,7 @@ export async function apiRoutes(
       platform,
       release,
       propertiesContains,
+      q,
       range,
     };
 
@@ -1162,6 +1173,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       sort?: string;
       order?: string;
       view?: string;
@@ -1176,6 +1188,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const view = queryString(query.view) ?? "grouped";
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
@@ -1197,6 +1210,7 @@ export async function apiRoutes(
         platform,
         release,
         propertiesContains,
+        q,
         range,
       };
       const metricsFilter = enrichEventListFilterForMetrics(filter, range, metricsAnchor);
@@ -1249,6 +1263,7 @@ export async function apiRoutes(
       gte: range.gte,
       lte: range.lte,
       propertiesContains: propertiesContains?.trim() || undefined,
+      q: q?.trim() || undefined,
     });
     const ob = EVENT_SORT_SQL[sortParsed.sort];
     const [countRow, rows] = await Promise.all([
@@ -1312,6 +1327,80 @@ export async function apiRoutes(
       chartBucket
     );
     return reply.send(summary);
+  });
+
+  app.get("/search", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      q?: string | string[];
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+      metricsUntil?: string;
+    };
+    const q = queryString(query.q) ?? "";
+    const parsed = parseGlobalSearchQuery(q);
+    const appId = queryApp(query.app);
+
+    // Date range: structured from/to/range in `q` override URL params when present.
+    const dateQuery =
+      parsed.filters.from || parsed.filters.to || parsed.filters.range
+        ? {
+            range: parsed.filters.range,
+            from: parsed.filters.from,
+            to: parsed.filters.to,
+          }
+        : {
+            range: queryString(query.range),
+            from: queryString(query.from),
+            to: queryString(query.to),
+          };
+    const range = parseCreatedRange(dateQuery, "all");
+    // Sessions/users: same open-ended anchoring as Sessions list (metricsUntil → ~7d).
+    const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
+    const sessionStartedAt = resolveSessionListStartedAtBounds(range, metricsAnchor);
+    // Events: same open-ended ~7d window as Events list (`enrichEventListFilterForMetrics`).
+    const eventsMetrics = enrichEventListFilterForMetrics(
+      { range },
+      range,
+      metricsAnchor
+    );
+    const eventCreatedAt = {
+      gte: range.gte ?? eventsMetrics.eventCountRange?.gte,
+      lte: range.lte ?? eventsMetrics.eventCountRange?.lte,
+    };
+    // Issues: occurrence window when release/platform scoped (open-ended → metrics window).
+    const errorsMetrics = enrichErrorListFilterForMetrics(
+      { range, status: "all" },
+      range,
+      metricsAnchor
+    );
+    const errorOccurrenceRange = {
+      gte: range.gte ?? errorsMetrics.occurrenceCountRange?.gte,
+      lte: range.lte ?? errorsMetrics.occurrenceCountRange?.lte,
+    };
+
+    const scope = {
+      ...mergeGlobalSearchScope({
+        parsed,
+        appId,
+        environment: queryString(query.environment),
+        platform: queryString(query.platform),
+        release: queryString(query.release),
+        range,
+      }),
+      sessionStartedAt,
+      eventCreatedAt,
+      errorOccurrenceRange,
+    };
+
+    const result = await executeGlobalSearch(prisma, projectId, parsed, scope);
+    return reply.send(result);
   });
 
   app.get("/releases/summary", async (request, reply) => {

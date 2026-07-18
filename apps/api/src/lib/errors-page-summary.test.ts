@@ -138,7 +138,21 @@ describe("buildErrorGroupScopeSql", () => {
       "proj-1"
     );
     const text = prismaSqlText(sql);
-    expect(text).toContain('"message" ILIKE ?');
+    expect(text).toContain('COALESCE("eg"."message", \'\') ILIKE ?');
+    expect(text).toContain('COALESCE("eg"."fingerprint", \'\') ILIKE ?');
+  });
+
+  it("applies multi-word q as AND across message OR fingerprint terms", () => {
+    const sql = buildErrorGroupScopeSql(
+      { range: {}, q: "checkout TypeError", status: "all" },
+      "proj-1"
+    );
+    const text = prismaSqlText(sql);
+    expect(text).toContain(" AND ");
+    expect(text).toContain(" OR ");
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain("%checkout%");
+    expect(values).toContain("%TypeError%");
   });
 });
 

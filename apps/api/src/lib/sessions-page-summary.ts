@@ -7,7 +7,7 @@
  */
 
 import { Prisma, PrismaClient } from "@prisma/client";
-import { escapeLikePattern } from "./list-query.js";
+import { freeTextAndMatchSql } from "./list-query-helpers.js";
 import { generateOverviewChartBuckets, overviewChartQuerySince } from "./overview-timeseries.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
@@ -25,7 +25,7 @@ export type SessionListFilterInput = {
   environment?: string;
   release?: string;
   country?: string;
-  /** Search user id, email, country, or device fields. */
+  /** Free text: each term matches identity/device/session fields (AND across terms). */
   q?: string;
   range: { gte?: Date; lte?: Date };
 };
@@ -339,7 +339,7 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
  * set, Session.environment must match (no NULL-env fallback) — same as Releases.
  * Environment-only event fallback remains scoped to `eventWindow`.
  */
-function sessionEnvReleaseMatchSql(
+export function sessionEnvReleaseMatchSql(
   projectId: string,
   sessionAlias: string,
   f: Pick<SessionListFilterInput, "environment" | "release" | "platform">,
@@ -479,16 +479,19 @@ export function sessionWindowWithEventScope(
   return Prisma.sql`(${startedAt} AND ${match})`;
 }
 
-function sessionSearchSql(q: string): Prisma.Sql {
-  const pat = `%${escapeLikePattern(q.trim())}%`;
-  return Prisma.sql`(
-    COALESCE(s."user_id", '') ILIKE ${pat} ESCAPE '\\'
-    OR COALESCE(s."anonymous_id", '') ILIKE ${pat} ESCAPE '\\'
-    OR COALESCE(s."user_email", '') ILIKE ${pat} ESCAPE '\\'
-    OR COALESCE(s."country", '') ILIKE ${pat} ESCAPE '\\'
-    OR COALESCE(s."device_browser", '') ILIKE ${pat} ESCAPE '\\'
-    OR COALESCE(s."device_os", '') ILIKE ${pat} ESCAPE '\\'
-  )`;
+function sessionSearchSql(q: string): Prisma.Sql | null {
+  // Align with Global Search session free text (AND across terms).
+  return freeTextAndMatchSql(q, [
+    Prisma.sql`s."session_id"`,
+    Prisma.sql`s."user_id"`,
+    Prisma.sql`s."anonymous_id"`,
+    Prisma.sql`s."user_email"`,
+    Prisma.sql`s."country"`,
+    Prisma.sql`s."device_browser"`,
+    Prisma.sql`s."device_os"`,
+    Prisma.sql`s."release"`,
+    Prisma.sql`s."platform"`,
+  ]);
 }
 
 export function sessionFilterSql(
@@ -505,7 +508,8 @@ export function sessionFilterSql(
     const envReleaseScope = sessionEnvReleaseScopeSql(projectId, f, eventWindow);
     if (envReleaseScope) parts.push(envReleaseScope);
   }
-  if (f.q?.trim()) parts.push(sessionSearchSql(f.q));
+  const searchSql = f.q?.trim() ? sessionSearchSql(f.q) : null;
+  if (searchSql) parts.push(searchSql);
   return Prisma.join(parts, " AND ");
 }
 
