@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
+  buildErrorOccurrenceScopeWhere,
   fetchImpactMetricsForGroupId,
   fetchMetricsForGroupIds,
   fetchScopedOccurrenceSummaryForGroupId,
@@ -9,6 +10,7 @@ import {
   isAggregateSort,
   listErrorGroupsAggregated,
   listErrorGroupsPrisma,
+  listScopedOccurrenceIdsForGroupId,
   parseErrorListOrderParam,
   parseErrorListSortParam,
   parseTrendWindowParam,
@@ -49,6 +51,14 @@ import {
   parsePerformanceMetricsAnchor,
   resolvePerformanceSummaryWindow,
 } from "../lib/performance-page-summary.js";
+import {
+  buildReleasesFilter,
+  fetchReleasesPageSummary,
+  parseReleasesMetricsAnchor,
+  parseReleasesOrderParam,
+  parseReleasesSortParam,
+  resolveReleasesSummaryWindow,
+} from "../lib/releases-page-summary.js";
 import {
   attachLatestEventIds,
   fetchSparklinesForEventNames,
@@ -113,9 +123,9 @@ import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
 } from "../lib/read-project-request.js";
+import { releasePrismaWhere } from "../lib/release-key.js";
 import {
   EVENT_SORT_SQL,
-  eventListOrderBy,
   overviewErrorOrderBy,
   parseEventListSortParam as parseRawEventListSortParam,
   parseListOrderParam,
@@ -175,6 +185,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       compare?: string;
+      metricsUntil?: string;
       errorsPage?: string;
       eventsPage?: string;
       listPageSize?: string;
@@ -201,10 +212,14 @@ export async function apiRoutes(
     const environment = queryString(query.environment);
     const platform = queryString(query.platform);
     const release = queryString(query.release);
+    const metricsUntilRaw = queryString(query.metricsUntil);
+    const metricsAnchor = metricsUntilRaw
+      ? parseErrorsMetricsAnchor(metricsUntilRaw)
+      : until;
     const metricsWindow = isUnselectedTimeRange(timeRange.key)
       ? await resolveUnselectedMetricsWindow(prisma, {
           projectId,
-          until,
+          until: metricsAnchor,
           app: appFilter,
           environment,
           platform,
@@ -299,7 +314,7 @@ export async function apiRoutes(
       ...(appFilter ? { app: appFilter } : {}),
       ...(environment ? { environment } : {}),
       ...(platform ? { platform } : {}),
-      ...(release ? { release } : {}),
+      ...releasePrismaWhere(release),
     };
     const errorGroupWhere = {
       ...whereErrorGroupProject(projectId),
@@ -353,6 +368,15 @@ export async function apiRoutes(
             to: queryString(query.to),
           }
         : { range: timeRange.key }),
+      // Open-ended Overview KPIs use metricsWindow; forward the exact window so
+      // issue detail does not take the Issues ~7d metricsUntil-only path or
+      // re-anchor to a fresh "now".
+      ...(isUnselectedTimeRange(timeRange.key)
+        ? {
+            metricsSince: metricsWindow.gte.toISOString(),
+            metricsUntil: metricsWindow.lte.toISOString(),
+          }
+        : {}),
     };
 
     const [
@@ -396,14 +420,40 @@ export async function apiRoutes(
             orderBy: errorGroupOrderBy,
             include: { _count: { select: { occurrences_list: true } } },
           }),
-      prisma.event.groupBy({
-        by: ["name"],
-        where: eventWhere,
-        _count: { name: true },
-        orderBy: eventGroupByOrderBy,
-        skip: eventsSkip,
-        take: listPageSize,
-      }),
+      // Release filters need TRIM / Unknown SQL matching (Prisma equality diverges).
+      release
+        ? prisma
+            .$queryRaw<{ name: string; c: bigint }[]>(Prisma.sql`
+              SELECT e."name" AS name, COUNT(*)::bigint AS c
+              FROM "Event" e
+              WHERE ${eventListWhereSql}
+              GROUP BY e."name"
+              ORDER BY ${
+                topEvSortParsed.sort === "count"
+                  ? topEvOrderParsed.order === "asc"
+                    ? Prisma.sql`COUNT(*) ASC, e."name" ASC`
+                    : Prisma.sql`COUNT(*) DESC, e."name" ASC`
+                  : topEvOrderParsed.order === "asc"
+                    ? Prisma.sql`e."name" ASC`
+                    : Prisma.sql`e."name" DESC`
+              }
+              OFFSET ${eventsSkip}
+              LIMIT ${listPageSize}
+            `)
+            .then((rows) =>
+              rows.map((row) => ({
+                name: row.name,
+                _count: { name: Number(row.c) },
+              }))
+            )
+        : prisma.event.groupBy({
+            by: ["name"],
+            where: eventWhere,
+            _count: { name: true },
+            orderBy: eventGroupByOrderBy,
+            skip: eventsSkip,
+            take: listPageSize,
+          }),
       getOverviewTimeSeries(
         prisma,
         projectId,
@@ -842,6 +892,7 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       metricsUntil?: string;
+      metricsSince?: string;
     };
     const appFilter = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -849,14 +900,31 @@ export async function apiRoutes(
     const release = queryString(query.release);
     const rangeKey = queryString(query.range);
     const metricsUntilRaw = queryString(query.metricsUntil);
+    const metricsSinceRaw = queryString(query.metricsSince);
     const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
-    // Issues list passes metricsUntil (~7d). Overview range=none/all uses the same
-    // resolveUnselectedMetricsWindow as Overview KPIs / scoped error list.
-    const useIssuesMetricsWindow = Boolean(metricsUntilRaw);
+    // Issues list passes metricsUntil only (~7d). Overview open-ended drills pass
+    // metricsSince+metricsUntil for the exact resolveUnselectedMetricsWindow.
+    // Legacy Overview range=none/all without metricsUntil still uses that helper.
+    const parseIsoDate = (raw: string | undefined): Date | undefined => {
+      if (!raw) return undefined;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    };
+    const explicitMetricsSince = parseIsoDate(metricsSinceRaw);
+    const explicitMetricsUntil = parseIsoDate(metricsUntilRaw);
+    const explicitOverviewWindow =
+      explicitMetricsSince &&
+      explicitMetricsUntil &&
+      explicitMetricsSince.getTime() < explicitMetricsUntil.getTime()
+        ? { gte: explicitMetricsSince, lte: explicitMetricsUntil }
+        : undefined;
+    const useIssuesMetricsWindow =
+      Boolean(metricsUntilRaw) && !explicitOverviewWindow;
     const isOverviewUnselected =
       !hasFromTo &&
       (rangeKey === "none" || rangeKey === "all") &&
-      !useIssuesMetricsWindow;
+      !useIssuesMetricsWindow &&
+      !explicitOverviewWindow;
     const hasBoundedPreset =
       hasFromTo || Boolean(rangeKey && rangeKey !== "all" && rangeKey !== "none");
     const listRange = parseCreatedRange(query, "all");
@@ -864,7 +932,10 @@ export async function apiRoutes(
 
     let windowGte: Date | undefined;
     let windowLte: Date | undefined;
-    if (isOverviewUnselected) {
+    if (explicitOverviewWindow) {
+      windowGte = explicitOverviewWindow.gte;
+      windowLte = explicitOverviewWindow.lte;
+    } else if (isOverviewUnselected) {
       const metricsWindow = await resolveUnselectedMetricsWindow(prisma, {
         projectId,
         until: metricsAnchor,
@@ -901,18 +972,27 @@ export async function apiRoutes(
     const applyScopedMetrics = Boolean(
       platform || release || windowGte || windowLte
     );
-    const occurrenceWhere = {
+    // Release filters need SQL TRIM / Unknown matching (same as scoped KPIs).
+    // Resolve matching ids first, then load rows via Prisma include.
+    const occurrenceScopeFilter = {
       ...(platform ? { platform } : {}),
       ...(release ? { release } : {}),
-      ...(windowGte || windowLte
-        ? {
-            created_at: {
-              ...(windowGte ? { gte: windowGte } : {}),
-              ...(windowLte ? { lte: windowLte } : {}),
-            },
-          }
-        : {}),
+      ...(windowGte ? { gte: windowGte } : {}),
+      ...(windowLte ? { lte: windowLte } : {}),
     };
+    const occurrenceWhere = release
+      ? {
+          id: {
+            in: await listScopedOccurrenceIdsForGroupId(
+              prisma,
+              id,
+              projectId,
+              occurrenceScopeFilter,
+              50
+            ),
+          },
+        }
+      : buildErrorOccurrenceScopeWhere(occurrenceScopeFilter);
 
     const group = await prisma.errorGroup.findFirst({
       where: whereErrorGroupById(id, projectId),
@@ -1156,57 +1236,31 @@ export async function apiRoutes(
     if (!orderParsed.ok) {
       return reply.status(400).send({ error: "Invalid order" });
     }
-    const eventOrderBy = eventListOrderBy(sortParsed.sort, orderParsed.order);
+    // Always SQL so release=__unknown__ / TRIM match summary KPIs and Release Health.
     const orderDirSql =
       orderParsed.order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-
-    const props = propertiesContains?.trim();
-    if (props) {
-      const whereSql = buildEventWhereSql({
-        projectId,
-        appId,
-        name,
-        environment,
-        platform,
-        release,
-        gte: range.gte,
-        lte: range.lte,
-        propertiesContains: props,
-      });
-      const ob = EVENT_SORT_SQL[sortParsed.sort];
-      const [countRow, rows] = await Promise.all([
-        prisma.$queryRaw<[{ c: bigint }]>(
-          Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`
-        ),
-        prisma.$queryRaw<Record<string, unknown>[]>(
-          Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY ${ob} ${orderDirSql} LIMIT ${pageSize} OFFSET ${skip}`
-        ),
-      ]);
-      const total = Number(countRow[0]?.c ?? 0);
-      return reply.send({ items: rows, total, page, pageSize, view: "raw" });
-    }
-
-    const where: Prisma.EventWhereInput = whereEventProject(projectId);
-    if (appId) where.app = appId;
-    if (name) where.name = name;
-    if (environment) where.environment = environment;
-    if (platform) where.platform = platform;
-    if (release) where.release = release;
-    if (range.gte || range.lte) {
-      where.created_at = {};
-      if (range.gte) where.created_at.gte = range.gte;
-      if (range.lte) where.created_at.lte = range.lte;
-    }
-    const [total, list] = await Promise.all([
-      prisma.event.count({ where }),
-      prisma.event.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: eventOrderBy,
-      }),
+    const whereSql = buildEventWhereSql({
+      projectId,
+      appId,
+      name,
+      environment,
+      platform,
+      release,
+      gte: range.gte,
+      lte: range.lte,
+      propertiesContains: propertiesContains?.trim() || undefined,
+    });
+    const ob = EVENT_SORT_SQL[sortParsed.sort];
+    const [countRow, rows] = await Promise.all([
+      prisma.$queryRaw<[{ c: bigint }]>(
+        Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`
+      ),
+      prisma.$queryRaw<Record<string, unknown>[]>(
+        Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY ${ob} ${orderDirSql} LIMIT ${pageSize} OFFSET ${skip}`
+      ),
     ]);
-    return reply.send({ items: list, total, page, pageSize, view: "raw" });
+    const total = Number(countRow[0]?.c ?? 0);
+    return reply.send({ items: rows, total, page, pageSize, view: "raw" });
   });
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
@@ -1256,6 +1310,52 @@ export async function apiRoutes(
       projectId,
       window,
       chartBucket
+    );
+    return reply.send(summary);
+  });
+
+  app.get("/releases/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      metricsUntil?: string;
+      sort?: string;
+      order?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseReleasesMetricsAnchor(queryString(query.metricsUntil));
+    const sortParsed = parseReleasesSortParam(queryString(query.sort));
+    if (!sortParsed.ok) {
+      return reply.code(400).send({ error: "Invalid sort" });
+    }
+    const orderParsed = parseReleasesOrderParam(queryString(query.order));
+    if (!orderParsed.ok) {
+      return reply.code(400).send({ error: "Invalid order" });
+    }
+
+    const filter = buildReleasesFilter({
+      appId,
+      platform,
+      environment,
+      range,
+    });
+    const window = resolveReleasesSummaryWindow(range, metricsAnchor);
+    const summary = await fetchReleasesPageSummary(
+      prisma,
+      filter,
+      projectId,
+      window,
+      sortParsed.sort,
+      orderParsed.order
     );
     return reply.send(summary);
   });

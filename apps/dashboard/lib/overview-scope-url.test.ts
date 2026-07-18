@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDashboardNavTabHref,
   buildDashboardScopedListHref,
   buildErrorGroupDetailHref,
   buildEventListHref,
@@ -22,6 +23,11 @@ describe("resolveScopedQueryValue", () => {
   it("returns null for empty input", () => {
     expect(resolveScopedQueryValue("", ["production"])).toBeNull();
     expect(resolveScopedQueryValue(undefined, ["production"])).toBeNull();
+  });
+
+  it("always allows the Unknown release sentinel", () => {
+    expect(resolveScopedQueryValue("__unknown__", [])).toBe("__unknown__");
+    expect(resolveScopedQueryValue("__unknown__", ["1.0.0"])).toBe("__unknown__");
   });
 });
 
@@ -51,6 +57,31 @@ describe("buildErrorGroupDetailHref", () => {
       })
     ).toBe("/dashboard/errors/eg_1?app=web&platform=ios&range=7d");
   });
+
+  it("includes metricsUntil for open-ended detail deep links", () => {
+    expect(
+      buildErrorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
+
+  it("includes metricsSince with metricsUntil for Overview exact-window deep links", () => {
+    expect(
+      buildErrorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsSince: "2026-03-08T12:00:00.000Z",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsSince=2026-03-08T12%3A00%3A00.000Z&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
 });
 
 describe("buildDashboardScopedListHref", () => {
@@ -63,6 +94,71 @@ describe("buildDashboardScopedListHref", () => {
         release: "1.0.0",
       })
     ).toBe("/dashboard/events?app=web&environment=production&platform=web&release=1.0.0");
+  });
+
+  it("preserves the Unknown release sentinel", () => {
+    expect(
+      buildDashboardScopedListHref("/dashboard/errors", {
+        release: "__unknown__",
+        range: "7d",
+      })
+    ).toBe("/dashboard/errors?release=__unknown__&range=7d");
+  });
+
+  it("preserves metricsUntil for open-ended deep links", () => {
+    expect(
+      buildDashboardScopedListHref("/dashboard/sessions", {
+        release: "1.2.0",
+        range: "none",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/sessions?release=1.2.0&range=none&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
+});
+
+describe("buildDashboardNavTabHref", () => {
+  it("preserves app/environment/platform/release scope across tabs", () => {
+    const sp = new URLSearchParams({
+      app: "web",
+      environment: "production",
+      platform: "ios",
+      release: "1.2.0",
+      sort: "count",
+    });
+    expect(buildDashboardNavTabHref("/dashboard/events", sp)).toBe(
+      "/dashboard/events?app=web&environment=production&platform=ios&release=1.2.0"
+    );
+  });
+
+  it("preserves time-window params including metricsUntil", () => {
+    const sp = new URLSearchParams({
+      release: "1.2.0",
+      range: "none",
+      metricsUntil: "2026-03-15T12:00:00.000Z",
+      page: "2",
+    });
+    expect(buildDashboardNavTabHref("/dashboard/errors", sp)).toBe(
+      "/dashboard/errors?release=1.2.0&range=none&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
+
+  it("preserves custom from/to windows", () => {
+    const sp = new URLSearchParams({
+      range: "custom",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+    });
+    expect(buildDashboardNavTabHref("/dashboard/sessions", sp)).toBe(
+      "/dashboard/sessions?range=custom&from=2026-03-01T00%3A00%3A00.000Z&to=2026-03-08T00%3A00%3A00.000Z"
+    );
+  });
+
+  it("returns the bare path when no scoped params are present", () => {
+    expect(buildDashboardNavTabHref("/dashboard/overview", new URLSearchParams())).toBe(
+      "/dashboard/overview"
+    );
   });
 });
 

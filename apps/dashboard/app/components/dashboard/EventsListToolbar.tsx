@@ -21,6 +21,7 @@ import {
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
 import { ClientListSortRow } from "@/app/components/dashboard/ClientListSortRow";
+import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 
 export const EVENTS_SORT_OPTIONS: DashboardSelectOption[] = [
   { value: "last_seen", label: "Last seen" },
@@ -78,7 +79,12 @@ export function EventsListToolbar({
 }: Props) {
   const fieldIds = useId();
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
-  const timeHidden = listTimeRangeHiddenFields(timeRange, fromParam, toParam);
+  const timeHidden = listTimeRangeHiddenFields(
+    timeRange,
+    fromParam,
+    toParam,
+    currentParams.metricsUntil
+  );
   const pickerRange = {
     key: timeRange.key,
     label: timeRange.label,
@@ -102,10 +108,7 @@ export function EventsListToolbar({
     [platforms]
   );
   const releaseOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "", label: "Any" },
-      ...releases.map((e) => ({ value: e, label: e })),
-    ],
+    () => releaseFilterSelectOptions(releases),
     [releases]
   );
 

@@ -79,12 +79,18 @@ export function TimeRangePicker({
 
   const applyPreset = useCallback(
     (key: string) => {
-      navigate({ [rangeKey]: key, [fromKey]: null, [toKey]: null });
+      navigate({
+        [rangeKey]: key,
+        [fromKey]: null,
+        [toKey]: null,
+        metricsUntil: null,
+      });
     },
     [fromKey, navigate, rangeKey, toKey]
   );
 
   const clearDateFilter = useCallback(() => {
+    // Keep metricsUntil — still an open-ended window.
     navigate({ [rangeKey]: "none", [fromKey]: null, [toKey]: null });
   }, [fromKey, navigate, rangeKey, toKey]);
 
@@ -92,7 +98,12 @@ export function TimeRangePicker({
     (raw: string) => {
       const token = tryParseCustomRelativeInput(raw);
       if (!token) return false;
-      navigate({ [rangeKey]: token, [fromKey]: null, [toKey]: null });
+      navigate({
+        [rangeKey]: token,
+        [fromKey]: null,
+        [toKey]: null,
+        metricsUntil: null,
+      });
       return true;
     },
     [fromKey, navigate, rangeKey, toKey]
@@ -104,6 +115,7 @@ export function TimeRangePicker({
       [rangeKey]: null,
       [fromKey]: fromDate,
       [toKey]: toDate,
+      metricsUntil: null,
     });
   }, [fromDate, fromKey, navigate, rangeKey, toDate, toKey]);
 

@@ -1,5 +1,8 @@
 /** URL helpers for overview scope (app, environment, platform, release, compare). */
 
+/** Explicit sentinel for null/blank release values (Release Health #453). */
+export const UNKNOWN_RELEASE_KEY = "__unknown__";
+
 export type OverviewCompareParam = "previous" | "week-ago";
 
 export function parseOverviewCompare(raw: string | undefined): OverviewCompareParam {
@@ -22,26 +25,23 @@ export function resolveScopedQueryValue(
   allowed: readonly string[]
 ): string | null {
   const value = raw?.trim() ?? "";
-  if (value === "" || !allowed.includes(value)) return null;
+  if (value === "") return null;
+  // Always allow the Unknown release sentinel so Issues deep links are not stripped.
+  if (value === UNKNOWN_RELEASE_KEY) return UNKNOWN_RELEASE_KEY;
+  if (!allowed.includes(value)) return null;
   return value;
 }
 
-/** Preserve dashboard scope when switching top-level dashboard tabs. */
-export function buildDashboardNavTabHref(
-  path: string,
-  searchParams: URLSearchParams
-): string {
-  const params = new URLSearchParams();
-  const app = searchParams.get("app");
-  const environment = searchParams.get("environment");
-  const platform = searchParams.get("platform");
-  const release = searchParams.get("release");
-  if (app) params.set("app", app);
-  if (environment) params.set("environment", environment);
-  if (platform) params.set("platform", platform);
-  if (release) params.set("release", release);
-  const q = params.toString();
-  return q ? `${path}?${q}` : path;
+/** Release filter options including the explicit Unknown bucket (#453). */
+export function releaseFilterSelectOptions(
+  releases: readonly string[]
+): Array<{ value: string; label: string }> {
+  const known = releases.filter((r) => r !== UNKNOWN_RELEASE_KEY);
+  return [
+    { value: "", label: "Any" },
+    { value: UNKNOWN_RELEASE_KEY, label: "Unknown" },
+    ...known.map((e) => ({ value: e, label: e })),
+  ];
 }
 
 export type DashboardListScope = {
@@ -52,8 +52,13 @@ export type DashboardListScope = {
   range?: string | null;
   from?: string | null;
   to?: string | null;
-  /** When set, error detail applies the Issues ~7d metrics window for unbounded ranges. */
+  /** When set, list/KPI pages apply the Issues ~7d metrics window for unbounded ranges. */
   metricsUntil?: string | null;
+  /**
+   * With metricsUntil, issue detail uses this exact Overview metrics window
+   * instead of the Issues-list ~7d path. Not forwarded on list deep links.
+   */
+  metricsSince?: string | null;
 };
 
 function appendDashboardListScope(params: URLSearchParams, scope: DashboardListScope): void {
@@ -64,6 +69,7 @@ function appendDashboardListScope(params: URLSearchParams, scope: DashboardListS
   if (scope.range) params.set("range", scope.range);
   if (scope.from) params.set("from", scope.from);
   if (scope.to) params.set("to", scope.to);
+  if (scope.metricsSince) params.set("metricsSince", scope.metricsSince);
   if (scope.metricsUntil) params.set("metricsUntil", scope.metricsUntil);
 }
 
@@ -76,6 +82,26 @@ export function buildDashboardScopedListHref(
   appendDashboardListScope(params, scope);
   const q = params.toString();
   return q ? `${path}?${q}` : path;
+}
+
+/**
+ * Preserve dashboard scope when switching top-level dashboard tabs.
+ * Forwards the same allow-list as scoped list deep links (including the KPI window).
+ */
+export function buildDashboardNavTabHref(
+  path: string,
+  searchParams: URLSearchParams
+): string {
+  return buildDashboardScopedListHref(path, {
+    app: searchParams.get("app"),
+    environment: searchParams.get("environment"),
+    platform: searchParams.get("platform"),
+    release: searchParams.get("release"),
+    range: searchParams.get("range"),
+    from: searchParams.get("from"),
+    to: searchParams.get("to"),
+    metricsUntil: searchParams.get("metricsUntil"),
+  });
 }
 
 /** Preserve event-name drill-down scope from overview. */

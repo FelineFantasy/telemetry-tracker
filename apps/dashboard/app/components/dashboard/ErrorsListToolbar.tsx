@@ -15,6 +15,7 @@ import {
   FilterSubmitBtn,
   FilterSubmitWrap,
 } from "@/app/components/dashboard/list-filters-ui";
+import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 import {
   ListFiltersTimeRangeSection,
   listFiltersRangeSummary,
@@ -94,7 +95,12 @@ export function ErrorsListToolbar({
   const fieldIds = useId();
 
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
-  const timeHidden = listTimeRangeHiddenFields(timeRange, fromParam, toParam);
+  const timeHidden = listTimeRangeHiddenFields(
+    timeRange,
+    fromParam,
+    toParam,
+    currentParams.metricsUntil
+  );
   const trendHidden = trendTimeRangeHiddenFields(
     trendTimeRange,
     trendFromParam,
@@ -134,10 +140,7 @@ export function ErrorsListToolbar({
   );
 
   const releaseOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "", label: "Any" },
-      ...releases.map((e) => ({ value: e, label: e })),
-    ],
+    () => releaseFilterSelectOptions(releases),
     [releases]
   );
 

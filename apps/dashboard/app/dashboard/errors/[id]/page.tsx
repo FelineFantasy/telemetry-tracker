@@ -63,6 +63,7 @@ async function getErrorGroup(
     from?: string;
     to?: string;
     metricsUntil?: string;
+    metricsSince?: string;
   }
 ): Promise<ErrorGroup | null> {
   const qs = new URLSearchParams();
@@ -73,6 +74,7 @@ async function getErrorGroup(
   if (scope.range) qs.set("range", scope.range);
   if (scope.from) qs.set("from", scope.from);
   if (scope.to) qs.set("to", scope.to);
+  if (scope.metricsSince) qs.set("metricsSince", scope.metricsSince);
   if (scope.metricsUntil) qs.set("metricsUntil", scope.metricsUntil);
   const q = qs.toString();
   const res = await dashboardApiFetch(`/api/errors/${id}${q ? `?${q}` : ""}`);
@@ -98,6 +100,7 @@ export default async function ErrorDetailPage({
     from?: string;
     to?: string;
     metricsUntil?: string;
+    metricsSince?: string;
   }>;
 }) {
   const { id } = await params;
@@ -110,6 +113,7 @@ export default async function ErrorDetailPage({
   const from = sp.from?.trim() || undefined;
   const to = sp.to?.trim() || undefined;
   const metricsUntil = sp.metricsUntil?.trim() || undefined;
+  const metricsSince = sp.metricsSince?.trim() || undefined;
   const listHref = buildDashboardScopedListHref("/dashboard/errors", {
     app,
     environment,
@@ -131,6 +135,7 @@ export default async function ErrorDetailPage({
       from,
       to,
       metricsUntil,
+      metricsSince,
     });
   } catch (e) {
     return (

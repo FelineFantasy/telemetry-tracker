@@ -9,6 +9,8 @@ import {
   FilterForm,
   FilterLabel,
   FilterRow,
+  FilterSegment,
+  FilterSegmentItem,
   FilterSubmitBtn,
   FilterSubmitWrap,
 } from "@/app/components/dashboard/list-filters-ui";
@@ -17,7 +19,6 @@ import {
   listFiltersRangeSummary,
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
-import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 
 type Props = {
   path: string;
@@ -28,14 +29,20 @@ type Props = {
   appFilter: string;
   environment: string;
   platform: string;
-  release: string;
-  chartBucket: string;
+  sort: string;
+  order: string;
   environments: string[];
   platforms: string[];
-  releases: string[];
 };
 
-export function PerformanceListToolbar({
+const SORT_OPTIONS: DashboardSelectOption[] = [
+  { value: "recency", label: "Recency (first seen)" },
+  { value: "adoption", label: "Adoption" },
+  { value: "errors", label: "Error count" },
+  { value: "error_rate", label: "Error rate" },
+];
+
+export function ReleasesListToolbar({
   path,
   currentParams,
   timeRange,
@@ -44,11 +51,10 @@ export function PerformanceListToolbar({
   appFilter,
   environment,
   platform,
-  release,
-  chartBucket,
+  sort,
+  order,
   environments,
   platforms,
-  releases,
 }: Props) {
   const fieldIds = useId();
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
@@ -80,10 +86,6 @@ export function PerformanceListToolbar({
     ],
     [platforms]
   );
-  const releaseOptions: DashboardSelectOption[] = useMemo(
-    () => releaseFilterSelectOptions(releases),
-    [releases]
-  );
 
   const id = (suffix: string) => `${fieldIds.replace(/:/g, "")}-${suffix}`;
 
@@ -101,7 +103,6 @@ export function PerformanceListToolbar({
         {Object.entries(timeHidden).map(([k, v]) => (
           <input key={k} type="hidden" name={k} value={v} />
         ))}
-        {chartBucket ? <input type="hidden" name="chartBucket" value={chartBucket} /> : null}
 
         <FilterRow>
           <FilterField>
@@ -125,15 +126,27 @@ export function PerformanceListToolbar({
             />
           </FilterField>
           <FilterField>
-            <FilterLabel id={id("rel-l")}>Release</FilterLabel>
+            <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
             <DashboardCustomSelect
-              name="release"
-              value={release}
-              options={releaseOptions}
-              triggerId={id("rel-t")}
-              listLabelledBy={id("rel-l")}
+              name="sort"
+              value={sort}
+              options={SORT_OPTIONS}
+              triggerId={id("sort-t")}
+              listLabelledBy={id("sort-l")}
             />
           </FilterField>
+          <FilterSegment
+            legend="Order"
+            title="Descending vs ascending order for the selected column."
+            ariaLabel="Sort order"
+          >
+            <FilterSegmentItem name="order" value="desc" checked={order !== "asc"}>
+              Desc
+            </FilterSegmentItem>
+            <FilterSegmentItem name="order" value="asc" checked={order === "asc"}>
+              Asc
+            </FilterSegmentItem>
+          </FilterSegment>
           <FilterSubmitWrap>
             <FilterSubmitBtn>Apply</FilterSubmitBtn>
           </FilterSubmitWrap>

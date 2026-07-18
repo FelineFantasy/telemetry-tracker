@@ -4,6 +4,7 @@
  */
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
+import { optionalReleaseAndSql } from "./release-key.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -75,9 +76,7 @@ export async function resolveUnselectedMetricsWindow(
   const platformEventClause = platform
     ? Prisma.sql`AND e."platform" = ${platform}`
     : Prisma.empty;
-  const releaseEventClause = release
-    ? Prisma.sql`AND e."release" = ${release}`
-    : Prisma.empty;
+  const releaseEventClause = optionalReleaseAndSql(Prisma.sql`e."release"`, release);
   const appErrorClause = app ? Prisma.sql`AND eg."app" = ${app}` : Prisma.empty;
   const envErrorClause = environment
     ? Prisma.sql`AND eg."environment" = ${environment}`
@@ -85,9 +84,7 @@ export async function resolveUnselectedMetricsWindow(
   const platformErrorClause = platform
     ? Prisma.sql`AND eo."platform" = ${platform}`
     : Prisma.empty;
-  const releaseErrorClause = release
-    ? Prisma.sql`AND eo."release" = ${release}`
-    : Prisma.empty;
+  const releaseErrorClause = optionalReleaseAndSql(Prisma.sql`eo."release"`, release);
 
   const rows = await prisma.$queryRaw<{ oldest: Date | null }[]>(Prisma.sql`
     SELECT MIN(ts) AS oldest
