@@ -599,21 +599,23 @@ export function AlertsClient({
           description="Built-in system rule: fire when error occurrences in a rolling window exceed your threshold (all environments; fans out to all email recipients and delivery channels). Stored as a system-managed AlertRule — edit here, not under Custom rules."
         >
           <FieldGroup>
-            <Field label="Enable error spike alerts">
+            <Field label="Enable error spike alerts" htmlFor="error-spike-toggle">
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
+                  id="error-spike-toggle"
                   on={settings.errorSpike.enabled}
-                  onChange={(enabled) =>
+                  onChange={() =>
                     setSettings((s) => ({
                       ...s,
-                      errorSpike: { ...s.errorSpike, enabled },
+                      errorSpike: { ...s.errorSpike, enabled: !s.errorSpike.enabled },
                     }))
                   }
                 />
               </div>
             </Field>
-            <Field label="Threshold (errors per window)">
+            <Field label="Threshold (errors per window)" htmlFor="error-threshold">
               <input
+                id="error-threshold"
                 type="number"
                 min={1}
                 max={10000}
@@ -631,8 +633,9 @@ export function AlertsClient({
                 className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-[13px] disabled:opacity-50"
               />
             </Field>
-            <Field label="Window (minutes)">
+            <Field label="Window (minutes)" htmlFor="error-window">
               <input
+                id="error-window"
                 type="number"
                 min={5}
                 max={1440}
@@ -658,21 +661,23 @@ export function AlertsClient({
           description="Built-in system rules: warn before monthly ingest limits are reached; exceeded alerts always fire when usage is at or above the limit. Stored as system-managed AlertRules — edit warnings here, not under Custom rules."
         >
           <FieldGroup>
-            <Field label="Enable quota warnings">
+            <Field label="Enable quota warnings" htmlFor="quota-toggle">
               <div className={canEdit ? undefined : "pointer-events-none opacity-50"}>
                 <SettingsToggle
+                  id="quota-toggle"
                   on={settings.quota.enabled}
-                  onChange={(enabled) =>
+                  onChange={() =>
                     setSettings((s) => ({
                       ...s,
-                      quota: { ...s.quota, enabled },
+                      quota: { ...s.quota, enabled: !s.quota.enabled },
                     }))
                   }
                 />
               </div>
             </Field>
-            <Field label="Warning threshold (%)">
+            <Field label="Warning threshold (%)" htmlFor="quota-threshold">
               <input
+                id="quota-threshold"
                 type="number"
                 min={50}
                 max={99}
@@ -1082,7 +1087,7 @@ export function AlertsClient({
                   id="pii-scrub-session-email"
                   label="Scrub session user email"
                   on={scrubSessionUserEmail}
-                  onChange={setScrubSessionUserEmail}
+                  onChange={(v: boolean) => setScrubSessionUserEmail(v)}
                   disabled={!piiEditable}
                 />
               </div>

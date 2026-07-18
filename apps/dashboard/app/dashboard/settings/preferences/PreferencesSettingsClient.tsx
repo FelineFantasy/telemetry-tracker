@@ -84,8 +84,11 @@ export function PreferencesSettingsClient({
             <Field label="Compact table density">
               <SettingsToggle
                 on={prefs.compactTableDensity}
-                onChange={(compactTableDensity) =>
-                  setPrefs((current) => ({ ...current, compactTableDensity }))
+                onChange={() =>
+                  setPrefs((current) => ({
+                    ...current,
+                    compactTableDensity: !current.compactTableDensity,
+                  }))
                 }
                 label="Use tighter row spacing in lists"
               />
@@ -93,8 +96,11 @@ export function PreferencesSettingsClient({
             <Field label="Show resolved issues">
               <SettingsToggle
                 on={prefs.showResolvedIssues}
-                onChange={(showResolvedIssues) =>
-                  setPrefs((current) => ({ ...current, showResolvedIssues }))
+                onChange={() =>
+                  setPrefs((current) => ({
+                    ...current,
+                    showResolvedIssues: !current.showResolvedIssues,
+                  }))
                 }
                 label="Include resolved error groups by default"
               />
@@ -106,8 +112,11 @@ export function PreferencesSettingsClient({
             <Field label="Usage analytics">
               <SettingsToggle
                 on={prefs.usageAnalytics}
-                onChange={(usageAnalytics) =>
-                  setPrefs((current) => ({ ...current, usageAnalytics }))
+                onChange={() =>
+                  setPrefs((current) => ({
+                    ...current,
+                    usageAnalytics: !current.usageAnalytics,
+                  }))
                 }
                 label="Help improve Telemetry Tracker with anonymous usage data"
               />
