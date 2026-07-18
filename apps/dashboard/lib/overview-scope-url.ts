@@ -44,24 +44,6 @@ export function releaseFilterSelectOptions(
   ];
 }
 
-/** Preserve dashboard scope when switching top-level dashboard tabs. */
-export function buildDashboardNavTabHref(
-  path: string,
-  searchParams: URLSearchParams
-): string {
-  const params = new URLSearchParams();
-  const app = searchParams.get("app");
-  const environment = searchParams.get("environment");
-  const platform = searchParams.get("platform");
-  const release = searchParams.get("release");
-  if (app) params.set("app", app);
-  if (environment) params.set("environment", environment);
-  if (platform) params.set("platform", platform);
-  if (release) params.set("release", release);
-  const q = params.toString();
-  return q ? `${path}?${q}` : path;
-}
-
 export type DashboardListScope = {
   app?: string | null;
   environment?: string | null;
@@ -70,7 +52,7 @@ export type DashboardListScope = {
   range?: string | null;
   from?: string | null;
   to?: string | null;
-  /** When set, error detail applies the Issues ~7d metrics window for unbounded ranges. */
+  /** When set, list/KPI pages apply the Issues ~7d metrics window for unbounded ranges. */
   metricsUntil?: string | null;
 };
 
@@ -94,6 +76,26 @@ export function buildDashboardScopedListHref(
   appendDashboardListScope(params, scope);
   const q = params.toString();
   return q ? `${path}?${q}` : path;
+}
+
+/**
+ * Preserve dashboard scope when switching top-level dashboard tabs.
+ * Forwards the same allow-list as scoped list deep links (including the KPI window).
+ */
+export function buildDashboardNavTabHref(
+  path: string,
+  searchParams: URLSearchParams
+): string {
+  return buildDashboardScopedListHref(path, {
+    app: searchParams.get("app"),
+    environment: searchParams.get("environment"),
+    platform: searchParams.get("platform"),
+    release: searchParams.get("release"),
+    range: searchParams.get("range"),
+    from: searchParams.get("from"),
+    to: searchParams.get("to"),
+    metricsUntil: searchParams.get("metricsUntil"),
+  });
 }
 
 /** Preserve event-name drill-down scope from overview. */
