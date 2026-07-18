@@ -47,8 +47,9 @@ export type GlobalSearchScope = {
    */
   eventCreatedAt?: { gte?: Date; lte?: Date };
   /**
-   * ErrorOccurrence time bounds when release/platform scope is active
-   * (`occurrenceCountRange` for open-ended Issues list).
+   * Issues time window from the search route (`occurrenceCountRange` for
+   * open-ended ranges). Used for occurrence EXISTS when release/platform is
+   * set, and for `ErrorGroup.last_seen` on time-only issue hits.
    */
   errorOccurrenceRange?: { gte?: Date; lte?: Date };
 };
@@ -442,11 +443,14 @@ async function searchErrors(
         AND ${Prisma.join(scopeParts, " AND ")}
     )`);
   } else {
-    if (scope.range.gte) {
-      parts.push(Prisma.sql`eg."last_seen" >= ${scope.range.gte}`);
+    // Time-only: last_seen with the same effective window as Issues metrics
+    // (errorOccurrenceRange when range is open-ended / all-time).
+    const bounds = scope.errorOccurrenceRange ?? scope.range;
+    if (bounds.gte) {
+      parts.push(Prisma.sql`eg."last_seen" >= ${bounds.gte}`);
     }
-    if (scope.range.lte) {
-      parts.push(Prisma.sql`eg."last_seen" <= ${scope.range.lte}`);
+    if (bounds.lte) {
+      parts.push(Prisma.sql`eg."last_seen" <= ${bounds.lte}`);
     }
   }
 

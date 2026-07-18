@@ -62,6 +62,7 @@ Recent production bugs lived here — review cross-file carefully:
 - Formatting-only changes that pass `pnpm lint`.
 - Marketing copy and README unless factually wrong about security or deployment.
 - Missing tests for trivial renames or comment-only edits.
+- **Global Search vs Issues list all-time membership**: `GET /api/search` intentionally applies route-built metrics windows (`sessionStartedAt` / `eventCreatedAt` / `errorOccurrenceRange`) to all entity groups when nav range is open-ended or all-time. Do not flag time-only issue `last_seen` bounds from `errorOccurrenceRange` as over-filtering versus `/dashboard/errors`, which only applies `last_seen` when the list range itself has explicit bounds.
 
 ## Pre-merge expectations
 

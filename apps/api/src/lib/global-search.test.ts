@@ -56,6 +56,70 @@ describe("hasGlobalSearchTimeSignal", () => {
   });
 });
 
+describe("executeGlobalSearch issues time window", () => {
+  const gte = new Date("2026-07-01T00:00:00.000Z");
+  const lte = new Date("2026-07-08T00:00:00.000Z");
+
+  it("applies errorOccurrenceRange to last_seen when range is empty (no release/platform)", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+
+    await executeGlobalSearch(
+      prisma,
+      "proj-1",
+      parseGlobalSearchQuery("range:all"),
+      {
+        range: {},
+        sessionStartedAt: { gte, lte },
+        eventCreatedAt: { gte, lte },
+        errorOccurrenceRange: { gte, lte },
+      }
+    );
+
+    const errorSql = queryRaw.mock.calls
+      .map((call) => call[0] as Prisma.Sql)
+      .find((sql) => {
+        const text = prismaSqlText(sql);
+        return text.includes('"ErrorGroup"') && text.includes('eg."last_seen"');
+      });
+    expect(errorSql).toBeDefined();
+    const text = prismaSqlText(errorSql!);
+    expect(text).toContain('eg."last_seen" >=');
+    expect(text).toContain('eg."last_seen" <=');
+    expect(prismaSqlValues(errorSql!)).toEqual(
+      expect.arrayContaining([gte, lte])
+    );
+    expect(text).not.toContain("ErrorOccurrence");
+  });
+
+  it("still uses occurrence EXISTS with errorOccurrenceRange when release is scoped", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient;
+
+    await executeGlobalSearch(
+      prisma,
+      "proj-1",
+      parseGlobalSearchQuery("release:1.0.0"),
+      {
+        range: {},
+        release: "1.0.0",
+        errorOccurrenceRange: { gte, lte },
+      }
+    );
+
+    const errorSql = queryRaw.mock.calls
+      .map((call) => call[0] as Prisma.Sql)
+      .find((sql) => prismaSqlText(sql).includes('"ErrorGroup"'));
+    expect(errorSql).toBeDefined();
+    const text = prismaSqlText(errorSql!);
+    expect(text).toContain("ErrorOccurrence");
+    expect(text).toContain('rel."created_at"');
+    expect(prismaSqlValues(errorSql!)).toEqual(
+      expect.arrayContaining([gte, lte])
+    );
+  });
+});
+
 describe("executeGlobalSearch users ordering", () => {
   it("orders distinct identities by latest session activity, not alphabetically", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
