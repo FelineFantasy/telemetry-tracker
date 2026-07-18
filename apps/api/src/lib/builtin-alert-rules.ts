@@ -293,15 +293,7 @@ async function upsertBuiltinSpec(
     }
   }
 
-  const same =
-    existing.enabled === spec.enabled &&
-    existing.name === spec.name &&
-    existing.source === "SYSTEM" &&
-    existing.system_kind === spec.systemKind &&
-    existing.cooldown_minutes === spec.cooldownMinutes &&
-    JSON.stringify(existing.conditions) === JSON.stringify(spec.conditions);
-
-  if (same) return "unchanged";
+  if (builtinSpecMatchesExisting(existing, spec)) return "unchanged";
 
   await prisma.alertRule.update({
     where: { id: existing.id },
@@ -316,6 +308,27 @@ async function upsertBuiltinSpec(
     },
   });
   return "updated";
+}
+
+function builtinSpecMatchesExisting(
+  existing: {
+    enabled: boolean;
+    name: string;
+    source: string;
+    system_kind: AlertRuleSystemKind | null;
+    cooldown_minutes: number;
+    conditions: unknown;
+  },
+  spec: BuiltinSpec
+): boolean {
+  return (
+    existing.enabled === spec.enabled &&
+    existing.name === spec.name &&
+    existing.source === "SYSTEM" &&
+    existing.system_kind === spec.systemKind &&
+    existing.cooldown_minutes === spec.cooldownMinutes &&
+    JSON.stringify(existing.conditions) === JSON.stringify(spec.conditions)
+  );
 }
 
 /**
@@ -405,7 +418,9 @@ export type BuiltinAlertRulesBackfillResult = {
 };
 
 /**
- * Backfill SYSTEM AlertRule rows for every non-deleted project.
+ * Backfill SYSTEM AlertRule rows for every active project under an active org.
+ * Skips soft-deleted projects and projects whose parent organization is
+ * soft-deleted (matches ingest + scheduled-evaluator tenant gates).
  * Idempotent — re-running only updates drift / creates missing rows.
  */
 export async function backfillBuiltinAlertRules(
@@ -417,7 +432,10 @@ export async function backfillBuiltinAlertRules(
 ): Promise<BuiltinAlertRulesBackfillResult> {
   const dryRun = options.dryRun === true;
   const projects = await prisma.project.findMany({
-    where: { deleted_at: null },
+    where: {
+      deleted_at: null,
+      organization: { deleted_at: null },
+    },
     select: { id: true, alert_settings: true },
     orderBy: { created_at: "asc" },
   });
@@ -439,20 +457,54 @@ export async function backfillBuiltinAlertRules(
           where: {
             project_id: project.id,
             migration_key: { in: Object.values(BUILTIN_MIGRATION_KEYS) },
-            deleted_at: null,
           },
-          select: { migration_key: true },
+          select: {
+            migration_key: true,
+            deleted_at: true,
+            enabled: true,
+            name: true,
+            source: true,
+            system_kind: true,
+            cooldown_minutes: true,
+            conditions: true,
+          },
         });
-        const have = new Set(existing.map((r) => r.migration_key));
-        const missing = Object.values(BUILTIN_MIGRATION_KEYS).filter(
-          (k) => !have.has(k)
-        );
-        if (missing.length > 0) {
+        // Prefer active row when both active + soft-deleted exist for a key.
+        const byKey = new Map<
+          string,
+          (typeof existing)[number]
+        >();
+        for (const row of existing) {
+          if (!row.migration_key) continue;
+          const prev = byKey.get(row.migration_key);
+          if (!prev || (prev.deleted_at != null && row.deleted_at == null)) {
+            byKey.set(row.migration_key, row);
+          }
+        }
+
+        let created = 0;
+        let updated = 0;
+        let unchanged = 0;
+        for (const spec of builtinSpecsFromSettings(settings)) {
+          const row = byKey.get(spec.migrationKey);
+          if (!row) {
+            created += 1;
+          } else if (row.deleted_at != null) {
+            updated += 1; // would revive soft-deleted SYSTEM row
+          } else if (builtinSpecMatchesExisting(row, spec)) {
+            unchanged += 1;
+          } else {
+            updated += 1;
+          }
+        }
+        result.rulesCreated += created;
+        result.rulesUpdated += updated;
+        result.rulesUnchanged += unchanged;
+        if (created > 0 || updated > 0) {
           result.projectsUpdated += 1;
-          result.rulesCreated += missing.length;
         }
         options.onProgress?.(
-          `dry-run project=${project.id} missing=${missing.length}`
+          `dry-run project=${project.id} would-create=${created} would-update=${updated} unchanged=${unchanged}`
         );
         continue;
       }

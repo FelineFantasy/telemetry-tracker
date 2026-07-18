@@ -241,13 +241,36 @@ describe("ensureBuiltinAlertRules", () => {
 });
 
 describe("backfillBuiltinAlertRules", () => {
-  it("scans projects and reports dry-run missing rules", async () => {
+  it("queries only active projects under active organizations", async () => {
+    let capturedWhere: unknown;
     const prisma = {
       project: {
-        findMany: async () => [
-          { id: "p1", alert_settings: null },
-          { id: "p2", alert_settings: null },
-        ],
+        findMany: async ({ where }: { where: unknown }) => {
+          capturedWhere = where;
+          return [];
+        },
+      },
+    };
+    await backfillBuiltinAlertRules(prisma as never, { dryRun: true });
+    expect(capturedWhere).toEqual({
+      deleted_at: null,
+      organization: { deleted_at: null },
+    });
+  });
+
+  it("skips projects under soft-deleted organizations (not returned by query)", async () => {
+    // Prisma where clause excludes archived-org projects; mock mirrors that gate.
+    const prisma = {
+      project: {
+        findMany: async ({
+          where,
+        }: {
+          where: { deleted_at: null; organization: { deleted_at: null } };
+        }) => {
+          expect(where.organization.deleted_at).toBeNull();
+          // Active project under archived org would not match the where clause.
+          return [{ id: "active-org-project", alert_settings: null }];
+        },
       },
       alertRule: {
         findMany: async () => [],
@@ -256,9 +279,85 @@ describe("backfillBuiltinAlertRules", () => {
     const result = await backfillBuiltinAlertRules(prisma as never, {
       dryRun: true,
     });
+    expect(result.projectsScanned).toBe(1);
+    expect(result.rulesCreated).toBe(3);
+    expect(result.failures).toBe(0);
+  });
+
+  it("scans projects and reports dry-run would-create / would-update / unchanged", async () => {
+    const prisma = {
+      project: {
+        findMany: async () => [
+          { id: "p1", alert_settings: null },
+          {
+            id: "p2",
+            alert_settings: {
+              errorSpike: { enabled: true, threshold: 25, windowMinutes: 15 },
+              quota: { enabled: true, nearPercent: 90 },
+              email: { enabled: false, recipients: [] },
+            },
+          },
+        ],
+      },
+      alertRule: {
+        findMany: async ({
+          where,
+        }: {
+          where: { project_id: string };
+        }) => {
+          if (where.project_id === "p1") return [];
+          // p2: all three present; spike drifted from defaults (threshold 25 vs row 99)
+          return [
+            {
+              migration_key: BUILTIN_MIGRATION_KEYS.ERROR_SPIKE,
+              deleted_at: null,
+              enabled: true,
+              name: "Error spike",
+              source: "SYSTEM",
+              system_kind: "ERROR_SPIKE",
+              cooldown_minutes: 15,
+              conditions: [
+                {
+                  type: "BUILTIN_ERROR_SPIKE",
+                  threshold: 99,
+                  windowMinutes: 15,
+                },
+              ],
+            },
+            {
+              migration_key: BUILTIN_MIGRATION_KEYS.QUOTA_WARNING,
+              deleted_at: null,
+              enabled: true,
+              name: "Quota warning",
+              source: "SYSTEM",
+              system_kind: "QUOTA_WARNING",
+              cooldown_minutes: 60,
+              conditions: [
+                { type: "BUILTIN_QUOTA_WARNING", thresholdPercent: 90 },
+              ],
+            },
+            {
+              migration_key: BUILTIN_MIGRATION_KEYS.QUOTA_EXCEEDED,
+              deleted_at: null,
+              enabled: true,
+              name: "Quota exceeded",
+              source: "SYSTEM",
+              system_kind: "QUOTA_EXCEEDED",
+              cooldown_minutes: 60,
+              conditions: [{ type: "BUILTIN_QUOTA_EXCEEDED" }],
+            },
+          ];
+        },
+      },
+    };
+    const result = await backfillBuiltinAlertRules(prisma as never, {
+      dryRun: true,
+    });
     expect(result.projectsScanned).toBe(2);
+    expect(result.rulesCreated).toBe(3); // p1 missing all three
+    expect(result.rulesUpdated).toBe(1); // p2 spike drift
+    expect(result.rulesUnchanged).toBe(2); // p2 warning + exceeded
     expect(result.projectsUpdated).toBe(2);
-    expect(result.rulesCreated).toBe(6);
     expect(result.failures).toBe(0);
   });
 });
