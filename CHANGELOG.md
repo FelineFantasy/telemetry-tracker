@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.15.9] - 2026-07-18
+
+### Fixed
+
+- **Email brand logo in Gmail** — embed the mark as a CID inline attachment instead of a hotlinked URL so Gmail Image Proxy / Cloudflare no longer shows a broken placeholder ([#559](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/559))
+
+---
+
 ## [1.15.8] - 2026-07-18
 
 ### Added
