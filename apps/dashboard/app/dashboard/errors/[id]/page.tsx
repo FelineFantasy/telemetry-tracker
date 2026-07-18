@@ -14,6 +14,7 @@ import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { MiniSparkline, type SparklinePoint } from "@/app/components/dashboard/MiniSparkline";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { parseDashboardApiResourceId } from "@/lib/dashboard-api-url";
 import { buildDashboardScopedListHref } from "@/lib/overview-scope-url";
 
 type Occurrence = {
@@ -53,7 +54,7 @@ type ErrorGroup = {
 };
 
 async function getErrorGroup(
-  id: string,
+  rawId: string,
   scope: {
     app?: string;
     environment?: string;
@@ -66,6 +67,8 @@ async function getErrorGroup(
     metricsSince?: string;
   }
 ): Promise<ErrorGroup | null> {
+  const id = parseDashboardApiResourceId(rawId);
+  if (!id) return null;
   const qs = new URLSearchParams();
   if (scope.app) qs.set("app", scope.app);
   if (scope.environment) qs.set("environment", scope.environment);

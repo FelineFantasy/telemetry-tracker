@@ -1,11 +1,12 @@
 import { API_BASE_URL } from "@/lib/api-url";
 
 /**
- * Resolve a dashboard API path against the fixed `API_BASE_URL` origin.
+ * Resolve a dashboard API path against the fixed `API_BASE_URL` origin
+ * (and any path prefix on that base).
  *
  * Only relative `/api/...` paths are accepted. Absolute URLs, scheme-relative
- * URLs, and path traversal that would leave `/api/` are rejected so
- * `dashboardApiFetch` cannot be pointed at an arbitrary host or route.
+ * URLs, and path traversal that would leave the base `/api/` root are rejected
+ * so `dashboardApiFetch` cannot be pointed at an arbitrary host or route.
  */
 export function resolveDashboardApiUrl(pathAndQuery: string): string {
   const trimmed = pathAndQuery.trim();
@@ -21,13 +22,19 @@ export function resolveDashboardApiUrl(pathAndQuery: string): string {
     throw new Error("Dashboard API path must not contain a scheme or authority");
   }
 
-  const base = new URL(API_BASE_URL);
-  const resolved = new URL(trimmed, base);
+  // Join as a relative path so an `API_URL` path prefix is preserved.
+  // `new URL("/api/...", base)` would replace the base pathname entirely.
+  const baseHref = API_BASE_URL.endsWith("/") ? API_BASE_URL : `${API_BASE_URL}/`;
+  const base = new URL(baseHref);
+  const resolved = new URL(trimmed.slice(1), base);
 
   if (resolved.origin !== base.origin) {
     throw new Error("Dashboard API URL must stay on the configured API origin");
   }
-  if (!resolved.pathname.startsWith("/api/")) {
+
+  const basePath = base.pathname.replace(/\/$/, "") || "";
+  const apiPrefix = `${basePath}/api/`;
+  if (!resolved.pathname.startsWith(apiPrefix)) {
     throw new Error("Dashboard API URL pathname must remain under /api/");
   }
 

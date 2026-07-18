@@ -7,6 +7,7 @@ import { JsonContextView } from "@/app/components/dashboard/JsonContextView";
 import { TimeAgo } from "@/app/components/TimeAgo";
 import { formatRelativeTime } from "@/lib/format-time";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { parseDashboardApiResourceId } from "@/lib/dashboard-api-url";
 
 type EventDetail = {
   id: string;
@@ -23,7 +24,9 @@ type EventDetail = {
   created_at: string;
 };
 
-async function getEvent(id: string): Promise<EventDetail | null> {
+async function getEvent(rawId: string): Promise<EventDetail | null> {
+  const id = parseDashboardApiResourceId(rawId);
+  if (!id) return null;
   const res = await dashboardApiFetch(`/api/events/${id}`);
   if (res.status === 404) return null;
   if (!res.ok) {

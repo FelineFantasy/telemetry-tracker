@@ -64,6 +64,22 @@ describe("resolveDashboardApiUrl", () => {
       resolveDashboardApiUrl("https://api.example.com/api/meta/projects")
     ).toThrow(/relative \/api/);
   });
+
+  it("preserves an API_URL path prefix", async () => {
+    const { resolveDashboardApiUrl } = await loadResolver(
+      "https://host.example/prefix"
+    );
+    expect(resolveDashboardApiUrl("/api/errors")).toBe(
+      "https://host.example/prefix/api/errors"
+    );
+    expect(resolveDashboardApiUrl("/api/errors?limit=10")).toBe(
+      "https://host.example/prefix/api/errors?limit=10"
+    );
+    expect(() => resolveDashboardApiUrl("/api/../admin")).toThrow(/under \/api/);
+    expect(() => resolveDashboardApiUrl("/api/foo/../../admin")).toThrow(
+      /under \/api/
+    );
+  });
 });
 
 describe("parseDashboardApiResourceId", () => {
