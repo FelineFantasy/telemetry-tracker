@@ -188,10 +188,9 @@ export function overviewSessionBucketEnvironmentExistsSql(
   )`;
 }
 
-function overviewSessionEventExistsSql(
+/** Unwindowed event EXISTS — aligns known-release filters with Release Health. */
+function overviewSessionEventExistsUnwindowedSql(
   projectId: string,
-  since: Date,
-  until: Date,
   extra: Prisma.Sql,
   sessionAlias = "s"
 ): Prisma.Sql {
@@ -202,8 +201,6 @@ function overviewSessionEventExistsSql(
       AND e."session_id" = ${s}."session_id"
       AND e."app" = ${s}."app"
       AND ${extra}
-      AND e."created_at" >= ${since}
-      AND e."created_at" <= ${until}
   )`;
 }
 
@@ -247,6 +244,10 @@ export function overviewSessionEnvReleaseScopeSql(
         )
       )}`;
     }
+    const bothOnEvent = overviewSessionEventExistsUnwindowedSql(
+      projectId,
+      Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
+    );
     return Prisma.sql`AND (
       (
         s."environment" = ${environmentFilter}
@@ -255,32 +256,17 @@ export function overviewSessionEnvReleaseScopeSql(
       OR (
         s."environment" IS NULL
         AND s."release" IS NULL
-        AND ${overviewSessionEventExistsSql(
-          projectId,
-          since,
-          until,
-          Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
-        )}
+        AND ${bothOnEvent}
       )
       OR (
         s."environment" = ${environmentFilter}
         AND s."release" IS NULL
-        AND ${overviewSessionEventExistsSql(
-          projectId,
-          since,
-          until,
-          Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
-        )}
+        AND ${bothOnEvent}
       )
       OR (
         s."environment" IS NULL
         AND ${sessionRelease}
-        AND ${overviewSessionEventExistsSql(
-          projectId,
-          since,
-          until,
-          Prisma.sql`e."environment" = ${environmentFilter} AND ${eventRelease}`
-        )}
+        AND ${bothOnEvent}
       )
     )`;
   }
@@ -310,10 +296,8 @@ export function overviewSessionEnvReleaseScopeSql(
       ${sessionRelease}
       OR (
         s."release" IS NULL
-        AND ${overviewSessionEventExistsSql(
+        AND ${overviewSessionEventExistsUnwindowedSql(
           projectId,
-          since,
-          until,
           releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter)
         )}
       )

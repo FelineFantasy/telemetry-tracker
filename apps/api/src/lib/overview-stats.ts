@@ -208,7 +208,14 @@ export function overviewEnvironmentSessionCountSql(
         AND ${extra}
         AND ${eventTime}
     )`;
-  // Unwindowed: align Unknown exclusion with Release Health all-time attribution.
+  // Unwindowed: align release= filters with Release Health all-time attribution.
+  const eventExistsUnwindowed = (extra: Prisma.Sql) => Prisma.sql`EXISTS (
+      SELECT 1 FROM "Event" e
+      WHERE e."project_id" = s."project_id"
+        AND e."session_id" = s."session_id"
+        AND e."app" = s."app"
+        AND ${extra}
+    )`;
   const knownEventReleaseExists = (extra?: Prisma.Sql) => Prisma.sql`EXISTS (
       SELECT 1 FROM "Event" e
       WHERE e."project_id" = s."project_id"
@@ -229,7 +236,10 @@ export function overviewEnvironmentSessionCountSql(
         knownEventReleaseExists(Prisma.sql`e."environment" = ${scope.environment}`)
       );
     } else {
-    envReleaseMatch = Prisma.sql`(
+      const bothOnEvent = eventExistsUnwindowed(
+        Prisma.sql`e."environment" = ${scope.environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release)}`
+      );
+      envReleaseMatch = Prisma.sql`(
         (
           s."environment" = ${scope.environment}
           AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release)}
@@ -237,23 +247,17 @@ export function overviewEnvironmentSessionCountSql(
         OR (
           s."environment" IS NULL
           AND s."release" IS NULL
-          AND ${eventExists(
-            Prisma.sql`e."environment" = ${scope.environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release)}`
-          )}
+          AND ${bothOnEvent}
         )
         OR (
           s."environment" = ${scope.environment}
           AND s."release" IS NULL
-          AND ${eventExists(
-            Prisma.sql`e."environment" = ${scope.environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release)}`
-          )}
+          AND ${bothOnEvent}
         )
         OR (
           s."environment" IS NULL
           AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release)}
-          AND ${eventExists(
-            Prisma.sql`e."environment" = ${scope.environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release)}`
-          )}
+          AND ${bothOnEvent}
         )
       )`;
     }
@@ -276,7 +280,7 @@ export function overviewEnvironmentSessionCountSql(
         ${releaseFilterMatchSql(Prisma.sql`s."release"`, scope.release!)}
         OR (
           s."release" IS NULL
-          AND ${eventExists(releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release!))}
+          AND ${eventExistsUnwindowed(releaseFilterMatchSql(Prisma.sql`e."release"`, scope.release!))}
         )
       )`;
     }
@@ -402,7 +406,14 @@ export async function getSessionDurationSeries(
       AND e."created_at" >= ${querySince}
       ${eventUntilClause}
   )`;
-  // Unwindowed: align Unknown exclusion with Release Health all-time attribution.
+  // Unwindowed: align release= filters with Release Health all-time attribution.
+  const eventExistsUnwindowed = (extra: Prisma.Sql) => Prisma.sql`EXISTS (
+    SELECT 1 FROM "Event" e
+    WHERE e."project_id" = s."project_id"
+      AND e."session_id" = s."session_id"
+      AND e."app" = s."app"
+      AND ${extra}
+  )`;
   const knownEventReleaseExists = (extra?: Prisma.Sql) => Prisma.sql`EXISTS (
     SELECT 1 FROM "Event" e
     WHERE e."project_id" = s."project_id"
@@ -423,7 +434,10 @@ export async function getSessionDurationSeries(
         knownEventReleaseExists(Prisma.sql`e."environment" = ${environment}`)
       )}`;
     } else {
-    envReleaseClause = Prisma.sql`AND (
+      const bothOnEvent = eventExistsUnwindowed(
+        Prisma.sql`e."environment" = ${environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, release)}`
+      );
+      envReleaseClause = Prisma.sql`AND (
       (
         s."environment" = ${environment}
         AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, release)}
@@ -431,23 +445,17 @@ export async function getSessionDurationSeries(
       OR (
         s."environment" IS NULL
         AND s."release" IS NULL
-        AND ${eventExists(
-          Prisma.sql`e."environment" = ${environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, release)}`
-        )}
+        AND ${bothOnEvent}
       )
       OR (
         s."environment" = ${environment}
         AND s."release" IS NULL
-        AND ${eventExists(
-          Prisma.sql`e."environment" = ${environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, release)}`
-        )}
+        AND ${bothOnEvent}
       )
       OR (
         s."environment" IS NULL
         AND ${releaseFilterMatchSql(Prisma.sql`s."release"`, release)}
-        AND ${eventExists(
-          Prisma.sql`e."environment" = ${environment} AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, release)}`
-        )}
+        AND ${bothOnEvent}
       )
     )`;
     }
@@ -470,7 +478,7 @@ export async function getSessionDurationSeries(
       ${releaseFilterMatchSql(Prisma.sql`s."release"`, release)}
       OR (
         s."release" IS NULL
-        AND ${eventExists(releaseFilterMatchSql(Prisma.sql`e."release"`, release))}
+        AND ${eventExistsUnwindowed(releaseFilterMatchSql(Prisma.sql`e."release"`, release))}
       )
     )`;
     }

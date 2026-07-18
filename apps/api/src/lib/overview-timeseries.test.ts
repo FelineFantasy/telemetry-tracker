@@ -83,6 +83,24 @@ describe("overviewSessionEnvReleaseScopeSql", () => {
     expect(text).not.toMatch(/AND NOT[\s\S]*e\."created_at"/);
   });
 
+  it("uses unwindowed event fallback for known release filters", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql("proj_1", since, until, undefined, "1.2.0")
+    );
+    expect(text).toContain("EXISTS");
+    expect(text).toContain('s."release" IS NULL');
+    expect(text).not.toContain('e."created_at"');
+  });
+
+  it("uses unwindowed event fallback for known release + environment", () => {
+    const text = prismaSqlText(
+      overviewSessionEnvReleaseScopeSql("proj_1", since, until, "production", "1.2.0")
+    );
+    expect(text).toContain('e."environment"');
+    expect(text).toContain("EXISTS");
+    expect(text).not.toContain('e."created_at"');
+  });
+
   it("scopes known-event exclusion by environment for Unknown + environment", () => {
     const text = prismaSqlText(
       overviewSessionEnvReleaseScopeSql(

@@ -165,6 +165,40 @@ describe("overviewEnvironmentSessionCountSql", () => {
     );
   });
 
+  it("uses unwindowed event fallback for known release filters", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain("EXISTS");
+    expect(text).toContain('s."release" IS NULL');
+    // Known-release event fallback has no created_at (matches Release Health).
+    expect(text).not.toMatch(
+      /s\."release" IS NULL AND EXISTS \([\s\S]*e\."created_at"/
+    );
+  });
+
+  it("uses unwindowed event fallback for known release + environment", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('e."environment" =');
+    expect(text).toContain("EXISTS");
+    expect(text).not.toMatch(
+      /s\."release" IS NULL AND EXISTS \([\s\S]*e\."created_at"/
+    );
+  });
+
   it("scopes known-event exclusion by environment for Unknown + environment", () => {
     const sql = overviewEnvironmentSessionCountSql({
       projectId: "proj_1",

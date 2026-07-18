@@ -335,9 +335,10 @@ function sessionEventScopeClauses(f: SessionListFilterInput): Prisma.Sql[] {
  * legacy null columns. When both filters are set, a single event must satisfy both
  * (or session columns must both match) — never different events per field.
  *
- * `release=__unknown__` matches only when Session.release is Unknown and no scoped
- * event carries a known release (Release Health effective-release alignment).
- * Known-event exclusion is intentionally unwindowed so deep links match Releases.
+ * When `release=` is set (known or Unknown), event-release attribution is
+ * intentionally unwindowed so Sessions deep links match Release Health's
+ * `COALESCE(session.release, latest known event.release)` over all time.
+ * Environment-only event fallback remains scoped to `eventWindow`.
  */
 function sessionEnvReleaseMatchSql(
   projectId: string,
@@ -370,12 +371,11 @@ function sessionEnvReleaseMatchSql(
         hasKnownEventRelease
       );
     }
-    const bothOnEvent = sessionEventExistsSql(
-      projectId,
-      sessionAlias,
-      [Prisma.sql`e."environment" = ${f.environment}`, eventReleaseMatch],
-      eventWindow
-    );
+    // No eventWindow: known-release fallback matches Release Health all-time attribution.
+    const bothOnEvent = sessionEventExistsSql(projectId, sessionAlias, [
+      Prisma.sql`e."environment" = ${f.environment}`,
+      eventReleaseMatch,
+    ]);
     return Prisma.sql`(
       (
         ${s}."environment" = ${f.environment}
@@ -426,11 +426,12 @@ function sessionEnvReleaseMatchSql(
     );
   }
 
+  // No eventWindow: known-release fallback matches Release Health all-time attribution.
   return Prisma.sql`(
     ${sessionReleaseMatch}
     OR (
       ${s}."release" IS NULL
-      AND ${sessionEventExistsSql(projectId, sessionAlias, [eventReleaseMatch], eventWindow)}
+      AND ${sessionEventExistsSql(projectId, sessionAlias, [eventReleaseMatch])}
     )
   )`;
 }

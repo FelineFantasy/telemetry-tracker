@@ -201,7 +201,8 @@ function sessionScopeSql(alias: string, f: ReleasesFilterInput, projectId: strin
 
 /**
  * Prefer Session.release; when blank, fall back to the latest non-blank Event.release
- * for the same session (aligned with Sessions list legacy inference).
+ * for the same session over all time (no metrics-window bound). Sessions/Overview
+ * `release=` filters use the same unwindowed event fallback so deep-link counts match.
  */
 function sessionEffectiveReleaseKeySql(
   sessionAlias: string,

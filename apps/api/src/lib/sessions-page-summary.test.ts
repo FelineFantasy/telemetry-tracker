@@ -188,6 +188,41 @@ describe("sessionFilterSql", () => {
     expect(text).not.toMatch(/AND NOT[\s\S]*e\."created_at"/);
   });
 
+  it("uses unwindowed event fallback for known release filters", () => {
+    const since = new Date("2026-03-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const text = prismaSqlText(
+      sessionFilterSql(
+        "proj-1",
+        { range: { gte: since, lte: until }, release: "1.2.0" },
+        { gte: since, lte: until }
+      )
+    );
+    expect(text).toContain('TRIM(e."release") = ?');
+    expect(text).toContain("EXISTS");
+    // Known-release event fallback matches Release Health (all-time, no created_at).
+    expect(text).not.toContain('e."created_at"');
+  });
+
+  it("uses unwindowed event fallback for known release + environment", () => {
+    const since = new Date("2026-03-01T00:00:00.000Z");
+    const until = new Date("2026-03-15T00:00:00.000Z");
+    const text = prismaSqlText(
+      sessionFilterSql(
+        "proj-1",
+        {
+          range: { gte: since, lte: until },
+          environment: "production",
+          release: "1.2.0",
+        },
+        { gte: since, lte: until }
+      )
+    );
+    expect(text).toContain('e."environment" = ?');
+    expect(text).toContain('TRIM(e."release") = ?');
+    expect(text).not.toContain('e."created_at"');
+  });
+
   it("scopes known-event exclusion by environment for Unknown + environment", () => {
     const text = prismaSqlText(
       sessionFilterSql("proj-1", {
