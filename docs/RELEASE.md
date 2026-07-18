@@ -106,7 +106,7 @@ For **audit trail**, PATCH and docs hotfixes **should** still:
 
 If the patch-line milestone is **closed**, you may still assign merged PRs to it retroactively, or open a new patch-line milestone if you prefer a clean bucket for the next patches.
 
-Product update emails remain policy-driven ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md)); docs-only PATCH releases usually **skip** subscriber email.
+Product update emails remain policy-driven ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md)); they send on **line close** of a completed minor (whole `vX.Y.*`), not when opening the next milestone’s first `.0`. Docs-only PATCH releases usually **skip** subscriber email.
 
 ---
 
@@ -127,7 +127,7 @@ App releases use **`vX.Y.Z`**:
 | **Y** | **MINOR** | Features, backward-compatible migrations, dashboard UX (typical milestone release) |
 | **Z** | **PATCH** | Bug fixes and hotfixes on `main` |
 
-Product update emails (see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#when-to-send-maintainer-policy)) send on **X** or **Y** increases; **Z**-only hotfixes do not.
+Product update emails (see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#when-to-send-maintainer-policy)) send when **closing** a completed minor line (last intended `vX.Y.z` before the next milestone), summarizing all `vX.Y.*` since the previous product email — **not** when tagging the first `.0` of a new line. Mid-line **Z**-only hotfixes stay skip.
 
 Always document **migrations**, **new env vars**, and **breaking changes** in CHANGELOG and the GitHub Release notes.
 
@@ -141,15 +141,16 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
 - [ ] [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` section complete
 - [ ] CI green on `develop` (`pnpm lint`, `pnpm test`, `pnpm -r run build`)
 - [ ] Self-host upgrade notes ready (migrations, env vars)
-- [ ] If this is a **MINOR** (Y) or **MAJOR** (X) release: confirm `CHANGELOG.md` is ready and plan to run [production migrations](#3-database-migrations-production) **before** pushing the tag — [product update email](./MARKETING-EMAIL.md#automated-send-minor--major-tags) sends automatically when the tag is pushed
+- [ ] If this closes a milestone / is the **last intended release** of `vX.Y.*`: confirm `CHANGELOG.md` covers the whole line and plan to run [production migrations](#3-database-migrations-production) **before** pushing the tag — then send the [product update email](./MARKETING-EMAIL.md#line-close-send-preferred) via workflow_dispatch with `line_close` (tag push alone does **not** email on a new `.0`)
+- [ ] If this **opens** a new minor (`vX.Y.0`) while the previous line was already emailed (or will be emailed on its final tag): no product email for the new line yet
 
 ### On `main` after promotion
 
 1. **Finalize CHANGELOG** — rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`. Prefer doing this in the **`develop` → `main`** release PR so `develop` and `main` stay aligned; if you commit on `main` after promotion, you **must** sync `develop` in step 9.
 2. **Deploy** — Railway rebuilds `main` automatically when the release PR merges; see [Deploy runbook](#deploy-runbook-railway).
-3. **Production DB** — run [migrations](#3-database-migrations-production) **before tagging** on MINOR (Y) / MAJOR (X) releases. The release email workflow reads production Postgres but does not migrate (use the public `DATABASE_URL` in GitHub secrets — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#automated-send-minor--major-tags)).
+3. **Production DB** — run [migrations](#3-database-migrations-production) **before tagging** on MINOR (Y) / MAJOR (X) releases (and before a line-close product email). The release email workflow reads production Postgres but does not migrate (use the public `DATABASE_URL` in GitHub secrets — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#line-close-send-preferred)).
 4. **Post-deploy** — [verification](#post-deploy-verification).
-5. **Tag** — after deploy and migrations are green (tag push triggers the product update email workflow for MINOR/MAJOR — **X** or **Y** bump, not Z-only hotfixes). **Push the tag only after the release PR is merged to `main`** so `CHANGELOG.md` contains the version section when the email workflow runs (an early tag push can fail once, then succeed on retag):
+5. **Tag** — after deploy and migrations are green. Tag push starts the release-email workflow but **does not** send for opening `.0` or mid-line patches — send on **line close** via dispatch ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md#line-close-send-preferred)). **Push the tag only after the release PR is merged to `main`** so `CHANGELOG.md` contains the version section when any email workflow runs (an early tag push can fail once, then succeed on retag):
    ```bash
    git checkout main && git pull origin main
    git tag -a v1.1.0 -m "Telemetry Tracker v1.1.0"
@@ -167,7 +168,7 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
    ```
    See the template for section guidance and a filled v1.1.0 example. Do not duplicate the entire CHANGELOG — keep the release body scannable for deployers.
 7. **SDK** — if ingest/SDK contract changed, bump `packages/*/package.json` and `pnpm publish:packages`.
-8. **Product update email** — **MINOR** (Y) and **MAJOR** (X) tags trigger the [Release product email](../.github/workflows/release-email.yml) workflow automatically (Z-only patch/hotfix tags skipped). Ensure repository secrets are set ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md#automated-send-minor--major-tags)). After the workflow completes, note send date and recipient count in the GitHub Release. For notable PATCH (Z) releases or backfill, send manually with `--force` — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#manual-send-override--backfill).
+8. **Product update email** — when this tag is the **last intended release** of a minor line (milestone close), run [Release product email](../.github/workflows/release-email.yml) with **`line_close=true`**, `version` = that closing tag, and `previous_version` = last emailed / previous minor final. The email covers the whole **`vX.Y.*`** line. Opening a new `vX.Y.0` and mid-line patches do **not** send. Ensure repository secrets are set ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md#line-close-send-preferred)). After the send completes, note date and recipient count in the GitHub Release. For exceptional single-version PATCH backfill, use `--force` — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#manual-send-cli--backfill).
 9. **Sync `develop`** — merge **`main` into `develop`** and push after every release (milestone promotion or hotfix). Required whenever `main` has commits not on `develop` — including squash merges, merge commits from the release PR, and any post-promotion edits on `main`:
    ```bash
    git checkout develop && git pull origin develop
