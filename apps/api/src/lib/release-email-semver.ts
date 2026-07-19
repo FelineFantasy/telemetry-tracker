@@ -37,6 +37,63 @@ export function formatMinorLineLabel(version: ReleaseSemver): string {
   return `${version.major}.${version.minor}`;
 }
 
+/**
+ * Product milestone titles look like `v1.16.x — Release Intelligence`.
+ * Returns the minor line when the title matches; ignores unrelated milestones.
+ */
+export function parseProductMilestoneTitle(
+  title: string
+): { major: number; minor: number; lineLabel: string } | null {
+  const trimmed = title.trim();
+  const match = /^v?(\d+)\.(\d+)\.x(?:\b|[^\d]|$)/i.exec(trimmed);
+  if (!match) return null;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return { major, minor, lineLabel: `${major}.${minor}` };
+}
+
+export type LineCloseVersionResolution =
+  | { ok: true; version: string; previousVersion: string | null; lineLabel: string }
+  | { ok: false; error: string };
+
+/**
+ * Given all known semver tags and a closed product minor line, pick:
+ * - `version` = latest tag on that minor (`X.Y.*`)
+ * - `previousVersion` = latest tag strictly before that minor line (previous minor final)
+ */
+export function resolveLineCloseVersions(
+  tags: readonly string[],
+  major: number,
+  minor: number
+): LineCloseVersionResolution {
+  const lineLabel = `${major}.${minor}`;
+  const parsed = tags
+    .map((tag) => parseReleaseVersion(tag))
+    .filter((v): v is ReleaseSemver => v !== null)
+    .sort(compareReleaseVersion);
+
+  const onLine = parsed.filter((v) => v.major === major && v.minor === minor);
+  if (onLine.length === 0) {
+    return {
+      ok: false,
+      error: `no semver tags found for minor line ${lineLabel} (expected v${lineLabel}.*)`,
+    };
+  }
+
+  const closing = onLine[onLine.length - 1]!;
+  const beforeLine = parsed.filter(
+    (v) => v.major < major || (v.major === major && v.minor < minor)
+  );
+  const previous = beforeLine.length > 0 ? beforeLine[beforeLine.length - 1]! : null;
+
+  return {
+    ok: true,
+    version: formatReleaseVersion(closing),
+    previousVersion: previous ? formatReleaseVersion(previous) : null,
+    lineLabel,
+  };
+}
+
 export type ShouldSendReleaseEmailOptions = {
   /** Closing the last intended release of a minor line — send even for Z-only tags. */
   lineClose?: boolean;

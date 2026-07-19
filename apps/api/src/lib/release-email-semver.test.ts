@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   compareReleaseVersion,
   formatMinorLineLabel,
+  parseProductMilestoneTitle,
   parseReleaseVersion,
+  resolveLineCloseVersions,
   shouldSendProductUpdateEmail,
 } from "./release-email-semver.js";
 
@@ -30,6 +32,78 @@ describe("compareReleaseVersion", () => {
 describe("formatMinorLineLabel", () => {
   it("formats X.Y from a release", () => {
     expect(formatMinorLineLabel({ major: 1, minor: 15, patch: 4 })).toBe("1.15");
+  });
+});
+
+describe("parseProductMilestoneTitle", () => {
+  it("parses vX.Y.x product milestones", () => {
+    expect(parseProductMilestoneTitle("v1.16.x — Release Intelligence")).toEqual({
+      major: 1,
+      minor: 16,
+      lineLabel: "1.16",
+    });
+    expect(parseProductMilestoneTitle("v1.15.x - Alert Rules")).toEqual({
+      major: 1,
+      minor: 15,
+      lineLabel: "1.15",
+    });
+    expect(parseProductMilestoneTitle("1.14.x — Notifications")).toEqual({
+      major: 1,
+      minor: 14,
+      lineLabel: "1.14",
+    });
+  });
+
+  it("ignores unrelated milestones", () => {
+    expect(parseProductMilestoneTitle("Q3 marketing")).toBeNull();
+    expect(parseProductMilestoneTitle("v1.16.0 — too specific")).toBeNull();
+    expect(parseProductMilestoneTitle("Release Intelligence")).toBeNull();
+  });
+});
+
+describe("resolveLineCloseVersions", () => {
+  const tags = [
+    "v1.14.4",
+    "v1.15.0",
+    "v1.15.9",
+    "v1.16.0",
+    "v1.16.7",
+    "not-a-tag",
+    "v2.0.0",
+  ];
+
+  it("picks latest tag on the closed minor and previous minor final", () => {
+    expect(resolveLineCloseVersions(tags, 1, 16)).toEqual({
+      ok: true,
+      version: "1.16.7",
+      previousVersion: "1.15.9",
+      lineLabel: "1.16",
+    });
+  });
+
+  it("uses latest prior major when closing X.0", () => {
+    expect(resolveLineCloseVersions(tags, 2, 0)).toEqual({
+      ok: true,
+      version: "2.0.0",
+      previousVersion: "1.16.7",
+      lineLabel: "2.0",
+    });
+  });
+
+  it("fails safely when the minor line has no tags", () => {
+    expect(resolveLineCloseVersions(tags, 1, 99)).toEqual({
+      ok: false,
+      error: expect.stringContaining("no semver tags found for minor line 1.99"),
+    });
+  });
+
+  it("allows bootstrap when there is no previous minor", () => {
+    expect(resolveLineCloseVersions(["v1.0.0", "v1.0.1"], 1, 0)).toEqual({
+      ok: true,
+      version: "1.0.1",
+      previousVersion: null,
+      lineLabel: "1.0",
+    });
   });
 });
 

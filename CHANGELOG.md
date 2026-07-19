@@ -13,6 +13,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Product update email on milestone close** — closing a `vX.Y.x — …` GitHub milestone auto-sends the line-close product email (latest tag on that minor + previous minor final); tag pushes still skip; workflow `dry_run` input for previews ([docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md))
+
 ### Fixed
 
 ### Changed
