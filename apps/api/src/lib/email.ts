@@ -18,6 +18,11 @@ export type TransactionalEmailAttachment = {
   path?: string;
 };
 
+/** Strip CR/LF before logging (CodeQL js/log-injection: replace /\n|\r/g with ""). */
+function sanitizeForLog(value: string): string {
+  return value.replace(/\n|\r/g, "").slice(0, 500);
+}
+
 export function isTransactionalEmailConfigured(): boolean {
   return Boolean(
     process.env.RESEND_API_KEY?.trim() && process.env.TELEMETRY_EMAIL_FROM?.trim()
@@ -34,7 +39,15 @@ export async function sendTransactionalEmail(opts: {
 }): Promise<{ sent: boolean; devLogged?: boolean; status?: number; error?: string }> {
   if (!isTransactionalEmailConfigured()) {
     if (process.env.NODE_ENV !== "production") {
-      console.info("[email:dev]", opts.to, opts.subject, opts.html.slice(0, 200));
+      const to = Array.isArray(opts.to)
+        ? opts.to.map(sanitizeForLog).join(", ")
+        : sanitizeForLog(opts.to);
+      console.info(
+        "[email:dev]",
+        to,
+        sanitizeForLog(opts.subject),
+        sanitizeForLog(opts.html.slice(0, 200))
+      );
       return { sent: false, devLogged: true };
     }
     return { sent: false };

@@ -76,6 +76,27 @@ describe("sendTransactionalEmail", () => {
     logSpy.mockRestore();
   });
 
+  it("strips CR/LF from dev-logged email fields", async () => {
+    delete process.env.RESEND_API_KEY;
+    delete process.env.TELEMETRY_EMAIL_FROM;
+    process.env.NODE_ENV = "development";
+    const logSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await sendTransactionalEmail({
+      to: "user@example.com\r\n[INFO] forged",
+      subject: "Sub\nject",
+      html: "<p>Hello\r\nWorld</p>",
+    });
+
+    expect(logSpy).toHaveBeenCalledWith(
+      "[email:dev]",
+      "user@example.com[INFO] forged",
+      "Subject",
+      "<p>HelloWorld</p>"
+    );
+    logSpy.mockRestore();
+  });
+
   it("no-ops silently in production when not configured", async () => {
     delete process.env.RESEND_API_KEY;
     delete process.env.TELEMETRY_EMAIL_FROM;
