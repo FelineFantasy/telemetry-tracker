@@ -89,9 +89,13 @@ import {
   getSessionDurationSeries,
   listActiveIssues,
   listDistinctEnvironments,
-  resolveCompareWindow,
-  type OverviewCompareMode,
 } from "../lib/overview-stats.js";
+import {
+  isRollingCompareMode,
+  parseCompareMode,
+  resolveCompareWindows,
+} from "../lib/compare-windows.js";
+import { applySummaryCompare } from "../lib/summary-compare-window.js";
 import {
   buildOverviewSessionFilter,
   countOverviewErrorGroupsInWindow,
@@ -190,6 +194,8 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
       metricsUntil?: string;
       errorsPage?: string;
       eventsPage?: string;
@@ -240,8 +246,7 @@ export async function apiRoutes(
     const chartBucketSeconds = isUnselectedTimeRange(timeRange.key)
       ? metricsBucket.bucketSeconds
       : timeRange.bucketSeconds;
-    const compare: OverviewCompareMode =
-      queryString(query.compare) === "week-ago" ? "week-ago" : "previous";
+    const compareMode = parseCompareMode(queryString(query.compare));
     const errSortParsed = parseOverviewErrorSortParam(queryString(query.errorsSort));
     if (!errSortParsed.ok) {
       return reply.status(400).send({ error: "Invalid errorsSort" });
@@ -258,16 +263,47 @@ export async function apiRoutes(
     if (!topEvOrderParsed.ok) {
       return reply.status(400).send({ error: "Invalid topEventsOrder" });
     }
-    const compareWindow = resolveCompareWindow(
-      metricsWindow.durationMs,
-      compare,
-      metricsWindow.gte,
-      metricsWindow.lte
-    );
-    const metricsScope = {
-      projectId,
+    const compareResolved = resolveCompareWindows({
+      mode: compareMode,
       since: metricsWindow.gte,
       until: metricsWindow.lte,
+      label: timeRange.label,
+      anchor: metricsWindow.lte,
+      custom: {
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+    });
+    if (!compareResolved.ok) {
+      return reply.status(400).send({ error: compareResolved.error });
+    }
+    const effectiveMetrics = isRollingCompareMode(compareMode)
+      ? {
+          gte: metricsWindow.gte,
+          lte: metricsWindow.lte,
+          durationMs: metricsWindow.durationMs,
+          label: timeRange.label,
+        }
+      : {
+          gte: compareResolved.windows.since,
+          lte: compareResolved.windows.until,
+          durationMs: Math.max(
+            compareResolved.windows.until.getTime() -
+              compareResolved.windows.since.getTime(),
+            1
+          ),
+          label: compareResolved.windows.label,
+        };
+    /** Rolling modes keep the historic `compare` response field; calendar/custom use mode name. */
+    const compare = compareMode;
+    const compareWindow = {
+      previousSince: compareResolved.windows.previousSince,
+      previousUntil: compareResolved.windows.previousUntil,
+    };
+    const metricsScope = {
+      projectId,
+      since: effectiveMetrics.gte,
+      until: effectiveMetrics.lte,
       app: appFilter,
       environment,
       platform,
@@ -304,11 +340,12 @@ export async function apiRoutes(
         : { name: topEvOrderParsed.order };
 
     const useScopedErrorList = Boolean(platform || release);
-    // Platform/release lists must use metricsWindow so counts match KPIs/charts when
-    // the overview time range is unselected (epoch→now vs ~30d metrics window).
+    // Platform/release lists must use metricsScope so counts match KPIs/charts when
+    // the overview time range is unselected (epoch→now vs ~30d metrics window)
+    // or when a calendar compare mode overrides the metrics window.
     const scopedErrorListScope = useScopedErrorList ? metricsScope : listScope;
-    const eventListSince = useScopedErrorList ? metricsWindow.gte : since;
-    const eventListUntil = useScopedErrorList ? metricsWindow.lte : until;
+    const eventListSince = useScopedErrorList ? effectiveMetrics.gte : since;
+    const eventListUntil = useScopedErrorList ? effectiveMetrics.lte : until;
 
     const baseWhere = {
       ...whereEventProject(projectId),
@@ -339,11 +376,11 @@ export async function apiRoutes(
         : {}),
     };
 
-    const previousUntil = compareWindow.previousUntil ?? metricsWindow.gte;
+    const previousUntil = compareWindow.previousUntil ?? effectiveMetrics.gte;
     const windowParams = {
       projectId,
-      since: metricsWindow.gte,
-      until: metricsWindow.lte,
+      since: effectiveMetrics.gte,
+      until: effectiveMetrics.lte,
       previousSince: compareWindow.previousSince,
       previousUntil,
       app: appFilter,
@@ -376,10 +413,10 @@ export async function apiRoutes(
       // Open-ended Overview KPIs use metricsWindow; forward the exact window so
       // issue detail does not take the Issues ~7d metricsUntil-only path or
       // re-anchor to a fresh "now".
-      ...(isUnselectedTimeRange(timeRange.key)
+      ...(isUnselectedTimeRange(timeRange.key) || !isRollingCompareMode(compareMode)
         ? {
-            metricsSince: metricsWindow.gte.toISOString(),
-            metricsUntil: metricsWindow.lte.toISOString(),
+            metricsSince: effectiveMetrics.gte.toISOString(),
+            metricsUntil: effectiveMetrics.lte.toISOString(),
           }
         : {}),
     };
@@ -505,11 +542,11 @@ export async function apiRoutes(
       listOverviewRecentSessions(
         prisma,
         buildOverviewSessionFilter(metricsScope, {
-          gte: metricsWindow.gte,
-          lte: metricsWindow.lte,
+          gte: effectiveMetrics.gte,
+          lte: effectiveMetrics.lte,
         }),
         projectId,
-        { gte: metricsWindow.gte, lte: metricsWindow.lte },
+        { gte: effectiveMetrics.gte, lte: effectiveMetrics.lte },
         8
       ),
       listOverviewTopErrorGroups(prisma, metricsScope, 8),
@@ -566,14 +603,15 @@ export async function apiRoutes(
 
     return reply.send({
       range: timeRange.key,
-      rangeLabel: timeRange.label,
+      rangeLabel: effectiveMetrics.label,
       since: since.toISOString(),
       until: until.toISOString(),
-      metricsSince: metricsWindow.gte.toISOString(),
-      metricsUntil: metricsWindow.lte.toISOString(),
-      metricsDurationMs: metricsWindow.durationMs,
+      metricsSince: effectiveMetrics.gte.toISOString(),
+      metricsUntil: effectiveMetrics.lte.toISOString(),
+      metricsDurationMs: effectiveMetrics.durationMs,
       bucket: chartBucket,
       compare,
+      compareLabel: compareResolved.windows.compareLabel,
       errorsLast24h: errorsCount,
       eventsLast24h: eventsCount,
       errorsPrevious,
@@ -616,6 +654,9 @@ export async function apiRoutes(
       q?: string;
       status?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -641,8 +682,25 @@ export async function apiRoutes(
             : "all",
     };
 
-    const window = resolveErrorsSummaryWindow(range, metricsAnchor);
-    const summary = await fetchErrorsPageSummary(prisma, filter, projectId, window);
+    const baseWindow = resolveErrorsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+      metricsAnchor
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const summary = await fetchErrorsPageSummary(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(summary);
   });
 

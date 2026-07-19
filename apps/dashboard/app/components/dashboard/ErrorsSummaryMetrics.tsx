@@ -1,10 +1,9 @@
 import {
   AnalyticsPanel,
+  MetricDelta,
 } from "@/app/components/dashboard/analytics-ui";
 import {
-  calcDeltaPct,
   formatCompact,
-  formatDeltaPct,
   formatPct,
 } from "@/lib/overview-format";
 
@@ -29,68 +28,6 @@ export type ErrorsPageSummary = {
   errorRatePctPrevious: number;
 };
 
-function Delta({
-  current,
-  previous,
-  invert = false,
-}: {
-  current: number;
-  previous: number;
-  invert?: boolean;
-}) {
-  const delta = formatDeltaPct(calcDeltaPct(current, previous));
-  const good =
-    delta.tone === "flat"
-      ? "text-muted-foreground"
-      : delta.tone === "up"
-        ? invert
-          ? "text-destructive"
-          : "text-success"
-        : invert
-          ? "text-success"
-          : "text-destructive";
-  const arrow = delta.tone === "up" ? "▲" : delta.tone === "down" ? "▼" : "—";
-  return (
-    <p className={`mt-1 text-[11px] ${good}`}>
-      <span aria-hidden>{arrow}</span> {delta.text}
-    </p>
-  );
-}
-
-function PpDelta({
-  deltaPp,
-  invert = false,
-}: {
-  deltaPp: number;
-  invert?: boolean;
-}) {
-  const tone =
-    Math.abs(deltaPp) < 0.05
-      ? "flat"
-      : deltaPp > 0
-        ? "up"
-        : "down";
-  const good =
-    tone === "flat"
-      ? "text-muted-foreground"
-      : tone === "up"
-        ? invert
-          ? "text-destructive"
-          : "text-success"
-        : invert
-          ? "text-success"
-          : "text-destructive";
-  const arrow = tone === "up" ? "▲" : tone === "down" ? "▼" : "—";
-  const sign = deltaPp > 0 ? "+" : deltaPp < 0 ? "−" : "";
-  const text =
-    tone === "flat" ? "—" : `${sign}${Math.abs(deltaPp).toFixed(1)} pp`;
-  return (
-    <p className={`mt-1 text-[11px] ${good}`}>
-      <span aria-hidden>{arrow}</span> {text}
-    </p>
-  );
-}
-
 function MetricCell({
   label,
   value,
@@ -110,11 +47,12 @@ function MetricCell({
     <div className="px-4 py-3 sm:px-5 sm:py-4">
       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight sm:text-xl">{value}</p>
-      {deltaMode === "pp" ? (
-        <PpDelta deltaPp={current - previous} invert={invertDelta} />
-      ) : (
-        <Delta current={current} previous={previous} invert={invertDelta} />
-      )}
+      <MetricDelta
+        current={current}
+        previous={previous}
+        invert={invertDelta}
+        mode={deltaMode}
+      />
     </div>
   );
 }

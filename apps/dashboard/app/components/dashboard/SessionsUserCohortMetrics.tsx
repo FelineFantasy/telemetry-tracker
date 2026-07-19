@@ -1,36 +1,15 @@
 "use client";
 
-import { AnalyticsPanel } from "@/app/components/dashboard/analytics-ui";
+import {
+  AnalyticsPanel,
+  MetricDelta,
+} from "@/app/components/dashboard/analytics-ui";
 import { MetricHelp } from "@/app/components/dashboard/MetricHelp";
 import {
-  calcDeltaPct,
   formatCompact,
-  formatDeltaPct,
   formatPct,
 } from "@/lib/overview-format";
 import type { SessionsPageSummary } from "@/app/components/dashboard/SessionsSummaryMetrics";
-
-function CohortDelta({
-  current,
-  previous,
-}: {
-  current: number;
-  previous: number;
-}) {
-  const delta = formatDeltaPct(calcDeltaPct(current, previous));
-  const good =
-    delta.tone === "flat"
-      ? "text-muted-foreground"
-      : delta.tone === "up"
-        ? "text-success"
-        : "text-destructive";
-  const arrow = delta.tone === "up" ? "▲" : delta.tone === "down" ? "▼" : "—";
-  return (
-    <p className={`mt-1 text-[11px] ${good}`}>
-      <span aria-hidden>{arrow}</span> {delta.text}
-    </p>
-  );
-}
 
 function CohortCell({
   label,
@@ -59,7 +38,7 @@ function CohortCell({
           ({formatPct(sharePct, 0)})
         </span>
       </p>
-      <CohortDelta current={count} previous={previousCount} />
+      <MetricDelta current={count} previous={previousCount} />
     </div>
   );
 }

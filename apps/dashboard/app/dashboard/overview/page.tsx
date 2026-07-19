@@ -93,7 +93,8 @@ async function getOverview(
     topEventsOrder: string;
   },
   scope: OverviewRequestScope,
-  metricsUntil?: string
+  metricsUntil?: string,
+  compareBounds?: { compareFrom?: string; compareTo?: string }
 ) {
   const params = new URLSearchParams();
   appendListTimeRangeToParams(params, parsedRange, timeFromTo.from, timeFromTo.to);
@@ -101,7 +102,9 @@ async function getOverview(
   if (environment) params.set("environment", environment);
   if (platform) params.set("platform", platform);
   if (release) params.set("release", release);
-  if (compare === "week-ago") params.set("compare", "week-ago");
+  if (compare && compare !== "previous") params.set("compare", compare);
+  if (compareBounds?.compareFrom) params.set("compareFrom", compareBounds.compareFrom);
+  if (compareBounds?.compareTo) params.set("compareTo", compareBounds.compareTo);
   if (metricsUntil) params.set("metricsUntil", metricsUntil);
   params.set("errorsPage", String(list.errorsPage));
   params.set("eventsPage", String(list.eventsPage));
@@ -176,6 +179,8 @@ function buildOverviewParamsRecord(
     "platform",
     "release",
     "compare",
+    "compareFrom",
+    "compareTo",
     "errorsPage",
     "eventsPage",
     "listPageSize",
@@ -239,6 +244,8 @@ export default async function OverviewPage({
     platform?: string | string[];
     release?: string | string[];
     compare?: string | string[];
+    compareFrom?: string | string[];
+    compareTo?: string | string[];
     errorsPage?: string | string[];
     eventsPage?: string | string[];
     listPageSize?: string | string[];
@@ -296,6 +303,8 @@ export default async function OverviewPage({
   const rawPlatform = firstQueryValue(params.platform)?.trim() || null;
   const rawRelease = firstQueryValue(params.release)?.trim() || null;
   const compare = parseOverviewCompare(firstQueryValue(params.compare));
+  const compareFrom = firstQueryValue(params.compareFrom) ?? undefined;
+  const compareTo = firstQueryValue(params.compareTo) ?? undefined;
   const errorsPage = parsePageParam(firstQueryValue(params.errorsPage));
   const eventsPage = parsePageParam(firstQueryValue(params.eventsPage));
   const listPageSize = parseOverviewListPageSize(params.listPageSize);
@@ -328,7 +337,8 @@ export default async function OverviewPage({
           compare,
           listParams,
           cookieScope,
-          pageMetricsUntil
+          pageMetricsUntil,
+          { compareFrom, compareTo }
         ).catch((e) => ({ error: e } as const))
       : Promise.resolve({ error: new Error("No project selected") } as const);
 
@@ -372,7 +382,8 @@ export default async function OverviewPage({
         compare,
         listParams,
         resolvedScope,
-        pageMetricsUntil
+        pageMetricsUntil,
+        { compareFrom, compareTo }
       ).catch((e) => ({ error: e } as const));
     } else {
       overviewResult = { error: new Error("No project selected") } as const;
@@ -467,7 +478,8 @@ export default async function OverviewPage({
   const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
   const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
-  const compareLabel = compareLabelFor(compare, displayRangeLabel);
+  const compareLabel =
+    overviewData.compareLabel ?? compareLabelFor(compare, displayRangeLabel);
   const errDeltaFmt = formatOverviewDeltaLine(errorsDelta, "errors", compareLabel);
   const evDeltaFmt = formatOverviewDeltaLine(eventsDelta, "events", compareLabel);
 

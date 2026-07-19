@@ -28,11 +28,24 @@ function DeltaLine({
   invert = false,
 }: {
   label: string;
-  value: number | null | undefined;
+  value: number | null | undefined | "new";
   kind: "pp" | "pct";
   invert?: boolean;
 }) {
-  if (value == null) return null;
+  if (value === "new") {
+    return (
+      <div className="text-[11px] tabular-nums text-muted-foreground">
+        {label} New
+      </div>
+    );
+  }
+  if (value == null) {
+    return (
+      <div className="text-[11px] tabular-nums text-muted-foreground">
+        {label} —
+      </div>
+    );
+  }
   const sign = value > 0 ? "↑" : value < 0 ? "↓" : "→";
   const abs = Math.abs(value);
   const formatted = kind === "pp" ? `${abs} pp` : `${abs}%`;
@@ -103,10 +116,7 @@ export function ReleasesTable({
               <tr key={row.releaseKey}>
                 <td>
                   <div className="font-medium text-foreground">{label}</div>
-                  {vs &&
-                  (vs.errorRatePp != null ||
-                    vs.sessionsPct != null ||
-                    vs.errorsPct != null) ? (
+                  {vs ? (
                     <div className="mt-1 space-y-0.5">
                       <DeltaLine label="Error rate" value={vs.errorRatePp} kind="pp" invert />
                       <DeltaLine label="Sessions" value={vs.sessionsPct} kind="pct" />
