@@ -20,6 +20,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
+- **Bugbot gate paused** — `bugbot-review` required check is a reversible no-op (`BUGBOT_REVIEW_ENABLED=false` in [`.github/workflows/bugbot-review.yml`](.github/workflows/bugbot-review.yml)); flip to `true` to restore the Cursor Bugbot wait for maintainer PRs ([CONTRIBUTING.md](CONTRIBUTING.md#ai-code-review-bugbot))
+
 ### Database
 
 ---
