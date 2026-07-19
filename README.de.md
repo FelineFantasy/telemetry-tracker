@@ -52,6 +52,9 @@
 | Fehler | ✅ |
 | Events | ✅ |
 | Sessions | ✅ |
+| Performance / Web Vitals | ✅ |
+| Releases | ✅ |
+| Globale Suche | ✅ |
 | Organisationen | ✅ |
 | Projekte | ✅ |
 | API-Keys | ✅ |
@@ -61,7 +64,8 @@
 | Self-hosted | ✅ |
 | Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com)) | ✅ |
 | Zahlungspläne (Free / Pro / Business, in EUR) | ✅ |
-| Benachrichtigungen | ✅ |
+| Benachrichtigungen (Notifications & Kanäle) | ✅ |
+| Alert-Regeln (Bedingungen & Ziele) | ✅ |
 | Source Maps | ✅ |
 
 Self-Hosting-Einrichtung: [DEPLOYMENT.md](DEPLOYMENT.md)
@@ -203,13 +207,12 @@ Die bereits verfügbaren Funktionen befinden sich oben unter **[Features](#featu
 | **In Entwicklung** | Als *Coming soon* gekennzeichnet; Zeitpunkt und Umfang noch offen |
 
 <details>
-<summary><strong>Geplant & in Entwicklung</strong> (11 Bereiche — Observierung, Plattform, Konto)</summary>
+<summary><strong>Geplant & in Entwicklung</strong> (9 Bereiche — Observierung, Plattform, Konto)</summary>
 
 ### Observierung
 
 | Bereich | Status |
 |---------|--------|
-| [Performance / Web Vitals](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/99) | Geplant |
 | Traces | In Entwicklung |
 | Logs | In Entwicklung |
 
@@ -218,7 +221,6 @@ Die bereits verfügbaren Funktionen befinden sich oben unter **[Features](#featu
 | Bereich | Status |
 |---------|--------|
 | Benutzerdefinierte Dashboards | Geplant |
-| Releases | In Entwicklung |
 | Feature Flags | In Entwicklung |
 | Exportberichte | In Entwicklung |
 
