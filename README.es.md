@@ -52,6 +52,9 @@
 | Errores | ✅ |
 | Eventos | ✅ |
 | Sesiones | ✅ |
+| Rendimiento / Web Vitals | ✅ |
+| Lanzamientos (Releases) | ✅ |
+| Búsqueda global | ✅ |
 | Organizaciones | ✅ |
 | Proyectos | ✅ |
 | API keys | ✅ |
@@ -61,7 +64,8 @@
 | Autoalojado | ✅ |
 | Nube alojada ([telemetry-tracker.com](https://telemetry-tracker.com)) | ✅ |
 | Planes de pago (Gratis / Pro / Business, EUR mediante Stripe) | ✅ |
-| Alertas | ✅ |
+| Alertas (notificaciones y canales) | ✅ |
+| Reglas de alerta (condiciones y destinos) | ✅ |
 | Source maps | ✅ |
 
 Configuración autoalojada: [DEPLOYMENT.md](DEPLOYMENT.md)
@@ -203,13 +207,12 @@ Las funcionalidades ya implementadas se encuentran en **[Características](#cara
 | **En exploración** | Etiquetado como *Próximamente* en el producto; fecha y alcance por definir |
 
 <details>
-<summary><strong>Planificado y en exploración</strong> (11 áreas — Observabilidad, Plataforma, Cuenta)</summary>
+<summary><strong>Planificado y en exploración</strong> (9 áreas — Observabilidad, Plataforma, Cuenta)</summary>
 
 ### Observabilidad
 
 | Área | Estado |
 |------|--------|
-| Rendimiento / Web Vitals | Planificado |
 | Trazas | En exploración |
 | Logs | En exploración |
 
@@ -218,7 +221,6 @@ Las funcionalidades ya implementadas se encuentran en **[Características](#cara
 | Área | Estado |
 |------|--------|
 | Paneles personalizados | Planificado |
-| Lanzamientos | En exploración |
 | Feature flags | En exploración |
 | Exportar informes | En exploración |
 

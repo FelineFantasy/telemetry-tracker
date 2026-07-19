@@ -52,6 +52,9 @@
 | Errors | ✅ |
 | Events | ✅ |
 | Sessions | ✅ |
+| Performance / Web Vitals | ✅ |
+| Releases | ✅ |
+| Global search | ✅ |
 | Organizations | ✅ |
 | Projects | ✅ |
 | API keys | ✅ |
@@ -61,7 +64,8 @@
 | Self-hosted | ✅ |
 | Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com)) | ✅ |
 | Paid plans (Free / Pro / Business, EUR via Stripe) | ✅ |
-| Alerting | ✅ |
+| Alerting (notifications & channels) | ✅ |
+| Alert rules (conditions & destinations) | ✅ |
 | Source maps | ✅ |
 
 Self-host setup: [DEPLOYMENT.md](DEPLOYMENT.md)
@@ -203,13 +207,12 @@ Shipped capabilities are in **[Features](#features)** above. What follows is **p
 | **Exploring** | Labeled *Coming soon* in the product; timing and scope TBD |
 
 <details>
-<summary><strong>Planned & exploring</strong> (11 areas — Observability, Platform, Account)</summary>
+<summary><strong>Planned & exploring</strong> (9 areas — Observability, Platform, Account)</summary>
 
 ### Observability
 
 | Area | Status |
 |------|--------|
-| [Performance / Web Vitals](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/99) | Planned |
 | Traces | Exploring |
 | Logs | Exploring |
 
@@ -218,7 +221,6 @@ Shipped capabilities are in **[Features](#features)** above. What follows is **p
 | Area | Status |
 |------|--------|
 | Custom dashboards | Planned |
-| Releases | Exploring |
 | Feature flags | Exploring |
 | Export reports | Exploring |
 
