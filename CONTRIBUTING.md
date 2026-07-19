@@ -179,7 +179,9 @@ CI runs on pull requests to **`develop`** and **`main`** (see [.github/workflows
 
 ### AI code review (Bugbot)
 
-This repo uses [Cursor Bugbot](https://cursor.com/docs/bugbot) on GitHub pull requests. Project-specific review rules live in:
+> **Temporarily paused:** the [`bugbot-review`](.github/workflows/bugbot-review.yml) required check is a **no-op success** (`BUGBOT_REVIEW_ENABLED=false`). It does not wait for Cursor Bugbot. To re-enable: set that env to `"true"` in the workflow, merge, and (if paused) turn the Cursor Bugbot GitHub App back on for this repo in the [Cursor Bugbot dashboard](https://www.cursor.com/dashboard/bugbot). Leave `bugbot-review` in branch protection — the check still runs and passes.
+
+This repo uses [Cursor Bugbot](https://cursor.com/docs/bugbot) on GitHub pull requests (when the app is enabled). Project-specific review rules live in:
 
 | File | Scope |
 |------|--------|
@@ -188,11 +190,11 @@ This repo uses [Cursor Bugbot](https://cursor.com/docs/bugbot) on GitHub pull re
 | [`apps/dashboard/.cursor/BUGBOT.md`](apps/dashboard/.cursor/BUGBOT.md) | Next.js server/client split, UI |
 | [`packages/.cursor/BUGBOT.md`](packages/.cursor/BUGBOT.md) | SDK semver and public API |
 
-**Before you push** (especially for alerts, notifications, billing, or ingest): run **`/review-bugbot`** in Cursor on your branch. If the same diff is reviewed locally, GitHub Bugbot can skip a duplicate run when the PR opens.
+**Before you push** (especially for alerts, notifications, billing, or ingest): `/review-bugbot` in Cursor is optional while the gate is paused; still useful for high-risk diffs.
 
-**On GitHub:** comment `cursor review` or `bugbot run` on a PR to trigger a manual review. When Bugbot is wrong, resolve the thread and add an ignore rule to the relevant `BUGBOT.md` (or comment `@cursor remember …` on the PR for learned rules).
+**On GitHub:** when Bugbot is enabled again, comment `cursor review` or `bugbot run` on a PR to trigger a manual review. When Bugbot is wrong, resolve the thread and add an ignore rule to the relevant `BUGBOT.md` (or comment `@cursor remember …` on the PR for learned rules).
 
-**Branch protection (maintainers):** On **`develop`** and **`main`**, require status checks `build`, `bugbot-review`, and `maintainer-review` (not `Cursor Bugbot` directly). The [`bugbot-review` workflow](.github/workflows/bugbot-review.yml) requires **Cursor Bugbot** only when the PR author is @unjica; fork and external contributor PRs pass automatically because the GitHub App often never runs there. Set **required human approvals to 0** on both branches — `maintainer-review` enforces your approval when someone else opens a PR. Enable **incremental review** and **fail on unresolved issues** in the Bugbot dashboard if you want findings to block maintainer merges.
+**Branch protection (maintainers):** On **`develop`**, require status checks `build`, `bugbot-review`, and `maintainer-review` (not `Cursor Bugbot` directly). On **`main`**, require `build` and `maintainer-review` (`bugbot-review` is optional). While paused, `bugbot-review` always succeeds. Set **required human approvals to 0** on both branches — `maintainer-review` enforces your approval when someone else opens a PR.
 
 ## Code of conduct
 
