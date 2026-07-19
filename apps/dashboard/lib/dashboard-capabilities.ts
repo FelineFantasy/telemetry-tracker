@@ -45,7 +45,6 @@ export type DashboardSessionContext = {
 
 /** If shape is wrong (e.g. API mismatch), omit the banner rather than failing the whole session. */
 function parseUsageQuota(uq: unknown): UsageQuotaInfo | null {
-  if (uq == null) return null;
   if (typeof uq !== "object" || uq === null) return null;
   const o = uq as Record<string, unknown>;
   if (
@@ -75,7 +74,6 @@ function parseUsageQuota(uq: unknown): UsageQuotaInfo | null {
 }
 
 function parseBillingHealth(bh: unknown): BillingHealthInfo | null {
-  if (bh == null) return null;
   if (typeof bh !== "object" || bh === null) return null;
   const o = bh as Record<string, unknown>;
   const variant = o.billingAlertVariant;
