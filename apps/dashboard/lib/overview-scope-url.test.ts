@@ -9,6 +9,7 @@ import {
   formatOverviewDeltaLine,
   isRollingCompareParam,
   resolveScopedQueryValue,
+  scopeForPerformanceEventsDrillDown,
 } from "./overview-scope-url";
 
 describe("isRollingCompareParam", () => {
@@ -225,6 +226,49 @@ describe("buildSlowPageWebVitalEventsHref", () => {
       })
     ).toBe(
       "/dashboard/events?name=%24web_vital&q=%2Fcheckout&app=web&platform=web&range=24h"
+    );
+  });
+});
+
+describe("scopeForPerformanceEventsDrillDown", () => {
+  it("maps the resolved metrics window to a custom Events range and drops compare", () => {
+    expect(
+      scopeForPerformanceEventsDrillDown(
+        {
+          app: "web",
+          environment: "production",
+          platform: "web",
+          release: "1.2.0",
+          range: "7d",
+          compare: "today-yesterday",
+          metricsUntil: "2026-07-19T12:00:00.000Z",
+        },
+        {
+          since: "2026-07-19T00:00:00.000Z",
+          until: "2026-07-19T23:59:59.999Z",
+        }
+      )
+    ).toEqual({
+      app: "web",
+      environment: "production",
+      platform: "web",
+      release: "1.2.0",
+      range: "custom",
+      from: "2026-07-19T00:00:00.000Z",
+      to: "2026-07-19T23:59:59.999Z",
+    });
+  });
+
+  it("produces Events deep links that match the table window", () => {
+    const scope = scopeForPerformanceEventsDrillDown(
+      { app: "api", compare: "week", range: "30d" },
+      {
+        since: "2026-07-13T00:00:00.000Z",
+        until: "2026-07-19T23:59:59.999Z",
+      }
+    );
+    expect(buildSlowRouteEventsHref("GET", "/health", scope)).toBe(
+      "/dashboard/events?name=%24request&q=GET+%2Fhealth&app=api&range=custom&from=2026-07-13T00%3A00%3A00.000Z&to=2026-07-19T23%3A59%3A59.999Z"
     );
   });
 });

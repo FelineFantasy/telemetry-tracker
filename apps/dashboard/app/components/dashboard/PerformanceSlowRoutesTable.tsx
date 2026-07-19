@@ -9,6 +9,7 @@ import { Table } from "@/app/components/ui/Table";
 import { formatPct } from "@/lib/overview-format";
 import {
   buildSlowRouteEventsHref,
+  scopeForPerformanceEventsDrillDown,
   type DashboardListScope,
 } from "@/lib/overview-scope-url";
 import type { SlowRouteRow } from "@/lib/performance-summary";
@@ -36,6 +37,7 @@ export function PerformanceSlowRoutesTable({
   page,
   pageSize,
   scope,
+  metricsWindow,
   rangeLabel,
   hrefForPage,
 }: {
@@ -44,9 +46,11 @@ export function PerformanceSlowRoutesTable({
   page: number;
   pageSize: number;
   scope: DashboardListScope;
+  metricsWindow: { since: string; until: string };
   rangeLabel: string;
   hrefForPage: (page: number) => string;
 }) {
+  const eventsScope = scopeForPerformanceEventsDrillDown(scope, metricsWindow);
   return (
     <AnalyticsPanel aria-label="Slow routes">
       <AnalyticsPanelHeader
@@ -76,7 +80,11 @@ export function PerformanceSlowRoutesTable({
               </thead>
               <tbody>
                 {items.map((row) => {
-                  const href = buildSlowRouteEventsHref(row.method, row.url, scope);
+                  const href = buildSlowRouteEventsHref(
+                    row.method,
+                    row.url,
+                    eventsScope
+                  );
                   return (
                     <tr key={`${row.method}:${row.url}`}>
                       <td className="font-mono text-[12px] tabular-nums">{row.method}</td>

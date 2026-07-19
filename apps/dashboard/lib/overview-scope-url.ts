@@ -165,6 +165,8 @@ export function buildEventListHref(
 /**
  * Deep-link to Events filtered to `$request` rows for a slow route (#196).
  * Free-text `q` includes method + path so property JSON matches both fields.
+ * Pass a scope already aligned to the table's resolved metrics window
+ * (see {@link scopeForPerformanceEventsDrillDown}).
  */
 export function buildSlowRouteEventsHref(
   method: string,
@@ -179,7 +181,11 @@ export function buildSlowRouteEventsHref(
   return `/dashboard/events?${params.toString()}`;
 }
 
-/** Deep-link to `$web_vital` Events for a slow page path, preserving scope (#196). */
+/**
+ * Deep-link to `$web_vital` Events for a slow page path (#196).
+ * Pass a scope already aligned to the table's resolved metrics window
+ * (see {@link scopeForPerformanceEventsDrillDown}).
+ */
 export function buildSlowPageWebVitalEventsHref(
   path: string,
   scope: DashboardListScope
@@ -190,6 +196,26 @@ export function buildSlowPageWebVitalEventsHref(
   if (pagePath) params.set("q", pagePath);
   appendDashboardListScope(params, scope);
   return `/dashboard/events?${params.toString()}`;
+}
+
+/**
+ * Map Performance table scope to an Events list window that matches the
+ * aggregated rows. Events list filtering ignores `compare*`, so calendar
+ * compare modes must be expressed as an explicit custom `from`/`to` range.
+ */
+export function scopeForPerformanceEventsDrillDown(
+  scope: DashboardListScope,
+  window: { since: string; until: string }
+): DashboardListScope {
+  return {
+    app: scope.app,
+    environment: scope.environment,
+    platform: scope.platform,
+    release: scope.release,
+    range: "custom",
+    from: window.since,
+    to: window.until,
+  };
 }
 
 export function mergeOverviewScopeQuery(

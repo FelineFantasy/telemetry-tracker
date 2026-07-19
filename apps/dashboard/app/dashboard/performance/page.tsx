@@ -299,6 +299,7 @@ export default async function PerformancePage({
                 page={slowRoutes.page}
                 pageSize={slowRoutes.pageSize}
                 scope={listScope}
+                metricsWindow={slowRoutes.window}
                 rangeLabel={slowRoutes.window.label}
                 hrefForPage={(p) =>
                   mergeListQuery(PERFORMANCE_PATH, currentParams, {
@@ -314,6 +315,7 @@ export default async function PerformancePage({
                 page={slowPages.page}
                 pageSize={slowPages.pageSize}
                 scope={listScope}
+                metricsWindow={slowPages.window}
                 rangeLabel={slowPages.window.label}
                 hrefForPage={(p) =>
                   mergeListQuery(PERFORMANCE_PATH, currentParams, {

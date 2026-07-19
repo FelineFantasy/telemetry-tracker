@@ -8,6 +8,7 @@ import { Pagination } from "@/app/components/ui/Pagination";
 import { Table } from "@/app/components/ui/Table";
 import {
   buildSlowPageWebVitalEventsHref,
+  scopeForPerformanceEventsDrillDown,
   type DashboardListScope,
 } from "@/lib/overview-scope-url";
 import type { SlowPageRow } from "@/lib/performance-summary";
@@ -40,6 +41,7 @@ export function PerformanceSlowPagesTable({
   page,
   pageSize,
   scope,
+  metricsWindow,
   rangeLabel,
   hrefForPage,
 }: {
@@ -48,9 +50,11 @@ export function PerformanceSlowPagesTable({
   page: number;
   pageSize: number;
   scope: DashboardListScope;
+  metricsWindow: { since: string; until: string };
   rangeLabel: string;
   hrefForPage: (page: number) => string;
 }) {
+  const eventsScope = scopeForPerformanceEventsDrillDown(scope, metricsWindow);
   return (
     <AnalyticsPanel aria-label="Slow pages">
       <AnalyticsPanelHeader
@@ -78,7 +82,10 @@ export function PerformanceSlowPagesTable({
               </thead>
               <tbody>
                 {items.map((row) => {
-                  const eventsHref = buildSlowPageWebVitalEventsHref(row.path, scope);
+                  const eventsHref = buildSlowPageWebVitalEventsHref(
+                    row.path,
+                    eventsScope
+                  );
                   return (
                     <tr key={row.path}>
                       <td>
