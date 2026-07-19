@@ -114,6 +114,29 @@ describe("buildDashboardScopedListHref", () => {
     ).toBe("/dashboard/events?app=web&environment=production&platform=web&release=1.0.0");
   });
 
+  it("preserves Overview scope on Performance deep links", () => {
+    expect(
+      buildDashboardScopedListHref("/dashboard/performance", {
+        app: "web",
+        environment: "production",
+        platform: "browser",
+        range: "7d",
+      })
+    ).toBe(
+      "/dashboard/performance?app=web&environment=production&platform=browser&range=7d"
+    );
+  });
+
+  it("omits compare from Performance links when not provided", () => {
+    expect(
+      buildDashboardScopedListHref("/dashboard/performance", {
+        app: "web",
+        range: "7d",
+        compare: undefined,
+      })
+    ).toBe("/dashboard/performance?app=web&range=7d");
+  });
+
   it("preserves the Unknown release sentinel", () => {
     expect(
       buildDashboardScopedListHref("/dashboard/errors", {
