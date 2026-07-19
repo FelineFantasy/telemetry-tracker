@@ -71,8 +71,7 @@ export default async function BillingSettingsPage() {
   const hasStripeCustomer = billing?.hasStripeCustomer === true;
   const billingContextLoaded = capabilities !== null;
   const effectivePlanTier = resolveEffectivePlanTier(billing, usage);
-  const showBillingActions =
-    canManageBilling && resolvedOrgId !== null && billingContextLoaded;
+  const showBillingActions = canManageBilling && billingContextLoaded;
   const billingActionsInUsageCard = Boolean(usage && showBillingActions);
   const periodEnd = formatPeriodEnd(billing?.stripeCurrentPeriodEnd ?? null);
   const usageMessage = usageUnavailableMessage({
