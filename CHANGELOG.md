@@ -21,6 +21,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.6] - 2026-07-19
+
+### Fixed
+
+- **CodeQL medium / Actions hygiene** — harden GitHub Actions (`permissions`, pin `pnpm/action-setup`, env-based composite inputs), sanitize CR/LF in email/dashboard debug logs, and harden publish CLI (`execFile` + validated OTP args) ([#586](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/586))
+- **Dependabot moderate/low alerts** — resolve transitive advisories via pnpm overrides for `js-yaml`, `yaml`, `postcss`, `uuid`, `brace-expansion`, `@babel/core`, `esbuild`, and `diff` ([#587](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/587)). **Still open:** Dependabot [#45](https://github.com/Telemetry-Tracker/telemetry-tracker/security/dependabot/45) (`@opentelemetry/core`) blocked on Sentry 9→10 (OTel 2.x)
+
+---
+
 ## [1.16.5] - 2026-07-19
 
 ### Fixed
