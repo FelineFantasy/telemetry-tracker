@@ -731,6 +731,9 @@ export async function apiRoutes(
       q?: string;
       status?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -756,8 +759,25 @@ export async function apiRoutes(
             : "all",
     };
 
-    const window = resolveErrorsSummaryWindow(range, metricsAnchor);
-    const analytics = await fetchErrorsAnalytics(prisma, filter, projectId, window);
+    const baseWindow = resolveErrorsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+      metricsAnchor
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const analytics = await fetchErrorsAnalytics(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(analytics);
   });
 
@@ -1221,6 +1241,9 @@ export async function apiRoutes(
       propertiesContains?: string;
       q?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const name = queryString(query.name);
@@ -1243,8 +1266,25 @@ export async function apiRoutes(
       range,
     };
 
-    const window = resolveEventsSummaryWindow(range, metricsAnchor);
-    const analytics = await fetchEventsAnalytics(prisma, filter, projectId, window);
+    const baseWindow = resolveEventsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+      metricsAnchor
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const analytics = await fetchEventsAnalytics(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(analytics);
   });
 
@@ -1628,6 +1668,9 @@ export async function apiRoutes(
       q?: string;
       metricsUntil?: string;
       chartBucket?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
@@ -1648,12 +1691,24 @@ export async function apiRoutes(
       q,
       range,
     });
-    const window = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const baseWindow = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+      metricsAnchor
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
     const analytics = await fetchSessionsAnalytics(
       prisma,
       filter,
       projectId,
-      window,
+      compared.window,
       chartBucket
     );
     return reply.send(analytics);

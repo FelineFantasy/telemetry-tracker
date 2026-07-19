@@ -571,6 +571,7 @@ export default async function OverviewPage({
           workspaceTelemetry={workspaceTelemetry}
           sparklines={overviewData.kpiSparklines ?? emptySparklines()}
           requestMetrics={overviewData.requestMetrics}
+          compareLabel={compareLabel}
         />
       </Suspense>
 
