@@ -13,6 +13,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Performance Overview card** — Overview Web Vitals snapshot (LCP, INP/FID, CLS, TTFB) with Good / Needs improvement / Poor classification, rating distribution bars, scoped `View report →` to Performance, and empty-state handling when no vitals exist ([#197](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/197); milestone v1.17.x — Performance Intelligence)
+
 ### Fixed
 
 ### Changed
