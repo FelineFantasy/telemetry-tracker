@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { EventsClientListSection } from "@/app/components/dashboard/EventsClientListSection";
 import { EventsSummaryMetrics, type EventsPageSummary } from "@/app/components/dashboard/EventsSummaryMetrics";
 import { DeferredEventsAnalytics } from "@/app/components/dashboard/DeferredEventsAnalytics";
+import { CompareModeControl } from "@/app/components/dashboard/CompareModeControl";
 import { type EventsTableRow } from "@/app/components/dashboard/EventsTable";
 import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import {
@@ -20,7 +21,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
-import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { parseOverviewCompare, resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const EVENTS_PATH = "/dashboard/events";
@@ -84,6 +85,9 @@ function buildEventsParamsRecord(sp: Record<string, string | string[] | undefine
     "q",
     "sort",
     "order",
+    "compare",
+    "compareFrom",
+    "compareTo",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -162,6 +166,9 @@ export default async function EventsPage({
   if (pageAnchorIso) {
     apiQuery.set("metricsUntil", pageAnchorIso);
   }
+  const compare = parseOverviewCompare(firstQueryValue(sp.compare));
+  const compareFrom = firstQueryValue(sp.compareFrom);
+  const compareTo = firstQueryValue(sp.compareTo);
 
   const summaryQuery = new URLSearchParams(apiQuery);
   summaryQuery.delete("page");
@@ -169,6 +176,9 @@ export default async function EventsPage({
   summaryQuery.delete("sort");
   summaryQuery.delete("order");
   summaryQuery.delete("view");
+  if (compare !== "previous") summaryQuery.set("compare", compare);
+  if (compareFrom) summaryQuery.set("compareFrom", compareFrom);
+  if (compareTo) summaryQuery.set("compareTo", compareTo);
 
   let initialListData: {
     items: EventNameRow[];
@@ -231,6 +241,7 @@ export default async function EventsPage({
       />
 
       <AnalyticsListShell>
+        <CompareModeControl path={EVENTS_PATH} currentParams={currentParams} />
         {summary ? <EventsSummaryMetrics summary={summary} /> : null}
 
         <EventsClientListSection

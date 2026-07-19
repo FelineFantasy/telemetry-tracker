@@ -14,7 +14,13 @@ import {
   type OverviewTimeSeriesPoint,
 } from "./overview-timeseries.js";
 
-export type OverviewCompareMode = "previous" | "week-ago";
+import {
+  resolveCompareWindow,
+  type OverviewCompareMode,
+} from "./compare-windows.js";
+
+export type { OverviewCompareMode };
+export { resolveCompareWindow };
 
 export type OverviewHealth = {
   status: "operational" | "degraded" | "outage";
@@ -140,23 +146,6 @@ function errorOccurrenceScopeSql(
     ${platformClause}
     ${releaseClause}
   `;
-}
-
-export function resolveCompareWindow(
-  durationMs: number,
-  compare: OverviewCompareMode,
-  currentSince: Date,
-  currentUntil?: Date
-): { previousSince: Date; previousUntil: Date | undefined } {
-  const ms = durationMs;
-  if (compare === "week-ago") {
-    const windowEnd = currentUntil ?? new Date(currentSince.getTime() + ms);
-    const weekAgoEnd = new Date(windowEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const weekAgoStart = new Date(weekAgoEnd.getTime() - ms);
-    return { previousSince: weekAgoStart, previousUntil: weekAgoEnd };
-  }
-  const previousSince = new Date(currentSince.getTime() - ms);
-  return { previousSince, previousUntil: currentSince };
 }
 
 /**

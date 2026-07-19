@@ -2,16 +2,13 @@
 
 import {
   AnalyticsPanel,
+  MetricDelta,
 } from "@/app/components/dashboard/analytics-ui";
 import {
   MiniSparkline,
   type SparklinePoint,
 } from "@/app/components/dashboard/MiniSparkline";
-import {
-  calcDeltaPct,
-  formatDeltaPct,
-  formatPct,
-} from "@/lib/overview-format";
+import { formatPct } from "@/lib/overview-format";
 import type {
   PerformancePageSummary,
   PerformanceRequestLatency,
@@ -46,66 +43,6 @@ function toSparkline(series: { t: string; value: number | null }[]): SparklinePo
   return series.map((point) => ({ t: point.t, count: point.value }));
 }
 
-function Delta({
-  current,
-  previous,
-  invert = false,
-  compareText,
-}: {
-  current: number;
-  previous: number;
-  invert?: boolean;
-  compareText: string;
-}) {
-  const delta = formatDeltaPct(calcDeltaPct(current, previous));
-  const good =
-    delta.tone === "flat"
-      ? "text-muted-foreground"
-      : delta.tone === "up"
-        ? invert
-          ? "text-destructive"
-          : "text-success"
-        : invert
-          ? "text-success"
-          : "text-destructive";
-  const arrow = delta.tone === "up" ? "▲" : delta.tone === "down" ? "▼" : "—";
-  return (
-    <p className={`mt-1 text-[11px] ${good}`}>
-      <span aria-hidden>{arrow}</span> {delta.text} {compareText}
-    </p>
-  );
-}
-
-function PpDelta({
-  deltaPp,
-  invert = false,
-}: {
-  deltaPp: number;
-  invert?: boolean;
-}) {
-  const tone =
-    Math.abs(deltaPp) < 0.05 ? "flat" : deltaPp > 0 ? "up" : "down";
-  const good =
-    tone === "flat"
-      ? "text-muted-foreground"
-      : tone === "up"
-        ? invert
-          ? "text-destructive"
-          : "text-success"
-        : invert
-          ? "text-success"
-          : "text-destructive";
-  const arrow = tone === "up" ? "▲" : tone === "down" ? "▼" : "—";
-  const sign = deltaPp > 0 ? "+" : deltaPp < 0 ? "−" : "";
-  const text =
-    tone === "flat" ? "—" : `${sign}${Math.abs(deltaPp).toFixed(1)} pp`;
-  return (
-    <p className={`mt-1 text-[11px] ${good}`}>
-      <span aria-hidden>{arrow}</span> {text}
-    </p>
-  );
-}
-
 function MetricCell({
   label,
   value,
@@ -134,13 +71,12 @@ function MetricCell({
         <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight sm:text-xl">{value}</p>
         {previous == null ? (
           <p className="mt-1 text-[11px] text-muted-foreground">— {compareText}</p>
-        ) : deltaMode === "pp" ? (
-          <PpDelta deltaPp={current - previous} invert={invertDelta} />
         ) : (
-          <Delta
+          <MetricDelta
             current={current}
             previous={previous}
             invert={invertDelta}
+            mode={deltaMode}
             compareText={compareText}
           />
         )}

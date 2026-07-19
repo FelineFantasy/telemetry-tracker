@@ -3,20 +3,57 @@
 /** Explicit sentinel for null/blank release values (Release Health #453). */
 export const UNKNOWN_RELEASE_KEY = "__unknown__";
 
-export type OverviewCompareParam = "previous" | "week-ago";
+/**
+ * Period compare modes (#495). Calendar presets use UTC boundaries.
+ * Query params: `compare`, optional `compareFrom` / `compareTo` for `custom`.
+ */
+export const COMPARE_PARAMS = [
+  "previous",
+  "week-ago",
+  "today-yesterday",
+  "week",
+  "month",
+  "custom",
+] as const;
 
-export function parseOverviewCompare(raw: string | undefined): OverviewCompareParam {
-  return raw === "week-ago" ? "week-ago" : "previous";
+export type OverviewCompareParam = (typeof COMPARE_PARAMS)[number];
+
+export function parseOverviewCompare(
+  raw: string | undefined | null
+): OverviewCompareParam {
+  const value = raw?.trim().toLowerCase() ?? "";
+  if ((COMPARE_PARAMS as readonly string[]).includes(value)) {
+    return value as OverviewCompareParam;
+  }
+  return "previous";
+}
+
+/** Rolling modes keep the page range; calendar/custom replace the KPI window. */
+export function isRollingCompareParam(param: OverviewCompareParam): boolean {
+  return param === "previous" || param === "week-ago";
 }
 
 export function compareLabelFor(
   param: OverviewCompareParam,
   rangeLabel: string
 ): string {
-  if (param === "week-ago") return "vs same window last week";
-  if (rangeLabel === "Recent data") return "vs earlier data";
-  const normalized = rangeLabel.replace(/^Last /i, "");
-  return `vs prior ${normalized.toLowerCase()}`;
+  switch (param) {
+    case "week-ago":
+      return "vs same window last week";
+    case "today-yesterday":
+      return "vs yesterday";
+    case "week":
+      return "vs last week";
+    case "month":
+      return "vs last month";
+    case "custom":
+      return "vs custom period";
+    default: {
+      if (rangeLabel === "Recent data") return "vs earlier data";
+      const normalized = rangeLabel.replace(/^Last /i, "");
+      return `vs prior ${normalized.toLowerCase()}`;
+    }
+  }
 }
 
 /** Keep only query values present in the scoped allow-list (app/env pickers). */
@@ -59,6 +96,10 @@ export type DashboardListScope = {
    * instead of the Issues-list ~7d path. Not forwarded on list deep links.
    */
   metricsSince?: string | null;
+  /** Period compare mode (#495). */
+  compare?: string | null;
+  compareFrom?: string | null;
+  compareTo?: string | null;
 };
 
 function appendDashboardListScope(params: URLSearchParams, scope: DashboardListScope): void {
@@ -71,6 +112,9 @@ function appendDashboardListScope(params: URLSearchParams, scope: DashboardListS
   if (scope.to) params.set("to", scope.to);
   if (scope.metricsSince) params.set("metricsSince", scope.metricsSince);
   if (scope.metricsUntil) params.set("metricsUntil", scope.metricsUntil);
+  if (scope.compare && scope.compare !== "previous") params.set("compare", scope.compare);
+  if (scope.compareFrom) params.set("compareFrom", scope.compareFrom);
+  if (scope.compareTo) params.set("compareTo", scope.compareTo);
 }
 
 /** Preserve list filters when linking between dashboard pages. */
@@ -101,6 +145,9 @@ export function buildDashboardNavTabHref(
     from: searchParams.get("from"),
     to: searchParams.get("to"),
     metricsUntil: searchParams.get("metricsUntil"),
+    compare: searchParams.get("compare"),
+    compareFrom: searchParams.get("compareFrom"),
+    compareTo: searchParams.get("compareTo"),
   });
 }
 
@@ -124,6 +171,8 @@ export function mergeOverviewScopeQuery(
     platform?: string | null;
     release?: string | null;
     compare?: OverviewCompareParam | null;
+    compareFrom?: string | null;
+    compareTo?: string | null;
     range?: string | null;
     errorsPage?: string | null;
     eventsPage?: string | null;
@@ -164,10 +213,18 @@ export function buildErrorGroupDetailHref(
 }
 
 export function formatOverviewDeltaLine(
-  delta: number,
+  current: number,
+  previous: number,
   kind: "errors" | "events",
   compareLabel: string
 ): { className: string; text: string } {
+  if (previous <= 0) {
+    if (current > 0) {
+      return { className: "vs-previous", text: "New" };
+    }
+    return { className: "vs-previous", text: "—" };
+  }
+  const delta = current - previous;
   const baseline = compareLabel.replace(/^vs /, "");
   if (delta === 0) {
     return { className: "vs-previous", text: `Same as ${baseline}` };

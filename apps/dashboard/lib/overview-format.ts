@@ -6,13 +6,17 @@ export function formatCompact(n: number): string {
 
 export function formatDeltaPct(pct: number): { text: string; tone: "up" | "down" | "flat" } {
   if (pct === 0) return { text: "—", tone: "flat" };
-  const sign = pct > 0 ? "+" : "";
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
   return {
-    text: `${sign}${pct.toFixed(1)}%`,
+    text: `${sign}${Math.abs(pct).toFixed(1)}%`,
     tone: pct > 0 ? "up" : "down",
   };
 }
 
+/**
+ * @deprecated Prefer `formatRelativeDelta` from compare-format (#495).
+ * Kept for call sites that still expect a numeric % (0→N maps to 100 historically).
+ */
 export function calcDeltaPct(current: number, previous: number): number {
   if (previous === 0) return current > 0 ? 100 : 0;
   return ((current - previous) / previous) * 100;

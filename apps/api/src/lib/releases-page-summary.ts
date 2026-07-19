@@ -9,13 +9,20 @@
 
 import { Prisma, PrismaClient } from "@prisma/client";
 import { sessionUserIdentityExpr } from "./brief-snapshot-sql.js";
-import { resolveCompareWindow } from "./overview-stats.js";
+import {
+  errorRatePpDelta,
+  percentChange,
+  percentChangeOrNew,
+  resolveCompareWindow,
+} from "./compare-windows.js";
 import {
   isUnknownReleaseKey,
   normalizeReleaseKeySql,
   sessionEffectiveReleaseKeySql,
   UNKNOWN_RELEASE_KEY,
 } from "./release-key.js";
+
+export { errorRatePpDelta, percentChange };
 
 export const RELEASES_SORTS = ["recency", "adoption", "errors", "error_rate"] as const;
 export type ReleasesSort = (typeof RELEASES_SORTS)[number];
@@ -37,11 +44,21 @@ export type ResolvedReleasesWindow = {
   compareLabel: string;
 };
 
+/** Absolute count delta: numeric %, `"new"` for 0→N, `null` for incomparable / 0→0. */
+export type ReleaseCountDelta = number | null | "new";
+
 export type ReleaseVsPrevious = {
   errorRatePp: number | null;
-  sessionsPct: number | null;
-  errorsPct: number | null;
+  sessionsPct: ReleaseCountDelta;
+  errorsPct: ReleaseCountDelta;
 };
+
+function releaseCountDelta(current: number, previous: number): ReleaseCountDelta {
+  const result = percentChangeOrNew(current, previous);
+  if (result.kind === "new") return "new";
+  if (result.kind === "none") return null;
+  return result.value;
+}
 
 export type ReleaseHealthRow = {
   release: string | null;
@@ -164,19 +181,6 @@ export function releaseAdoptionSharePct(sessions: number, totalSessions: number)
   return Math.round((sessions / totalSessions) * 10000) / 100;
 }
 
-export function percentChange(current: number, previous: number): number | null {
-  if (previous <= 0) return null;
-  return Math.round(((current - previous) / previous) * 10000) / 100;
-}
-
-export function errorRatePpDelta(
-  current: number | null,
-  previous: number | null
-): number | null {
-  if (current == null || previous == null) return null;
-  return Math.round((current - previous) * 100) / 100;
-}
-
 type AggRow = {
   release_key: string | null;
   first_seen: Date;
@@ -289,8 +293,8 @@ export function attachPreviousReleaseComparisons(rows: ReleaseHealthRow[]): Rele
       previousReleaseKey: prevKey,
       vsPrevious: {
         errorRatePp: errorRatePpDelta(row.errorRatePct, prev.errorRatePct),
-        sessionsPct: percentChange(row.sessions, prev.sessions),
-        errorsPct: percentChange(row.errors, prev.errors),
+        sessionsPct: releaseCountDelta(row.sessions, prev.sessions),
+        errorsPct: releaseCountDelta(row.errors, prev.errors),
       },
     };
   });
