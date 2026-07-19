@@ -31,6 +31,10 @@ import {
   OverviewRecentSessionsPanel,
   OverviewTopErrorsPanel,
 } from "@/app/components/dashboard/overview/OverviewBreakdownGrid";
+import {
+  OverviewPerformanceCard,
+  OverviewPerformanceCardSkeleton,
+} from "@/app/components/dashboard/overview/OverviewPerformanceCard";
 import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
@@ -624,6 +628,11 @@ export default async function OverviewPage({
           rangeLabel={displayRangeLabel}
           sessionsHref={buildDashboardScopedListHref("/dashboard/sessions", listScope)}
         />
+        <div className="lg:col-start-2">
+          <Suspense fallback={<OverviewPerformanceCardSkeleton />}>
+            <OverviewPerformanceCard listScope={listScope} rangeLabel={displayRangeLabel} />
+          </Suspense>
+        </div>
       </section>
 
       <OverviewExtraCharts
