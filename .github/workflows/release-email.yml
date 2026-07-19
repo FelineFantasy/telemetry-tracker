@@ -86,7 +86,8 @@ jobs:
               DRY_RUN=true
             fi
           elif [ "${{ github.event_name }}" = "milestone" ]; then
-            TAGS=$(git tag -l "v*.*.*" --sort=version:refname \
+            # Only tags reachable from checked-out main (not stray tags on other branches).
+            TAGS=$(git tag -l "v*.*.*" --merged HEAD --sort=version:refname \
               | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
               | tr '\n' ',' \
               | sed 's/,$//')

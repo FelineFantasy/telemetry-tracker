@@ -63,7 +63,7 @@ Reserved / documentation domains (`example.com`, `example.org`, `example.net`, a
 | `previous_version` | Latest tag **before** that minor line (previous minor final) |
 | `line_close` | **true** |
 
-Only titles matching **`vX.Y.x`** or **`vX.Y.x — …`** / **`vX.Y.x - …`** are product lines — unrelated milestones are ignored. The job checks out **`main`**, requires a CHANGELOG section for the closing tag, and fails safely if that minor has no tags yet. **Close the milestone only after the final `vX.Y.Z` tag exists** — closing early emails whatever latest `vX.Y.*` tag is already present and will not include later patches.
+Only titles matching **`vX.Y.x`** or **`vX.Y.x — …`** / **`vX.Y.x - …`** are product lines — unrelated milestones are ignored. The job checks out **`main`**, resolves versions from semver tags **reachable from `main`** (not stray tags on other branches), requires a CHANGELOG section for the closing tag, and fails safely if that minor has no tags yet. **Close the milestone only after the final `vX.Y.Z` tag exists on `main`** — closing early emails whatever latest reachable `vX.Y.*` tag is already present and will not include later patches.
 
 Idempotency: delivery is keyed by ledger version **`X.Y`**. Re-closing a milestone, re-running the workflow, or a prior manual send for the same minor skips already-emailed subscribers and only delivers to anyone who subscribed later.
 
