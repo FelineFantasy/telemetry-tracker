@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 
 const root = join(fileURLToPath(import.meta.url), "..", "..");
 const packagesDir = join(root, "packages");
@@ -27,13 +27,9 @@ function writeJson(path, obj) {
   writeFileSync(path, JSON.stringify(obj, null, 2) + "\n");
 }
 
-function run(cmd, cwd = root) {
-  execSync(cmd, { cwd, stdio: "inherit" });
-}
-
-function runOptional(cmd, cwd = root) {
+function runOptional(file, args, cwd = root) {
   try {
-    execSync(cmd, { cwd, stdio: "inherit" });
+    execFileSync(file, args, { cwd, stdio: "inherit" });
     return true;
   } catch {
     return false;
@@ -42,12 +38,23 @@ function runOptional(cmd, cwd = root) {
 
 const dryRun = process.argv.includes("--dry-run");
 const otpArg = process.argv.find((a) => a.startsWith("--otp="));
-const otpFlag = otpArg ? ` ${otpArg}` : "";
+const otp = otpArg?.slice("--otp=".length) ?? "";
+if (otpArg && !/^\d{6,8}$/.test(otp)) {
+  console.error("Invalid --otp= value (expected 6–8 digits)");
+  process.exit(1);
+}
+
+function publishArgs() {
+  const args = ["publish", "--access", "public", "--no-git-checks"];
+  if (dryRun) args.push("--dry-run");
+  if (otp) args.push(`--otp=${otp}`);
+  return args;
+}
 
 function assertNpmAuth() {
   if (dryRun) return;
   try {
-    execSync("npm whoami", { cwd: root, stdio: "pipe" });
+    execFileSync("npm", ["whoami"], { cwd: root, stdio: "pipe" });
   } catch {
     console.error(`
 npm publish failed: not logged in to https://registry.npmjs.org/
@@ -70,12 +77,7 @@ const coreVersion = readJson(corePkgPath).version;
 console.log(`\n${coreName} version: ${coreVersion}\n`);
 
 // 2. Publish telemetry-core (continue if already published)
-const publishFlags = [
-  "--access public",
-  dryRun ? "--dry-run" : "",
-  "--no-git-checks",
-].filter(Boolean).join(" ") + otpFlag;
-const corePublished = runOptional(`pnpm publish ${publishFlags}`, join(packagesDir, coreName));
+const corePublished = runOptional("pnpm", publishArgs(), join(packagesDir, coreName));
 if (!corePublished) {
   console.log(`\n(${coreName} publish failed or skipped, continuing with dependents…)\n`);
 }
@@ -90,7 +92,7 @@ for (const name of dependents) {
     writeJson(pkgPath, pkg);
   }
   try {
-    const ok = runOptional(`pnpm publish ${publishFlags}`, join(packagesDir, name));
+    const ok = runOptional("pnpm", publishArgs(), join(packagesDir, name));
     if (!ok) console.log(`(${name} publish failed or skipped.)\n`);
   } finally {
     writeJson(pkgPath, original);
