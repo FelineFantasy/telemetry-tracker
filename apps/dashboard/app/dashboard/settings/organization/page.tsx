@@ -71,10 +71,9 @@ export default async function OrganizationSettingsPage() {
   const permissionsUnknown =
     capabilities === null && effectiveProjectId !== "";
   /** Prefer roster from GET /meta/members (same org as sidebar) — matches POST /meta/projects when session-context is missing or stale. */
-  const canCreateProject =
-    membersRes.ok && user
-      ? membersRes.members.some((m) => m.userId === user.id && m.role === "OWNER")
-      : capabilities?.canCreateProject === true;
+  const canCreateProject = membersRes.ok
+    ? membersRes.members.some((m) => m.userId === user.id && m.role === "OWNER")
+    : capabilities?.canCreateProject === true;
 
   const activeOrgName =
     effectiveOrgId !== null

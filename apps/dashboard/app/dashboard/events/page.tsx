@@ -177,10 +177,10 @@ export default async function EventsPage({
     pageSize: number;
   };
   let summary: EventsPageSummary | null = null;
-  let filterOptions = {
-    environments: [] as string[],
-    platforms: [] as string[],
-    releases: [] as string[],
+  let filterOptions: {
+    environments: string[];
+    platforms: string[];
+    releases: string[];
   };
 
   try {
