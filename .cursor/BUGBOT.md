@@ -66,6 +66,8 @@ Recent production bugs lived here — review cross-file carefully:
 
 ## Pre-merge expectations
 
+> **GitHub `bugbot-review` is temporarily paused** (`BUGBOT_REVIEW_ENABLED=false`). Local `/review-bugbot` remains optional. Re-enable: set the flag to `"true"` in [`.github/workflows/bugbot-review.yml`](../.github/workflows/bugbot-review.yml).
+
 Contributors should run locally before opening PRs:
 
 ```bash

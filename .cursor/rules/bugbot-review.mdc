@@ -12,4 +12,4 @@ When editing notifications, alerts, billing, ingest, auth, or plan enforcement:
 2. Keep quota session context, ingest alerts, and bell feed behavior in sync (thresholds, routing, dedupe ids).
 3. Split dashboard server-only code into `*-server.ts` — never import `next/headers` from client-shared `lib/`.
 4. Add or update Vitest coverage for non-trivial lib behavior.
-5. Before suggesting the PR is done, recommend the user run `/review-bugbot` locally for cross-file logic changes.
+5. Before suggesting the PR is done, recommend the user run `/review-bugbot` locally for cross-file logic changes (optional while the GitHub `bugbot-review` gate is paused — see `.github/workflows/bugbot-review.yml`).
