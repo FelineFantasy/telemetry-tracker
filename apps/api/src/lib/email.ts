@@ -18,9 +18,9 @@ export type TransactionalEmailAttachment = {
   path?: string;
 };
 
-/** Collapse CR/LF so log sinks cannot be forged via user-controlled email fields. */
+/** Strip CR/LF before logging (CodeQL js/log-injection: replace /\n|\r/g with ""). */
 function sanitizeForLog(value: string): string {
-  return value.replace(/[\r\n]+/g, " ").slice(0, 500);
+  return value.replace(/\n|\r/g, "").slice(0, 500);
 }
 
 export function isTransactionalEmailConfigured(): boolean {

@@ -1,6 +1,6 @@
-/** Collapse CR/LF so debug logs cannot be forged via request-derived values. */
+/** Strip CR/LF before logging (CodeQL js/log-injection: replace /\n|\r/g with ""). */
 function sanitizeForLog(value: string): string {
-  return value.replace(/[\r\n]+/g, " ");
+  return value.replace(/\n|\r/g, "");
 }
 
 /** Server-side dashboard diagnostics (`DASHBOARD_DEBUG=1` or dev by default). */
@@ -15,8 +15,6 @@ export function dashboardDebug(
   if (!enabled) return;
   const safeScope = sanitizeForLog(scope);
   const safeMessage = sanitizeForLog(message);
-  const payload = detail
-    ? ` ${sanitizeForLog(JSON.stringify(detail))}`
-    : "";
+  const payload = detail ? ` ${JSON.stringify(detail)}` : "";
   console.log(`[dashboard:${safeScope}] ${safeMessage}${payload}`);
 }

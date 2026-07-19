@@ -39,14 +39,15 @@ runs:
         PROJECT_ID: ${{ inputs.project_id }}
         API_KEY: ${{ inputs.api_key }}
       run: |
-        node -e "
+        # Quoted heredoc so bash does not expand process.env.* in the Node script.
+        node <<'NODE'
         const fs = require('fs');
         const path = require('path');
 
         const apiUrl = new URL(process.env.BASE_API_URL || 'https://api.telemetry-tracker.com');
         const http = require(apiUrl.protocol === 'https:' ? 'https' : 'http');
         const pathPrefix = apiUrl.pathname.replace(/\/$/, '');
-        const uploadPath = \`\${pathPrefix}/api/project/source-maps\`;
+        const uploadPath = `${pathPrefix}/api/project/source-maps`;
         const artifactPath = process.env.ARTIFACT_PATH || './dist';
         const baseUrl = (process.env.BASE_URL || '').replace(/\/$/, '');
         const appName = process.env.APP_NAME || '';
@@ -70,14 +71,11 @@ runs:
         function uploadFile(filePath) {
           return new Promise((resolve, reject) => {
             const content = fs.readFileSync(filePath, 'utf8');
-            // 1. Get path relative to artifact_path
             const resolvedArtifactPath = path.resolve(artifactPath);
             const resolvedFilePath = path.resolve(filePath);
             const relativePath = path.relative(resolvedArtifactPath, resolvedFilePath);
-            // 2. Remove .map to get the original JS path
             const jsPath = relativePath.replace(/\.map$/, '');
-            // 3. Build the full URL
-            const bundleUrl = \`\${baseUrl}/\${jsPath}\`;
+            const bundleUrl = `${baseUrl}/${jsPath}`;
 
             const payload = JSON.stringify({
               app: appName,
@@ -104,9 +102,9 @@ runs:
               res.on('data', chunk => body += chunk);
               res.on('end', () => {
                 if (res.statusCode >= 400) {
-                  reject(new Error(\`Failed to upload \${path.basename(filePath)}: \${res.statusCode} - \${body}\`));
+                  reject(new Error(`Failed to upload ${path.basename(filePath)}: ${res.statusCode} - ${body}`));
                 } else {
-                  console.log(\`Successfully uploaded \${path.basename(filePath)}\`);
+                  console.log(`Successfully uploaded ${path.basename(filePath)}`);
                   resolve();
                 }
               });
@@ -133,4 +131,4 @@ runs:
             process.exit(1);
           }
         })();
-        "
+        NODE

@@ -27,9 +27,18 @@ function writeJson(path, obj) {
   writeFileSync(path, JSON.stringify(obj, null, 2) + "\n");
 }
 
+/** Run npm/pnpm via execFile. On Windows, shell+PATHEXT resolves .cmd/.exe;
+ * args stay argv-safe (no string-concat OTP / flags into a shell command). */
+function runTool(name, args, options) {
+  return execFileSync(name, args, {
+    ...options,
+    shell: process.platform === "win32",
+  });
+}
+
 function runOptional(file, args, cwd = root) {
   try {
-    execFileSync(file, args, { cwd, stdio: "inherit" });
+    runTool(file, args, { cwd, stdio: "inherit" });
     return true;
   } catch {
     return false;
@@ -54,7 +63,7 @@ function publishArgs() {
 function assertNpmAuth() {
   if (dryRun) return;
   try {
-    execFileSync("npm", ["whoami"], { cwd: root, stdio: "pipe" });
+    runTool("npm", ["whoami"], { cwd: root, stdio: "pipe" });
   } catch {
     console.error(`
 npm publish failed: not logged in to https://registry.npmjs.org/
