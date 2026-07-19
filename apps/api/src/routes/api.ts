@@ -424,10 +424,11 @@ export async function apiRoutes(
             to: queryString(query.to),
           }
         : { range: timeRange.key }),
-      // Open-ended Overview KPIs use metricsWindow; forward the exact window so
-      // issue detail does not take the Issues ~7d metricsUntil-only path or
-      // re-anchor to a fresh "now".
-      ...(isUnselectedTimeRange(timeRange.key) || !isRollingCompareMode(compareMode)
+      // Forward exact metrics window when the issue list itself uses that window
+      // (open-ended Overview, or platform/release lists that follow metricsScope /
+      // calendar compare). Bounded list-range rows keep the page range.
+      ...(isUnselectedTimeRange(timeRange.key) ||
+      ((platform || release) && !isRollingCompareMode(compareMode))
         ? {
             metricsSince: effectiveMetrics.gte.toISOString(),
             metricsUntil: effectiveMetrics.lte.toISOString(),

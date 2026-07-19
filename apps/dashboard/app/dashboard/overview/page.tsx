@@ -204,7 +204,12 @@ function buildOverviewListScope(
   platform: string | null,
   release: string | null,
   timeQuery: { range?: string; from?: string; to?: string },
-  metricsUntil?: string | null
+  metricsUntil?: string | null,
+  compare?: {
+    compare?: string | null;
+    compareFrom?: string | null;
+    compareTo?: string | null;
+  }
 ): DashboardListScope {
   return {
     app,
@@ -215,6 +220,11 @@ function buildOverviewListScope(
     from: timeQuery.from ?? null,
     to: timeQuery.to ?? null,
     ...(metricsUntil ? { metricsUntil } : {}),
+    ...(compare?.compare && compare.compare !== "previous"
+      ? { compare: compare.compare }
+      : {}),
+    ...(compare?.compareFrom ? { compareFrom: compare.compareFrom } : {}),
+    ...(compare?.compareTo ? { compareTo: compare.compareTo } : {}),
   };
 }
 
@@ -438,7 +448,8 @@ export default async function OverviewPage({
     platform,
     release,
     timeQuery,
-    pageMetricsUntil
+    pageMetricsUntil,
+    { compare, compareFrom, compareTo }
   );
 
   const workspaceStats = buildOverviewWorkspaceStats(
@@ -463,10 +474,10 @@ export default async function OverviewPage({
     kpiSparklines: overviewResult.kpiSparklines ?? emptySparklines(),
   };
 
-  // When Overview KPIs use a non-list window (open-ended range, or calendar /
-  // custom compare), pass the exact metrics window so issue detail matches KPIs
-  // (metricsUntil alone would select the Issues ~7d path).
-  const issueDetailScope =
+  // Metrics-aligned panels (KPI top errors) use the exact Overview metrics window
+  // for open-ended ranges and calendar/custom compare. Paginated list rows keep
+  // the page list range unless the range is open-ended (list last_seen ≠ KPIs).
+  const metricsIssueDetailScope =
     overviewData.metricsSince &&
     (overviewData.metricsUntil || pageMetricsUntil) &&
     (isUnselectedTimeRange(parsedRange.key) || !isRollingCompareParam(compare))
@@ -476,6 +487,9 @@ export default async function OverviewPage({
           metricsUntil: overviewData.metricsUntil || pageMetricsUntil,
         }
       : listScope;
+  const listIssueDetailScope = isUnselectedTimeRange(parsedRange.key)
+    ? metricsIssueDetailScope
+    : listScope;
 
   const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
@@ -590,7 +604,7 @@ export default async function OverviewPage({
         <OverviewTopErrorsPanel
           groups={(overviewData.metricsTopErrorGroups ?? []).map((group) => ({
             ...group,
-            href: buildErrorGroupDetailHref(group.id, issueDetailScope),
+            href: buildErrorGroupDetailHref(group.id, metricsIssueDetailScope),
           }))}
           rangeLabel={displayRangeLabel}
           errorsHref={buildDashboardScopedListHref("/dashboard/errors", listScope)}
@@ -670,7 +684,7 @@ export default async function OverviewPage({
               }) => (
                 <OverviewListItem
                   key={g.id}
-                  href={buildErrorGroupDetailHref(g.id, issueDetailScope)}
+                  href={buildErrorGroupDetailHref(g.id, listIssueDetailScope)}
                   title={g.message}
                   titleClassName="font-medium text-destructive"
                   badges={<Badge>{g.app}</Badge>}
