@@ -60,4 +60,66 @@ describe("findOrCreateErrorGroup", () => {
       })
     );
   });
+
+  it("on create race (P2002), re-fetches existing group and returns isNew false", async () => {
+    prisma.errorGroup.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "eg-winner",
+        message: "boom",
+        app: "web",
+        environment: "production",
+      });
+    prisma.errorGroup.create.mockRejectedValueOnce(
+      Object.assign(new Error("Unique constraint failed"), { code: "P2002" })
+    );
+    prisma.errorGroup.update.mockResolvedValueOnce({});
+
+    const result = await findOrCreateErrorGroup(prisma as never, {
+      projectId: "p1",
+      fingerprint: "fp",
+      message: "boom",
+      top_stack: "at foo",
+      app: "web",
+      environment: "production",
+      release: "1.2.0",
+    });
+
+    expect(result).toEqual({
+      group: {
+        id: "eg-winner",
+        message: "boom",
+        app: "web",
+        environment: "production",
+      },
+      isNew: false,
+    });
+    expect(prisma.errorGroup.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "eg-winner" },
+        data: expect.objectContaining({
+          occurrences: { increment: 1 },
+          release: "1.2.0",
+        }),
+      })
+    );
+  });
+
+  it("re-throws non-P2002 create errors", async () => {
+    prisma.errorGroup.findUnique.mockResolvedValueOnce(null);
+    prisma.errorGroup.create.mockRejectedValueOnce(
+      Object.assign(new Error("db down"), { code: "P1001" })
+    );
+
+    await expect(
+      findOrCreateErrorGroup(prisma as never, {
+        projectId: "p1",
+        fingerprint: "fp",
+        message: "boom",
+        top_stack: "at foo",
+        app: "web",
+      })
+    ).rejects.toMatchObject({ code: "P1001" });
+    expect(prisma.errorGroup.update).not.toHaveBeenCalled();
+  });
 });
