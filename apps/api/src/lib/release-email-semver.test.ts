@@ -57,7 +57,16 @@ describe("parseProductMilestoneTitle", () => {
   it("ignores unrelated milestones", () => {
     expect(parseProductMilestoneTitle("Q3 marketing")).toBeNull();
     expect(parseProductMilestoneTitle("v1.16.0 — too specific")).toBeNull();
+    expect(parseProductMilestoneTitle("v1.16.xtra — false friend")).toBeNull();
     expect(parseProductMilestoneTitle("Release Intelligence")).toBeNull();
+  });
+
+  it("accepts a bare vX.Y.x title", () => {
+    expect(parseProductMilestoneTitle("v1.16.x")).toEqual({
+      major: 1,
+      minor: 16,
+      lineLabel: "1.16",
+    });
   });
 });
 

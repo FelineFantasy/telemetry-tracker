@@ -40,12 +40,14 @@ export function formatMinorLineLabel(version: ReleaseSemver): string {
 /**
  * Product milestone titles look like `v1.16.x — Release Intelligence`.
  * Returns the minor line when the title matches; ignores unrelated milestones.
+ * Requires `.x` at the end of the version token (optional ` — title` / ` - title` suffix).
  */
 export function parseProductMilestoneTitle(
   title: string
 ): { major: number; minor: number; lineLabel: string } | null {
   const trimmed = title.trim();
-  const match = /^v?(\d+)\.(\d+)\.x(?:\b|[^\d]|$)/i.exec(trimmed);
+  // Em dash, en dash, or hyphen after optional whitespace — not arbitrary suffixes like "xtra".
+  const match = /^v?(\d+)\.(\d+)\.x(?:\s*[—–-].*)?$/i.exec(trimmed);
   if (!match) return null;
   const major = Number(match[1]);
   const minor = Number(match[2]);

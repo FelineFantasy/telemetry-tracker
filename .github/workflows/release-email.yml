@@ -24,11 +24,12 @@ on:
         default: false
 
 concurrency:
+  # Serialize live/preview broadcasts so milestone close and workflow_dispatch cannot
+  # race the same minor line and double-send before the ledger row is written.
+  # Tag pushes never send; they keep a per-ref group so they do not block broadcasts.
   group: >-
     release-email-${{
-      github.event_name == 'workflow_dispatch' && format('manual-{0}', inputs.version) ||
-      github.event_name == 'milestone' && format('milestone-{0}', github.event.milestone.number) ||
-      github.ref
+      github.event_name == 'push' && github.ref || 'broadcast'
     }}
   cancel-in-progress: false
 
