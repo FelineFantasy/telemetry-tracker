@@ -69,19 +69,60 @@ export function requestMethodExpr(alias = "e"): Prisma.Sql {
 }
 
 /**
- * Path/URL for route grouping: strip query string from `url` (or `path` fallback).
+ * Normalize a request URL/path for slow-route grouping.
+ * Absolute URLs become pathname only; relative paths keep query stripped.
+ */
+export function normalizeRequestUrlPath(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const pathname = new URL(trimmed).pathname;
+      return pathname || "/";
+    } catch {
+      // Malformed absolute URL — fall through to relative stripping.
+    }
+  }
+
+  const withoutQuery = trimmed.split("?", 1)[0]?.trim() ?? "";
+  return withoutQuery || null;
+}
+
+/**
+ * Path/URL for route grouping: pathname from absolute `url`, else strip query
+ * from relative `url` (or `path` fallback). Keep in sync with
+ * {@link normalizeRequestUrlPath}.
  */
 export function requestUrlPathExpr(alias = "e"): Prisma.Sql {
   const a = Prisma.raw(`"${alias}"`);
-  return Prisma.sql`NULLIF(TRIM(SPLIT_PART(
-    COALESCE(
+  const raw = Prisma.sql`COALESCE(
       NULLIF(TRIM(COALESCE(${a}."properties"->>'url', '')), ''),
       NULLIF(TRIM(COALESCE(${a}."properties"->>'path', '')), ''),
       ''
-    ),
-    '?',
-    1
-  )), '')`;
+    )`;
+  return Prisma.sql`NULLIF(TRIM(
+    CASE
+      WHEN ${raw} ~* '^https?://' THEN
+        COALESCE(
+          NULLIF(
+            SPLIT_PART(
+              SPLIT_PART(
+                REGEXP_REPLACE(${raw}, '^https?://[^/?#]*', '', 'i'),
+                '?',
+                1
+              ),
+              '#',
+              1
+            ),
+            ''
+          ),
+          '/'
+        )
+      ELSE
+        SPLIT_PART(${raw}, '?', 1)
+    END
+  ), '')`;
 }
 
 /** Numeric HTTP status from optional `status_code` / `status` properties. */

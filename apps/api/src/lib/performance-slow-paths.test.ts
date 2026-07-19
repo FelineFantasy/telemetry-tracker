@@ -1,17 +1,25 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   compareSlowPages,
   compareSlowRoutes,
   computeErrorRatePct,
   isSmallSample,
+  normalizeRequestUrlPath,
   paginateRows,
   PERFORMANCE_SMALL_SAMPLE_THRESHOLD,
+  requestUrlPathExpr,
   resolveListPage,
   sortSlowPages,
   sortSlowRoutes,
   type SlowPageRow,
   type SlowRouteRow,
 } from "./performance-slow-paths.js";
+
+function prismaSqlText(fragment: Prisma.Sql): string {
+  const parts = fragment as unknown as { strings: string[]; values: unknown[] };
+  return parts.strings.join("?");
+}
 
 function route(
   partial: Partial<SlowRouteRow> & Pick<SlowRouteRow, "method" | "url">
@@ -37,6 +45,40 @@ function page(
     ...partial,
   };
 }
+
+describe("normalizeRequestUrlPath", () => {
+  it("maps absolute URLs with query strings to pathname only", () => {
+    expect(normalizeRequestUrlPath("https://example.com/api/users?page=1")).toBe(
+      "/api/users"
+    );
+    expect(normalizeRequestUrlPath("http://example.com:8080/v1/orders?id=9")).toBe(
+      "/v1/orders"
+    );
+  });
+
+  it("strips query from relative paths", () => {
+    expect(normalizeRequestUrlPath("/api/users?page=1")).toBe("/api/users");
+  });
+
+  it("leaves relative paths without query unchanged", () => {
+    expect(normalizeRequestUrlPath("/api/users")).toBe("/api/users");
+  });
+
+  it("returns null for blank input", () => {
+    expect(normalizeRequestUrlPath("")).toBeNull();
+    expect(normalizeRequestUrlPath("   ")).toBeNull();
+  });
+});
+
+describe("requestUrlPathExpr", () => {
+  it("normalizes absolute URLs to pathname in SQL", () => {
+    const text = prismaSqlText(requestUrlPathExpr("e"));
+    expect(text).toContain("~*");
+    expect(text).toContain("REGEXP_REPLACE");
+    expect(text).toContain("^https?://");
+    expect(text).toContain("SPLIT_PART");
+  });
+});
 
 describe("isSmallSample", () => {
   it("flags positive counts below the threshold", () => {
