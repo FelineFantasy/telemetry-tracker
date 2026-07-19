@@ -5,8 +5,23 @@ import {
   buildErrorGroupDetailHref,
   buildEventListHref,
   formatOverviewDeltaLine,
+  isRollingCompareParam,
   resolveScopedQueryValue,
 } from "./overview-scope-url";
+
+describe("isRollingCompareParam", () => {
+  it("treats previous and week-ago as rolling", () => {
+    expect(isRollingCompareParam("previous")).toBe(true);
+    expect(isRollingCompareParam("week-ago")).toBe(true);
+  });
+
+  it("treats calendar and custom as non-rolling", () => {
+    expect(isRollingCompareParam("today-yesterday")).toBe(false);
+    expect(isRollingCompareParam("week")).toBe(false);
+    expect(isRollingCompareParam("month")).toBe(false);
+    expect(isRollingCompareParam("custom")).toBe(false);
+  });
+});
 
 describe("resolveScopedQueryValue", () => {
   it("returns null for values outside the allow-list", () => {

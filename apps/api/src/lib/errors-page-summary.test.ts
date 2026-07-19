@@ -4,6 +4,7 @@ import {
   buildErrorGroupScopeSql,
   buildEventSessionScopeSql,
   enrichErrorListFilterForMetrics,
+  errorFilterForComparedWindow,
   fetchErrorsPageSummary,
   parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
@@ -212,6 +213,42 @@ describe("enrichErrorListFilterForMetrics", () => {
     const since = new Date("2026-06-01T00:00:00.000Z");
     const filter = { range: { gte: since }, status: "all" as const };
     expect(enrichErrorListFilterForMetrics(filter, filter.range, anchor)).toEqual(filter);
+  });
+});
+
+describe("errorFilterForComparedWindow", () => {
+  const window = {
+    since: new Date("2026-07-13T00:00:00.000Z"),
+    until: new Date("2026-07-19T23:59:59.999Z"),
+    previousSince: new Date("2026-07-06T00:00:00.000Z"),
+  };
+
+  it("spans previous+current for summary scope", () => {
+    const aligned = errorFilterForComparedWindow(
+      {
+        range: {
+          gte: new Date("2026-07-18T00:00:00.000Z"),
+          lte: new Date("2026-07-19T00:00:00.000Z"),
+        },
+        status: "all",
+        appId: "web",
+      },
+      window
+    );
+    expect(aligned.range).toEqual({
+      gte: window.previousSince,
+      lte: window.until,
+    });
+    expect(aligned.appId).toBe("web");
+  });
+
+  it("uses current window only when includePrevious is false", () => {
+    const aligned = errorFilterForComparedWindow(
+      { range: { gte: new Date("2026-07-18T00:00:00.000Z") }, status: "all" },
+      window,
+      { includePrevious: false }
+    );
+    expect(aligned.range).toEqual({ gte: window.since, lte: window.until });
   });
 });
 

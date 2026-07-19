@@ -37,6 +37,7 @@ import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, Overvi
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
 import {
   parseOverviewCompare,
+  isRollingCompareParam,
   resolveScopedQueryValue,
   compareLabelFor,
   buildErrorGroupDetailHref,
@@ -462,12 +463,13 @@ export default async function OverviewPage({
     kpiSparklines: overviewResult.kpiSparklines ?? emptySparklines(),
   };
 
-  // Open-ended Overview → issue detail: pass the exact metrics window so detail
-  // matches KPIs (metricsUntil alone would select the Issues ~7d path).
+  // When Overview KPIs use a non-list window (open-ended range, or calendar /
+  // custom compare), pass the exact metrics window so issue detail matches KPIs
+  // (metricsUntil alone would select the Issues ~7d path).
   const issueDetailScope =
-    isUnselectedTimeRange(parsedRange.key) &&
     overviewData.metricsSince &&
-    (overviewData.metricsUntil || pageMetricsUntil)
+    (overviewData.metricsUntil || pageMetricsUntil) &&
+    (isUnselectedTimeRange(parsedRange.key) || !isRollingCompareParam(compare))
       ? {
           ...listScope,
           metricsSince: overviewData.metricsSince,

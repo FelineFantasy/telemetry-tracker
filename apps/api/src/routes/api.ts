@@ -24,6 +24,7 @@ import { fetchErrorsAnalytics } from "../lib/errors-analytics.js";
 import { fetchEventsAnalytics } from "../lib/events-analytics.js";
 import {
   enrichErrorListFilterForMetrics,
+  errorFilterForComparedWindow,
   fetchErrorsPageSummary,
   parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
@@ -710,7 +711,7 @@ export async function apiRoutes(
     }
     const summary = await fetchErrorsPageSummary(
       prisma,
-      filter,
+      errorFilterForComparedWindow(filter, compared.window),
       projectId,
       compared.window
     );
@@ -774,7 +775,9 @@ export async function apiRoutes(
     }
     const analytics = await fetchErrorsAnalytics(
       prisma,
-      filter,
+      errorFilterForComparedWindow(filter, compared.window, {
+        includePrevious: false,
+      }),
       projectId,
       compared.window
     );

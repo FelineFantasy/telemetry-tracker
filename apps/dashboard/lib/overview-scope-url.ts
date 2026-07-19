@@ -28,6 +28,11 @@ export function parseOverviewCompare(
   return "previous";
 }
 
+/** Rolling modes keep the page range; calendar/custom replace the KPI window. */
+export function isRollingCompareParam(param: OverviewCompareParam): boolean {
+  return param === "previous" || param === "week-ago";
+}
+
 export function compareLabelFor(
   param: OverviewCompareParam,
   rangeLabel: string
