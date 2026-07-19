@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.17.1] - 2026-07-19
+
+### Fixed
+
+- **Concurrent error-group create race** — `findOrCreateErrorGroup` now handles Prisma P2002 on unique `(project_id, fingerprint)` by re-fetching the existing group and incrementing occurrences (`isNew: false`), so concurrent `POST /ingest/error` no longer 500s ([#599](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/599))
+
+---
+
 ## [1.17.0] - 2026-07-19
 
 ### Added
