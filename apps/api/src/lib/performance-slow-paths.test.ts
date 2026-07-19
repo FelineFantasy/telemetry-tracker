@@ -6,6 +6,7 @@ import {
   isSmallSample,
   paginateRows,
   PERFORMANCE_SMALL_SAMPLE_THRESHOLD,
+  resolveListPage,
   sortSlowPages,
   sortSlowRoutes,
   type SlowPageRow,
@@ -121,6 +122,21 @@ describe("paginateRows", () => {
       total: 0,
       page: 1,
       pageSize: 10,
+    });
+  });
+});
+
+describe("resolveListPage", () => {
+  it("clamps page against total for SQL OFFSET", () => {
+    expect(resolveListPage(99, 20, 45)).toEqual({
+      page: 3,
+      pageSize: 20,
+      skip: 40,
+    });
+    expect(resolveListPage(1, 20, 0)).toEqual({
+      page: 1,
+      pageSize: 20,
+      skip: 0,
     });
   });
 });

@@ -155,14 +155,35 @@ export function paginateRows<T>(
   const safeSize =
     Number.isFinite(pageSize) && pageSize >= 1 ? Math.floor(pageSize) : 20;
   const total = rows.length;
-  const maxPage = Math.max(1, Math.ceil(total / safeSize) || 1);
-  const clampedPage = Math.min(safePage, maxPage);
-  const start = (clampedPage - 1) * safeSize;
+  const { page: clampedPage, pageSize: size, skip } = resolveListPage(
+    safePage,
+    safeSize,
+    total
+  );
   return {
-    items: rows.slice(start, start + safeSize),
+    items: rows.slice(skip, skip + size),
     total,
     page: clampedPage,
+    pageSize: size,
+  };
+}
+
+/** Clamp page/pageSize against a known total and return the SQL OFFSET. */
+export function resolveListPage(
+  page: number,
+  pageSize: number,
+  total: number
+): { page: number; pageSize: number; skip: number } {
+  const safePage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
+  const safeSize =
+    Number.isFinite(pageSize) && pageSize >= 1 ? Math.floor(pageSize) : 20;
+  const safeTotal = Number.isFinite(total) && total >= 0 ? Math.floor(total) : 0;
+  const maxPage = Math.max(1, Math.ceil(safeTotal / safeSize) || 1);
+  const clampedPage = Math.min(safePage, maxPage);
+  return {
+    page: clampedPage,
     pageSize: safeSize,
+    skip: (clampedPage - 1) * safeSize,
   };
 }
 
@@ -229,7 +250,7 @@ export async function fetchSlowRoutes(
   const url = requestUrlPathExpr("e");
   const status = requestStatusCodeExpr("e");
 
-  const rows = await prisma.$queryRaw<SlowRouteSqlRow[]>(Prisma.sql`
+  const grouped = Prisma.sql`
     SELECT
       COALESCE(${method}, 'GET') AS method,
       ${url} AS url,
@@ -247,16 +268,41 @@ export async function fetchSlowRoutes(
       AND e."created_at" <= ${until}
       AND ${url} IS NOT NULL
     GROUP BY 1, 2
-  `);
+  `;
 
-  const mapped = rows
+  const countRows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
+    SELECT COUNT(*)::bigint AS c FROM (${grouped}) AS routes
+  `);
+  const total = Number(countRows[0]?.c ?? 0);
+  const { page: clampedPage, pageSize: take, skip } = resolveListPage(
+    page,
+    pageSize,
+    total
+  );
+
+  const rows =
+    total === 0
+      ? []
+      : await prisma.$queryRaw<SlowRouteSqlRow[]>(Prisma.sql`
+          SELECT * FROM (${grouped}) AS routes
+          ORDER BY
+            p95_ms DESC NULLS LAST,
+            p50_ms DESC NULLS LAST,
+            request_count DESC,
+            method ASC,
+            url ASC
+          LIMIT ${take} OFFSET ${skip}
+        `);
+
+  const items = rows
     .map(mapSlowRouteRow)
     .filter((row): row is SlowRouteRow => row != null);
-  const sorted = sortSlowRoutes(mapped);
-  const paged = paginateRows(sorted, page, pageSize);
 
   return {
-    ...paged,
+    items,
+    total,
+    page: clampedPage,
+    pageSize: take,
     window: {
       since: since.toISOString(),
       until: until.toISOString(),
@@ -279,7 +325,7 @@ export async function fetchSlowPages(
   const metricKey = webVitalMetricKeySql("e");
   const path = webVitalPathExpr("e");
 
-  const rows = await prisma.$queryRaw<SlowPageSqlRow[]>(Prisma.sql`
+  const grouped = Prisma.sql`
     SELECT
       ${path} AS path,
       PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${value})
@@ -297,16 +343,39 @@ export async function fetchSlowPages(
       AND ${value} IS NOT NULL
     GROUP BY 1
     HAVING COUNT(*) FILTER (WHERE ${metricKey} = 'LCP') > 0
-  `);
+  `;
 
-  const mapped = rows
+  const countRows = await prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
+    SELECT COUNT(*)::bigint AS c FROM (${grouped}) AS pages
+  `);
+  const total = Number(countRows[0]?.c ?? 0);
+  const { page: clampedPage, pageSize: take, skip } = resolveListPage(
+    page,
+    pageSize,
+    total
+  );
+
+  const rows =
+    total === 0
+      ? []
+      : await prisma.$queryRaw<SlowPageSqlRow[]>(Prisma.sql`
+          SELECT * FROM (${grouped}) AS pages
+          ORDER BY
+            lcp_p75 DESC NULLS LAST,
+            sample_count DESC,
+            path ASC
+          LIMIT ${take} OFFSET ${skip}
+        `);
+
+  const items = rows
     .map(mapSlowPageRow)
     .filter((row): row is SlowPageRow => row != null);
-  const sorted = sortSlowPages(mapped);
-  const paged = paginateRows(sorted, page, pageSize);
 
   return {
-    ...paged,
+    items,
+    total,
+    page: clampedPage,
+    pageSize: take,
     window: {
       since: since.toISOString(),
       until: until.toISOString(),
