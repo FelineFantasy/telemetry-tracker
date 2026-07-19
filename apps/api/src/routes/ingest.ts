@@ -176,7 +176,7 @@ export async function ingestRoutes(
       },
     });
     await addIngestUnits(prisma, projectId, 1);
-    void maybeNotifyQuotaAlerts(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId).catch(() => {});
     return reply.status(204).send();
   });
 
@@ -242,7 +242,7 @@ export async function ingestRoutes(
       });
     }
     await addIngestUnits(prisma, projectId, 1);
-    void maybeNotifyQuotaAlerts(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId).catch(() => {});
     return reply.status(204).send();
   });
 
@@ -279,7 +279,7 @@ export async function ingestRoutes(
       });
     }
     await addIngestUnits(prisma, projectId, n);
-    void maybeNotifyQuotaAlerts(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId).catch(() => {});
     return reply.status(204).send();
   });
 
@@ -329,7 +329,7 @@ export async function ingestRoutes(
     }
     void maybeNotifyErrorSpike(prisma, projectId);
     void maybeEvaluateAlertRules(prisma, projectId);
-    void maybeNotifyQuotaAlerts(prisma, projectId);
+    void maybeNotifyQuotaAlerts(prisma, projectId).catch(() => {});
     return reply.status(204).send();
   });
 }

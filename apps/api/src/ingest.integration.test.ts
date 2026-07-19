@@ -42,6 +42,8 @@ describe.skipIf(!runDbIntegration)("POST /ingest/event with API key (integration
 
   afterAll(async () => {
     if (app) await app.close();
+    // Let fire-and-forget quota alerts from ingest settle before cascade-deleting the org.
+    await new Promise<void>((resolve) => setImmediate(resolve));
     if (organizationId) {
       await prisma.organization
         .delete({ where: { id: organizationId } })

@@ -26,34 +26,19 @@ export async function loadPlanContextForProject(
   prisma: PrismaClient,
   projectId: string
 ): Promise<PlanContext | null> {
+  // Do not select the required `organization` relation. Concurrent hard-deletes
+  // (cascade / integration teardown) can make Prisma throw
+  // "Field organization is required to return data, got `null` instead".
   const row = await prisma.project.findFirst({
-    where: { id: projectId, deleted_at: null },
-    select: {
-      organization_id: true,
-      organization: {
-        select: {
-          plan_tier: true,
-          stripe_customer_id: true,
-          stripe_subscription_status: true,
-          stripe_current_period_end: true,
-          deleted_at: true,
-        },
-      },
+    where: {
+      id: projectId,
+      deleted_at: null,
+      organization: { deleted_at: null },
     },
+    select: { organization_id: true },
   });
-  if (!row || row.organization.deleted_at) return null;
-  const stored = row.organization.plan_tier;
-  const status = row.organization.stripe_subscription_status;
-  const tier = effectivePlanTierForLimits(stored, status);
-  return {
-    organizationId: row.organization_id,
-    storedPlanTier: stored,
-    planTier: tier,
-    stripeCustomerId: row.organization.stripe_customer_id,
-    stripeSubscriptionStatus: status,
-    stripeCurrentPeriodEnd: row.organization.stripe_current_period_end,
-    limits: limitsForPlan(tier),
-  };
+  if (!row) return null;
+  return loadPlanContextForOrganization(prisma, row.organization_id);
 }
 
 export async function loadPlanContextForOrganization(
@@ -169,7 +154,7 @@ export async function assertIngestPlanOrReply(
   if (!m.ok) {
     if (used >= ctx.limits.monthlyIngestUnits) {
       const { maybeNotifyQuotaAlerts } = await import("./quota-alert.js");
-      void maybeNotifyQuotaAlerts(prisma, projectId);
+      void maybeNotifyQuotaAlerts(prisma, projectId).catch(() => {});
     }
     return {
       ok: false,

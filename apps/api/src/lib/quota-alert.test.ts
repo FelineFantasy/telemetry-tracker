@@ -80,4 +80,13 @@ describe("maybeNotifyQuotaAlerts", () => {
       expect.objectContaining({ rule: "QUOTA_NEAR", projectId: "project-1" })
     );
   });
+
+  it("swallows load failures so fire-and-forget ingest hooks stay rejection-safe", async () => {
+    loadPlanContextForProject.mockRejectedValueOnce(
+      new Error("Inconsistent query result: Field organization is required")
+    );
+
+    await expect(maybeNotifyQuotaAlerts({} as never, "project-1")).resolves.toBeUndefined();
+    expect(fireProjectAlert).not.toHaveBeenCalled();
+  });
 });
