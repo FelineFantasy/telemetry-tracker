@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.5] - 2026-07-19
+
+### Fixed
+
+- **Quota alert plan context** — avoid Prisma required-relation null errors in `loadPlanContextForProject` when ingest fire-and-forget quota hooks race org cascade deletes (integration teardown), and swallow alert load failures so they cannot fail the request ([#583](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/583))
+
+---
+
 ## [1.16.4] - 2026-07-19
 
 ### Fixed
