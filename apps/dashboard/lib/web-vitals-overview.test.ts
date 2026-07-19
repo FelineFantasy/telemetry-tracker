@@ -9,7 +9,9 @@ import {
   overviewPerformanceReportScope,
   overviewVitalBadgeTone,
   overviewVitalRatingLabel,
+  resolveOverviewPerformanceScope,
 } from "./web-vitals-overview";
+import { buildDashboardScopedListHref } from "./overview-scope-url";
 
 function emptyRating(): WebVitalMetricSummary["rating"] {
   return {
@@ -121,7 +123,7 @@ describe("overviewVitalRatingLabel / overviewVitalBadgeTone", () => {
 });
 
 describe("buildOverviewPerformanceSummaryQuery", () => {
-  it("forwards Overview scope without compare params", () => {
+  it("forwards page-range scope without compare params", () => {
     const params = buildOverviewPerformanceSummaryQuery({
       app: "web",
       environment: "production",
@@ -151,6 +153,95 @@ describe("buildOverviewPerformanceSummaryQuery", () => {
     });
     expect(params.get("from")).toBe("2026-07-01T00:00:00.000Z");
     expect(params.get("to")).toBe("2026-07-08T00:00:00.000Z");
+  });
+});
+
+describe("resolveOverviewPerformanceScope", () => {
+  const listScope = {
+    app: "web",
+    environment: "production",
+    platform: "browser",
+    release: "1.2.0",
+    range: "7d",
+    compare: "week" as const,
+  };
+
+  it("maps compare=week resolved KPI window to custom from/to and drops compare", () => {
+    const scope = resolveOverviewPerformanceScope(listScope, {
+      since: "2026-07-13T00:00:00.000Z",
+      until: "2026-07-19T15:30:00.000Z",
+    });
+    expect(scope).toEqual({
+      app: "web",
+      environment: "production",
+      platform: "browser",
+      release: "1.2.0",
+      range: "custom",
+      from: "2026-07-13T00:00:00.000Z",
+      to: "2026-07-19T15:30:00.000Z",
+    });
+    const params = buildOverviewPerformanceSummaryQuery(scope);
+    expect(params.get("range")).toBe("custom");
+    expect(params.get("from")).toBe("2026-07-13T00:00:00.000Z");
+    expect(params.get("to")).toBe("2026-07-19T15:30:00.000Z");
+    expect(params.get("compare")).toBeNull();
+    expect(
+      buildDashboardScopedListHref("/dashboard/performance", scope)
+    ).toBe(
+      "/dashboard/performance?app=web&environment=production&platform=browser&release=1.2.0&range=custom&from=2026-07-13T00%3A00%3A00.000Z&to=2026-07-19T15%3A30%3A00.000Z"
+    );
+  });
+
+  it("maps custom comparison current window to custom from/to and drops compareFrom/To", () => {
+    const scope = resolveOverviewPerformanceScope(
+      {
+        app: "api",
+        range: "custom",
+        from: "2026-07-10T00:00:00.000Z",
+        to: "2026-07-17T00:00:00.000Z",
+        compare: "custom",
+        compareFrom: "2026-07-03T00:00:00.000Z",
+        compareTo: "2026-07-10T00:00:00.000Z",
+      },
+      {
+        since: "2026-07-10T00:00:00.000Z",
+        until: "2026-07-17T00:00:00.000Z",
+      }
+    );
+    expect(scope).toEqual({
+      app: "api",
+      environment: undefined,
+      platform: undefined,
+      release: undefined,
+      range: "custom",
+      from: "2026-07-10T00:00:00.000Z",
+      to: "2026-07-17T00:00:00.000Z",
+    });
+    const params = buildOverviewPerformanceSummaryQuery(scope);
+    expect(params.get("range")).toBe("custom");
+    expect(params.get("from")).toBe("2026-07-10T00:00:00.000Z");
+    expect(params.get("to")).toBe("2026-07-17T00:00:00.000Z");
+    expect(params.get("compare")).toBeNull();
+    expect(params.get("compareFrom")).toBeNull();
+    expect(params.get("compareTo")).toBeNull();
+    expect(
+      buildDashboardScopedListHref("/dashboard/performance", scope)
+    ).toBe(
+      "/dashboard/performance?app=api&range=custom&from=2026-07-10T00%3A00%3A00.000Z&to=2026-07-17T00%3A00%3A00.000Z"
+    );
+  });
+
+  it("falls back to page-range scope (no compare) when metrics window is absent", () => {
+    expect(resolveOverviewPerformanceScope(listScope, null)).toEqual({
+      app: "web",
+      environment: "production",
+      platform: "browser",
+      release: "1.2.0",
+      range: "7d",
+      from: undefined,
+      to: undefined,
+      metricsUntil: undefined,
+    });
   });
 });
 

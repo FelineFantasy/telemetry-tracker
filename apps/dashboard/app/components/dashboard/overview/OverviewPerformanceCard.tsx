@@ -10,7 +10,8 @@ import {
   buildOverviewPerformanceSummaryQuery,
   hasOverviewWebVitals,
   mapOverviewVitalRows,
-  overviewPerformanceReportScope,
+  resolveOverviewPerformanceScope,
+  type OverviewMetricsWindow,
   type OverviewVitalRow,
 } from "@/lib/web-vitals-overview";
 
@@ -157,17 +158,20 @@ export function OverviewPerformanceCardSkeleton() {
 export async function OverviewPerformanceCard({
   listScope,
   rangeLabel,
+  metricsWindow,
 }: {
   listScope: DashboardListScope;
   rangeLabel: string;
+  /** Resolved Overview KPI window — required for calendar/custom compare (#495). */
+  metricsWindow?: OverviewMetricsWindow | null;
 }) {
-  const reportScope = overviewPerformanceReportScope(listScope);
+  const performanceScope = resolveOverviewPerformanceScope(listScope, metricsWindow);
   const performanceHref = buildDashboardScopedListHref(
     "/dashboard/performance",
-    reportScope
+    performanceScope
   );
   const summary = await fetchPerformanceSummary(
-    buildOverviewPerformanceSummaryQuery(listScope)
+    buildOverviewPerformanceSummaryQuery(performanceScope)
   );
 
   if (summary == null) {

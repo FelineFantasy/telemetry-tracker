@@ -495,6 +495,18 @@ export default async function OverviewPage({
     ? metricsIssueDetailScope
     : listScope;
 
+  // Same window Top Errors detail links use: calendar/custom compare and open-ended
+  // ranges resolve a KPI window that may differ from the page `range` filter.
+  const performanceMetricsWindow =
+    overviewData.metricsSince &&
+    (overviewData.metricsUntil || pageMetricsUntil) &&
+    (isUnselectedTimeRange(parsedRange.key) || !isRollingCompareParam(compare))
+      ? {
+          since: overviewData.metricsSince,
+          until: overviewData.metricsUntil || pageMetricsUntil!,
+        }
+      : null;
+
   const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
   const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
@@ -630,7 +642,11 @@ export default async function OverviewPage({
         />
         <div className="lg:col-start-2">
           <Suspense fallback={<OverviewPerformanceCardSkeleton />}>
-            <OverviewPerformanceCard listScope={listScope} rangeLabel={displayRangeLabel} />
+            <OverviewPerformanceCard
+              listScope={listScope}
+              rangeLabel={displayRangeLabel}
+              metricsWindow={performanceMetricsWindow}
+            />
           </Suspense>
         </div>
       </section>

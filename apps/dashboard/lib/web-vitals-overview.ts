@@ -1,7 +1,10 @@
 /** Overview Performance card helpers — Web Vitals snapshot (#197). */
 
 import { rateWebVital, type WebVitalRating } from "@telemetry-tracker/core";
-import type { DashboardListScope } from "@/lib/overview-scope-url";
+import {
+  scopeForPerformanceEventsDrillDown,
+  type DashboardListScope,
+} from "@/lib/overview-scope-url";
 import type {
   PerformancePageSummary,
   WebVitalMetricSummary,
@@ -33,6 +36,11 @@ export type OverviewVitalRow = {
   badgeTone: OverviewVitalBadgeTone | null;
   sampleCount: number;
   ratingDistribution: WebVitalMetricSummary["rating"];
+};
+
+export type OverviewMetricsWindow = {
+  since: string;
+  until: string;
 };
 
 const RATING_LABELS: Record<WebVitalRating, OverviewVitalRatingLabel> = {
@@ -86,7 +94,26 @@ export function overviewVitalBadgeTone(
   return rating ? RATING_TONES[rating] : null;
 }
 
-/** Build `GET /api/performance/summary` query from Overview list scope (no compare). */
+/**
+ * Align Performance card + View report with Overview's resolved KPI window.
+ *
+ * Calendar/custom compare (#495) replace the current metrics window (e.g.
+ * `compare=week` → "This week"). Performance summary ignores Overview's
+ * compare semantics unless we either forward compare* or express the resolved
+ * window as `range=custom&from&to`. Match Performance→Events drill-downs:
+ * convert the resolved window and drop compare*.
+ */
+export function resolveOverviewPerformanceScope(
+  listScope: DashboardListScope,
+  metricsWindow?: OverviewMetricsWindow | null
+): DashboardListScope {
+  if (metricsWindow?.since && metricsWindow?.until) {
+    return scopeForPerformanceEventsDrillDown(listScope, metricsWindow);
+  }
+  return overviewPerformanceReportScope(listScope);
+}
+
+/** Build `GET /api/performance/summary` query from a resolved Performance scope. */
 export function buildOverviewPerformanceSummaryQuery(
   scope: DashboardListScope
 ): URLSearchParams {
@@ -103,8 +130,8 @@ export function buildOverviewPerformanceSummaryQuery(
 }
 
 /**
- * Scope for Performance `View report →` — same filters as the card query.
- * Compare params are omitted (#197 / #495 out of scope for this card).
+ * Scope for Performance `View report →` when no resolved metrics window is
+ * provided — keep page range filters, omit compare* (card is a snapshot).
  */
 export function overviewPerformanceReportScope(
   listScope: DashboardListScope
