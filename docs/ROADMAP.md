@@ -74,4 +74,4 @@ Export telemetry data for reporting, compliance, and external workflows.
 - Milestones group features that provide value together.
 - Parent roadmap issues remain the source of truth for scope and future extensions (prefer leaving them open after the milestone closes).
 - Child issues may ship incrementally within their milestone as implementation slices are completed.
-- Product update emails send on **minor line close** (whole `vX.Y.*`), not on the first `.0` of the next milestone — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md).
+- Product update emails send on **minor line close** (whole `vX.Y.*`) when the `vX.Y.x` GitHub milestone is closed — not on the first `.0` of the next milestone — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md).

@@ -14,6 +14,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 ### Added
 
 - **Compare periods** — explicit period-comparison mode across Overview, Errors, Events, and Sessions with calendar presets (Today vs Yesterday, week, month; UTC), equal-duration custom ranges (`compare` / `compareFrom` / `compareTo`), unified New/— delta formatting, and release-vs-previous “New” handling on Releases ([#495](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/495); milestone v1.17.x — Performance Intelligence)
+- **Product update email on milestone close** — closing a `vX.Y.x — …` GitHub milestone auto-sends the line-close product email (latest tag on that minor + previous minor final); tag pushes still skip; workflow `dry_run` input for previews ([docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md))
 
 ### Fixed
 
