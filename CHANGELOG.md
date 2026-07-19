@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.17.3] - 2026-07-19
+
+### Changed
+
+- **Docs** — mark Performance / Web Vitals, Releases, and Global search as shipped in README (EN/DE/ES) and site `/docs/dashboard`; mark roadmap milestones v1.16.x and v1.17.x as shipped
+
+---
+
 ## [1.17.2] - 2026-07-19
 
 ### Added
