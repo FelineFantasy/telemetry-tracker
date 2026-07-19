@@ -179,22 +179,7 @@ export function buildSlowRouteEventsHref(
   return `/dashboard/events?${params.toString()}`;
 }
 
-/**
- * Deep-link to Sessions filtered by page path, preserving dashboard scope (#196).
- */
-export function buildSlowPageSessionsHref(
-  path: string,
-  scope: DashboardListScope
-): string {
-  const params = new URLSearchParams();
-  const pagePath = path.trim();
-  if (pagePath) params.set("q", pagePath);
-  appendDashboardListScope(params, scope);
-  const q = params.toString();
-  return q ? `/dashboard/sessions?${q}` : "/dashboard/sessions";
-}
-
-/** Related telemetry view for a slow page: `$web_vital` events for that path. */
+/** Deep-link to `$web_vital` Events for a slow page path, preserving scope (#196). */
 export function buildSlowPageWebVitalEventsHref(
   path: string,
   scope: DashboardListScope

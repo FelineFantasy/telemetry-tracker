@@ -4,7 +4,6 @@ import {
   buildDashboardScopedListHref,
   buildErrorGroupDetailHref,
   buildEventListHref,
-  buildSlowPageSessionsHref,
   buildSlowPageWebVitalEventsHref,
   buildSlowRouteEventsHref,
   formatOverviewDeltaLine,
@@ -205,18 +204,6 @@ describe("buildSlowRouteEventsHref", () => {
   });
 });
 
-describe("buildSlowPageSessionsHref", () => {
-  it("filters sessions by page path with scope", () => {
-    expect(
-      buildSlowPageSessionsHref("/checkout", {
-        app: "web",
-        platform: "web",
-        range: "24h",
-      })
-    ).toBe("/dashboard/sessions?q=%2Fcheckout&app=web&platform=web&range=24h");
-  });
-});
-
 describe("buildSlowPageWebVitalEventsHref", () => {
   it("filters $web_vital events by path with scope", () => {
     expect(
@@ -226,6 +213,18 @@ describe("buildSlowPageWebVitalEventsHref", () => {
       })
     ).toBe(
       "/dashboard/events?name=%24web_vital&q=%2Fcheckout&release=1.2.0&range=7d"
+    );
+  });
+
+  it("preserves app and platform scope for slow-page drill-down", () => {
+    expect(
+      buildSlowPageWebVitalEventsHref("/checkout", {
+        app: "web",
+        platform: "web",
+        range: "24h",
+      })
+    ).toBe(
+      "/dashboard/events?name=%24web_vital&q=%2Fcheckout&app=web&platform=web&range=24h"
     );
   });
 });

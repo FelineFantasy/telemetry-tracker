@@ -7,7 +7,6 @@ import { EmptyState } from "@/app/components/EmptyState";
 import { Pagination } from "@/app/components/ui/Pagination";
 import { Table } from "@/app/components/ui/Table";
 import {
-  buildSlowPageSessionsHref,
   buildSlowPageWebVitalEventsHref,
   type DashboardListScope,
 } from "@/lib/overview-scope-url";
@@ -75,18 +74,16 @@ export function PerformanceSlowPagesTable({
                   <th className="text-right">LCP p75</th>
                   <th className="hidden sm:table-cell text-right">CLS</th>
                   <th className="text-right">Samples</th>
-                  <th className="hidden md:table-cell">Open</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((row) => {
-                  const sessionsHref = buildSlowPageSessionsHref(row.path, scope);
                   const eventsHref = buildSlowPageWebVitalEventsHref(row.path, scope);
                   return (
                     <tr key={row.path}>
                       <td>
                         <Link
-                          href={sessionsHref}
+                          href={eventsHref}
                           className="font-mono text-[12.5px] text-foreground underline-offset-4 hover:text-brand hover:underline"
                         >
                           {row.path}
@@ -101,22 +98,6 @@ export function PerformanceSlowPagesTable({
                       </td>
                       <td className="text-right tabular-nums">
                         {row.sampleCount.toLocaleString()}
-                      </td>
-                      <td className="hidden md:table-cell">
-                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[12px]">
-                          <Link
-                            href={sessionsHref}
-                            className="text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
-                          >
-                            Sessions
-                          </Link>
-                          <Link
-                            href={eventsHref}
-                            className="text-muted-foreground underline-offset-4 hover:text-brand hover:underline"
-                          >
-                            Vitals
-                          </Link>
-                        </div>
                       </td>
                     </tr>
                   );
