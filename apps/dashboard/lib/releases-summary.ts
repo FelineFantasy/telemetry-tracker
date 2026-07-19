@@ -1,9 +1,12 @@
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
+/** Absolute count delta: numeric %, `"new"` for 0→N, `null` for incomparable / 0→0. */
+export type ReleaseCountDelta = number | null | "new";
+
 export type ReleaseVsPrevious = {
   errorRatePp: number | null;
-  sessionsPct: number | null;
-  errorsPct: number | null;
+  sessionsPct: ReleaseCountDelta;
+  errorsPct: ReleaseCountDelta;
 };
 
 export type ReleaseHealthRow = {

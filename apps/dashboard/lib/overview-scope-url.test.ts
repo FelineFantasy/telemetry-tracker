@@ -4,9 +4,27 @@ import {
   buildDashboardScopedListHref,
   buildErrorGroupDetailHref,
   buildEventListHref,
+  buildSlowPageWebVitalEventsHref,
+  buildSlowRouteEventsHref,
   formatOverviewDeltaLine,
+  isRollingCompareParam,
   resolveScopedQueryValue,
+  scopeForPerformanceEventsDrillDown,
 } from "./overview-scope-url";
+
+describe("isRollingCompareParam", () => {
+  it("treats previous and week-ago as rolling", () => {
+    expect(isRollingCompareParam("previous")).toBe(true);
+    expect(isRollingCompareParam("week-ago")).toBe(true);
+  });
+
+  it("treats calendar and custom as non-rolling", () => {
+    expect(isRollingCompareParam("today-yesterday")).toBe(false);
+    expect(isRollingCompareParam("week")).toBe(false);
+    expect(isRollingCompareParam("month")).toBe(false);
+    expect(isRollingCompareParam("custom")).toBe(false);
+  });
+});
 
 describe("resolveScopedQueryValue", () => {
   it("returns null for values outside the allow-list", () => {
@@ -173,14 +191,106 @@ describe("buildEventListHref", () => {
   });
 });
 
+describe("buildSlowRouteEventsHref", () => {
+  it("filters $request events by method and path with scope", () => {
+    expect(
+      buildSlowRouteEventsHref("GET", "/api/cart", {
+        app: "api",
+        environment: "production",
+        range: "7d",
+      })
+    ).toBe(
+      "/dashboard/events?name=%24request&q=GET+%2Fapi%2Fcart&app=api&environment=production&range=7d"
+    );
+  });
+});
+
+describe("buildSlowPageWebVitalEventsHref", () => {
+  it("filters $web_vital events by path with scope", () => {
+    expect(
+      buildSlowPageWebVitalEventsHref("/checkout", {
+        release: "1.2.0",
+        range: "7d",
+      })
+    ).toBe(
+      "/dashboard/events?name=%24web_vital&q=%2Fcheckout&release=1.2.0&range=7d"
+    );
+  });
+
+  it("preserves app and platform scope for slow-page drill-down", () => {
+    expect(
+      buildSlowPageWebVitalEventsHref("/checkout", {
+        app: "web",
+        platform: "web",
+        range: "24h",
+      })
+    ).toBe(
+      "/dashboard/events?name=%24web_vital&q=%2Fcheckout&app=web&platform=web&range=24h"
+    );
+  });
+});
+
+describe("scopeForPerformanceEventsDrillDown", () => {
+  it("maps the resolved metrics window to a custom Events range and drops compare", () => {
+    expect(
+      scopeForPerformanceEventsDrillDown(
+        {
+          app: "web",
+          environment: "production",
+          platform: "web",
+          release: "1.2.0",
+          range: "7d",
+          compare: "today-yesterday",
+          metricsUntil: "2026-07-19T12:00:00.000Z",
+        },
+        {
+          since: "2026-07-19T00:00:00.000Z",
+          until: "2026-07-19T23:59:59.999Z",
+        }
+      )
+    ).toEqual({
+      app: "web",
+      environment: "production",
+      platform: "web",
+      release: "1.2.0",
+      range: "custom",
+      from: "2026-07-19T00:00:00.000Z",
+      to: "2026-07-19T23:59:59.999Z",
+    });
+  });
+
+  it("produces Events deep links that match the table window", () => {
+    const scope = scopeForPerformanceEventsDrillDown(
+      { app: "api", compare: "week", range: "30d" },
+      {
+        since: "2026-07-13T00:00:00.000Z",
+        until: "2026-07-19T23:59:59.999Z",
+      }
+    );
+    expect(buildSlowRouteEventsHref("GET", "/health", scope)).toBe(
+      "/dashboard/events?name=%24request&q=GET+%2Fhealth&app=api&range=custom&from=2026-07-13T00%3A00%3A00.000Z&to=2026-07-19T23%3A59%3A59.999Z"
+    );
+  });
+});
+
 describe("formatOverviewDeltaLine", () => {
   it("uses week-ago compare label in stat card copy", () => {
-    const line = formatOverviewDeltaLine(3, "errors", "vs same window last week");
+    const line = formatOverviewDeltaLine(8, 5, "errors", "vs same window last week");
     expect(line.text).toBe("+3 vs same window last week");
   });
 
   it("uses previous-period baseline for zero delta", () => {
-    const line = formatOverviewDeltaLine(0, "events", "vs previous 7 days");
+    const line = formatOverviewDeltaLine(4, 4, "events", "vs previous 7 days");
     expect(line.text).toBe("Same as previous 7 days");
+  });
+
+  it("shows New when rising from a zero baseline", () => {
+    const line = formatOverviewDeltaLine(5, 0, "errors", "vs yesterday");
+    expect(line.text).toBe("New");
+  });
+
+  it("shows em dash when both windows are zero", () => {
+    const line = formatOverviewDeltaLine(0, 0, "events", "vs yesterday");
+    expect(line.text).toBe("—");
   });
 });

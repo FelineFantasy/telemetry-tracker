@@ -14,6 +14,7 @@ import {
   parseListTimeRangeOrDefault,
   resolveMetricsUntilIso,
 } from "@/lib/time-range";
+import { CompareModeControl } from "@/app/components/dashboard/CompareModeControl";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -23,6 +24,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { parseOverviewCompare } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const SESSIONS_PATH = "/dashboard/sessions";
@@ -92,6 +94,9 @@ function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefi
     "sort",
     "order",
     "chartBucket",
+    "compare",
+    "compareFrom",
+    "compareTo",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -169,12 +174,18 @@ export default async function SessionsPage({
   if (pageAnchorIso) {
     apiQuery.set("metricsUntil", pageAnchorIso);
   }
+  const compare = parseOverviewCompare(firstQueryValue(sp.compare));
+  const compareFrom = firstQueryValue(sp.compareFrom);
+  const compareTo = firstQueryValue(sp.compareTo);
 
   const summaryQuery = new URLSearchParams(apiQuery);
   summaryQuery.delete("page");
   summaryQuery.delete("pageSize");
   summaryQuery.delete("sort");
   summaryQuery.delete("order");
+  if (compare !== "previous") summaryQuery.set("compare", compare);
+  if (compareFrom) summaryQuery.set("compareFrom", compareFrom);
+  if (compareTo) summaryQuery.set("compareTo", compareTo);
 
   let initialListData: {
     items: SessionsTableRow[];
@@ -232,6 +243,7 @@ export default async function SessionsPage({
       />
 
       <AnalyticsListShell>
+        <CompareModeControl path={SESSIONS_PATH} currentParams={currentParams} />
         {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
         {summary ? <SessionsUserCohortMetrics summary={summary} /> : null}
 

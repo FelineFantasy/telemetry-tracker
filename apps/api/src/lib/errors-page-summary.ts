@@ -148,6 +148,26 @@ export function enrichErrorListFilterForMetrics(
   };
 }
 
+/**
+ * Align list filter.range with a summary/analytics window so group/occurrence
+ * scope SQL cannot clip KPI or chart bounds when compare presets expand the
+ * window beyond the page's list range (#495).
+ */
+export function errorFilterForComparedWindow(
+  filter: ErrorListFilterInput,
+  window: Pick<ResolvedSummaryWindow, "since" | "until" | "previousSince">,
+  opts?: { includePrevious?: boolean }
+): ErrorListFilterInput {
+  const includePrevious = opts?.includePrevious !== false;
+  return {
+    ...filter,
+    range: {
+      gte: includePrevious ? window.previousSince : window.since,
+      lte: window.until,
+    },
+  };
+}
+
 export function shouldScopeEventsToFilteredErrors(f: ErrorListFilterInput): boolean {
   return (f.q != null && f.q.trim() !== "") || f.status !== "all";
 }

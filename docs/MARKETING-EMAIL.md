@@ -1,6 +1,6 @@
 # Marketing / release email list
 
-Product update emails for the hosted cloud: footer subscribe form, registration opt-in, and a manual release send script.
+Product update emails for the hosted cloud: footer subscribe form, registration opt-in, and line-close send on product milestone close (plus manual dispatch / CLI).
 
 ## Data model
 
@@ -55,13 +55,26 @@ Reserved / documentation domains (`example.com`, `example.org`, `example.net`, a
 
 ### Line-close send (preferred)
 
-When the milestone is done and you cut (or have cut) the **last** intended tag of `vX.Y.*`, send via **Actions → Release product email → Run workflow**:
+**Auto-send:** when you **close** a product GitHub milestone titled `vX.Y.x — …` (after the final tag of that line is on `main`), [Release product email](../.github/workflows/release-email.yml) runs automatically with:
+
+| Derived input | Source |
+|---------------|--------|
+| `version` | Latest semver tag on that minor (`vX.Y.*`) |
+| `previous_version` | Latest tag **before** that minor line (previous minor final) |
+| `line_close` | **true** |
+
+Only titles matching **`vX.Y.x`** or **`vX.Y.x — …`** / **`vX.Y.x - …`** are product lines — unrelated milestones are ignored. The job checks out **`main`**, resolves versions from semver tags **reachable from `main`** (not stray tags on other branches), requires a CHANGELOG section for the closing tag, and fails safely if that minor has no tags yet. **Close the milestone only after the final `vX.Y.Z` tag exists on `main`** — closing early emails whatever latest reachable `vX.Y.*` tag is already present and will not include later patches.
+
+Idempotency: delivery is keyed by ledger version **`X.Y`**. Re-closing a milestone, re-running the workflow, or a prior manual send for the same minor skips already-emailed subscribers and only delivers to anyone who subscribed later.
+
+**Manual override / dry-run:** **Actions → Release product email → Run workflow**:
 
 | Input | Value |
 |-------|--------|
 | `version` | Closing tag (`X.Y.Z`) — last release of the line |
 | `previous_version` | Last emailed release / **previous minor final** (must be outside the closing `X.Y` line — not another `X.Y.*` patch) |
 | `line_close` | **true** (default on workflow_dispatch) |
+| `dry_run` | **true** to preview subject/recipients without sending |
 
 That runs `send-release-email.ts --version=… --previous-version=… --line-close`, which:
 
@@ -69,7 +82,7 @@ That runs `send-release-email.ts --version=… --previous-version=… --line-clo
 2. Composes the email body from **all** `CHANGELOG.md` sections for that **`X.Y.*`** line after `previous_version` through `version`.
 3. Uses subject / badge **`Telemetry Tracker X.Y is out`** and ledger key **`X.Y`**.
 
-Tag pushes still start the workflow but **never auto-send** under this policy (opens and mid-line patches both skip). Use dispatch with `line_close` when you are ready to email.
+Tag pushes still start the workflow but **never auto-send** under this policy (opens and mid-line patches both skip). Prefer closing the `vX.Y.x` milestone for the live send; use dispatch for dry-runs, retries, or exceptional backfills.
 
 Apply production migrations **before tagging** ([RELEASE.md](./RELEASE.md#3-database-migrations-production)); this workflow does not run `prisma migrate deploy` (GitHub Actions cannot reach Railway private `*.railway.internal` URLs).
 
@@ -154,12 +167,18 @@ pnpm exec tsx scripts/send-release-email.ts \
 3. Set `TELEMETRY_DASHBOARD_ORIGIN=https://telemetry-tracker.com` on the API.
 4. Finalize the target version section in `CHANGELOG.md` on `main`.
 5. Run `--dry-run --version=X.Y.Z --previous-version=… --line-close`, verify subscriber count and subject (`X.Y is out`).
-6. Run with `--version=X.Y.Z --previous-version=… --line-close` (no `--dry-run`) from a secure operator machine with production `DATABASE_URL`, or use workflow_dispatch.
+6. For a live send: close the `vX.Y.x` milestone after the final tag, or run with `--version=X.Y.Z --previous-version=… --line-close` (no `--dry-run`) / workflow_dispatch from a secure operator context with production secrets.
 7. Spot-check inbox rendering and the unsubscribe link.
 
 ### Automation
 
-Tag pushes start [Release product email](../.github/workflows/release-email.yml) but **do not send** by default (opening a new line and mid-line patches both skip). Send on **line close** via workflow_dispatch with `line_close=true`. See [When to send](#when-to-send-maintainer-policy).
+| Trigger | Behavior |
+|---------|----------|
+| **Product milestone closed** (`vX.Y.x — …`) | Auto line-close send (derived closing tag + previous minor final) |
+| Tag push `vX.Y.Z` | Workflow starts but **does not send** (opens and mid-line patches skip) |
+| `workflow_dispatch` | Manual line-close / dry-run / retry |
+
+See [When to send](#when-to-send-maintainer-policy) and [Line-close send](#line-close-send-preferred).
 
 ## Privacy
 

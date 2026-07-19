@@ -82,7 +82,14 @@ export type OverviewApiResponse = {
   metricsUntil?: string;
   metricsDurationMs?: number;
   bucket?: "hour" | "day" | "week";
-  compare?: "previous" | "week-ago";
+  compare?:
+    | "previous"
+    | "week-ago"
+    | "today-yesterday"
+    | "week"
+    | "month"
+    | "custom";
+  compareLabel?: string;
   errorsLast24h: number;
   eventsLast24h: number;
   errorsPrevious: number;

@@ -1,6 +1,13 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import {
+  deltaArrow,
+  deltaToneClass,
+  formatPpDelta,
+  formatRelativeDelta,
+  type FormattedDelta,
+} from "@/lib/compare-format";
 
 /** Shared panel surface used across analytics pages (dashboard, issues, events, sessions, alerts). */
 export const analyticsPanelClass =
@@ -225,5 +232,35 @@ export function IssueStatusBadge({ resolved }: { resolved: boolean }) {
       <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
       Unresolved
     </span>
+  );
+}
+
+/** Shared ▲/▼ / New / — delta line for period comparisons (#495). */
+export function MetricDelta({
+  current,
+  previous,
+  invert = false,
+  mode = "relative",
+  compareText,
+  className,
+}: {
+  current: number;
+  previous: number;
+  invert?: boolean;
+  mode?: "relative" | "pp";
+  compareText?: string;
+  className?: string;
+}) {
+  const delta: FormattedDelta =
+    mode === "pp"
+      ? formatPpDelta(current, previous)
+      : formatRelativeDelta(current, previous);
+  const toneClass = deltaToneClass(delta.tone, invert);
+  const arrow = deltaArrow(delta.tone);
+  return (
+    <p className={cn("mt-1 text-[11px]", toneClass, className)}>
+      <span aria-hidden>{arrow}</span> {delta.text}
+      {compareText ? ` ${compareText}` : ""}
+    </p>
   );
 }

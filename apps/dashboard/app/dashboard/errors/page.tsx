@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ErrorsClientListSection } from "@/app/components/dashboard/ErrorsClientListSection";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
 import { DeferredErrorsAnalytics } from "@/app/components/dashboard/DeferredErrorsAnalytics";
+import { CompareModeControl } from "@/app/components/dashboard/CompareModeControl";
 import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault, resolveMetricsUntilIso } from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
@@ -14,7 +15,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
-import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { parseOverviewCompare, resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const ERRORS_PATH = "/dashboard/errors";
@@ -103,6 +104,9 @@ function buildErrorsParamsRecord(sp: {
   trendWindow?: string | string[];
   trendFrom?: string | string[];
   trendTo?: string | string[];
+  compare?: string | string[];
+  compareFrom?: string | string[];
+  compareTo?: string | string[];
 }): Record<string, string> {
   const keys = [
     "app",
@@ -123,6 +127,9 @@ function buildErrorsParamsRecord(sp: {
     "trendWindow",
     "trendFrom",
     "trendTo",
+    "compare",
+    "compareFrom",
+    "compareTo",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -154,6 +161,9 @@ export default async function ErrorsListPage({
     trendFrom?: string | string[];
     trendTo?: string | string[];
     metricsUntil?: string | string[];
+    compare?: string | string[];
+    compareFrom?: string | string[];
+    compareTo?: string | string[];
   }>;
 }) {
   const sp = await searchParams;
@@ -228,6 +238,9 @@ export default async function ErrorsListPage({
   if (pageAnchorIso) {
     apiQuery.set("metricsUntil", pageAnchorIso);
   }
+  const compare = parseOverviewCompare(firstQueryValue(sp.compare));
+  const compareFrom = firstQueryValue(sp.compareFrom);
+  const compareTo = firstQueryValue(sp.compareTo);
 
   const summaryQuery = new URLSearchParams(apiQuery);
   summaryQuery.delete("page");
@@ -237,6 +250,9 @@ export default async function ErrorsListPage({
   summaryQuery.delete("trendWindow");
   summaryQuery.delete("trendFrom");
   summaryQuery.delete("trendTo");
+  if (compare !== "previous") summaryQuery.set("compare", compare);
+  if (compareFrom) summaryQuery.set("compareFrom", compareFrom);
+  if (compareTo) summaryQuery.set("compareTo", compareTo);
 
   let initialListData: {
     items: ErrorGroupRow[];
@@ -311,6 +327,7 @@ export default async function ErrorsListPage({
       />
 
       <AnalyticsListShell>
+        <CompareModeControl path={ERRORS_PATH} currentParams={currentParams} />
         {summary ? <ErrorsSummaryMetrics summary={summary} /> : null}
 
         <ErrorsClientListSection
