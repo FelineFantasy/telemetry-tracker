@@ -231,6 +231,41 @@ describe("resolveOverviewPerformanceScope", () => {
     );
   });
 
+  it("maps rolling/default 7d KPI window to custom from/to (not list range=7d)", () => {
+    const scope = resolveOverviewPerformanceScope(
+      {
+        app: "web",
+        environment: "production",
+        range: "7d",
+        compare: "previous",
+      },
+      {
+        since: "2026-07-12T12:00:00.000Z",
+        until: "2026-07-19T12:00:00.000Z",
+      }
+    );
+    expect(scope).toEqual({
+      app: "web",
+      environment: "production",
+      platform: undefined,
+      release: undefined,
+      range: "custom",
+      from: "2026-07-12T12:00:00.000Z",
+      to: "2026-07-19T12:00:00.000Z",
+    });
+    expect(scope.range).not.toBe("7d");
+    const params = buildOverviewPerformanceSummaryQuery(scope);
+    expect(params.get("range")).toBe("custom");
+    expect(params.get("from")).toBe("2026-07-12T12:00:00.000Z");
+    expect(params.get("to")).toBe("2026-07-19T12:00:00.000Z");
+    expect(params.get("compare")).toBeNull();
+    expect(
+      buildDashboardScopedListHref("/dashboard/performance", scope)
+    ).toBe(
+      "/dashboard/performance?app=web&environment=production&range=custom&from=2026-07-12T12%3A00%3A00.000Z&to=2026-07-19T12%3A00%3A00.000Z"
+    );
+  });
+
   it("falls back to page-range scope (no compare) when metrics window is absent", () => {
     expect(resolveOverviewPerformanceScope(listScope, null)).toEqual({
       app: "web",

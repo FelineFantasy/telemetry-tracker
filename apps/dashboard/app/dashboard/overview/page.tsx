@@ -495,17 +495,11 @@ export default async function OverviewPage({
     ? metricsIssueDetailScope
     : listScope;
 
-  // Same window Top Errors detail links use: calendar/custom compare and open-ended
-  // ranges resolve a KPI window that may differ from the page `range` filter.
-  const performanceMetricsWindow =
-    overviewData.metricsSince &&
-    (overviewData.metricsUntil || pageMetricsUntil) &&
-    (isUnselectedTimeRange(parsedRange.key) || !isRollingCompareParam(compare))
-      ? {
-          since: overviewData.metricsSince,
-          until: overviewData.metricsUntil || pageMetricsUntil!,
-        }
-      : null;
+  // Always drive the Performance card from Overview's resolved KPI window so
+  // calendar/custom compare and rolling presets (e.g. 7d) stay aligned with KPIs.
+  const performanceMetricsSince = overviewData.metricsSince ?? null;
+  const performanceMetricsUntil =
+    overviewData.metricsUntil || pageMetricsUntil || null;
 
   const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
@@ -645,7 +639,8 @@ export default async function OverviewPage({
             <OverviewPerformanceCard
               listScope={listScope}
               rangeLabel={displayRangeLabel}
-              metricsWindow={performanceMetricsWindow}
+              metricsSince={performanceMetricsSince}
+              metricsUntil={performanceMetricsUntil}
             />
           </Suspense>
         </div>

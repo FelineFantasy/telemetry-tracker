@@ -158,13 +158,20 @@ export function OverviewPerformanceCardSkeleton() {
 export async function OverviewPerformanceCard({
   listScope,
   rangeLabel,
-  metricsWindow,
+  metricsSince,
+  metricsUntil,
 }: {
   listScope: DashboardListScope;
   rangeLabel: string;
-  /** Resolved Overview KPI window — required for calendar/custom compare (#495). */
-  metricsWindow?: OverviewMetricsWindow | null;
+  /** Resolved Overview KPI window (`metricsSince` from `/api/overview`). */
+  metricsSince?: string | null;
+  /** Resolved Overview KPI window (`metricsUntil` from `/api/overview`). */
+  metricsUntil?: string | null;
 }) {
+  const metricsWindow: OverviewMetricsWindow | null =
+    metricsSince && metricsUntil
+      ? { since: metricsSince, until: metricsUntil }
+      : null;
   const performanceScope = resolveOverviewPerformanceScope(listScope, metricsWindow);
   const performanceHref = buildDashboardScopedListHref(
     "/dashboard/performance",

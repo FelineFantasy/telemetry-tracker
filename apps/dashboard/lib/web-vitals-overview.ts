@@ -97,11 +97,10 @@ export function overviewVitalBadgeTone(
 /**
  * Align Performance card + View report with Overview's resolved KPI window.
  *
- * Calendar/custom compare (#495) replace the current metrics window (e.g.
- * `compare=week` → "This week"). Performance summary ignores Overview's
- * compare semantics unless we either forward compare* or express the resolved
- * window as `range=custom&from&to`. Match Performance→Events drill-downs:
- * convert the resolved window and drop compare*.
+ * Always express `metricsSince`/`metricsUntil` as `range=custom&from&to` (same
+ * pattern as Performance→Events drill-downs). Do not forward compare* — once the
+ * current window is explicit, baseline params are unnecessary. Falls back to the
+ * page list range only when Overview did not return a metrics window.
  */
 export function resolveOverviewPerformanceScope(
   listScope: DashboardListScope,
