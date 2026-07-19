@@ -71,6 +71,8 @@ export function TimeRangePicker({
           page: null,
           errorsPage: null,
           eventsPage: null,
+          routesPage: null,
+          pagesPage: null,
         })
       );
     },
