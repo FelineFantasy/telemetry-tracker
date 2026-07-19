@@ -21,6 +21,15 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.16.7] - 2026-07-19
+
+### Fixed
+
+- **Dependabot #45 / Sentry 10** — upgrade `@sentry/node` and `@sentry/nextjs` to v10 so transitive `@opentelemetry/core` lands on ≥2.8.0 (unbounded W3C baggage parse); move dashboard client init to `instrumentation-client.ts` and update `withSentryConfig` for Sentry 10 ([#590](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/590))
+- **GitHub Code Quality findings** — clear open dashboard quality alerts (dead null checks, trivial conditionals, unused locals) ([#591](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/591))
+
+---
+
 ## [1.16.6] - 2026-07-19
 
 ### Fixed
