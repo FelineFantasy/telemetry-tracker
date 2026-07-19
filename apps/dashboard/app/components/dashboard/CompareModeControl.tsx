@@ -65,8 +65,9 @@ export function CompareModeControl({
       </label>
       {showCustomHint && compare === "custom" ? (
         <p className="text-[11px] text-muted-foreground">
-          Set equal-duration <code className="text-[10px]">compareFrom</code> /{" "}
-          <code className="text-[10px]">compareTo</code> query params (UTC).
+          Add equal-duration UTC <code className="text-[10px]">compareFrom</code> /{" "}
+          <code className="text-[10px]">compareTo</code> to enable custom
+          comparison (falls back to prior period until set).
         </p>
       ) : null}
     </div>

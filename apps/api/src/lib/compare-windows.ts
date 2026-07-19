@@ -192,10 +192,9 @@ export function resolveCompareWindows(
     const fromRaw = input.custom?.compareFrom?.trim() ?? "";
     const toRaw = input.custom?.compareTo?.trim() ?? "";
     if (!fromRaw || !toRaw) {
-      return {
-        ok: false,
-        error: "compare=custom requires compareFrom and compareTo",
-      };
+      // Incomplete custom selection: fall back to prior equal-length window so
+      // the dashboard control can land on compare=custom without hard-failing.
+      return resolveCompareWindows({ ...input, mode: "previous" });
     }
     const previousSince = parseBound(fromRaw);
     const previousUntilParsed = parseBound(toRaw);

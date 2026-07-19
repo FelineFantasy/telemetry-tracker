@@ -153,13 +153,18 @@ describe("resolveCompareWindows calendar presets (UTC)", () => {
     );
   });
 
-  it("requires compareFrom/compareTo for custom mode", () => {
+  it("falls back to previous when custom bounds are missing", () => {
+    const since = new Date("2026-07-01T00:00:00.000Z");
+    const until = new Date("2026-07-08T00:00:00.000Z");
     const result = resolveCompareWindows({
       mode: "custom",
-      since: new Date("2026-07-01T00:00:00.000Z"),
-      until: new Date("2026-07-08T00:00:00.000Z"),
+      since,
+      until,
     });
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.windows.mode).toBe("previous");
+    expect(result.windows.compareLabel).toBe("vs prior period");
   });
 });
 

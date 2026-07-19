@@ -237,15 +237,6 @@ export async function apiRoutes(
           release,
         })
       : effectiveOverviewWindow(timeRange);
-    const metricsBucket = chooseTimeRangeBucket(metricsWindow.durationMs);
-    const chartSince = isUnselectedTimeRange(timeRange.key) ? metricsWindow.gte : since;
-    const chartUntil = isUnselectedTimeRange(timeRange.key) ? metricsWindow.lte : until;
-    const chartBucket = isUnselectedTimeRange(timeRange.key)
-      ? metricsBucket.bucket
-      : timeRange.bucket;
-    const chartBucketSeconds = isUnselectedTimeRange(timeRange.key)
-      ? metricsBucket.bucketSeconds
-      : timeRange.bucketSeconds;
     const compareMode = parseCompareMode(queryString(query.compare));
     const errSortParsed = parseOverviewErrorSortParam(queryString(query.errorsSort));
     if (!errSortParsed.ok) {
@@ -294,6 +285,28 @@ export async function apiRoutes(
           ),
           label: compareResolved.windows.label,
         };
+    const metricsBucket = chooseTimeRangeBucket(effectiveMetrics.durationMs);
+    // Calendar/custom compare modes align charts with the effective metrics window.
+    const chartSince = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsWindow.gte
+        : since
+      : effectiveMetrics.gte;
+    const chartUntil = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsWindow.lte
+        : until
+      : effectiveMetrics.lte;
+    const chartBucket = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsBucket.bucket
+        : timeRange.bucket
+      : metricsBucket.bucket;
+    const chartBucketSeconds = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsBucket.bucketSeconds
+        : timeRange.bucketSeconds
+      : metricsBucket.bucketSeconds;
     /** Rolling modes keep the historic `compare` response field; calendar/custom use mode name. */
     const compare = compareMode;
     const compareWindow = {
@@ -1146,6 +1159,9 @@ export async function apiRoutes(
       propertiesContains?: string;
       q?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const name = queryString(query.name);
@@ -1168,8 +1184,25 @@ export async function apiRoutes(
       range,
     };
 
-    const window = resolveEventsSummaryWindow(range, metricsAnchor);
-    const summary = await fetchEventsPageSummary(prisma, filter, projectId, window);
+    const baseWindow = resolveEventsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+      metricsAnchor
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const summary = await fetchEventsPageSummary(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(summary);
   });
 
@@ -1360,6 +1393,9 @@ export async function apiRoutes(
       release?: string;
       metricsUntil?: string;
       chartBucket?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
@@ -1376,12 +1412,24 @@ export async function apiRoutes(
       release,
       range,
     });
-    const window = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const baseWindow = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+      metricsAnchor
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
     const summary = await fetchPerformancePageSummary(
       prisma,
       filter,
       projectId,
-      window,
+      compared.window,
       chartBucket
     );
     return reply.send(summary);
@@ -1521,6 +1569,9 @@ export async function apiRoutes(
       country?: string;
       q?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
@@ -1540,8 +1591,25 @@ export async function apiRoutes(
       q,
       range,
     });
-    const window = resolveSessionsSummaryWindow(range, metricsAnchor);
-    const summary = await fetchSessionsPageSummary(prisma, filter, projectId, window);
+    const baseWindow = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+      metricsAnchor
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const summary = await fetchSessionsPageSummary(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(summary);
   });
 
