@@ -4,6 +4,9 @@ import {
   buildDashboardScopedListHref,
   buildErrorGroupDetailHref,
   buildEventListHref,
+  buildSlowPageSessionsHref,
+  buildSlowPageWebVitalEventsHref,
+  buildSlowRouteEventsHref,
   formatOverviewDeltaLine,
   isRollingCompareParam,
   resolveScopedQueryValue,
@@ -185,6 +188,45 @@ describe("buildEventListHref", () => {
         platform: "android",
       })
     ).toBe("/dashboard/events?name=screen_view&app=mobile&platform=android");
+  });
+});
+
+describe("buildSlowRouteEventsHref", () => {
+  it("filters $request events by method and path with scope", () => {
+    expect(
+      buildSlowRouteEventsHref("GET", "/api/cart", {
+        app: "api",
+        environment: "production",
+        range: "7d",
+      })
+    ).toBe(
+      "/dashboard/events?name=%24request&q=GET+%2Fapi%2Fcart&app=api&environment=production&range=7d"
+    );
+  });
+});
+
+describe("buildSlowPageSessionsHref", () => {
+  it("filters sessions by page path with scope", () => {
+    expect(
+      buildSlowPageSessionsHref("/checkout", {
+        app: "web",
+        platform: "web",
+        range: "24h",
+      })
+    ).toBe("/dashboard/sessions?q=%2Fcheckout&app=web&platform=web&range=24h");
+  });
+});
+
+describe("buildSlowPageWebVitalEventsHref", () => {
+  it("filters $web_vital events by path with scope", () => {
+    expect(
+      buildSlowPageWebVitalEventsHref("/checkout", {
+        release: "1.2.0",
+        range: "7d",
+      })
+    ).toBe(
+      "/dashboard/events?name=%24web_vital&q=%2Fcheckout&release=1.2.0&range=7d"
+    );
   });
 });
 

@@ -13,6 +13,7 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Slow routes & slow pages** — Performance page tables for slowest `$request` routes (method, path, count, p50/p95, error rate) and `$web_vital` pages (path, LCP p75, CLS, samples), with pagination, small-sample callouts, and scope-preserving deep links to Events/Sessions ([#196](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/196); milestone v1.17.x — Performance Intelligence)
 - **Compare periods** — explicit period-comparison mode across Overview, Errors, Events, and Sessions with calendar presets (Today vs Yesterday, week, month; UTC), equal-duration custom ranges (`compare` / `compareFrom` / `compareTo`), unified New/— delta formatting, and release-vs-previous “New” handling on Releases ([#495](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/495); milestone v1.17.x — Performance Intelligence)
 - **Product update email on milestone close** — closing a `vX.Y.x — …` GitHub milestone auto-sends the line-close product email (latest tag on that minor + previous minor final); tag pushes still skip; workflow `dry_run` input for previews ([docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md))
 

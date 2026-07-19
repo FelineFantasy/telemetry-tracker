@@ -162,6 +162,51 @@ export function buildEventListHref(
   return `/dashboard/events?${params.toString()}`;
 }
 
+/**
+ * Deep-link to Events filtered to `$request` rows for a slow route (#196).
+ * Free-text `q` includes method + path so property JSON matches both fields.
+ */
+export function buildSlowRouteEventsHref(
+  method: string,
+  url: string,
+  scope: DashboardListScope
+): string {
+  const params = new URLSearchParams();
+  params.set("name", "$request");
+  const terms = [method.trim(), url.trim()].filter(Boolean);
+  if (terms.length > 0) params.set("q", terms.join(" "));
+  appendDashboardListScope(params, scope);
+  return `/dashboard/events?${params.toString()}`;
+}
+
+/**
+ * Deep-link to Sessions filtered by page path, preserving dashboard scope (#196).
+ */
+export function buildSlowPageSessionsHref(
+  path: string,
+  scope: DashboardListScope
+): string {
+  const params = new URLSearchParams();
+  const pagePath = path.trim();
+  if (pagePath) params.set("q", pagePath);
+  appendDashboardListScope(params, scope);
+  const q = params.toString();
+  return q ? `/dashboard/sessions?${q}` : "/dashboard/sessions";
+}
+
+/** Related telemetry view for a slow page: `$web_vital` events for that path. */
+export function buildSlowPageWebVitalEventsHref(
+  path: string,
+  scope: DashboardListScope
+): string {
+  const params = new URLSearchParams();
+  params.set("name", "$web_vital");
+  const pagePath = path.trim();
+  if (pagePath) params.set("q", pagePath);
+  appendDashboardListScope(params, scope);
+  return `/dashboard/events?${params.toString()}`;
+}
+
 export function mergeOverviewScopeQuery(
   path: string,
   current: Record<string, string>,

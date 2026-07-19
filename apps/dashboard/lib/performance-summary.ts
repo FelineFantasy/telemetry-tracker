@@ -64,6 +64,36 @@ export type PerformancePageSummary = {
   requestLatency: PerformanceRequestLatency;
 };
 
+export type SlowRouteRow = {
+  method: string;
+  url: string;
+  count: number;
+  p50Ms: number | null;
+  p95Ms: number | null;
+  errorRatePct: number | null;
+  smallSample: boolean;
+};
+
+export type SlowPageRow = {
+  path: string;
+  lcpP75: number | null;
+  clsP75: number | null;
+  sampleCount: number;
+  smallSample: boolean;
+};
+
+export type SlowPathsListResult<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  window: {
+    since: string;
+    until: string;
+    label: string;
+  };
+};
+
 /** Fetch performance summary KPIs for the dashboard performance page (#195). */
 export async function fetchPerformanceSummary(
   search: URLSearchParams
@@ -71,4 +101,26 @@ export async function fetchPerformanceSummary(
   const res = await dashboardApiFetch(`/api/performance/summary?${search.toString()}`);
   if (!res.ok) return null;
   return (await res.json()) as PerformancePageSummary;
+}
+
+/** Fetch slowest `$request` routes for the selected Performance scope (#196). */
+export async function fetchSlowRoutes(
+  search: URLSearchParams
+): Promise<SlowPathsListResult<SlowRouteRow> | null> {
+  const res = await dashboardApiFetch(
+    `/api/performance/slow-routes?${search.toString()}`
+  );
+  if (!res.ok) return null;
+  return (await res.json()) as SlowPathsListResult<SlowRouteRow>;
+}
+
+/** Fetch slowest pages from `$web_vital` LCP for the selected Performance scope (#196). */
+export async function fetchSlowPages(
+  search: URLSearchParams
+): Promise<SlowPathsListResult<SlowPageRow> | null> {
+  const res = await dashboardApiFetch(
+    `/api/performance/slow-pages?${search.toString()}`
+  );
+  if (!res.ok) return null;
+  return (await res.json()) as SlowPathsListResult<SlowPageRow>;
 }

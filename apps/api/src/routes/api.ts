@@ -53,6 +53,10 @@ import {
   resolvePerformanceSummaryWindow,
 } from "../lib/performance-page-summary.js";
 import {
+  fetchSlowPages,
+  fetchSlowRoutes,
+} from "../lib/performance-slow-paths.js";
+import {
   buildReleasesFilter,
   fetchReleasesPageSummary,
   parseReleasesMetricsAnchor,
@@ -1472,6 +1476,116 @@ export async function apiRoutes(
       chartBucket
     );
     return reply.send(summary);
+  });
+
+  app.get("/performance/slow-routes", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+      metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
+      page?: string;
+      pageSize?: string;
+      limit?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parsePerformanceMetricsAnchor(queryString(query.metricsUntil));
+    const page = parsePositivePage(queryString(query.page), 1);
+    const pageSize = parseListPageSize(queryString(query.pageSize), queryString(query.limit));
+
+    const filter = buildPerformanceFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      range,
+    });
+    const baseWindow = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(baseWindow, {
+      compare: queryString(query.compare),
+      compareFrom: queryString(query.compareFrom),
+      compareTo: queryString(query.compareTo),
+    });
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const result = await fetchSlowRoutes(
+      prisma,
+      filter,
+      projectId,
+      compared.window,
+      page,
+      pageSize
+    );
+    return reply.send(result);
+  });
+
+  app.get("/performance/slow-pages", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+      metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
+      page?: string;
+      pageSize?: string;
+      limit?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parsePerformanceMetricsAnchor(queryString(query.metricsUntil));
+    const page = parsePositivePage(queryString(query.page), 1);
+    const pageSize = parseListPageSize(queryString(query.pageSize), queryString(query.limit));
+
+    const filter = buildPerformanceFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      range,
+    });
+    const baseWindow = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(baseWindow, {
+      compare: queryString(query.compare),
+      compareFrom: queryString(query.compareFrom),
+      compareTo: queryString(query.compareTo),
+    });
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const result = await fetchSlowPages(
+      prisma,
+      filter,
+      projectId,
+      compared.window,
+      page,
+      pageSize
+    );
+    return reply.send(result);
   });
 
   app.get("/search", async (request, reply) => {
