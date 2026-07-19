@@ -190,12 +190,22 @@ describe("buildEventListHref", () => {
 
 describe("formatOverviewDeltaLine", () => {
   it("uses week-ago compare label in stat card copy", () => {
-    const line = formatOverviewDeltaLine(3, "errors", "vs same window last week");
+    const line = formatOverviewDeltaLine(8, 5, "errors", "vs same window last week");
     expect(line.text).toBe("+3 vs same window last week");
   });
 
   it("uses previous-period baseline for zero delta", () => {
-    const line = formatOverviewDeltaLine(0, "events", "vs previous 7 days");
+    const line = formatOverviewDeltaLine(4, 4, "events", "vs previous 7 days");
     expect(line.text).toBe("Same as previous 7 days");
+  });
+
+  it("shows New when rising from a zero baseline", () => {
+    const line = formatOverviewDeltaLine(5, 0, "errors", "vs yesterday");
+    expect(line.text).toBe("New");
+  });
+
+  it("shows em dash when both windows are zero", () => {
+    const line = formatOverviewDeltaLine(0, 0, "events", "vs yesterday");
+    expect(line.text).toBe("—");
   });
 });

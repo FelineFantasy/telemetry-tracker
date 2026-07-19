@@ -213,10 +213,18 @@ export function buildErrorGroupDetailHref(
 }
 
 export function formatOverviewDeltaLine(
-  delta: number,
+  current: number,
+  previous: number,
   kind: "errors" | "events",
   compareLabel: string
 ): { className: string; text: string } {
+  if (previous <= 0) {
+    if (current > 0) {
+      return { className: "vs-previous", text: "New" };
+    }
+    return { className: "vs-previous", text: "—" };
+  }
+  const delta = current - previous;
   const baseline = compareLabel.replace(/^vs /, "");
   if (delta === 0) {
     return { className: "vs-previous", text: `Same as ${baseline}` };

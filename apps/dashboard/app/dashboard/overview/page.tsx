@@ -496,8 +496,18 @@ export default async function OverviewPage({
   const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
   const compareLabel =
     overviewData.compareLabel ?? compareLabelFor(compare, displayRangeLabel);
-  const errDeltaFmt = formatOverviewDeltaLine(errorsDelta, "errors", compareLabel);
-  const evDeltaFmt = formatOverviewDeltaLine(eventsDelta, "events", compareLabel);
+  const errDeltaFmt = formatOverviewDeltaLine(
+    overviewData.errorsLast24h,
+    overviewData.errorsPrevious,
+    "errors",
+    compareLabel
+  );
+  const evDeltaFmt = formatOverviewDeltaLine(
+    overviewData.eventsLast24h,
+    overviewData.eventsPrevious,
+    "events",
+    compareLabel
+  );
 
   const health: OverviewHealth =
     overviewData.health ?? {

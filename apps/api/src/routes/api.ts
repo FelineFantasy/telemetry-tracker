@@ -704,8 +704,7 @@ export async function apiRoutes(
         compare: queryString(query.compare),
         compareFrom: queryString(query.compareFrom),
         compareTo: queryString(query.compareTo),
-      },
-      metricsAnchor
+      }
     );
     if (!compared.ok) {
       return reply.status(400).send({ error: compared.error });
@@ -768,8 +767,7 @@ export async function apiRoutes(
         compare: queryString(query.compare),
         compareFrom: queryString(query.compareFrom),
         compareTo: queryString(query.compareTo),
-      },
-      metricsAnchor
+      }
     );
     if (!compared.ok) {
       return reply.status(400).send({ error: compared.error });
@@ -1215,8 +1213,7 @@ export async function apiRoutes(
         compare: queryString(query.compare),
         compareFrom: queryString(query.compareFrom),
         compareTo: queryString(query.compareTo),
-      },
-      metricsAnchor
+      }
     );
     if (!compared.ok) {
       return reply.status(400).send({ error: compared.error });
@@ -1277,8 +1274,7 @@ export async function apiRoutes(
         compare: queryString(query.compare),
         compareFrom: queryString(query.compareFrom),
         compareTo: queryString(query.compareTo),
-      },
-      metricsAnchor
+      }
     );
     if (!compared.ok) {
       return reply.status(400).send({ error: compared.error });
@@ -1463,8 +1459,7 @@ export async function apiRoutes(
         compare: queryString(query.compare),
         compareFrom: queryString(query.compareFrom),
         compareTo: queryString(query.compareTo),
-      },
-      metricsAnchor
+      }
     );
     if (!compared.ok) {
       return reply.status(400).send({ error: compared.error });
@@ -1642,8 +1637,7 @@ export async function apiRoutes(
         compare: queryString(query.compare),
         compareFrom: queryString(query.compareFrom),
         compareTo: queryString(query.compareTo),
-      },
-      metricsAnchor
+      }
     );
     if (!compared.ok) {
       return reply.status(400).send({ error: compared.error });
@@ -1702,8 +1696,7 @@ export async function apiRoutes(
         compare: queryString(query.compare),
         compareFrom: queryString(query.compareFrom),
         compareTo: queryString(query.compareTo),
-      },
-      metricsAnchor
+      }
     );
     if (!compared.ok) {
       return reply.status(400).send({ error: compared.error });
