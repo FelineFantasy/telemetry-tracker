@@ -36,6 +36,7 @@ type Props = {
   platform: string;
   release: string;
   propertiesContains: string;
+  q: string;
   sort: string;
   order: string;
   environments: string[];
@@ -59,6 +60,7 @@ export function EventsClientListSection({
   platform,
   release,
   propertiesContains,
+  q,
   sort,
   order,
   environments,
@@ -117,6 +119,7 @@ export function EventsClientListSection({
         platform={platform}
         release={release}
         propertiesContains={propertiesContains}
+        q={q}
         sort={effectiveSort}
         order={effectiveOrder}
         environments={environments}
@@ -127,7 +130,8 @@ export function EventsClientListSection({
       />
 
       <p className="text-sm text-muted-foreground">
-        Properties search matches raw JSON text (useful for known keys or values).
+        Search matches event name or properties JSON (all terms). Properties (contains) is a
+        single substring on raw JSON only.
       </p>
 
       <ListResultCount

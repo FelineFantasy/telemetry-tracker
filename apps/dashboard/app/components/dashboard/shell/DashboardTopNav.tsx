@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Logo } from "@/app/components/marketing/logo";
 import type { OrgOption, ProjectOption } from "@/lib/dashboard-workspace-types";
 import type { DashboardUser } from "@/lib/dashboard-user";
+import { DashboardNavigationScopeAck } from "@/lib/use-dashboard-navigation";
 import { DashboardNavTabs } from "./DashboardNavTabs";
 import { DashboardTopNavActions } from "./DashboardTopNavActions";
 import { DashboardNotificationsLoader } from "./DashboardNotificationsLoader";
@@ -41,6 +42,10 @@ export function DashboardTopNav({
 }) {
   return (
     <header className="sticky top-0 z-40 w-full max-w-[100vw] overflow-x-clip border-b border-border bg-background/80 backdrop-blur-xl">
+      <DashboardNavigationScopeAck
+        organizationId={currentOrganizationId}
+        projectId={currentProjectId}
+      />
       <div className="relative z-50 mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center justify-between sm:gap-2 sm:px-6 lg:px-8">
         <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:contents">
           <Link

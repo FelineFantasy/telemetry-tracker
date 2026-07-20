@@ -25,8 +25,17 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** Linear-time shape check (avoids CodeQL polynomial-ReDoS email regexes). */
 function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (email.length === 0 || email.length > 255) return false;
+  const at = email.indexOf("@");
+  if (at <= 0 || at !== email.lastIndexOf("@")) return false;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!local || !domain) return false;
+  if (/\s/.test(local) || /\s/.test(domain)) return false;
+  const dot = domain.lastIndexOf(".");
+  return dot > 0 && dot < domain.length - 1;
 }
 
 function stripHeaderUnsafeChars(value: string): string {

@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Plus, Users } from "lucide-react";
 import { setDashboardOrganizationId } from "@/app/dashboard/actions";
 import { hrefWithoutAppSearchParam } from "@/lib/dashboard-app-href";
-import {
-  formatOrganizationRailName,
-  LEGACY_SEEDED_ORG_NAME,
-} from "@/lib/workspace-placeholders";
+import { useDashboardNavigation, useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
+import { formatOrganizationRailName } from "@/lib/workspace-placeholders";
 import type { OrgOption } from "@/lib/dashboard-workspace-types";
+import {
+  ORGANIZATION_SETTINGS_PATH,
+} from "@/app/components/OrganizationSettingsNewProjectParam";
+import { scrollToSectionId } from "@/app/components/ScrollToHash";
 import { DashboardPopover } from "./DashboardPopover";
 import { NavPickerTrigger } from "./shell-primitives";
 
@@ -21,10 +23,9 @@ export function TopNavOrgSwitcher({
   organizations: OrgOption[];
   currentOrganizationId: string | null;
 }) {
-  const router = useRouter();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const [pending, startTransition] = useTransition();
+  const { replaceAndRefresh, runPending, isPending: pending } = useDashboardNavigation();
   const [value, setValue] = useState(currentOrganizationId ?? "");
 
   useEffect(() => {
@@ -32,14 +33,7 @@ export function TopNavOrgSwitcher({
   }, [currentOrganizationId]);
 
   if (organizations.length === 0) {
-    return (
-      <Link
-        href="/dashboard/settings/organization"
-        className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-sm hover:bg-surface"
-      >
-        Create organization
-      </Link>
-    );
+    return <EmptyOrgCreateLink />;
   }
 
   const current =
@@ -83,11 +77,14 @@ export function TopNavOrgSwitcher({
                     return;
                   }
                   setValue(o.id);
-                  startTransition(async () => {
+                  void runPending(async () => {
                     const r = await setDashboardOrganizationId(o.id);
                     if (r.ok) {
-                      router.replace(hrefWithoutAppSearchParam(pathname, searchParams));
-                      router.refresh();
+                      await replaceAndRefresh(
+                        hrefWithoutAppSearchParam(pathname, searchParams),
+                        // Project may change to the org default after switch.
+                        { organizationId: o.id, projectId: "" }
+                      );
                       close();
                     } else {
                       setValue(currentOrganizationId ?? "");
@@ -104,36 +101,70 @@ export function TopNavOrgSwitcher({
               </button>
             );
           })}
-          {current.name === LEGACY_SEEDED_ORG_NAME ? (
-            <p className="px-2 py-2 text-[12px] text-muted-foreground">
-              <Link
-                href="/dashboard/settings/organization"
-                onClick={close}
-                className="text-brand hover:underline"
-              >
-                Rename your workspace
-              </Link>
-            </p>
-          ) : null}
+          <p className="px-2 py-2 text-[12px] text-muted-foreground">
+            <Link
+              href={`${ORGANIZATION_SETTINGS_PATH}#rename-workspace`}
+              onClick={() => {
+                close();
+                if (pathname === ORGANIZATION_SETTINGS_PATH) {
+                  scrollToSectionId("rename-workspace");
+                }
+              }}
+              className="text-brand hover:underline"
+            >
+              Rename your workspace
+            </Link>
+          </p>
           <div className="my-1 h-px bg-border" />
-          <Link
+          <OrgSettingsLink
             href="/dashboard/settings/organization"
-            onClick={close}
+            onNavigate={close}
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" />
             Create organization
-          </Link>
-          <Link
+          </OrgSettingsLink>
+          <OrgSettingsLink
             href="/dashboard/settings/team"
-            onClick={close}
+            onNavigate={close}
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-surface hover:text-foreground"
           >
             <Users className="h-3.5 w-3.5" />
             Invite team member
-          </Link>
+          </OrgSettingsLink>
         </div>
       )}
     </DashboardPopover>
+  );
+}
+
+function EmptyOrgCreateLink() {
+  const linkProps = useDashboardNavLinkProps("/dashboard/settings/organization");
+  return (
+    <Link
+      {...linkProps}
+      className="inline-flex items-center gap-2 rounded-md border border-border bg-surface/60 px-2.5 py-1.5 text-sm hover:bg-surface"
+    >
+      Create organization
+    </Link>
+  );
+}
+
+function OrgSettingsLink({
+  href,
+  onNavigate,
+  className,
+  children,
+}: {
+  href: string;
+  onNavigate: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const linkProps = useDashboardNavLinkProps(href, { onNavigate });
+  return (
+    <Link {...linkProps} className={className}>
+      {children}
+    </Link>
   );
 }

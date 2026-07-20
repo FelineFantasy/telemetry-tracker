@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import {
+  buildErrorOccurrenceScopeWhere,
   fetchImpactMetricsForGroupId,
   fetchMetricsForGroupIds,
   fetchScopedOccurrenceSummaryForGroupId,
@@ -9,6 +10,7 @@ import {
   isAggregateSort,
   listErrorGroupsAggregated,
   listErrorGroupsPrisma,
+  listScopedOccurrenceIdsForGroupId,
   parseErrorListOrderParam,
   parseErrorListSortParam,
   parseTrendWindowParam,
@@ -22,6 +24,7 @@ import { fetchErrorsAnalytics } from "../lib/errors-analytics.js";
 import { fetchEventsAnalytics } from "../lib/events-analytics.js";
 import {
   enrichErrorListFilterForMetrics,
+  errorFilterForComparedWindow,
   fetchErrorsPageSummary,
   parseErrorsMetricsAnchor,
   resolveErrorsSummaryWindow,
@@ -49,6 +52,18 @@ import {
   parsePerformanceMetricsAnchor,
   resolvePerformanceSummaryWindow,
 } from "../lib/performance-page-summary.js";
+import {
+  fetchSlowPages,
+  fetchSlowRoutes,
+} from "../lib/performance-slow-paths.js";
+import {
+  buildReleasesFilter,
+  fetchReleasesPageSummary,
+  parseReleasesMetricsAnchor,
+  parseReleasesOrderParam,
+  parseReleasesSortParam,
+  resolveReleasesSummaryWindow,
+} from "../lib/releases-page-summary.js";
 import {
   attachLatestEventIds,
   fetchSparklinesForEventNames,
@@ -79,9 +94,13 @@ import {
   getSessionDurationSeries,
   listActiveIssues,
   listDistinctEnvironments,
-  resolveCompareWindow,
-  type OverviewCompareMode,
 } from "../lib/overview-stats.js";
+import {
+  isRollingCompareMode,
+  parseCompareMode,
+  resolveCompareWindows,
+} from "../lib/compare-windows.js";
+import { applySummaryCompare } from "../lib/summary-compare-window.js";
 import {
   buildOverviewSessionFilter,
   countOverviewErrorGroupsInWindow,
@@ -113,15 +132,20 @@ import {
   resolveReadProjectId,
   resolveReadProjectIdWithSession,
 } from "../lib/read-project-request.js";
+import { releasePrismaWhere } from "../lib/release-key.js";
 import {
   EVENT_SORT_SQL,
-  eventListOrderBy,
   overviewErrorOrderBy,
   parseEventListSortParam as parseRawEventListSortParam,
   parseListOrderParam,
   parseOverviewErrorSortParam,
   parseOverviewTopEventsSortParam,
 } from "../lib/list-sort-params.js";
+import {
+  mergeGlobalSearchScope,
+  parseGlobalSearchQuery,
+} from "../lib/global-search-query.js";
+import { executeGlobalSearch } from "../lib/global-search.js";
 
 const DEFAULT_LIST_PAGE_SIZE = 20;
 const MAX_LIST_PAGE_SIZE = 100;
@@ -175,6 +199,9 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
+      metricsUntil?: string;
       errorsPage?: string;
       eventsPage?: string;
       listPageSize?: string;
@@ -201,27 +228,21 @@ export async function apiRoutes(
     const environment = queryString(query.environment);
     const platform = queryString(query.platform);
     const release = queryString(query.release);
+    const metricsUntilRaw = queryString(query.metricsUntil);
+    const metricsAnchor = metricsUntilRaw
+      ? parseErrorsMetricsAnchor(metricsUntilRaw)
+      : until;
     const metricsWindow = isUnselectedTimeRange(timeRange.key)
       ? await resolveUnselectedMetricsWindow(prisma, {
           projectId,
-          until,
+          until: metricsAnchor,
           app: appFilter,
           environment,
           platform,
           release,
         })
       : effectiveOverviewWindow(timeRange);
-    const metricsBucket = chooseTimeRangeBucket(metricsWindow.durationMs);
-    const chartSince = isUnselectedTimeRange(timeRange.key) ? metricsWindow.gte : since;
-    const chartUntil = isUnselectedTimeRange(timeRange.key) ? metricsWindow.lte : until;
-    const chartBucket = isUnselectedTimeRange(timeRange.key)
-      ? metricsBucket.bucket
-      : timeRange.bucket;
-    const chartBucketSeconds = isUnselectedTimeRange(timeRange.key)
-      ? metricsBucket.bucketSeconds
-      : timeRange.bucketSeconds;
-    const compare: OverviewCompareMode =
-      queryString(query.compare) === "week-ago" ? "week-ago" : "previous";
+    const compareMode = parseCompareMode(queryString(query.compare));
     const errSortParsed = parseOverviewErrorSortParam(queryString(query.errorsSort));
     if (!errSortParsed.ok) {
       return reply.status(400).send({ error: "Invalid errorsSort" });
@@ -238,16 +259,69 @@ export async function apiRoutes(
     if (!topEvOrderParsed.ok) {
       return reply.status(400).send({ error: "Invalid topEventsOrder" });
     }
-    const compareWindow = resolveCompareWindow(
-      metricsWindow.durationMs,
-      compare,
-      metricsWindow.gte,
-      metricsWindow.lte
-    );
-    const metricsScope = {
-      projectId,
+    const compareResolved = resolveCompareWindows({
+      mode: compareMode,
       since: metricsWindow.gte,
       until: metricsWindow.lte,
+      label: timeRange.label,
+      anchor: metricsWindow.lte,
+      custom: {
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      },
+    });
+    if (!compareResolved.ok) {
+      return reply.status(400).send({ error: compareResolved.error });
+    }
+    const effectiveMetrics = isRollingCompareMode(compareMode)
+      ? {
+          gte: metricsWindow.gte,
+          lte: metricsWindow.lte,
+          durationMs: metricsWindow.durationMs,
+          label: timeRange.label,
+        }
+      : {
+          gte: compareResolved.windows.since,
+          lte: compareResolved.windows.until,
+          durationMs: Math.max(
+            compareResolved.windows.until.getTime() -
+              compareResolved.windows.since.getTime(),
+            1
+          ),
+          label: compareResolved.windows.label,
+        };
+    const metricsBucket = chooseTimeRangeBucket(effectiveMetrics.durationMs);
+    // Calendar/custom compare modes align charts with the effective metrics window.
+    const chartSince = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsWindow.gte
+        : since
+      : effectiveMetrics.gte;
+    const chartUntil = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsWindow.lte
+        : until
+      : effectiveMetrics.lte;
+    const chartBucket = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsBucket.bucket
+        : timeRange.bucket
+      : metricsBucket.bucket;
+    const chartBucketSeconds = isRollingCompareMode(compareMode)
+      ? isUnselectedTimeRange(timeRange.key)
+        ? metricsBucket.bucketSeconds
+        : timeRange.bucketSeconds
+      : metricsBucket.bucketSeconds;
+    /** Rolling modes keep the historic `compare` response field; calendar/custom use mode name. */
+    const compare = compareMode;
+    const compareWindow = {
+      previousSince: compareResolved.windows.previousSince,
+      previousUntil: compareResolved.windows.previousUntil,
+    };
+    const metricsScope = {
+      projectId,
+      since: effectiveMetrics.gte,
+      until: effectiveMetrics.lte,
       app: appFilter,
       environment,
       platform,
@@ -284,11 +358,12 @@ export async function apiRoutes(
         : { name: topEvOrderParsed.order };
 
     const useScopedErrorList = Boolean(platform || release);
-    // Platform/release lists must use metricsWindow so counts match KPIs/charts when
-    // the overview time range is unselected (epoch→now vs ~30d metrics window).
+    // Platform/release lists must use metricsScope so counts match KPIs/charts when
+    // the overview time range is unselected (epoch→now vs ~30d metrics window)
+    // or when a calendar compare mode overrides the metrics window.
     const scopedErrorListScope = useScopedErrorList ? metricsScope : listScope;
-    const eventListSince = useScopedErrorList ? metricsWindow.gte : since;
-    const eventListUntil = useScopedErrorList ? metricsWindow.lte : until;
+    const eventListSince = useScopedErrorList ? effectiveMetrics.gte : since;
+    const eventListUntil = useScopedErrorList ? effectiveMetrics.lte : until;
 
     const baseWhere = {
       ...whereEventProject(projectId),
@@ -299,7 +374,7 @@ export async function apiRoutes(
       ...(appFilter ? { app: appFilter } : {}),
       ...(environment ? { environment } : {}),
       ...(platform ? { platform } : {}),
-      ...(release ? { release } : {}),
+      ...releasePrismaWhere(release),
     };
     const errorGroupWhere = {
       ...whereErrorGroupProject(projectId),
@@ -319,11 +394,11 @@ export async function apiRoutes(
         : {}),
     };
 
-    const previousUntil = compareWindow.previousUntil ?? metricsWindow.gte;
+    const previousUntil = compareWindow.previousUntil ?? effectiveMetrics.gte;
     const windowParams = {
       projectId,
-      since: metricsWindow.gte,
-      until: metricsWindow.lte,
+      since: effectiveMetrics.gte,
+      until: effectiveMetrics.lte,
       previousSince: compareWindow.previousSince,
       previousUntil,
       app: appFilter,
@@ -353,6 +428,16 @@ export async function apiRoutes(
             to: queryString(query.to),
           }
         : { range: timeRange.key }),
+      // Forward exact metrics window when the issue list itself uses that window
+      // (open-ended Overview, or platform/release lists that follow metricsScope /
+      // calendar compare). Bounded list-range rows keep the page range.
+      ...(isUnselectedTimeRange(timeRange.key) ||
+      ((platform || release) && !isRollingCompareMode(compareMode))
+        ? {
+            metricsSince: effectiveMetrics.gte.toISOString(),
+            metricsUntil: effectiveMetrics.lte.toISOString(),
+          }
+        : {}),
     };
 
     const [
@@ -396,14 +481,40 @@ export async function apiRoutes(
             orderBy: errorGroupOrderBy,
             include: { _count: { select: { occurrences_list: true } } },
           }),
-      prisma.event.groupBy({
-        by: ["name"],
-        where: eventWhere,
-        _count: { name: true },
-        orderBy: eventGroupByOrderBy,
-        skip: eventsSkip,
-        take: listPageSize,
-      }),
+      // Release filters need TRIM / Unknown SQL matching (Prisma equality diverges).
+      release
+        ? prisma
+            .$queryRaw<{ name: string; c: bigint }[]>(Prisma.sql`
+              SELECT e."name" AS name, COUNT(*)::bigint AS c
+              FROM "Event" e
+              WHERE ${eventListWhereSql}
+              GROUP BY e."name"
+              ORDER BY ${
+                topEvSortParsed.sort === "count"
+                  ? topEvOrderParsed.order === "asc"
+                    ? Prisma.sql`COUNT(*) ASC, e."name" ASC`
+                    : Prisma.sql`COUNT(*) DESC, e."name" ASC`
+                  : topEvOrderParsed.order === "asc"
+                    ? Prisma.sql`e."name" ASC`
+                    : Prisma.sql`e."name" DESC`
+              }
+              OFFSET ${eventsSkip}
+              LIMIT ${listPageSize}
+            `)
+            .then((rows) =>
+              rows.map((row) => ({
+                name: row.name,
+                _count: { name: Number(row.c) },
+              }))
+            )
+        : prisma.event.groupBy({
+            by: ["name"],
+            where: eventWhere,
+            _count: { name: true },
+            orderBy: eventGroupByOrderBy,
+            skip: eventsSkip,
+            take: listPageSize,
+          }),
       getOverviewTimeSeries(
         prisma,
         projectId,
@@ -450,11 +561,11 @@ export async function apiRoutes(
       listOverviewRecentSessions(
         prisma,
         buildOverviewSessionFilter(metricsScope, {
-          gte: metricsWindow.gte,
-          lte: metricsWindow.lte,
+          gte: effectiveMetrics.gte,
+          lte: effectiveMetrics.lte,
         }),
         projectId,
-        { gte: metricsWindow.gte, lte: metricsWindow.lte },
+        { gte: effectiveMetrics.gte, lte: effectiveMetrics.lte },
         8
       ),
       listOverviewTopErrorGroups(prisma, metricsScope, 8),
@@ -511,14 +622,15 @@ export async function apiRoutes(
 
     return reply.send({
       range: timeRange.key,
-      rangeLabel: timeRange.label,
+      rangeLabel: effectiveMetrics.label,
       since: since.toISOString(),
       until: until.toISOString(),
-      metricsSince: metricsWindow.gte.toISOString(),
-      metricsUntil: metricsWindow.lte.toISOString(),
-      metricsDurationMs: metricsWindow.durationMs,
+      metricsSince: effectiveMetrics.gte.toISOString(),
+      metricsUntil: effectiveMetrics.lte.toISOString(),
+      metricsDurationMs: effectiveMetrics.durationMs,
       bucket: chartBucket,
       compare,
+      compareLabel: compareResolved.windows.compareLabel,
       errorsLast24h: errorsCount,
       eventsLast24h: eventsCount,
       errorsPrevious,
@@ -561,6 +673,9 @@ export async function apiRoutes(
       q?: string;
       status?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -586,8 +701,24 @@ export async function apiRoutes(
             : "all",
     };
 
-    const window = resolveErrorsSummaryWindow(range, metricsAnchor);
-    const summary = await fetchErrorsPageSummary(prisma, filter, projectId, window);
+    const baseWindow = resolveErrorsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      }
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const summary = await fetchErrorsPageSummary(
+      prisma,
+      errorFilterForComparedWindow(filter, compared.window),
+      projectId,
+      compared.window
+    );
     return reply.send(summary);
   });
 
@@ -605,6 +736,9 @@ export async function apiRoutes(
       q?: string;
       status?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -630,8 +764,26 @@ export async function apiRoutes(
             : "all",
     };
 
-    const window = resolveErrorsSummaryWindow(range, metricsAnchor);
-    const analytics = await fetchErrorsAnalytics(prisma, filter, projectId, window);
+    const baseWindow = resolveErrorsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      }
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const analytics = await fetchErrorsAnalytics(
+      prisma,
+      errorFilterForComparedWindow(filter, compared.window, {
+        includePrevious: false,
+      }),
+      projectId,
+      compared.window
+    );
     return reply.send(analytics);
   });
 
@@ -842,6 +994,7 @@ export async function apiRoutes(
       from?: string;
       to?: string;
       metricsUntil?: string;
+      metricsSince?: string;
     };
     const appFilter = queryApp(query.app);
     const environment = queryString(query.environment);
@@ -849,14 +1002,31 @@ export async function apiRoutes(
     const release = queryString(query.release);
     const rangeKey = queryString(query.range);
     const metricsUntilRaw = queryString(query.metricsUntil);
+    const metricsSinceRaw = queryString(query.metricsSince);
     const hasFromTo = Boolean(queryString(query.from) || queryString(query.to));
-    // Issues list passes metricsUntil (~7d). Overview range=none/all uses the same
-    // resolveUnselectedMetricsWindow as Overview KPIs / scoped error list.
-    const useIssuesMetricsWindow = Boolean(metricsUntilRaw);
+    // Issues list passes metricsUntil only (~7d). Overview open-ended drills pass
+    // metricsSince+metricsUntil for the exact resolveUnselectedMetricsWindow.
+    // Legacy Overview range=none/all without metricsUntil still uses that helper.
+    const parseIsoDate = (raw: string | undefined): Date | undefined => {
+      if (!raw) return undefined;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    };
+    const explicitMetricsSince = parseIsoDate(metricsSinceRaw);
+    const explicitMetricsUntil = parseIsoDate(metricsUntilRaw);
+    const explicitOverviewWindow =
+      explicitMetricsSince &&
+      explicitMetricsUntil &&
+      explicitMetricsSince.getTime() < explicitMetricsUntil.getTime()
+        ? { gte: explicitMetricsSince, lte: explicitMetricsUntil }
+        : undefined;
+    const useIssuesMetricsWindow =
+      Boolean(metricsUntilRaw) && !explicitOverviewWindow;
     const isOverviewUnselected =
       !hasFromTo &&
       (rangeKey === "none" || rangeKey === "all") &&
-      !useIssuesMetricsWindow;
+      !useIssuesMetricsWindow &&
+      !explicitOverviewWindow;
     const hasBoundedPreset =
       hasFromTo || Boolean(rangeKey && rangeKey !== "all" && rangeKey !== "none");
     const listRange = parseCreatedRange(query, "all");
@@ -864,7 +1034,10 @@ export async function apiRoutes(
 
     let windowGte: Date | undefined;
     let windowLte: Date | undefined;
-    if (isOverviewUnselected) {
+    if (explicitOverviewWindow) {
+      windowGte = explicitOverviewWindow.gte;
+      windowLte = explicitOverviewWindow.lte;
+    } else if (isOverviewUnselected) {
       const metricsWindow = await resolveUnselectedMetricsWindow(prisma, {
         projectId,
         until: metricsAnchor,
@@ -901,18 +1074,27 @@ export async function apiRoutes(
     const applyScopedMetrics = Boolean(
       platform || release || windowGte || windowLte
     );
-    const occurrenceWhere = {
+    // Release filters need SQL TRIM / Unknown matching (same as scoped KPIs).
+    // Resolve matching ids first, then load rows via Prisma include.
+    const occurrenceScopeFilter = {
       ...(platform ? { platform } : {}),
       ...(release ? { release } : {}),
-      ...(windowGte || windowLte
-        ? {
-            created_at: {
-              ...(windowGte ? { gte: windowGte } : {}),
-              ...(windowLte ? { lte: windowLte } : {}),
-            },
-          }
-        : {}),
+      ...(windowGte ? { gte: windowGte } : {}),
+      ...(windowLte ? { lte: windowLte } : {}),
     };
+    const occurrenceWhere = release
+      ? {
+          id: {
+            in: await listScopedOccurrenceIdsForGroupId(
+              prisma,
+              id,
+              projectId,
+              occurrenceScopeFilter,
+              50
+            ),
+          },
+        }
+      : buildErrorOccurrenceScopeWhere(occurrenceScopeFilter);
 
     const group = await prisma.errorGroup.findFirst({
       where: whereErrorGroupById(id, projectId),
@@ -1001,7 +1183,11 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const name = queryString(query.name);
@@ -1009,6 +1195,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
 
@@ -1019,11 +1206,28 @@ export async function apiRoutes(
       platform,
       release,
       propertiesContains,
+      q,
       range,
     };
 
-    const window = resolveEventsSummaryWindow(range, metricsAnchor);
-    const summary = await fetchEventsPageSummary(prisma, filter, projectId, window);
+    const baseWindow = resolveEventsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      }
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const summary = await fetchEventsPageSummary(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(summary);
   });
 
@@ -1040,7 +1244,11 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const name = queryString(query.name);
@@ -1048,6 +1256,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
 
@@ -1058,11 +1267,28 @@ export async function apiRoutes(
       platform,
       release,
       propertiesContains,
+      q,
       range,
     };
 
-    const window = resolveEventsSummaryWindow(range, metricsAnchor);
-    const analytics = await fetchEventsAnalytics(prisma, filter, projectId, window);
+    const baseWindow = resolveEventsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      }
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const analytics = await fetchEventsAnalytics(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(analytics);
   });
 
@@ -1082,6 +1308,7 @@ export async function apiRoutes(
       platform?: string;
       release?: string;
       propertiesContains?: string;
+      q?: string;
       sort?: string;
       order?: string;
       view?: string;
@@ -1096,6 +1323,7 @@ export async function apiRoutes(
     const platform = queryString(query.platform);
     const release = queryString(query.release);
     const propertiesContains = queryString(query.propertiesContains);
+    const q = queryString(query.q);
     const range = parseCreatedRange(query, "all");
     const view = queryString(query.view) ?? "grouped";
     const metricsAnchor = parseEventsMetricsAnchor(queryString(query.metricsUntil));
@@ -1117,6 +1345,7 @@ export async function apiRoutes(
         platform,
         release,
         propertiesContains,
+        q,
         range,
       };
       const metricsFilter = enrichEventListFilterForMetrics(filter, range, metricsAnchor);
@@ -1156,57 +1385,32 @@ export async function apiRoutes(
     if (!orderParsed.ok) {
       return reply.status(400).send({ error: "Invalid order" });
     }
-    const eventOrderBy = eventListOrderBy(sortParsed.sort, orderParsed.order);
+    // Always SQL so release=__unknown__ / TRIM match summary KPIs and Release Health.
     const orderDirSql =
       orderParsed.order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-
-    const props = propertiesContains?.trim();
-    if (props) {
-      const whereSql = buildEventWhereSql({
-        projectId,
-        appId,
-        name,
-        environment,
-        platform,
-        release,
-        gte: range.gte,
-        lte: range.lte,
-        propertiesContains: props,
-      });
-      const ob = EVENT_SORT_SQL[sortParsed.sort];
-      const [countRow, rows] = await Promise.all([
-        prisma.$queryRaw<[{ c: bigint }]>(
-          Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`
-        ),
-        prisma.$queryRaw<Record<string, unknown>[]>(
-          Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY ${ob} ${orderDirSql} LIMIT ${pageSize} OFFSET ${skip}`
-        ),
-      ]);
-      const total = Number(countRow[0]?.c ?? 0);
-      return reply.send({ items: rows, total, page, pageSize, view: "raw" });
-    }
-
-    const where: Prisma.EventWhereInput = whereEventProject(projectId);
-    if (appId) where.app = appId;
-    if (name) where.name = name;
-    if (environment) where.environment = environment;
-    if (platform) where.platform = platform;
-    if (release) where.release = release;
-    if (range.gte || range.lte) {
-      where.created_at = {};
-      if (range.gte) where.created_at.gte = range.gte;
-      if (range.lte) where.created_at.lte = range.lte;
-    }
-    const [total, list] = await Promise.all([
-      prisma.event.count({ where }),
-      prisma.event.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: eventOrderBy,
-      }),
+    const whereSql = buildEventWhereSql({
+      projectId,
+      appId,
+      name,
+      environment,
+      platform,
+      release,
+      gte: range.gte,
+      lte: range.lte,
+      propertiesContains: propertiesContains?.trim() || undefined,
+      q: q?.trim() || undefined,
+    });
+    const ob = EVENT_SORT_SQL[sortParsed.sort];
+    const [countRow, rows] = await Promise.all([
+      prisma.$queryRaw<[{ c: bigint }]>(
+        Prisma.sql`SELECT COUNT(*)::bigint AS c FROM "Event" WHERE ${whereSql}`
+      ),
+      prisma.$queryRaw<Record<string, unknown>[]>(
+        Prisma.sql`SELECT * FROM "Event" WHERE ${whereSql} ORDER BY ${ob} ${orderDirSql} LIMIT ${pageSize} OFFSET ${skip}`
+      ),
     ]);
-    return reply.send({ items: list, total, page, pageSize, view: "raw" });
+    const total = Number(countRow[0]?.c ?? 0);
+    return reply.send({ items: rows, total, page, pageSize, view: "raw" });
   });
 
   app.get<{ Params: { id: string } }>("/events/:id", async (request, reply) => {
@@ -1233,6 +1437,9 @@ export async function apiRoutes(
       release?: string;
       metricsUntil?: string;
       chartBucket?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
@@ -1249,13 +1456,254 @@ export async function apiRoutes(
       release,
       range,
     });
-    const window = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const baseWindow = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      }
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
     const summary = await fetchPerformancePageSummary(
       prisma,
       filter,
       projectId,
-      window,
+      compared.window,
       chartBucket
+    );
+    return reply.send(summary);
+  });
+
+  app.get("/performance/slow-routes", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+      metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
+      page?: string;
+      pageSize?: string;
+      limit?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parsePerformanceMetricsAnchor(queryString(query.metricsUntil));
+    const page = parsePositivePage(queryString(query.page), 1);
+    const pageSize = parseListPageSize(queryString(query.pageSize), queryString(query.limit));
+
+    const filter = buildPerformanceFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      range,
+    });
+    const baseWindow = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(baseWindow, {
+      compare: queryString(query.compare),
+      compareFrom: queryString(query.compareFrom),
+      compareTo: queryString(query.compareTo),
+    });
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const result = await fetchSlowRoutes(
+      prisma,
+      filter,
+      projectId,
+      compared.window,
+      page,
+      pageSize
+    );
+    return reply.send(result);
+  });
+
+  app.get("/performance/slow-pages", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+      metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
+      page?: string;
+      pageSize?: string;
+      limit?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const release = queryString(query.release);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parsePerformanceMetricsAnchor(queryString(query.metricsUntil));
+    const page = parsePositivePage(queryString(query.page), 1);
+    const pageSize = parseListPageSize(queryString(query.pageSize), queryString(query.limit));
+
+    const filter = buildPerformanceFilter({
+      appId,
+      platform,
+      environment,
+      release,
+      range,
+    });
+    const baseWindow = resolvePerformanceSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(baseWindow, {
+      compare: queryString(query.compare),
+      compareFrom: queryString(query.compareFrom),
+      compareTo: queryString(query.compareTo),
+    });
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const result = await fetchSlowPages(
+      prisma,
+      filter,
+      projectId,
+      compared.window,
+      page,
+      pageSize
+    );
+    return reply.send(result);
+  });
+
+  app.get("/search", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      q?: string | string[];
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      release?: string;
+      metricsUntil?: string;
+    };
+    const q = queryString(query.q) ?? "";
+    const parsed = parseGlobalSearchQuery(q);
+    const appId = queryApp(query.app);
+
+    // Date range: structured from/to/range in `q` override URL params when present.
+    const dateQuery =
+      parsed.filters.from || parsed.filters.to || parsed.filters.range
+        ? {
+            range: parsed.filters.range,
+            from: parsed.filters.from,
+            to: parsed.filters.to,
+          }
+        : {
+            range: queryString(query.range),
+            from: queryString(query.from),
+            to: queryString(query.to),
+          };
+    const range = parseCreatedRange(dateQuery, "all");
+    // Sessions/users: same open-ended anchoring as Sessions list (metricsUntil → ~7d).
+    const metricsAnchor = parseSessionsMetricsAnchor(queryString(query.metricsUntil));
+    const sessionStartedAt = resolveSessionListStartedAtBounds(range, metricsAnchor);
+    // Events: same open-ended ~7d window as Events list (`enrichEventListFilterForMetrics`).
+    const eventsMetrics = enrichEventListFilterForMetrics(
+      { range },
+      range,
+      metricsAnchor
+    );
+    const eventCreatedAt = {
+      gte: range.gte ?? eventsMetrics.eventCountRange?.gte,
+      lte: range.lte ?? eventsMetrics.eventCountRange?.lte,
+    };
+    // Issues: occurrence window when release/platform scoped (open-ended → metrics window).
+    const errorsMetrics = enrichErrorListFilterForMetrics(
+      { range, status: "all" },
+      range,
+      metricsAnchor
+    );
+    const errorOccurrenceRange = {
+      gte: range.gte ?? errorsMetrics.occurrenceCountRange?.gte,
+      lte: range.lte ?? errorsMetrics.occurrenceCountRange?.lte,
+    };
+
+    const scope = {
+      ...mergeGlobalSearchScope({
+        parsed,
+        appId,
+        environment: queryString(query.environment),
+        platform: queryString(query.platform),
+        release: queryString(query.release),
+        range,
+      }),
+      sessionStartedAt,
+      eventCreatedAt,
+      errorOccurrenceRange,
+    };
+
+    const result = await executeGlobalSearch(prisma, projectId, parsed, scope);
+    return reply.send(result);
+  });
+
+  app.get("/releases/summary", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const query = request.query as {
+      app?: string | string[];
+      range?: string;
+      from?: string;
+      to?: string;
+      platform?: string;
+      environment?: string;
+      metricsUntil?: string;
+      sort?: string;
+      order?: string;
+    };
+    const appId = queryApp(query.app);
+    const platform = queryString(query.platform);
+    const environment = queryString(query.environment);
+    const range = parseCreatedRange(query, "all");
+    const metricsAnchor = parseReleasesMetricsAnchor(queryString(query.metricsUntil));
+    const sortParsed = parseReleasesSortParam(queryString(query.sort));
+    if (!sortParsed.ok) {
+      return reply.code(400).send({ error: "Invalid sort" });
+    }
+    const orderParsed = parseReleasesOrderParam(queryString(query.order));
+    if (!orderParsed.ok) {
+      return reply.code(400).send({ error: "Invalid order" });
+    }
+
+    const filter = buildReleasesFilter({
+      appId,
+      platform,
+      environment,
+      range,
+    });
+    const window = resolveReleasesSummaryWindow(range, metricsAnchor);
+    const summary = await fetchReleasesPageSummary(
+      prisma,
+      filter,
+      projectId,
+      window,
+      sortParsed.sort,
+      orderParsed.order
     );
     return reply.send(summary);
   });
@@ -1274,6 +1722,9 @@ export async function apiRoutes(
       country?: string;
       q?: string;
       metricsUntil?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
@@ -1293,8 +1744,24 @@ export async function apiRoutes(
       q,
       range,
     });
-    const window = resolveSessionsSummaryWindow(range, metricsAnchor);
-    const summary = await fetchSessionsPageSummary(prisma, filter, projectId, window);
+    const baseWindow = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      }
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
+    const summary = await fetchSessionsPageSummary(
+      prisma,
+      filter,
+      projectId,
+      compared.window
+    );
     return reply.send(summary);
   });
 
@@ -1313,6 +1780,9 @@ export async function apiRoutes(
       q?: string;
       metricsUntil?: string;
       chartBucket?: string;
+      compare?: string;
+      compareFrom?: string;
+      compareTo?: string;
     };
     const appId = queryApp(query.app);
     const platform = queryString(query.platform);
@@ -1333,12 +1803,23 @@ export async function apiRoutes(
       q,
       range,
     });
-    const window = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const baseWindow = resolveSessionsSummaryWindow(range, metricsAnchor);
+    const compared = applySummaryCompare(
+      baseWindow,
+      {
+        compare: queryString(query.compare),
+        compareFrom: queryString(query.compareFrom),
+        compareTo: queryString(query.compareTo),
+      }
+    );
+    if (!compared.ok) {
+      return reply.status(400).send({ error: compared.error });
+    }
     const analytics = await fetchSessionsAnalytics(
       prisma,
       filter,
       projectId,
-      window,
+      compared.window,
       chartBucket
     );
     return reply.send(analytics);

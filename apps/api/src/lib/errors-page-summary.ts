@@ -3,9 +3,10 @@
  */
 
 import { Prisma, PrismaClient } from "@prisma/client";
-import { escapeLikePattern } from "./list-query.js";
+import { freeTextAndMatchSql } from "./list-query-helpers.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import type { ErrorListFilterInput } from "./errors-list-query.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 
 export type ErrorsPageSummary = {
   window: {
@@ -87,17 +88,18 @@ export function buildErrorGroupScopeSql(
   const parts: Prisma.Sql[] = [Prisma.sql`${eg}."project_id" = ${projectId}`];
   if (f.appId) parts.push(Prisma.sql`${eg}."app" = ${f.appId}`);
   if (f.environment) parts.push(Prisma.sql`${eg}."environment" = ${f.environment}`);
-  if (f.q) {
-    const pat = `%${escapeLikePattern(f.q)}%`;
-    parts.push(Prisma.sql`${eg}."message" ILIKE ${pat} ESCAPE '\\'`);
-  }
+  const textSql = freeTextAndMatchSql(f.q, [
+    Prisma.sql`${eg}."message"`,
+    Prisma.sql`${eg}."fingerprint"`,
+  ]);
+  if (textSql) parts.push(textSql);
   if (f.status === "unresolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NULL`);
   if (f.status === "resolved") parts.push(Prisma.sql`${eg}."resolved_at" IS NOT NULL`);
   if (f.release || f.platform) {
     const gte = f.range.gte ?? f.occurrenceCountRange?.gte;
     const lte = f.range.lte ?? f.occurrenceCountRange?.lte;
     const scopeParts: Prisma.Sql[] = [];
-    if (f.release) scopeParts.push(Prisma.sql`rel."release" = ${f.release}`);
+    if (f.release) scopeParts.push(releaseFilterMatchSql(Prisma.sql`rel."release"`, f.release));
     if (f.platform) scopeParts.push(Prisma.sql`rel."platform" = ${f.platform}`);
     if (gte) scopeParts.push(Prisma.sql`rel."created_at" >= ${gte}`);
     if (lte) scopeParts.push(Prisma.sql`rel."created_at" <= ${lte}`);
@@ -146,6 +148,26 @@ export function enrichErrorListFilterForMetrics(
   };
 }
 
+/**
+ * Align list filter.range with a summary/analytics window so group/occurrence
+ * scope SQL cannot clip KPI or chart bounds when compare presets expand the
+ * window beyond the page's list range (#495).
+ */
+export function errorFilterForComparedWindow(
+  filter: ErrorListFilterInput,
+  window: Pick<ResolvedSummaryWindow, "since" | "until" | "previousSince">,
+  opts?: { includePrevious?: boolean }
+): ErrorListFilterInput {
+  const includePrevious = opts?.includePrevious !== false;
+  return {
+    ...filter,
+    range: {
+      gte: includePrevious ? window.previousSince : window.since,
+      lte: window.until,
+    },
+  };
+}
+
 export function shouldScopeEventsToFilteredErrors(f: ErrorListFilterInput): boolean {
   return (f.q != null && f.q.trim() !== "") || f.status !== "all";
 }
@@ -162,7 +184,7 @@ export function buildEventSessionScopeSql(
       FROM "ErrorOccurrence" seo
       INNER JOIN "ErrorGroup" seg ON seg."id" = seo."error_group_id"
       WHERE ${buildErrorGroupScopeSql(f, projectId, "seg")}
-        ${f.release ? Prisma.sql`AND seo."release" = ${f.release}` : Prisma.empty}
+        ${f.release ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`seo."release"`, f.release)}` : Prisma.empty}
         ${f.platform ? Prisma.sql`AND seo."platform" = ${f.platform}` : Prisma.empty}
         AND seo."created_at" >= ${previousSince}
         AND seo."created_at" <= ${until}
@@ -197,19 +219,16 @@ export async function fetchErrorsPageSummary(
   const eventParts: Prisma.Sql[] = [Prisma.sql`e."project_id" = ${projectId}`];
   if (f.appId) eventParts.push(Prisma.sql`e."app" = ${f.appId}`);
   if (f.environment) eventParts.push(Prisma.sql`e."environment" = ${f.environment}`);
-  if (f.release) eventParts.push(Prisma.sql`e."release" = ${f.release}`);
+  if (f.release) eventParts.push(releaseFilterMatchSql(Prisma.sql`e."release"`, f.release));
   if (f.platform) eventParts.push(Prisma.sql`e."platform" = ${f.platform}`);
   const eventFilter = Prisma.join(eventParts, " AND ");
-  const occurrenceScopeClause = Prisma.join(
-    [
-      ...(f.release ? [Prisma.sql`eo."release" = ${f.release}`] : []),
-      ...(f.platform ? [Prisma.sql`eo."platform" = ${f.platform}`] : []),
-    ],
-    " AND "
-  );
+  const occurrenceScopeParts: Prisma.Sql[] = [];
+  if (f.release) occurrenceScopeParts.push(releaseFilterMatchSql(Prisma.sql`eo."release"`, f.release));
+  if (f.platform) occurrenceScopeParts.push(Prisma.sql`eo."platform" = ${f.platform}`);
+  // Prisma.join throws on an empty array — only join when release/platform filters exist.
   const occurrenceReleaseClause =
-    f.release || f.platform
-      ? Prisma.sql`AND ${occurrenceScopeClause}`
+    occurrenceScopeParts.length > 0
+      ? Prisma.sql`AND ${Prisma.join(occurrenceScopeParts, " AND ")}`
       : Prisma.empty;
   const groupScopeSql = buildErrorGroupScopeSql(f, projectId, "eg");
   const eventSessionScope = buildEventSessionScopeSql(

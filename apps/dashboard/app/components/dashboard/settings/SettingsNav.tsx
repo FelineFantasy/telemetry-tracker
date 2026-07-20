@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ComingSoonBadge } from "@/app/components/dashboard/coming-soon-ui";
+import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 
 type Item = { href: string; label: string; badge?: string; comingSoon?: boolean };
 type Group = { label: string; items: Item[] };
@@ -42,6 +43,42 @@ const GROUPS: Group[] = [
   },
 ];
 
+function SettingsNavLink({
+  href,
+  active,
+  label,
+  badge,
+  comingSoon,
+}: {
+  href: string;
+  active: boolean;
+  label: string;
+  badge?: string;
+  comingSoon?: boolean;
+}) {
+  const linkProps = useDashboardNavLinkProps(href);
+
+  return (
+    <Link
+      {...linkProps}
+      className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors ${
+        active
+          ? "bg-surface text-foreground"
+          : "text-muted-foreground hover:bg-surface/60 hover:text-foreground"
+      }`}
+    >
+      <span className="min-w-0 truncate">{label}</span>
+      {comingSoon ? (
+        <ComingSoonBadge />
+      ) : badge ? (
+        <span className="shrink-0 rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+          {badge}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
 export function SettingsNav() {
   const pathname = usePathname() ?? "/";
 
@@ -57,30 +94,17 @@ export function SettingsNav() {
               {g.label}
             </div>
             <ul className="space-y-px">
-              {g.items.map((i) => {
-                const active = pathname === i.href;
-                return (
-                  <li key={i.href}>
-                    <Link
-                      href={i.href}
-                      className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors ${
-                        active
-                          ? "bg-surface text-foreground"
-                          : "text-muted-foreground hover:bg-surface/60 hover:text-foreground"
-                      }`}
-                    >
-                      <span className="min-w-0 truncate">{i.label}</span>
-                      {i.comingSoon ? (
-                        <ComingSoonBadge />
-                      ) : i.badge ? (
-                        <span className="shrink-0 rounded bg-surface-elevated px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
-                          {i.badge}
-                        </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                );
-              })}
+              {g.items.map((i) => (
+                <li key={i.href}>
+                  <SettingsNavLink
+                    href={i.href}
+                    active={pathname === i.href}
+                    label={i.label}
+                    badge={i.badge}
+                    comingSoon={i.comingSoon}
+                  />
+                </li>
+              ))}
             </ul>
           </div>
         ))}

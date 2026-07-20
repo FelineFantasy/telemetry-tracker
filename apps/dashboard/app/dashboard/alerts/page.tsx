@@ -3,6 +3,12 @@ import {
   fetchProjectAlertEvents,
   fetchProjectAlertSettings,
 } from "@/lib/alert-settings-server";
+import { fetchProjectAlertRules } from "@/lib/alert-rules-server";
+import {
+  fetchProjectWebhookDeliveries,
+  fetchProjectWebhooks,
+} from "@/lib/project-webhooks";
+import { fetchProjectPiiScrubSettings, piiScrubSettingsLoadFallback } from "@/lib/pii-scrub-settings-server";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 export const dynamic = "force-dynamic";
@@ -23,16 +29,28 @@ async function loadCanEdit(): Promise<boolean> {
 }
 
 export default async function AlertsPage() {
-  const [settings, events, canEdit] = await Promise.all([
-    fetchProjectAlertSettings(),
-    fetchProjectAlertEvents(),
-    loadCanEdit(),
-  ]);
+  const [settings, events, rules, webhooks, deliveries, piiResult, canEdit] =
+    await Promise.all([
+      fetchProjectAlertSettings(),
+      fetchProjectAlertEvents(),
+      fetchProjectAlertRules(),
+      fetchProjectWebhooks(),
+      fetchProjectWebhookDeliveries(25),
+      fetchProjectPiiScrubSettings(),
+      loadCanEdit(),
+    ]);
 
   return (
     <AlertsClient
       initialSettings={settings}
       initialEvents={events}
+      initialRules={rules}
+      initialWebhooks={webhooks}
+      initialDeliveries={deliveries}
+      initialPiiSettings={
+        piiResult.ok ? piiResult.settings : piiScrubSettingsLoadFallback()
+      }
+      piiSettingsLoadError={piiResult.ok ? null : piiResult.error}
       canEdit={canEdit}
     />
   );

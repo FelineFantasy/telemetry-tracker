@@ -16,7 +16,11 @@ const nextConfig: NextConfig = {
 export default withSentryConfig(nextConfig, {
   // Source map upload is optional — set SENTRY_AUTH_TOKEN in CI when ready.
   silent: !process.env.CI,
-  disableLogger: true,
   widenClientFileUpload: true,
-  automaticVercelMonitors: false,
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+    automaticVercelMonitors: false,
+  },
 });

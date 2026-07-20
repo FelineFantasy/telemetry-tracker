@@ -28,7 +28,10 @@ COPY packages packages
 COPY CHANGELOG.md CHANGELOG.md
 COPY eslint.config.mjs ./eslint.config.mjs
 
-RUN pnpm --filter dashboard build
+# Rebuild workspace packages so dashboard never relies on incomplete committed dist.
+RUN pnpm --filter @telemetry-tracker/core build && \
+    pnpm --filter @telemetry-tracker/next build && \
+    pnpm --filter dashboard build
 
 FROM base AS runner
 

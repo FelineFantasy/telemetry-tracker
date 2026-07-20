@@ -14,13 +14,15 @@ Deploy **Postgres + API + dashboard** as separate Railway services. Core env var
 | **API** | `apps/api` | **Railpack** (default Node) — **not** Dockerfile |
 | **Dashboard** | **empty** (repo root) | **Dockerfile** (repo root) — **only on this service** |
 | **Retention cron** (optional) | `apps/api` | Cron job |
+| **Alert rules evaluator cron** (optional) | `apps/api` | Cron job (scheduled AlertRule conditions) |
+| **Alert webhook worker** (optional) | `apps/api` | Continuous poll loop (not cron) |
 
 ---
 
 ## PostgreSQL
 
 1. Create a PostgreSQL service in your Railway project.
-2. Copy **`DATABASE_URL`** to the API (and cron) service — prefer the **internal** URL when services are in the same project.
+2. Copy **`DATABASE_URL`** to the API, cron, and worker services — prefer the **internal** URL when services are in the same project.
 
 ---
 
@@ -59,7 +61,7 @@ Optional: Resend, Stripe, registration flags — [BILLING.md](./BILLING.md) and 
 | Builder | **Dockerfile**, path `Dockerfile` |
 | Watch Paths (optional) | `apps/dashboard/**` |
 
-**Env:** `API_URL` = public API URL; `NEXT_PUBLIC_SITE_URL` = public dashboard URL (recommended). Optional: `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (same value) for error monitoring — see [MONITORING.md](./MONITORING.md#sentry-optional).
+**Env:** `API_URL` = public API URL; `NEXT_PUBLIC_SITE_URL` = public dashboard URL (recommended). Optional: `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (same value) for error monitoring — see [MONITORING.md](./MONITORING.md#sentry-optional). Optional dogfood: `NEXT_PUBLIC_TELEMETRY_INGEST_URL`, `NEXT_PUBLIC_TELEMETRY_API_KEY`, and optionally `NEXT_PUBLIC_TELEMETRY_APP` — see [MONITORING.md](./MONITORING.md#product-telemetry-dogfood-optional).
 
 If the build fails with `Unsupported URL Type "workspace:"`, Railway is using npm/Nixpacks instead of Docker — clear Root Directory to repo root and set Builder to Dockerfile on **this service only**.
 
@@ -105,6 +107,94 @@ pnpm --filter api retention                # live sweep (dev DB)
 ```
 
 After `pnpm --filter api build`, production entrypoint: `node dist/jobs/run-retention.js`.
+
+---
+
+## Alert rules evaluator cron
+
+Scheduled evaluation for Alert Rules conditions that are not ingest-triggered (`HEARTBEAT`, `NO_EVENTS`, `SESSION_DROP`, `QUOTA_PERCENT`, and `ERROR_RATE`). Product details: [ALERT-RULES.md](./ALERT-RULES.md).
+
+Cadence is defined in one place: `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` (default **5** minutes) in `apps/api/src/lib/alert-rules.ts`. Match the Railway cron to that value.
+
+This service is **not** auto-provisioned — add it manually in Railway when you use schedule-oriented CUSTOM rules. Do **not** repurpose or change any existing `brief-worker` service.
+
+### Railway setup (manual)
+
+1. **+ New** → **Empty Service** (e.g. `alert-rules-evaluator`).
+2. **Settings → Source** → **Root Directory** = `apps/api`.
+3. **Settings → Deploy** → **Start Command** = `node dist/jobs/run-alert-rules-evaluator.js`
+   - Use `node …` directly (same reason as retention cron).
+4. **Settings → Cron Schedule** = `*/5 * * * *` (every 5 minutes UTC), or match your `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`.
+5. **Variables** → **`DATABASE_URL`** (same as API). Optional: `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`.
+6. Confirm logs show JSON like:
+
+   ```json
+   {"ok":true,"projectsScanned":1,"rulesEvaluated":2,"rulesFired":0,"intervalMinutes":5,"at":"2026-07-18T12:00:01.234Z"}
+   ```
+
+| Setting | Value |
+|---------|--------|
+| Root Directory | `apps/api` |
+| Start command | `node dist/jobs/run-alert-rules-evaluator.js` |
+| Cron schedule | `*/5 * * * *` (default) |
+| `DATABASE_URL` | Same as API |
+
+Local: `pnpm --filter api alert-rules-evaluator`
+
+---
+
+## Alert webhook worker
+
+Delivers queued project alert webhooks (`AlertWebhookDelivery` rows). The job is
+implemented in `apps/api/src/jobs/run-alert-webhook-worker.ts` and must run as a
+**long-lived process** (not a cron) in each production environment that uses alert
+webhooks. Product details: [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md).
+
+### Railway setup (manual)
+
+Same pattern as the API / retention job: **Empty Service** first, configure
+Railpack + root directory + start command, **then** connect the GitHub repo.
+Connecting the repo before clearing Dockerfile settings can pick up the dashboard
+Dockerfile and fail at runtime.
+
+1. In your Railway project, click **+ New** → **Empty Service** (name it
+   `alert-webhook-worker`).
+2. **Settings → Source** → **Root Directory** = `apps/api`.
+3. **Settings → Build** → **Railpack** (not Dockerfile). Leave Dockerfile path empty.
+4. **Settings → Deploy** → **Start Command** =
+   `node dist/jobs/run-alert-webhook-worker.js`
+   - Use `node …` directly (same as retention). Do **not** set a Cron Schedule —
+     this is a continuous poll loop.
+5. **Settings → Source** → connect repo `Telemetry-Tracker/telemetry-tracker`,
+   branch **`main`**. Optional watch paths: `apps/api/**`.
+6. **Variables** → add **`DATABASE_URL`** (Reference from the Postgres / `DB`
+   service, same as API). Optional:
+   - `ALERT_WEBHOOK_WORKER_POLL_MS` (default `1000`)
+   - `ALERT_WEBHOOK_WORKER_LEASE_MS` (default `30000`)
+7. Deploy and confirm runtime logs show idle/processing JSON like:
+
+   ```json
+   {"ok":true,"status":"idle","at":"2026-07-17T12:27:31.755Z"}
+   ```
+
+| Setting | Value |
+|---------|--------|
+| Root Directory | `apps/api` |
+| Builder | Railpack (not Dockerfile) |
+| Start command | `node dist/jobs/run-alert-webhook-worker.js` |
+| Cron schedule | none (always-on) |
+| Branch | `main` |
+| `DATABASE_URL` | Same as API |
+
+### Local verification
+
+```bash
+pnpm --filter api alert-webhook-worker          # poll loop
+pnpm --filter api alert-webhook-worker -- --once  # single delivery
+```
+
+After `pnpm --filter api build`, production entrypoint:
+`node dist/jobs/run-alert-webhook-worker.js`.
 
 ---
 

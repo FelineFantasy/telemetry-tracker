@@ -5,8 +5,11 @@ import {
   filterInAppNotifications,
   filterInAppNotificationsForReadPersistence,
   isInQuietHours,
+  isMuted,
   parseNotificationPreferences,
+  shouldSendEmailForItem,
   shouldShowInAppNotification,
+  validateNotificationPreferencesPatch,
 } from "./notification-preferences.js";
 
 const issue: DashboardNotificationItem = {
@@ -27,12 +30,76 @@ const billing: DashboardNotificationItem = {
   href: "/dashboard/settings/billing",
 };
 
+const alert: DashboardNotificationItem = {
+  id: "alert:error_spike:p1:15:1",
+  type: "alert",
+  title: "Error spike detected",
+  body: "body",
+  occurredAt: new Date().toISOString(),
+  href: "/dashboard/errors",
+};
+
 describe("notification-preferences", () => {
   it("returns defaults for invalid stored JSON", () => {
     expect(parseNotificationPreferences(null)).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
     expect(parseNotificationPreferences({ channels: {} })).toEqual(
       DEFAULT_NOTIFICATION_PREFERENCES
     );
+  });
+
+  it("parses mutedUntil and digest with defaults", () => {
+    const prefs = parseNotificationPreferences({
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      mutedUntil: "2026-07-17T18:00:00.000Z",
+      digest: "daily",
+    });
+    expect(prefs.mutedUntil).toBe("2026-07-17T18:00:00.000Z");
+    expect(prefs.digest).toBe("daily");
+  });
+
+  it("preserves mutedUntil and digest when patch omits them", () => {
+    const previous = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      mutedUntil: "2026-07-17T20:00:00.000Z",
+      digest: "weekly" as const,
+    };
+    const result = validateNotificationPreferencesPatch(
+      {
+        channels: { inapp: true, email: true },
+        routing: DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        quietHours: DEFAULT_NOTIFICATION_PREFERENCES.quietHours,
+      },
+      previous
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.preferences.mutedUntil).toBe(previous.mutedUntil);
+      expect(result.preferences.digest).toBe("weekly");
+      expect(result.preferences.channels.email).toBe(true);
+    }
+  });
+
+  it("clears mute and updates digest when patch sets them explicitly", () => {
+    const previous = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      mutedUntil: "2026-07-17T20:00:00.000Z",
+      digest: "daily" as const,
+    };
+    const result = validateNotificationPreferencesPatch(
+      {
+        channels: DEFAULT_NOTIFICATION_PREFERENCES.channels,
+        routing: DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        quietHours: DEFAULT_NOTIFICATION_PREFERENCES.quietHours,
+        mutedUntil: null,
+        digest: "off",
+      },
+      previous
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.preferences.mutedUntil).toBeNull();
+      expect(result.preferences.digest).toBe("off");
+    }
   });
 
   it("filters issues when in-app routing is disabled", () => {
@@ -90,5 +157,47 @@ describe("notification-preferences", () => {
       issue,
       billing,
     ]);
+  });
+
+  it("mutes non-critical in-app and email until mutedUntil", () => {
+    const prefs = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      channels: { inapp: true, email: true },
+      routing: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        issues: { inapp: true, email: true },
+        alerts: { inapp: true, email: true },
+      },
+      mutedUntil: "2026-07-17T20:00:00.000Z",
+    };
+    const during = new Date("2026-07-17T19:00:00.000Z");
+    const after = new Date("2026-07-17T21:00:00.000Z");
+    expect(isMuted(prefs, during)).toBe(true);
+    expect(shouldShowInAppNotification(issue, prefs, during)).toBe(false);
+    expect(shouldShowInAppNotification(alert, prefs, during)).toBe(true);
+    expect(shouldSendEmailForItem(prefs, issue, during)).toBe(false);
+    expect(shouldSendEmailForItem(prefs, alert, during)).toBe(true);
+    expect(shouldSendEmailForItem(prefs, issue, after)).toBe(true);
+  });
+
+  it("applies quiet hours to email for non-critical items", () => {
+    const prefs = {
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      channels: { inapp: true, email: true },
+      routing: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES.routing,
+        issues: { inapp: true, email: true },
+        alerts: { inapp: true, email: true },
+      },
+      quietHours: {
+        enabled: true,
+        startHour: 0,
+        endHour: 24,
+        timezone: "UTC",
+      },
+    };
+    const noon = new Date("2026-07-01T12:00:00.000Z");
+    expect(shouldSendEmailForItem(prefs, issue, noon)).toBe(false);
+    expect(shouldSendEmailForItem(prefs, alert, noon)).toBe(true);
   });
 });

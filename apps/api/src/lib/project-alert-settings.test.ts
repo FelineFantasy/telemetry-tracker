@@ -3,6 +3,7 @@ import {
   DEFAULT_PROJECT_ALERT_SETTINGS,
   errorSpikeDedupeKey,
   parseProjectAlertSettings,
+  validateProjectAlertSettingsPatch,
 } from "./project-alert-settings.js";
 
 describe("project-alert-settings", () => {
@@ -13,12 +14,95 @@ describe("project-alert-settings", () => {
     );
   });
 
-  it("parses valid settings", () => {
+  it("parses valid settings and fills email defaults", () => {
     const custom = {
       errorSpike: { enabled: false, threshold: 10, windowMinutes: 30 },
       quota: { enabled: true, nearPercent: 85 },
     };
-    expect(parseProjectAlertSettings(custom)).toEqual(custom);
+    expect(parseProjectAlertSettings(custom)).toEqual({
+      ...custom,
+      email: DEFAULT_PROJECT_ALERT_SETTINGS.email,
+    });
+  });
+
+  it("parses email recipient settings", () => {
+    const custom = {
+      errorSpike: { enabled: true, threshold: 25, windowMinutes: 15 },
+      quota: { enabled: true, nearPercent: 90 },
+      email: {
+        enabled: false,
+        roles: ["OWNER", "VIEWER"],
+        additionalEmails: ["Ops@Example.com", "ops@example.com", "oncall@ex.co"],
+      },
+    };
+    expect(parseProjectAlertSettings(custom).email).toEqual({
+      enabled: false,
+      roles: ["OWNER", "VIEWER"],
+      additionalEmails: ["ops@example.com", "oncall@ex.co"],
+    });
+  });
+
+  it("rejects empty roles on patch", () => {
+    const result = validateProjectAlertSettingsPatch({
+      errorSpike: { enabled: true, threshold: 25, windowMinutes: 15 },
+      quota: { enabled: true, nearPercent: 90 },
+      email: { enabled: true, roles: [], additionalEmails: [] },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("preserves stored email when patch omits email", () => {
+    const previous = {
+      ...DEFAULT_PROJECT_ALERT_SETTINGS,
+      email: {
+        enabled: false,
+        roles: ["OWNER", "VIEWER"] as const,
+        additionalEmails: ["oncall@ex.co"],
+      },
+    };
+    const result = validateProjectAlertSettingsPatch(
+      {
+        errorSpike: { enabled: false, threshold: 10, windowMinutes: 30 },
+        quota: { enabled: true, nearPercent: 85 },
+      },
+      previous
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.settings.email).toEqual(previous.email);
+      expect(result.settings.errorSpike.threshold).toBe(10);
+    }
+  });
+
+  it("updates email when patch includes email", () => {
+    const previous = {
+      ...DEFAULT_PROJECT_ALERT_SETTINGS,
+      email: {
+        enabled: false,
+        roles: ["OWNER"] as const,
+        additionalEmails: ["old@ex.co"],
+      },
+    };
+    const result = validateProjectAlertSettingsPatch(
+      {
+        errorSpike: DEFAULT_PROJECT_ALERT_SETTINGS.errorSpike,
+        quota: DEFAULT_PROJECT_ALERT_SETTINGS.quota,
+        email: {
+          enabled: true,
+          roles: ["OWNER", "EDITOR"],
+          additionalEmails: ["new@ex.co"],
+        },
+      },
+      previous
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.settings.email).toEqual({
+        enabled: true,
+        roles: ["OWNER", "EDITOR"],
+        additionalEmails: ["new@ex.co"],
+      });
+    }
   });
 
   it("builds stable dedupe keys per window bucket", () => {

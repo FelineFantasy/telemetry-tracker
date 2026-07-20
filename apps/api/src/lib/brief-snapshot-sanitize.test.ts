@@ -15,13 +15,13 @@ describe("sanitizeBriefText", () => {
 
   it("redacts bearer tokens", () => {
     expect(sanitizeBriefText("Authorization Bearer abc.def-ghi_123")).toContain(
-      "[token]"
+      "[bearer-token]"
     );
   });
 
   it("redacts API key patterns", () => {
     expect(sanitizeBriefText("key tt_live_abcd0123efgh4567_secretpart")).toContain(
-      "[apikey]"
+      "[api-key]"
     );
   });
 
@@ -38,8 +38,10 @@ describe("sanitizeBriefText", () => {
   });
 
   it("redacts cookie and authorization headers", () => {
-    expect(sanitizeBriefText("cookie: session=abc123")).toBe("[redacted]");
-    expect(sanitizeBriefText("authorization: Bearer secret")).toBe("[redacted]");
+    expect(sanitizeBriefText("cookie: session=abc123")).toBe("cookie: [cookie]");
+    expect(sanitizeBriefText("authorization: Bearer secret")).toBe(
+      "authorization: [bearer-token]"
+    );
   });
 
   it("strips non-sensitive URL query strings", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes, ButtonHTMLAttributes } from "react";
 import {
@@ -48,24 +49,26 @@ export function Field({
   children,
   optional,
   error,
+  htmlFor,
 }: {
   label: string;
   hint?: string;
   optional?: boolean;
   error?: string;
   children: ReactNode;
+  htmlFor?: string;
 }) {
   return (
     <div className="grid grid-cols-1 gap-2 py-3 sm:grid-cols-[200px_1fr] sm:items-start sm:gap-6">
       <div className="pt-1.5">
-        <div className="flex items-center gap-1.5 text-[13px]">
+        <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-[13px]">
           <span>{label}</span>
           {optional ? (
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Optional
             </span>
           ) : null}
-        </div>
+        </label>
         {hint ? <p className="mt-1 text-[12px] text-muted-foreground">{hint}</p> : null}
       </div>
       <div className="min-w-0">
@@ -164,20 +167,25 @@ export function SettingsToggle({
   onChange,
   label,
   disabled,
+  id,
+  ...rest
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   label?: string;
   disabled?: boolean;
-}) {
+  id?: string;
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onChange">) {
   return (
     <button
+      id={id}
       type="button"
       role="switch"
       aria-checked={on}
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={`inline-flex items-center gap-2 text-[13px] ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+      {...rest}
     >
       <span
         className={`relative h-[18px] w-[30px] rounded-full transition-colors ${on ? "bg-brand" : "bg-surface-elevated"}`}

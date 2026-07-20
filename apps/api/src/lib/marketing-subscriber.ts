@@ -22,8 +22,41 @@ export function normalizeMarketingEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+/** Domains Resend (and RFC 2606) reject — keep them out of the marketing list and release sends. */
+const RESERVED_MARKETING_EMAIL_DOMAINS = new Set([
+  "example.com",
+  "example.org",
+  "example.net",
+  "localhost",
+]);
+
+export function isReservedMarketingEmailDomain(email: string): boolean {
+  const at = email.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = email.slice(at + 1).toLowerCase();
+  for (const reserved of RESERVED_MARKETING_EMAIL_DOMAINS) {
+    // Exact match and subdomains (e.g. mail.example.com) — Resend rejects both.
+    if (domain === reserved || domain.endsWith(`.${reserved}`)) return true;
+  }
+  // RFC 2606 / 6761 special-use TLDs
+  return /\.(example|invalid|localhost|test)$/i.test(domain);
+}
+
+/** Linear-time shape check (avoids CodeQL polynomial-ReDoS email regexes). */
+function hasBasicEmailShape(email: string): boolean {
+  if (email.length === 0 || email.length > 255) return false;
+  const at = email.indexOf("@");
+  if (at <= 0 || at !== email.lastIndexOf("@")) return false;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!local || !domain) return false;
+  if (/\s/.test(local) || /\s/.test(domain) || domain.includes("@")) return false;
+  const dot = domain.lastIndexOf(".");
+  return dot > 0 && dot < domain.length - 1;
+}
+
 export function isValidMarketingEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 255;
+  return hasBasicEmailShape(email) && !isReservedMarketingEmailDomain(email);
 }
 
 export function hashMarketingUnsubscribeToken(token: string): string {

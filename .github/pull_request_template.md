@@ -10,8 +10,10 @@
 
 ## Code review (Bugbot)
 
-- [ ] For **notification, alert, billing, ingest, or auth** changes: ran **`/review-bugbot`** in Cursor before opening this PR (optional but recommended — GitHub Bugbot may skip duplicate review)
-- [ ] Addressed or replied to Bugbot findings (resolve thread + update [`.cursor/BUGBOT.md`](../.cursor/BUGBOT.md) if a finding was a false positive)
+> **Paused:** GitHub `bugbot-review` is currently a no-op. `/review-bugbot` is optional.
+
+- [ ] For **notification, alert, billing, ingest, or auth** changes: considered running **`/review-bugbot`** in Cursor (optional while the gate is paused)
+- [ ] If Bugbot comments appear anyway: addressed or replied (resolve thread + update [`.cursor/BUGBOT.md`](../.cursor/BUGBOT.md) if a finding was a false positive)
 
 ## Checklist
 

@@ -2,13 +2,16 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { EventsClientListSection } from "@/app/components/dashboard/EventsClientListSection";
 import { EventsSummaryMetrics, type EventsPageSummary } from "@/app/components/dashboard/EventsSummaryMetrics";
-import {
-  EventsAnalyticsPanels,
-  type EventsAnalyticsData,
-} from "@/app/components/dashboard/EventsAnalyticsPanels";
+import { DeferredEventsAnalytics } from "@/app/components/dashboard/DeferredEventsAnalytics";
+import { CompareModeControl } from "@/app/components/dashboard/CompareModeControl";
 import { type EventsTableRow } from "@/app/components/dashboard/EventsTable";
-import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
+import {
+  appendListTimeRangeToParams,
+  isUnselectedTimeRange,
+  parseListTimeRangeOrDefault,
+  resolveMetricsUntilIso,
+} from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -18,7 +21,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
-import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { parseOverviewCompare, resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const EVENTS_PATH = "/dashboard/events";
@@ -41,12 +44,6 @@ async function getEvents(search: URLSearchParams) {
 
 async function getEventsSummary(search: URLSearchParams): Promise<EventsPageSummary | null> {
   const res = await dashboardApiFetch(`/api/events/summary?${search.toString()}`);
-  if (!res.ok) return null;
-  return res.json();
-}
-
-async function getEventsAnalytics(search: URLSearchParams): Promise<EventsAnalyticsData | null> {
-  const res = await dashboardApiFetch(`/api/events/analytics?${search.toString()}`);
   if (!res.ok) return null;
   return res.json();
 }
@@ -79,13 +76,18 @@ function buildEventsParamsRecord(sp: Record<string, string | string[] | undefine
     "range",
     "from",
     "to",
+    "metricsUntil",
     "name",
     "environment",
     "platform",
     "release",
     "propertiesContains",
+    "q",
     "sort",
     "order",
+    "compare",
+    "compareFrom",
+    "compareTo",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -101,8 +103,7 @@ export default async function EventsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const pageAnchor = new Date();
-  const currentParams = buildEventsParamsRecord(sp);
+  let currentParams = buildEventsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(EVENTS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
@@ -124,6 +125,23 @@ export default async function EventsPage({
     "all"
   );
 
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    EVENTS_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  if (pageAnchorIso) {
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
+  }
+
   const apiQuery = new URLSearchParams();
   if (appFilter) apiQuery.set("app", appFilter);
   apiQuery.set("page", String(page));
@@ -133,6 +151,7 @@ export default async function EventsPage({
   const platform = firstQueryValue(sp.platform);
   const release = firstQueryValue(sp.release);
   const propertiesContains = firstQueryValue(sp.propertiesContains);
+  const q = firstQueryValue(sp.q);
   const sort = firstQueryValue(sp.sort);
   const order = firstQueryValue(sp.order);
   appendListTimeRangeToParams(apiQuery, timeRange, from, to);
@@ -141,11 +160,15 @@ export default async function EventsPage({
   if (platform) apiQuery.set("platform", platform);
   if (release) apiQuery.set("release", release);
   if (propertiesContains) apiQuery.set("propertiesContains", propertiesContains);
+  if (q) apiQuery.set("q", q);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
+  const compare = parseOverviewCompare(firstQueryValue(sp.compare));
+  const compareFrom = firstQueryValue(sp.compareFrom);
+  const compareTo = firstQueryValue(sp.compareTo);
 
   const summaryQuery = new URLSearchParams(apiQuery);
   summaryQuery.delete("page");
@@ -153,6 +176,9 @@ export default async function EventsPage({
   summaryQuery.delete("sort");
   summaryQuery.delete("order");
   summaryQuery.delete("view");
+  if (compare !== "previous") summaryQuery.set("compare", compare);
+  if (compareFrom) summaryQuery.set("compareFrom", compareFrom);
+  if (compareTo) summaryQuery.set("compareTo", compareTo);
 
   let initialListData: {
     items: EventNameRow[];
@@ -161,19 +187,17 @@ export default async function EventsPage({
     pageSize: number;
   };
   let summary: EventsPageSummary | null = null;
-  let analytics: EventsAnalyticsData | null = null;
-  let filterOptions = {
-    environments: [] as string[],
-    platforms: [] as string[],
-    releases: [] as string[],
+  let filterOptions: {
+    environments: string[];
+    platforms: string[];
+    releases: string[];
   };
 
   try {
-    const [opts, data, summaryData, analyticsData] = await Promise.all([
+    const [opts, data, summaryData] = await Promise.all([
       getFilterOptions(appFilter || undefined),
       getEvents(apiQuery),
       getEventsSummary(summaryQuery),
-      getEventsAnalytics(summaryQuery),
     ]);
     filterOptions = opts;
     initialListData = {
@@ -183,7 +207,6 @@ export default async function EventsPage({
       pageSize: data.pageSize ?? pageSize,
     };
     summary = summaryData;
-    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -218,9 +241,8 @@ export default async function EventsPage({
       />
 
       <AnalyticsListShell>
+        <CompareModeControl path={EVENTS_PATH} currentParams={currentParams} />
         {summary ? <EventsSummaryMetrics summary={summary} /> : null}
-
-        {analytics ? <EventsAnalyticsPanels analytics={analytics} /> : null}
 
         <EventsClientListSection
           path={EVENTS_PATH}
@@ -238,12 +260,15 @@ export default async function EventsPage({
           platform={platform ?? ""}
           release={release ?? ""}
           propertiesContains={propertiesContains ?? ""}
+          q={q ?? ""}
           sort={effectiveSort}
           order={effectiveOrder}
           environments={filterOptions.environments}
           platforms={filterOptions.platforms}
           releases={filterOptions.releases}
         />
+
+        <DeferredEventsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );

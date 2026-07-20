@@ -1,5 +1,108 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { parseTrendWindowParam, serializeErrorGroupListItem, isAggregateSort } from "./errors-list-query.js";
+import {
+  buildErrorGroupWhereInput,
+  buildErrorOccurrenceScopeWhere,
+  listScopedOccurrenceIdsForGroupId,
+  parseTrendWindowParam,
+  serializeErrorGroupListItem,
+  isAggregateSort,
+} from "./errors-list-query.js";
+import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
+
+function prismaSqlText(fragment: Prisma.Sql): string {
+  const parts = fragment as unknown as { strings: string[]; values: unknown[] };
+  return parts.strings.join("?");
+}
+
+describe("buildErrorGroupWhereInput", () => {
+  it("applies multi-word q as AND of message OR fingerprint contains", () => {
+    const where = buildErrorGroupWhereInput(
+      { range: {}, q: "checkout TypeError", status: "all" },
+      "proj-1"
+    );
+    expect(where.AND).toEqual([
+      {
+        OR: [
+          { message: { contains: "checkout", mode: "insensitive" } },
+          { fingerprint: { contains: "checkout", mode: "insensitive" } },
+        ],
+      },
+      {
+        OR: [
+          { message: { contains: "TypeError", mode: "insensitive" } },
+          { fingerprint: { contains: "TypeError", mode: "insensitive" } },
+        ],
+      },
+    ]);
+  });
+});
+
+describe("buildErrorOccurrenceScopeWhere", () => {
+  it("returns empty object when no scope is set", () => {
+    expect(buildErrorOccurrenceScopeWhere({})).toEqual({});
+  });
+
+  it("matches Unknown via null / blank / sentinel (not exact __unknown__ only)", () => {
+    expect(buildErrorOccurrenceScopeWhere({ release: UNKNOWN_RELEASE_KEY })).toEqual({
+      OR: [{ release: null }, { release: "" }, { release: UNKNOWN_RELEASE_KEY }],
+    });
+  });
+
+  it("uses trimmed equality for known releases and keeps platform/window", () => {
+    const gte = new Date("2026-06-01T00:00:00.000Z");
+    const lte = new Date("2026-06-08T00:00:00.000Z");
+    expect(
+      buildErrorOccurrenceScopeWhere({
+        release: "  1.2.3  ",
+        platform: "ios",
+        gte,
+        lte,
+      })
+    ).toEqual({
+      platform: "ios",
+      release: "1.2.3",
+      created_at: { gte, lte },
+    });
+  });
+});
+
+describe("listScopedOccurrenceIdsForGroupId", () => {
+  it("returns empty without querying when scope is unset", async () => {
+    const prisma = { $queryRaw: vi.fn() };
+    const ids = await listScopedOccurrenceIdsForGroupId(
+      prisma as never,
+      "eg_1",
+      "proj_1",
+      {},
+      50
+    );
+    expect(ids).toEqual([]);
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("queries with releaseFilterMatchSql-compatible scope for Unknown", async () => {
+    const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "o1" }, { id: "o2" }]),
+    };
+    const ids = await listScopedOccurrenceIdsForGroupId(
+      prisma as never,
+      "eg_1",
+      "proj_1",
+      { release: UNKNOWN_RELEASE_KEY },
+      50
+    );
+    expect(ids).toEqual(["o1", "o2"]);
+    expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+    const sql = prisma.$queryRaw.mock.calls[0]?.[0] as Prisma.Sql;
+    const text = prismaSqlText(sql);
+    expect(text).toContain("ErrorOccurrence");
+    expect(text).toContain("ErrorGroup");
+    expect(text).toContain("project_id");
+    expect(text).toContain("ORDER BY");
+    expect(text).toContain("TRIM");
+  });
+});
 
 describe("isAggregateSort", () => {
   it("routes occurrences sort through the in-range aggregate path", () => {

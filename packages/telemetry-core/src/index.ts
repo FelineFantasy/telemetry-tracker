@@ -5,10 +5,12 @@ import {
   WEB_VITAL_EVENT_NAME,
   type WebVitalEventProperties,
 } from "./web-vitals.js";
+import { scrubPiiRecord, scrubPiiText } from "./pii-scrub.js";
 
 import { SDK_VERSION } from "./version.js";
 
 export { SDK_VERSION };
+export { scrubPiiText, scrubPiiRecord } from "./pii-scrub.js";
 export {
   WEB_VITAL_EVENT_NAME,
   installWebVitals,
@@ -27,15 +29,34 @@ const ANON_STORAGE_KEY = "tacko_telemetry_anon_id";
 
 let anonymousId: string | null = null;
 
+let fallbackIdSeq = 0;
+
+function bytesToUuid(bytes: Uint8Array): string {
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** Prefer Web Crypto; fall back for Node/RN hosts without a global crypto polyfill. */
 function generateUUID(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  const webCrypto = typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+  if (webCrypto && typeof webCrypto.randomUUID === "function") {
+    return webCrypto.randomUUID();
   }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  if (webCrypto && typeof webCrypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    webCrypto.getRandomValues(bytes);
+    return bytesToUuid(bytes);
+  }
+  // Constrained runtimes: unique analytics IDs without Math.random (CodeQL insecure-randomness).
+  const bytes = new Uint8Array(16);
+  let n = (Date.now() ^ (++fallbackIdSeq * 0x9e3779b9)) >>> 0;
+  for (let i = 0; i < 16; i++) {
+    n = (Math.imul(n, 1664525) + 1013904223) >>> 0;
+    bytes[i] = n & 0xff;
+  }
+  return bytesToUuid(bytes);
 }
 
 export function getAnonymousId(): string {
@@ -58,6 +79,13 @@ export function getAnonymousId(): string {
   return anonymousId;
 }
 
+export type TelemetryPiiScrubConfig =
+  | boolean
+  | {
+      /** Extra property/context keys to redact (case-insensitive). */
+      denyKeys?: string[];
+    };
+
 export type TelemetryConfig = {
   ingestUrl: string;
   app: string;
@@ -72,6 +100,12 @@ export type TelemetryConfig = {
   batchSize?: number;
   /** Capture Core Web Vitals (LCP, INP, CLS, TTFB) in browser. Default true. */
   webVitals?: boolean;
+  /**
+   * Optional client-side PII scrubbing before send (default off).
+   * Complements server ingest scrubbing — never rely on this alone.
+   * See https://github.com/Telemetry-Tracker/telemetry-tracker/blob/develop/docs/PII-SCRUBBING.md
+   */
+  piiScrub?: TelemetryPiiScrubConfig;
 };
 
 let config: TelemetryConfig | null = null;
@@ -157,12 +191,11 @@ function closeSessionKeepalive(endedAt: Date): void {
 }
 
 function startSession(): void {
+  const cfg = getConfigOrNull();
+  if (!cfg) return;
   sessionId = generateUUID();
   sessionStartedAt = new Date();
-  const cfg = getConfigOrNull();
-  if (cfg) {
-    void postSession(cfg);
-  }
+  void postSession(cfg);
 }
 
 function installBrowserSessionLifecycle(): void {
@@ -252,6 +285,10 @@ function installBrowserErrorHandlers(): void {
 }
 
 export function init(c: TelemetryConfig): void {
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
   if (sessionId) {
     endSession();
   }
@@ -271,6 +308,21 @@ export function init(c: TelemetryConfig): void {
   if (c.webVitals !== false) {
     installBrowserWebVitals();
   }
+}
+
+/**
+ * Stop ingesting: flush/end session, clear config and batch timer.
+ * Browser error and session listeners stay installed but no-op while config is unset.
+ */
+export function shutdown(): void {
+  flushEvents();
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
+  endSession();
+  config = null;
+  setWebVitalsCaptureEnabled(false);
 }
 
 function installBrowserWebVitals(): void {
@@ -389,6 +441,35 @@ function sendEventBatch(cfg: TelemetryConfig, batch: QueuedEvent[], keepalive: b
   }
 }
 
+function resolveClientPiiScrub(
+  cfg: TelemetryConfig | null
+): { denyKeys?: string[] } | null {
+  // Opt-in only: omitted / false / null → no client scrubbing.
+  if (cfg?.piiScrub == null || cfg.piiScrub === false) return null;
+  if (cfg.piiScrub === true) return {};
+  if (typeof cfg.piiScrub === "object") {
+    // `{ denyKeys: [] }` still enables default pattern/key scrubbing (no extra keys).
+    return {
+      ...(cfg.piiScrub.denyKeys && cfg.piiScrub.denyKeys.length > 0
+        ? { denyKeys: cfg.piiScrub.denyKeys }
+        : {}),
+    };
+  }
+  return null;
+}
+
+/** @internal exported for tests */
+export { resolveClientPiiScrub };
+
+function scrubEventProperties(
+  cfg: TelemetryConfig | null,
+  properties: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  const opts = resolveClientPiiScrub(cfg);
+  if (!opts || properties === undefined) return properties;
+  return scrubPiiRecord(properties, opts);
+}
+
 export function trackEvent(
   name: string,
   properties?: Record<string, unknown>
@@ -396,11 +477,12 @@ export function trackEvent(
   const cfg = getConfigOrNull();
   const interval = cfg?.batchInterval ?? DEFAULT_BATCH_INTERVAL;
   const batchSize = cfg?.batchSize ?? DEFAULT_BATCH_SIZE;
+  const scrubbedProperties = scrubEventProperties(cfg, properties ?? undefined);
   const item: QueuedEvent = {
     name,
     user_id: userId,
     session_id: sessionId ?? undefined,
-    properties: properties ?? undefined,
+    properties: scrubbedProperties,
   };
   if (interval > 0 && typeof setInterval !== "undefined") {
     eventQueue.push(item);
@@ -419,16 +501,26 @@ export function trackError(
   error: Error | { message: string; stack?: string },
   context?: Record<string, unknown>
 ): void {
-  if (!getConfigOrNull()) return;
+  const cfg = getConfigOrNull();
+  if (!cfg) return;
   const err = error instanceof Error ? error : { message: error.message, stack: error.stack };
   if (err && typeof err === "object" && (err as unknown as Record<symbol, boolean>)[REPORTED]) return;
-  const message = err instanceof Error ? err.message : err.message;
-  const stack = err instanceof Error ? err.stack : err.stack;
+  let message = err instanceof Error ? err.message : err.message;
+  let stack = err instanceof Error ? err.stack : err.stack;
+  let scrubbedContext = context ?? undefined;
+  const scrubOpts = resolveClientPiiScrub(cfg);
+  if (scrubOpts) {
+    message = scrubPiiText(message);
+    if (stack != null) stack = scrubPiiText(stack);
+    if (scrubbedContext != null) {
+      scrubbedContext = scrubPiiRecord(scrubbedContext, scrubOpts);
+    }
+  }
   if (err instanceof Error) (err as unknown as Record<symbol, boolean>)[REPORTED] = true;
   send("/ingest/error", {
     message,
     stack: stack ?? undefined,
-    context: context ?? undefined,
+    context: scrubbedContext,
     user_id: userId ?? undefined,
     session_id: sessionId ?? undefined,
   }).catch(() => {});

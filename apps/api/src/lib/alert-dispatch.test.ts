@@ -1,5 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { alertEventHref, recentAlertNotifications } from "./alert-dispatch.js";
+import { describe, expect, it, vi } from "vitest";
+import { alertEventHref, fireProjectAlert, recentAlertNotifications } from "./alert-dispatch.js";
+
+vi.mock("./notification-email-dispatch.js", () => ({
+  notifyProjectMembersByEmail: vi.fn(async () => undefined),
+}));
+
+vi.mock("./alert-webhook-dispatch.js", () => ({
+  enqueueAlertWebhookDeliveries: vi.fn(async () => 1),
+}));
+
+import { enqueueAlertWebhookDeliveries } from "./alert-webhook-dispatch.js";
+import { notifyProjectMembersByEmail } from "./notification-email-dispatch.js";
 
 describe("alertEventHref", () => {
   it("uses stored href when present", () => {
@@ -10,8 +21,127 @@ describe("alertEventHref", () => {
 
   it("falls back by rule for legacy rows without href", () => {
     expect(alertEventHref("ERROR_SPIKE", null)).toBe("/dashboard/errors");
+    expect(alertEventHref("ALERT_RULE", null)).toBe("/dashboard/errors");
     expect(alertEventHref("QUOTA_NEAR", null)).toBe("/dashboard/settings/billing");
     expect(alertEventHref("QUOTA_EXCEEDED", null)).toBe("/dashboard/settings/billing");
+  });
+});
+
+describe("fireProjectAlert", () => {
+  it("commits AlertEvent and webhook enqueue in one transaction", async () => {
+    const create = vi.fn(async () => ({ id: "ae1" }));
+    const enqueue = vi.mocked(enqueueAlertWebhookDeliveries);
+    enqueue.mockClear();
+    enqueue.mockResolvedValue(1);
+    vi.mocked(notifyProjectMembersByEmail).mockClear();
+
+    const tx = { alertEvent: { create } };
+    const prisma = {
+      $transaction: vi.fn(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
+    };
+
+    const ok = await fireProjectAlert(prisma as never, {
+      projectId: "p1",
+      rule: "ERROR_SPIKE",
+      dedupeKey: "alert:error_spike:p1:15:1",
+      title: "Spike",
+      body: "Many errors",
+      href: "/dashboard/errors",
+    });
+
+    expect(ok).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        projectId: "p1",
+        dedupeKey: "alert:error_spike:p1:15:1",
+      })
+    );
+    expect(notifyProjectMembersByEmail).toHaveBeenCalled();
+  });
+
+  it("honors destination filters for email and webhooks", async () => {
+    const create = vi.fn(async () => ({ id: "ae1" }));
+    const enqueue = vi.mocked(enqueueAlertWebhookDeliveries);
+    enqueue.mockClear();
+    enqueue.mockResolvedValue(0);
+    vi.mocked(notifyProjectMembersByEmail).mockClear();
+
+    const tx = { alertEvent: { create } };
+    const prisma = {
+      $transaction: vi.fn(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
+    };
+
+    const ok = await fireProjectAlert(prisma as never, {
+      projectId: "p1",
+      rule: "ALERT_RULE",
+      dedupeKey: "alert:rule:r1:15:1",
+      title: "Custom",
+      body: "Triggered",
+      href: "/dashboard/errors",
+      destinations: {
+        email: false,
+        webhookIds: ["33333333-3333-3333-3333-333333333333"],
+      },
+    });
+
+    expect(ok).toBe(true);
+    expect(enqueue).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        webhookIds: ["33333333-3333-3333-3333-333333333333"],
+      })
+    );
+    expect(notifyProjectMembersByEmail).not.toHaveBeenCalled();
+  });
+
+  it("keeps AlertEvent and enqueue in the same transaction callback", async () => {
+    const create = vi.fn(async () => ({ id: "ae1" }));
+    const enqueue = vi.mocked(enqueueAlertWebhookDeliveries);
+    enqueue.mockClear();
+    enqueue.mockRejectedValue(new Error("createMany failed"));
+
+    const tx = { alertEvent: { create } };
+    const prisma = {
+      $transaction: vi.fn(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
+    };
+
+    await expect(
+      fireProjectAlert(prisma as never, {
+        projectId: "p1",
+        rule: "ERROR_SPIKE",
+        dedupeKey: "alert:error_spike:p1:15:1",
+        title: "Spike",
+        body: "Many errors",
+        href: "/dashboard/errors",
+      })
+    ).rejects.toThrow("createMany failed");
+
+    // Real DB $transaction rolls back the AlertEvent insert with enqueue.
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns false on unique dedupe collision", async () => {
+    const prisma = {
+      $transaction: vi.fn(async () => {
+        const err = Object.assign(new Error("Unique constraint"), { code: "P2002" });
+        throw err;
+      }),
+    };
+
+    const ok = await fireProjectAlert(prisma as never, {
+      projectId: "p1",
+      rule: "ERROR_SPIKE",
+      dedupeKey: "alert:error_spike:p1:15:1",
+      title: "Spike",
+      body: "Many errors",
+      href: "/dashboard/errors",
+    });
+    expect(ok).toBe(false);
   });
 });
 

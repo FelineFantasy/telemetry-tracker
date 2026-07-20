@@ -29,6 +29,8 @@ export type EventListFilterInput = {
   platform?: string;
   release?: string;
   propertiesContains?: string;
+  /** Free text: each term matches name OR properties (AND across terms). */
+  q?: string;
   range: { gte?: Date; lte?: Date };
   /** When list range is all-time, counts use this window (aligned with summary KPIs). */
   eventCountRange?: { gte: Date; lte: Date };
@@ -199,6 +201,7 @@ function buildGroupedBaseWhereSql(
     platform: f.platform,
     release: f.release,
     propertiesContains: f.propertiesContains,
+    q: f.q,
   });
 }
 
@@ -376,6 +379,7 @@ export async function attachLatestEventIds(
     platform: f.platform,
     release: f.release,
     propertiesContains: f.propertiesContains,
+    q: f.q,
     names: rows.map((r) => r.name),
   });
 

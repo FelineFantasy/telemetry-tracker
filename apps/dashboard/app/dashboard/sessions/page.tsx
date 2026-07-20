@@ -6,10 +6,15 @@ import {
   type SessionsPageSummary,
 } from "@/app/components/dashboard/SessionsSummaryMetrics";
 import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
-import type { SessionsAnalyticsData } from "@/app/components/dashboard/SessionsAnalyticsPanels";
 import { type SessionsTableRow } from "@/app/components/dashboard/SessionsTable";
-import { redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault } from "@/lib/time-range";
+import { redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
+import {
+  appendListTimeRangeToParams,
+  isUnselectedTimeRange,
+  parseListTimeRangeOrDefault,
+  resolveMetricsUntilIso,
+} from "@/lib/time-range";
+import { CompareModeControl } from "@/app/components/dashboard/CompareModeControl";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -19,6 +24,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
+import { parseOverviewCompare } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const SESSIONS_PATH = "/dashboard/sessions";
@@ -40,12 +46,6 @@ async function getSessions(search: URLSearchParams) {
 
 async function getSessionsSummary(search: URLSearchParams): Promise<SessionsPageSummary | null> {
   const res = await dashboardApiFetch(`/api/sessions/summary?${search.toString()}`);
-  if (!res.ok) return null;
-  return res.json();
-}
-
-async function getSessionsAnalytics(search: URLSearchParams): Promise<SessionsAnalyticsData | null> {
-  const res = await dashboardApiFetch(`/api/sessions/analytics?${search.toString()}`);
   if (!res.ok) return null;
   return res.json();
 }
@@ -85,6 +85,7 @@ function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefi
     "range",
     "from",
     "to",
+    "metricsUntil",
     "q",
     "environment",
     "release",
@@ -93,6 +94,9 @@ function buildSessionsParamsRecord(sp: Record<string, string | string[] | undefi
     "sort",
     "order",
     "chartBucket",
+    "compare",
+    "compareFrom",
+    "compareTo",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -108,7 +112,7 @@ export default async function SessionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const currentParams = buildSessionsParamsRecord(sp);
+  let currentParams = buildSessionsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(SESSIONS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
@@ -127,6 +131,23 @@ export default async function SessionsPage({
     },
     "all"
   );
+
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    SESSIONS_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  if (pageAnchorIso) {
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
+  }
 
   const apiQuery = new URLSearchParams();
   if (appFilter) apiQuery.set("app", appFilter);
@@ -150,16 +171,21 @@ export default async function SessionsPage({
   if (order) apiQuery.set("order", order);
   if (chartBucket) apiQuery.set("chartBucket", chartBucket);
 
-  const pageAnchor = new Date();
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
+  const compare = parseOverviewCompare(firstQueryValue(sp.compare));
+  const compareFrom = firstQueryValue(sp.compareFrom);
+  const compareTo = firstQueryValue(sp.compareTo);
 
   const summaryQuery = new URLSearchParams(apiQuery);
   summaryQuery.delete("page");
   summaryQuery.delete("pageSize");
   summaryQuery.delete("sort");
   summaryQuery.delete("order");
+  if (compare !== "previous") summaryQuery.set("compare", compare);
+  if (compareFrom) summaryQuery.set("compareFrom", compareFrom);
+  if (compareTo) summaryQuery.set("compareTo", compareTo);
 
   let initialListData: {
     items: SessionsTableRow[];
@@ -169,17 +195,15 @@ export default async function SessionsPage({
     max_duration_sec: number;
   };
   let summary: SessionsPageSummary | null = null;
-  let analytics: SessionsAnalyticsData | null = null;
   let platforms: string[] = [];
   let environments: string[] = [];
   let releases: string[] = [];
   let countries: string[] = [];
   try {
-    const [data, opts, summaryData, analyticsData] = await Promise.all([
+    const [data, opts, summaryData] = await Promise.all([
       getSessions(apiQuery),
       getFilterOptions(appFilter || undefined),
       getSessionsSummary(summaryQuery),
-      getSessionsAnalytics(summaryQuery),
     ]);
     initialListData = {
       items: data.items ?? [],
@@ -193,7 +217,6 @@ export default async function SessionsPage({
     releases = opts.releases;
     countries = opts.countries;
     summary = summaryData;
-    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -220,6 +243,7 @@ export default async function SessionsPage({
       />
 
       <AnalyticsListShell>
+        <CompareModeControl path={SESSIONS_PATH} currentParams={currentParams} />
         {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
         {summary ? <SessionsUserCohortMetrics summary={summary} /> : null}
 
@@ -228,7 +252,7 @@ export default async function SessionsPage({
           urlParams={currentParams}
           initialListParams={initialListParams}
           initialData={initialListData}
-          analytics={analytics}
+          analyticsQueryString={summaryQuery.toString()}
           timeRange={timeRange}
           fromParam={from}
           toParam={to}

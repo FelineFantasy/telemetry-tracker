@@ -10,6 +10,7 @@ import {
   FilterRow,
 } from "@/app/components/dashboard/list-filters-ui";
 import { mergeListQuery } from "@/lib/list-filters-url";
+import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 
 export function OverviewScopeFilters({
   path,
@@ -51,10 +52,11 @@ export function OverviewScopeFilters({
   );
 
   const releaseOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "", label: "Any release" },
-      ...releases.map((value) => ({ value, label: value })),
-    ],
+    () => {
+      const opts = releaseFilterSelectOptions(releases);
+      // Overview uses "Any release" wording for the empty option.
+      return opts.map((o) => (o.value === "" ? { ...o, label: "Any release" } : o));
+    },
     [releases]
   );
 

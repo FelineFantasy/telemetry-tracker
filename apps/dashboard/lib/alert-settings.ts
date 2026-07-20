@@ -1,3 +1,11 @@
+export type ProjectAlertEmailRole = "OWNER" | "EDITOR" | "VIEWER";
+
+export type ProjectAlertEmailSettings = {
+  enabled: boolean;
+  roles: ProjectAlertEmailRole[];
+  additionalEmails: string[];
+};
+
 export type ProjectAlertSettings = {
   errorSpike: {
     enabled: boolean;
@@ -8,15 +16,22 @@ export type ProjectAlertSettings = {
     enabled: boolean;
     nearPercent: number;
   };
+  email: ProjectAlertEmailSettings;
 };
 
 export type AlertEventRow = {
   id: string;
-  rule: "ERROR_SPIKE" | "QUOTA_NEAR" | "QUOTA_EXCEEDED";
+  rule: "ERROR_SPIKE" | "QUOTA_NEAR" | "QUOTA_EXCEEDED" | "ALERT_RULE";
   title: string;
   body: string;
   href: string | null;
   firedAt: string;
+};
+
+export const DEFAULT_PROJECT_ALERT_EMAIL_SETTINGS: ProjectAlertEmailSettings = {
+  enabled: true,
+  roles: ["OWNER", "EDITOR"],
+  additionalEmails: [],
 };
 
 export const DEFAULT_PROJECT_ALERT_SETTINGS: ProjectAlertSettings = {
@@ -29,9 +44,45 @@ export const DEFAULT_PROJECT_ALERT_SETTINGS: ProjectAlertSettings = {
     enabled: true,
     nearPercent: 90,
   },
+  email: { ...DEFAULT_PROJECT_ALERT_EMAIL_SETTINGS },
 };
 
-function isSettings(value: unknown): value is ProjectAlertSettings {
+function isEmailRole(value: unknown): value is ProjectAlertEmailRole {
+  return value === "OWNER" || value === "EDITOR" || value === "VIEWER";
+}
+
+function parseEmailSettings(raw: unknown): ProjectAlertEmailSettings {
+  if (typeof raw !== "object" || raw === null) {
+    return { ...DEFAULT_PROJECT_ALERT_EMAIL_SETTINGS };
+  }
+  const o = raw as Record<string, unknown>;
+  if (typeof o.enabled !== "boolean" || !Array.isArray(o.roles)) {
+    return { ...DEFAULT_PROJECT_ALERT_EMAIL_SETTINGS };
+  }
+  const roles = o.roles.filter(isEmailRole);
+  if (roles.length === 0) {
+    return { ...DEFAULT_PROJECT_ALERT_EMAIL_SETTINGS };
+  }
+  const additionalEmails = Array.isArray(o.additionalEmails)
+    ? [
+        ...new Set(
+          o.additionalEmails
+            .filter((e): e is string => typeof e === "string")
+            .map((e) => e.trim().toLowerCase())
+            .filter((e) => e.includes("@"))
+        ),
+      ].slice(0, 10)
+    : [];
+  return {
+    enabled: o.enabled,
+    roles: [...new Set(roles)],
+    additionalEmails,
+  };
+}
+
+function isSettings(value: unknown): value is Omit<ProjectAlertSettings, "email"> & {
+  email?: unknown;
+} {
   if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
   const es = o.errorSpike;
@@ -51,11 +102,31 @@ function isSettings(value: unknown): value is ProjectAlertSettings {
 }
 
 export function parseProjectAlertSettings(raw: unknown): ProjectAlertSettings {
-  return isSettings(raw) ? raw : DEFAULT_PROJECT_ALERT_SETTINGS;
+  if (!isSettings(raw)) return { ...DEFAULT_PROJECT_ALERT_SETTINGS, email: { ...DEFAULT_PROJECT_ALERT_EMAIL_SETTINGS } };
+  return {
+    errorSpike: raw.errorSpike,
+    quota: raw.quota,
+    email: parseEmailSettings(raw.email),
+  };
 }
 
 export function alertSettingsEqual(a: ProjectAlertSettings, b: ProjectAlertSettings): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function formatAdditionalEmailsInput(emails: string[]): string {
+  return emails.join("\n");
+}
+
+export function parseAdditionalEmailsInput(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split(/[\n,;]+/)
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => e.includes("@") && e.length <= 254)
+    ),
+  ].slice(0, 10);
 }
 
 export function ruleLabel(rule: AlertEventRow["rule"]): string {
@@ -66,6 +137,8 @@ export function ruleLabel(rule: AlertEventRow["rule"]): string {
       return "Quota warning";
     case "QUOTA_EXCEEDED":
       return "Quota exceeded";
+    case "ALERT_RULE":
+      return "Alert rule";
     default:
       return rule;
   }

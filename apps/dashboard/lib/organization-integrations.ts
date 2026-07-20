@@ -6,6 +6,8 @@ export type IntegrationId =
   | "webhooks"
   | "slack"
   | "discord"
+  | "microsoft_teams"
+  | "telegram"
   | "github";
 
 export type IntegrationScope = "organization" | "project";

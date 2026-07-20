@@ -4,6 +4,10 @@
  */
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
+import {
+  releaseFilterMatchSql,
+  sessionEffectiveReleaseFilterSql,
+} from "./release-key.js";
 
 export type OverviewSeriesBucket = "hour" | "day" | "week";
 
@@ -143,7 +147,7 @@ async function queryEventBuckets(
     ? Prisma.sql`AND e."platform" = ${platformFilter}`
     : Prisma.empty;
   const releaseClause = releaseFilter
-    ? Prisma.sql`AND e."release" = ${releaseFilter}`
+    ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`e."release"`, releaseFilter)}`
     : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT
@@ -182,68 +186,23 @@ export function overviewSessionBucketEnvironmentExistsSql(
   )`;
 }
 
-function overviewSessionEventExistsSql(
-  projectId: string,
-  since: Date,
-  until: Date,
-  extra: Prisma.Sql,
-  sessionAlias = "s"
-): Prisma.Sql {
-  const s = Prisma.raw(`"${sessionAlias}"`);
-  return Prisma.sql`EXISTS (
-    SELECT 1 FROM "Event" e
-    WHERE e."project_id" = ${projectId}
-      AND e."session_id" = ${s}."session_id"
-      AND e."app" = ${s}."app"
-      AND ${extra}
-      AND e."created_at" >= ${since}
-      AND e."created_at" <= ${until}
-  )`;
-}
-
-function overviewSessionEnvReleaseScopeSql(
+/** @internal Exported for unit tests. */
+export function overviewSessionEnvReleaseScopeSql(
   projectId: string,
   since: Date,
   until: Date,
   environmentFilter?: string,
-  releaseFilter?: string
+  releaseFilter?: string,
+  platformFilter?: string
 ): Prisma.Sql {
   if (environmentFilter && releaseFilter) {
+    // Match Release Health: Session.environment must equal the filter (no NULL-env fallback).
     return Prisma.sql`AND (
-      (
-        s."environment" = ${environmentFilter}
-        AND s."release" = ${releaseFilter}
-      )
-      OR (
-        s."environment" IS NULL
-        AND s."release" IS NULL
-        AND ${overviewSessionEventExistsSql(
-          projectId,
-          since,
-          until,
-          Prisma.sql`e."environment" = ${environmentFilter} AND e."release" = ${releaseFilter}`
-        )}
-      )
-      OR (
-        s."environment" = ${environmentFilter}
-        AND s."release" IS NULL
-        AND ${overviewSessionEventExistsSql(
-          projectId,
-          since,
-          until,
-          Prisma.sql`e."release" = ${releaseFilter}`
-        )}
-      )
-      OR (
-        s."environment" IS NULL
-        AND s."release" = ${releaseFilter}
-        AND ${overviewSessionEventExistsSql(
-          projectId,
-          since,
-          until,
-          Prisma.sql`e."environment" = ${environmentFilter}`
-        )}
-      )
+      s."environment" = ${environmentFilter}
+      AND ${sessionEffectiveReleaseFilterSql(projectId, "s", releaseFilter, {
+        environment: environmentFilter,
+        platform: platformFilter,
+      })}
     )`;
   }
   if (environmentFilter) {
@@ -261,18 +220,12 @@ function overviewSessionEnvReleaseScopeSql(
     )`;
   }
   if (releaseFilter) {
-    return Prisma.sql`AND (
-      s."release" = ${releaseFilter}
-      OR (
-        s."release" IS NULL
-        AND ${overviewSessionEventExistsSql(
-          projectId,
-          since,
-          until,
-          Prisma.sql`e."release" = ${releaseFilter}`
-        )}
-      )
-    )`;
+    return Prisma.sql`AND ${sessionEffectiveReleaseFilterSql(
+      projectId,
+      "s",
+      releaseFilter,
+      { platform: platformFilter }
+    )}`;
   }
   return Prisma.empty;
 }
@@ -297,7 +250,8 @@ async function querySessionBuckets(
     since,
     until,
     environmentFilter,
-    releaseFilter
+    releaseFilter,
+    platformFilter
   );
   const trunc = bucket === "week" ? "week" : bucket;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
@@ -335,7 +289,7 @@ async function queryErrorBuckets(
     ? Prisma.sql`AND eo."platform" = ${platformFilter}`
     : Prisma.empty;
   const releaseClause = releaseFilter
-    ? Prisma.sql`AND eo."release" = ${releaseFilter}`
+    ? Prisma.sql`AND ${releaseFilterMatchSql(Prisma.sql`eo."release"`, releaseFilter)}`
     : Prisma.empty;
   return prisma.$queryRaw<{ bucket: Date; c: bigint }[]>(Prisma.sql`
     SELECT

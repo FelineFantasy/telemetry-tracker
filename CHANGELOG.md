@@ -13,6 +13,383 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Database
+
+---
+
+## [1.17.3] - 2026-07-19
+
+### Changed
+
+- **Docs** — mark Performance / Web Vitals, Releases, and Global search as shipped in README (EN/DE/ES) and site `/docs/dashboard`; mark roadmap milestones v1.16.x and v1.17.x as shipped
+
+---
+
+## [1.17.2] - 2026-07-19
+
+### Added
+
+- **Performance Overview card** — Overview Web Vitals snapshot (LCP, INP/FID, CLS, TTFB) with Good / Needs improvement / Poor classification, rating distribution bars, scoped `View report →` to Performance, and empty-state handling when no vitals exist ([#197](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/197); milestone v1.17.x — Performance Intelligence)
+
+---
+
+## [1.17.1] - 2026-07-19
+
+### Fixed
+
+- **Concurrent error-group create race** — `findOrCreateErrorGroup` now handles Prisma P2002 on unique `(project_id, fingerprint)` by re-fetching the existing group and incrementing occurrences (`isNew: false`), so concurrent `POST /ingest/error` no longer 500s ([#599](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/599))
+
+---
+
+## [1.17.0] - 2026-07-19
+
+### Added
+
+- **Slow routes & slow pages** — Performance page tables for slowest `$request` routes (method, path, count, p50/p95, error rate) and `$web_vital` pages (path, LCP p75, CLS, samples), with pagination, small-sample callouts, and scope-preserving deep links to Events ([#196](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/196); milestone v1.17.x — Performance Intelligence)
+- **Compare periods** — explicit period-comparison mode across Overview, Errors, Events, and Sessions with calendar presets (Today vs Yesterday, week, month; UTC), equal-duration custom ranges (`compare` / `compareFrom` / `compareTo`), unified New/— delta formatting, and release-vs-previous “New” handling on Releases ([#495](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/495); milestone v1.17.x — Performance Intelligence)
+- **Product update email on milestone close** — closing a `vX.Y.x — …` GitHub milestone auto-sends the line-close product email (latest tag on that minor + previous minor final); tag pushes still skip; workflow `dry_run` input for previews ([docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md))
+
+### Changed
+
+- **Bugbot gate paused** — `bugbot-review` required check is a reversible no-op (`BUGBOT_REVIEW_ENABLED=false` in [`.github/workflows/bugbot-review.yml`](.github/workflows/bugbot-review.yml)); flip to `true` to restore the Cursor Bugbot wait for maintainer PRs ([CONTRIBUTING.md](CONTRIBUTING.md#ai-code-review-bugbot))
+
+---
+
+## [1.16.7] - 2026-07-19
+
+### Fixed
+
+- **Dependabot #45 / Sentry 10** — upgrade `@sentry/node` and `@sentry/nextjs` to v10 so transitive `@opentelemetry/core` lands on ≥2.8.0 (unbounded W3C baggage parse); move dashboard client init to `instrumentation-client.ts` and update `withSentryConfig` for Sentry 10 ([#590](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/590))
+- **GitHub Code Quality findings** — clear open dashboard quality alerts (dead null checks, trivial conditionals, unused locals) ([#591](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/591))
+
+---
+
+## [1.16.6] - 2026-07-19
+
+### Fixed
+
+- **CodeQL medium / Actions hygiene** — harden GitHub Actions (`permissions`, pin `pnpm/action-setup`, env-based composite inputs), sanitize CR/LF in email/dashboard debug logs, and harden publish CLI (`execFile` + validated OTP args) ([#586](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/586))
+- **Dependabot moderate/low alerts** — resolve transitive advisories via pnpm overrides for `js-yaml`, `yaml`, `postcss`, `uuid`, `brace-expansion`, `@babel/core`, `esbuild`, and `diff` ([#587](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/587)). **Still open:** Dependabot [#45](https://github.com/Telemetry-Tracker/telemetry-tracker/security/dependabot/45) (`@opentelemetry/core`) blocked on Sentry 9→10 (OTel 2.x)
+
+---
+
+## [1.16.5] - 2026-07-19
+
+### Fixed
+
+- **Quota alert plan context** — avoid Prisma required-relation null errors in `loadPlanContextForProject` when ingest fire-and-forget quota hooks race org cascade deletes (integration teardown), and swallow alert load failures so they cannot fail the request ([#583](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/583))
+
+---
+
+## [1.16.4] - 2026-07-19
+
+### Fixed
+
+- **Dependabot high alerts** — resolve high-severity transitive dependency alerts via lockfile upgrades and pnpm overrides: `next` (≥15.5.18), `ws` (7.5.11 / 8.21.1), `defu` (≥6.1.5), `lodash` (4.18.1), and `effect` (≥3.20.0) ([#581](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/581))
+
+---
+
+## [1.16.3] - 2026-07-19
+
+### Fixed
+
+- **CodeQL high alerts** — prefer Web Crypto for client UUID generation (non-`Math.random` fallback), replace polynomial email/slug regexes with linear checks, and correct smoke-test email assertion anchors ([#578](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/578))
+- **Project slug trim order** — trim leading/trailing separators before the length clamp so a leading dash does not steal a character from the 64-char budget ([#578](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/578))
+
+---
+
+## [1.16.2] - 2026-07-19
+
+### Fixed
+
+- **Dashboard API SSRF hardening** — restrict `dashboardApiFetch` to relative `/api` paths on `API_BASE_URL` and validate error group ids before path interpolation ([#574](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/574); CodeQL #12)
+- **Dashboard API URL join** — preserve an `API_URL` path prefix when resolving `/api/...` paths, and treat non-UUID error/event/session route ids as not-found instead of throwing in the URL resolver ([#576](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/576))
+- **shell-quote CVE-2026-9277** — pin transitive `shell-quote` to `>=1.8.4` via pnpm override for Dependabot alert #38 ([#575](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/575))
+
+---
+
+## [1.16.1] - 2026-07-19
+
+### Added
+
+- **Global Search** — project-scoped search across issues, events, sessions, releases, and users (`/dashboard/search`, `GET /api/search`) with free text and `key:value` filters; grouped results (8 per group), keyboard navigation, ignored-key feedback, and View all deep links ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494); [#571](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/571); milestone v1.16.x — Release Intelligence)
+
+### Fixed
+
+- **Global Search list parity** — align hits and View all with Issues/Events/Sessions filters: effective-release + NULL-env fallback, `metricsUntil` / nav time windows, release activity window, recent-user ranking, URL tokens as free text, AND multi-word `q`, and pending-nav submit guard ([#494](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/494))
+- **Dashboard Sentry client capture** — re-check `window` inside async product-telemetry callbacks so Vitest teardown cannot throw `window is not defined` after `captureClientException`
+
+---
+
+## [1.16.0] - 2026-07-18
+
+### Added
+
+- **Releases Health** — enable `/dashboard/releases` (nav + Quick Action) with per-release sessions, active users, events, errors, adoption share, and error rate; environment/platform/date-range filters; sort by recency/adoption/errors/error rate; vs-previous-release deltas (Unknown excluded from the comparison chain); deep links to Issues/Events/Sessions ([#453](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/453); [#568](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/568); milestone v1.16.x — Release Intelligence)
+- **`GET /api/releases/summary`** — aggregates release health KPIs including an explicit **Unknown** bucket in the adoption denominator
+- **`release=__unknown__` filter** — URL allow-list, list/overview filters with TRIM matching, and Unknown option in release pickers so deep links never rely on an empty `release=` param
+
+### Fixed
+
+- **Release filter attribution** — align Unknown and known-release filters across Prisma/SQL lists, Overview KPIs/active users, issue-detail occurrences, and event-release fallback (platform-scoped; all-time for known releases; exclude event-fallback sessions from Unknown)
+- **metricsUntil deep links** — honor and preserve `metricsUntil` across Overview, Release Health links, list toolbars, and nav tab switches so open-ended KPI windows stay consistent
+
+---
+
+## [1.15.9] - 2026-07-18
+
+### Fixed
+
+- **Email brand logo in Gmail** — embed the mark as a CID inline attachment instead of a hotlinked URL so Gmail Image Proxy / Cloudflare no longer shows a broken placeholder ([#559](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/559))
+
+---
+
+## [1.15.8] - 2026-07-18
+
+### Added
+
+- **GitHub CodeQL Advanced** — CI workflow scans `actions` and `javascript-typescript` on pushes/PRs to `develop`/`main`, plus a weekly schedule ([#561](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/561))
+
+---
+
+## [1.15.7] - 2026-07-18
+
+### Changed
+
+- **Docs staleness pass** — align RELEASE / PRODUCTION-READINESS / ROADMAP / MONITORING with shipped Notifications + Alert Rules, Railway `alert-rules-evaluator` cron (leave `brief-worker` alone), and corrected ops notes (CI does not migrate production; Slack/Discord Delivery shipped) ([#556](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/556))
+
+---
+
+## [1.15.6] - 2026-07-18
+
+### Fixed
+
+- **Settings Field label association** — `Field` and `SettingsToggle` wire `htmlFor` / `id` so settings labels activate their controls (alerts, notifications, preferences, labs) ([#460](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/460))
+
+### Changed
+
+- **Product update email on line close** — send when finishing the last intended release of a minor (`vX.Y.*`), summarizing the whole line since the previous product email; do not auto-send on the first `.0` of the next milestone. Workflow `line_close` + `--line-close` compose full-minor CHANGELOG; mid-line patches stay skip ([#553](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/553); [docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md), [docs/RELEASE.md](docs/RELEASE.md))
+
+---
+
+## [1.15.5] - 2026-07-18
+
+### Changed
+
+- **Dependency security bumps** — Dependabot group update: `fastify` 5.8.5, `next` 15.5.18, `postcss` 8.5.10, `vitest` 3.2.6, plus transitive `fast-uri` / `picomatch` ([#551](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/551))
+
+---
+
+## [1.15.4] - 2026-07-18
+
+### Changed
+
+- **Vite dependency alignment** — pin `vite@7.3.5` via root `pnpm.overrides` (Dependabot bump from 7.3.2) so the monorepo resolves a single patched Vite ([#545](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/545))
+
+---
+
+## [1.15.3] - 2026-07-18
+
+### Fixed
+
+- **Production smoke billing portal probe** — `scripts/smoke-production.sh` sends `-d '{}'` with `Content-Type: application/json` on `POST …/billing/portal` so Fastify no longer rejects an empty body (Sentry `FastifyError` during v1.15.2 smoke) ([#547](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/547))
+
+---
+
+## [1.15.2] - 2026-07-18
+
+### Added
+
+- **Alert rules built-in integration** — error-spike and quota alerts are system-managed `AlertRule` rows (`source=SYSTEM`, stable `migration_key`); idempotent ensure/backfill from `alert_settings`; dual-write via alert-settings API; custom CRUD/evaluators skip SYSTEM so delivery stays on `fireProjectAlert` with legacy dedupe keys ([#535](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/535); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+- **Alert rules dashboard UX** — edit existing rules, multi-condition (AND) authoring matching the API, clearer opaque destination picker, and validation/empty-state polish on Alerts → Custom rules ([#533](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/533); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+- **Alert rules conditions + scheduled evaluator** — API support for `ERROR_RATE`, `SESSION_DROP`, `NEW_ERROR_GROUP`, `AFFECTED_USERS`, `QUOTA_PERCENT`, `NO_EVENTS`, and `HEARTBEAT`; skip-safe unknown condition types; ingest + scheduled evaluation paths with shared `last_fired_at` cooldown into `fireProjectAlert`; cron entrypoint `alert-rules-evaluator` ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534); parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493))
+
+### Fixed
+
+- **Event ingest environment normalization** — `/event` and `/batch` now trim/cap `environment` like sessions and errors so AlertRule `NO_EVENTS` / `HEARTBEAT` environment filters match stored rows ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534))
+- **Alert rule cooldown** — fires are gated by elapsed time since `last_fired_at` (atomic claim), not wall-clock dedupe buckets, so scheduled conditions cannot re-fire when a cooldown bucket rolls ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534))
+- **Scheduled alert-rules org gate** — evaluator skips soft-deleted projects and soft-deleted organizations, matching ingest API-key auth ([#534](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/534))
+
+### Changed
+
+- **Alert rules docs / ops** — [docs/ALERT-RULES.md](docs/ALERT-RULES.md) and [docs/RAILWAY.md](docs/RAILWAY.md) document scheduled evaluation cadence (`ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`, default 5); built-in spike/quota migration and dual-write noted in ALERT-RULES
+
+### Database
+
+- `AlertRule.source` / `system_kind` / `migration_key` for system-managed built-in rules (`20260718140000_alert_rule_system_builtin`)
+- `AlertRule.last_fired_at` for concurrency-safe cooldown claims (`20260718120000_alert_rule_last_fired_at`)
+
+## [1.15.1] - 2026-07-17
+
+### Fixed
+
+- **Marketing reserved email domains** — reject RFC/example reserved domains (e.g. `example.com`, `*.test`) on marketing subscribe, and skip those addresses when sending product update emails so Resend 422s no longer abort release broadcasts ([#539](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/539))
+
+---
+
+## [1.15.0] - 2026-07-17
+
+### Added
+
+- **Alert rules (foundation)** — configurable per-project rules with `Condition[]` (AND), opaque `destinationIds` resolved by Notifications (`project-email` + `ProjectWebhook` ids), Alerts → Custom rules CRUD, and ingest-time evaluation for `ERROR_COUNT` with cooldown dedupe into existing `fireProjectAlert` fan-out ([#532](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/532); parent vision [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); milestone v1.15.x). Rules decide conditions → trigger → bindings; Notifications owns delivery.
+- **Alert Rules docs** — [docs/ALERT-RULES.md](docs/ALERT-RULES.md) separation of concerns, condition model, and destination binding notes; ALERT-WEBHOOKS cross-links updated
+
+### Database
+
+- `AlertRule` table (`conditions` JSON AND-array, `destination_ids` opaque refs); `AlertRuleType.ALERT_RULE` for custom-rule firings (`20260717220000_alert_rules`)
+- `ErrorOccurrence.environment` for accurate alert-rule environment scope (group-level env remains a last-seen tag only) (`20260717223000_error_occurrence_environment`)
+
+---
+
+## [1.14.4] - 2026-07-17
+
+### Fixed
+
+- **Alert webhook delivery on Node 24** — pinned HTTPS `lookup` now returns an address array when Node requests `{ all: true }`, fixing `Invalid IP address: undefined` delivery failures
+
+### Changed
+
+- **Release process** — document merge-only-when-required-checks-are-green and milestone close-out notes ([#526](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/526))
+
+---
+
+## [1.14.3] - 2026-07-17
+
+### Added
+
+- **Slack alert notifications** — add Slack Incoming Webhook destinations on Alerts → Delivery; worker POSTs Slack Block Kit–compatible JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Slack connected when an enabled Slack destination exists ([#223](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/223); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492); builds on [#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225))
+- **Discord alert notifications** — add Discord webhook destinations on Alerts → Delivery; worker POSTs embed JSON (title, body, rule, dashboard link) when alerts fire; Integrations catalog marks Discord connected when an enabled Discord destination exists ([#224](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/224); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+- **Telegram and Microsoft Teams alert channels** — add Teams Incoming Webhook and Telegram Bot API (`sendMessage` + chat id) destinations on Alerts → Delivery; Integrations catalog marks each connected when an enabled destination exists ([#500](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/500); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+### Database
+
+- `ProjectWebhook.provider` (`GENERIC` | `SLACK` | `DISCORD` | `MICROSOFT_TEAMS` | `TELEGRAM`) and optional `config` JSON for provider-specific non-secret settings (e.g. Telegram chat id)
+
+---
+
+## [1.14.2] - 2026-07-17
+
+### Added
+
+- **Email alert delivery** — branded templates for error spike, new error, quota near/exceeded, and generic/custom alerts; per-project email recipients (roles + additional addresses) on Alerts → Email recipients; quiet hours apply to email as well as in-app; temporary mute and digest preference hooks in Settings → Notifications ([#499](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/499); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+---
+
+## [1.14.1] - 2026-07-17
+
+### Added
+
+- **Notification Center** — `/dashboard/notifications` inbox with day grouping, read/unread, project and type filters, and links into the dashboard; bell feed gains a “View all” entry while remaining the compact active-project preview ([#508](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/508); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+---
+
+## [1.14.0] - 2026-07-17
+
+### Added
+
+- **Alert webhooks** — configure HTTPS destinations per project on Alerts → Delivery; `fireProjectAlert` enqueues durable `PENDING` deliveries (worker POSTs signed `alert.fired` JSON with DNS-pinned SSRF checks + retry); operators can browse delivery status in the same Delivery section ([#225](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/225); parent vision [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492))
+
+### Database
+
+- `ProjectWebhook` and `AlertWebhookDelivery` tables for outbound alert webhook destinations; delivery rows use claim/lease fields (`PENDING`/`PROCESSING`, `lease_owner`, `lease_expires_at`, `next_attempt_at`) plus attempt/dead-letter history
+
+---
+
+## [1.13.2] - 2026-07-17
+
+### Fixed
+
+- **Navigation overlay** — profile/settings links from the user menu, quick actions, and theme entry use the shared nav loader; soft navigations keep the overlay visible for a short minimum so fast settings pages still show it ([#503](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/503))
+
+---
+
+## [1.13.1] - 2026-07-17
+
+### Fixed
+
+- **Navigation overlay** — after a workspace/project switch, keep the full-screen loader until the refresh settle hold finishes (not only when the nav scope ack arrives), so list/overview RSC is less likely to flash stale data
+
+---
+
+## [1.13.0] - 2026-07-17
+
+### Added
+
+- Dashboard: full-screen loading overlay while switching app, environment, workspace, project, section tabs, settings pages, time range, and command-palette / keyboard navigation ([#484](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/484)).
+- **Rename project** — owners can update project name and slug from Settings → Organization; project switcher “Rename this project” links to the edit form ([#480](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/480))
+- **Rename workspace** — owners can update the organization name from Settings → Organization; org switcher “Rename your workspace” links to the edit form ([#482](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/482))
+
+### Fixed
+
+- **Overview session counts** — fix Postgres syntax error (42601 near `s`) on `GET /api/overview` when environment or release filters are set (missing `AND` before upper-bound `started_at` / `created_at` clauses) ([#490](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/490))
+
+### Changed
+
+- Dashboard: errors, events, and sessions list pages load filters, summary, and the table first; analytics panels render below the list and fetch after paint so above-the-fold content is not blocked ([#486](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/486)).
+
+---
+
+## [1.12.1] - 2026-07-17
+
+### Fixed
+
+- **Logout** — Log out no longer closes the user menu before the server action runs (which aborted logout and left the session cookie intact)
+
+---
+
+## [1.12.0] - 2026-07-16
+
+### Added
+
+- **Ingest PII scrubbing** — default server-side redaction of emails, tokens, API keys, and sensitive keys in error messages/stacks/context and event properties before persistence; disable with `TELEMETRY_INGEST_PII_SCRUB=false` ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
+- **PII scrubbing (Phase 2)** — optional SDK `piiScrub` in `@telemetry-tracker/core` 1.4.0; project deny-list keys (`pii_scrub_settings`) on Alerts; ingest merges deny-keys with server defaults ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
+- **PII scrubbing (Phase 3a)** — phone / payment-card text heuristics; opt-in `scrubSessionUserEmail`; organization audit events on PII settings changes ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
+- **PII scrubbing (Phase 3b)** — opt-in CLI backfill for stored events/errors/sessions (`pnpm --filter api pii-scrub-backfill`) ([#470](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/470))
+
+### Database
+
+- Migration `20260716200000_project_pii_scrub_settings` — `Project.pii_scrub_settings` JSON
+
+### Fixed
+
+- **Alerts PII settings** — failed or invalid settings responses no longer crash the page or allow saving empty deny-keys that would wipe stored project keys
+
+---
+
+## [1.11.3] - 2026-07-16
+
+### Fixed
+
+- **Errors summary** — avoid `Prisma.join([])` crash on `GET /api/errors/summary` when no release/platform filter is set ([#468](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/468))
+
+---
+
+## [1.11.2] - 2026-07-16
+
+### Fixed
+
+- **Dashboard Docker build** — commit missing `@telemetry-tracker/core` `device-context` dist artifacts; rebuild workspace packages in the Dockerfile before `next build` so Railway does not fail with `Can't resolve './device-context.js'`
+
+---
+
+## [1.11.1] - 2026-07-16
+
+### Added
+
+- **Product telemetry (dogfood)** — optional `@telemetry-tracker/next` on `/dashboard` for visits, sessions, and browser errors when `NEXT_PUBLIC_TELEMETRY_INGEST_URL` + `NEXT_PUBLIC_TELEMETRY_API_KEY` are set (marketing/docs unchanged) ([#463](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/463))
+- **SDK** — `shutdown()` in `@telemetry-tracker/core` / `@telemetry-tracker/next`; `TelemetryProvider` tears down on unmount so leaving `/dashboard` stops ingest ([#463](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/463))
+- **SDK** — `TelemetryProvider` inits in `useLayoutEffect` so the first `useTrackPage` screen attaches to the new session ([#464](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/464))
+
+---
+
+## [1.11.0] - 2026-07-16
+
+### Added
+
 - **Errors platform** — persist `platform` on error groups/occurrences; Platform filter on Errors; include in filter-options ([#445](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/445))
 - **Session environment & release** — store on `Session` at ingest; SDK sends `release` on session payloads; filters prefer session columns with event fallback ([#446](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/446), [#447](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/447))
 - **Overview scope** — Platform and Release filters on Overview ([#445](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/445), [#448](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/448))
@@ -75,6 +452,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 - **Time range picker** — clearer copy when the table is unfiltered but charts use a recent window ([#422](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/422), [#427](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/427))
 
 ---
+
+## [1.8.11] - 2026-07-14
 
 ### Added
 
@@ -526,7 +905,9 @@ Continues the **v1.5.0 — Analytics dashboard** milestone ([#182](https://githu
 
 ---
 
-First release of the **v1.5.0 — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
+## [1.5.0] - 2026-07-07
+
+First release of the **v1.5.x — Analytics dashboard** milestone ([#181](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/181)).
 
 ### Added
 

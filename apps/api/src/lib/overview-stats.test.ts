@@ -4,15 +4,23 @@ import {
   buildWorkspaceTelemetry,
   computeOverviewHealth,
   errorGroupDetailHref,
+  overviewEnvironmentSessionCountSql,
   overviewEnvironmentSessionCountUpperClauses,
+  overviewReleaseActiveUsersCountSql,
   resolveCompareWindow,
 } from "./overview-stats.js";
+import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
 function prismaSqlText(fragment: Prisma.Sql): string {
   return fragment.strings.reduce(
     (acc, part, i) => acc + part + (fragment.values[i] ?? ""),
     ""
   );
+}
+
+/** Collapse whitespace so SQL shape assertions stay readable. */
+function normalizeSql(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
 }
 
 describe("resolveCompareWindow", () => {
@@ -71,8 +79,12 @@ describe("overviewEnvironmentSessionCountUpperClauses", () => {
       environment: "production",
     });
 
-    expect(prismaSqlText(clauses.session)).toContain("<=");
-    expect(prismaSqlText(clauses.event)).toContain("<=");
+    expect(normalizeSql(prismaSqlText(clauses.session))).toContain(
+      'AND s."started_at" <='
+    );
+    expect(normalizeSql(prismaSqlText(clauses.event))).toContain(
+      'AND e."created_at" <='
+    );
   });
 
   it("uses exclusive upper bounds for the previous compare window", () => {
@@ -87,9 +99,239 @@ describe("overviewEnvironmentSessionCountUpperClauses", () => {
       previousUntil
     );
 
-    expect(prismaSqlText(clauses.session)).toContain("<");
-    expect(prismaSqlText(clauses.session)).not.toContain("<=");
-    expect(prismaSqlText(clauses.event)).toContain("<");
+    expect(normalizeSql(prismaSqlText(clauses.session))).toContain(
+      'AND s."started_at" <'
+    );
+    expect(normalizeSql(prismaSqlText(clauses.session))).not.toContain("<=");
+    expect(normalizeSql(prismaSqlText(clauses.event))).toContain(
+      'AND e."created_at" <'
+    );
+  });
+});
+
+describe("overviewEnvironmentSessionCountSql", () => {
+  const since = new Date("2026-07-16T02:00:00.000Z");
+  const until = new Date("2026-07-17T02:00:00.000Z");
+  const previousUntil = since;
+
+  it("keeps AND before session upper bound (Sentry 42601 near s)", () => {
+    // Mirrors GET /api/overview?range=24h&environment=development&… compare window.
+    const sql = overviewEnvironmentSessionCountSql(
+      {
+        projectId: "proj_1",
+        since,
+        until,
+        environment: "development",
+      },
+      previousUntil
+    );
+    const text = normalizeSql(prismaSqlText(sql));
+
+    // Regression: missing AND produced `... >= <date> s."started_at" < ...` (42601 near "s").
+    expect(text).toMatch(/s\."started_at" >= .+ AND s\."started_at" </);
+    expect(text).not.toMatch(/started_at" >=\s+s\."started_at"/);
+    expect(text).toMatch(/e\."created_at" >= .+ AND e\."created_at" </);
+    expect(text).not.toMatch(/created_at" >=\s+e\."created_at"/);
+    expect(text).toContain('s."environment" =');
+  });
+
+  it("keeps AND for inclusive until on the current metrics window", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "development",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toMatch(/s\."started_at" >= .+ AND s\."started_at" <=/);
+    expect(text).toMatch(/e\."created_at" >= .+ AND e\."created_at" <=/);
+  });
+
+  it("excludes sessions with known event releases when filtering Unknown", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+  });
+
+  it("uses latest-event effective release for known release filters", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    // Blank/sentinel session releases normalize to NULL (not only SQL NULL).
+    expect(text).toContain("TRIM");
+    expect(text).not.toContain('s."release" IS NULL');
+  });
+
+  it("uses latest-event effective release for known release + environment", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('e."environment" =');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("scopes known-event exclusion by environment for Unknown + environment", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."environment" =');
+    expect(text).toContain('e."environment" =');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+  });
+
+  it("scopes latest-event fallback by platform when platform + release are set", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      platform: "ios",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."platform" =');
+    expect(text).toContain('e."platform" =');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("scopes known-event exclusion by platform for Unknown + platform", () => {
+    const sql = overviewEnvironmentSessionCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      platform: "android",
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."platform" =');
+    expect(text).toContain('e."platform" =');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+  });
+});
+
+describe("overviewReleaseActiveUsersCountSql", () => {
+  const since = new Date("2026-07-16T02:00:00.000Z");
+  const until = new Date("2026-07-17T02:00:00.000Z");
+
+  it("uses session effective release (not Event.release) for known filters", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('FROM "Session" s');
+    expect(text).toContain("COUNT(DISTINCT");
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+    expect(text).toContain("LIMIT 1");
+    // Session identities — not Event.release-only event-row counting.
+    expect(text).not.toContain('COALESCE(e."user_id", e."anonymous_id")');
+    expect(text).toContain('"s"."user_id"');
+    expect(text).toContain('"s"."anonymous_id"');
+  });
+
+  it("uses effective release IS NULL for Unknown filters", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      release: UNKNOWN_RELEASE_KEY,
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('FROM "Session" s');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain("IS NULL");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("matches Release Health env + release: session environment + effective release", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."environment" =');
+    expect(text).toContain("COALESCE");
+    expect(text).toContain('ORDER BY e."created_at" DESC');
+  });
+
+  it("scopes latest-event fallback by platform when platform + release are set", () => {
+    const sql = overviewReleaseActiveUsersCountSql({
+      projectId: "proj_1",
+      since,
+      until,
+      platform: "ios",
+      release: "1.2.0",
+    });
+    const text = normalizeSql(prismaSqlText(sql));
+
+    expect(text).toContain('s."platform" =');
+    expect(text).toContain('e."platform" =');
+    expect(text).toContain("COALESCE");
+  });
+
+  it("shares the same effective-release predicate shape as session counts", () => {
+    const scope = {
+      projectId: "proj_1",
+      since,
+      until,
+      environment: "production",
+      platform: "ios",
+      release: "1.2.0",
+    };
+    const sessionsText = normalizeSql(prismaSqlText(overviewEnvironmentSessionCountSql(scope)));
+    const usersText = normalizeSql(prismaSqlText(overviewReleaseActiveUsersCountSql(scope)));
+
+    // Both must apply the same COALESCE(session, latest known event) filter.
+    expect(usersText).toContain("COALESCE");
+    expect(sessionsText).toContain("COALESCE");
+    expect(usersText).toContain('s."environment" =');
+    expect(sessionsText).toContain('s."environment" =');
+    expect(usersText).toContain('e."platform" =');
+    expect(sessionsText).toContain('e."platform" =');
   });
 });
 
@@ -121,6 +363,31 @@ describe("errorGroupDetailHref", () => {
         range: "none",
       })
     ).toBe("/dashboard/errors/eg_1?app=web&platform=ios&range=none");
+  });
+
+  it("includes metricsUntil for open-ended KPI window deep links", () => {
+    expect(
+      errorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
+  });
+
+  it("includes metricsSince with metricsUntil for Overview exact-window deep links", () => {
+    expect(
+      errorGroupDetailHref("eg_1", {
+        app: "web",
+        range: "none",
+        metricsSince: "2026-03-08T12:00:00.000Z",
+        metricsUntil: "2026-03-15T12:00:00.000Z",
+      })
+    ).toBe(
+      "/dashboard/errors/eg_1?app=web&range=none&metricsSince=2026-03-08T12%3A00%3A00.000Z&metricsUntil=2026-03-15T12%3A00%3A00.000Z"
+    );
   });
 
   it("omits query string when no scope filters are set", () => {

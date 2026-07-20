@@ -5,7 +5,7 @@ export function Badge({
   variant = "outline",
 }: {
   children: string;
-  variant?: "outline" | "secondary" | "brand" | "success" | "destructive";
+  variant?: "outline" | "secondary" | "brand" | "success" | "warning" | "destructive";
 }) {
   return (
     <ShadBadge variant={variant} className="font-mono text-[10px] font-normal uppercase tracking-wider">

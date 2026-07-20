@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  emptyReleaseEmailAudienceMessage,
   isReleaseEmailBroadcastComplete,
   pendingReleaseEmailRecipients,
 } from "./release-email-send.js";
@@ -26,5 +27,25 @@ describe("pendingReleaseEmailRecipients", () => {
       { id: "a" },
       { id: "c" },
     ]);
+  });
+});
+
+describe("emptyReleaseEmailAudienceMessage", () => {
+  it("reports no active rows when the marketing list is empty", () => {
+    expect(emptyReleaseEmailAudienceMessage(0)).toBe(
+      "No active marketing subscribers. Re-run after subscribers exist; the workflow can be retried safely."
+    );
+    expect(emptyReleaseEmailAudienceMessage(0, { dryRun: true })).toBe(
+      "--dry-run: would send to 0 subscriber(s)."
+    );
+  });
+
+  it("explains when active rows were all filtered as undeliverable", () => {
+    expect(emptyReleaseEmailAudienceMessage(2)).toContain(
+      "No deliverable marketing subscribers (2 active row(s) skipped as reserved/invalid)"
+    );
+    expect(emptyReleaseEmailAudienceMessage(2, { dryRun: true })).toBe(
+      "--dry-run: would send to 0 subscriber(s) (2 active row(s) skipped as reserved/invalid)."
+    );
   });
 });

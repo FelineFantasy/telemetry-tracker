@@ -1,45 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Bell,
-  BellRing,
-  CreditCard,
-  Users,
-  Zap,
-} from "lucide-react";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
   markAllNotificationsReadAction,
   markNotificationsReadAction,
 } from "@/app/dashboard/actions";
+import { NotificationTypeIcon } from "@/app/components/dashboard/NotificationTypeIcon";
 import { DashboardPopover } from "./DashboardPopover";
 import type { DashboardNotificationItem } from "@/lib/dashboard-notifications";
 import { formatRelativeTime } from "@/lib/format-time";
+import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 
 type Props = {
   initialItems: DashboardNotificationItem[];
 };
-
-function NotifIcon({ type }: { type: DashboardNotificationItem["type"] }) {
-  const cls = "h-3.5 w-3.5";
-  switch (type) {
-    case "issue":
-      return <AlertTriangle className={`${cls} text-destructive`} />;
-    case "billing":
-      return <CreditCard className={`${cls} text-warning`} />;
-    case "quota":
-      return <Zap className={`${cls} text-warning`} />;
-    case "team":
-      return <Users className={`${cls} text-brand`} />;
-    case "alert":
-      return <BellRing className={`${cls} text-warning`} />;
-    default:
-      return <Bell className={`${cls} text-brand`} />;
-  }
-}
 
 export function DashboardNotifications({ initialItems }: Props) {
   const [items, setItems] = useState(initialItems);
@@ -163,7 +140,7 @@ export function DashboardNotifications({ initialItems }: Props) {
               const content = (
                 <>
                   <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-md border border-border bg-background">
-                    <NotifIcon type={n.type} />
+                    <NotificationTypeIcon type={n.type} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start gap-2">
@@ -220,16 +197,8 @@ export function DashboardNotifications({ initialItems }: Props) {
             ) : null}
           </ul>
           <div className="flex items-center justify-between border-t border-border px-3 py-2">
-            <Link
-              href="/dashboard/settings/notifications"
-              onClick={close}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              Notification settings
-            </Link>
-            <span className="text-[11px] text-muted-foreground">
-              {effectiveProjectLabel(viewItems)}
-            </span>
+            <NotificationCenterLink onNavigate={close} />
+            <NotificationSettingsLink onNavigate={close} />
           </div>
         </div>
       )}
@@ -237,13 +206,30 @@ export function DashboardNotifications({ initialItems }: Props) {
   );
 }
 
-function effectiveProjectLabel(items: DashboardNotificationItem[]): string {
-  const hasIssues = items.some((i) => i.type === "issue");
-  const hasBilling = items.some((i) => i.type === "billing" || i.type === "quota");
-  const hasTeam = items.some((i) => i.type === "team");
-  if (hasIssues && hasBilling) return "Project alerts";
-  if (hasTeam && !hasIssues && !hasBilling) return "Team updates";
-  if (hasIssues) return "Open issues";
-  if (hasBilling) return "Billing & usage";
-  return "Live data";
+function NotificationCenterLink({ onNavigate }: { onNavigate: () => void }) {
+  const linkProps = useDashboardNavLinkProps("/dashboard/notifications", {
+    onNavigate,
+  });
+  return (
+    <Link
+      {...linkProps}
+      className="text-[11px] font-medium text-brand hover:underline"
+    >
+      View all
+    </Link>
+  );
+}
+
+function NotificationSettingsLink({ onNavigate }: { onNavigate: () => void }) {
+  const linkProps = useDashboardNavLinkProps("/dashboard/settings/notifications", {
+    onNavigate,
+  });
+  return (
+    <Link
+      {...linkProps}
+      className="text-[11px] text-muted-foreground hover:text-foreground"
+    >
+      Settings
+    </Link>
+  );
 }

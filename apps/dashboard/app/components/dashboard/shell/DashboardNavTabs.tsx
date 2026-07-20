@@ -4,7 +4,39 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ComingSoonBadge } from "@/app/components/dashboard/coming-soon-ui";
 import { buildDashboardNavTabHref } from "@/lib/overview-scope-url";
+import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 import { DASHBOARD_NAV } from "./dashboard-nav";
+
+function NavTabLink({
+  href,
+  active,
+  label,
+  comingSoon,
+}: {
+  href: string;
+  active: boolean;
+  label: string;
+  comingSoon?: boolean;
+}) {
+  const linkProps = useDashboardNavLinkProps(href);
+
+  return (
+    <Link
+      {...linkProps}
+      className={`relative inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-[13px] transition-colors ${
+        active
+          ? "text-foreground"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {label}
+      {comingSoon ? <ComingSoonBadge /> : null}
+      {active ? (
+        <span className="absolute inset-x-3 -bottom-px h-px bg-foreground" />
+      ) : null}
+    </Link>
+  );
+}
 
 export function DashboardNavTabs() {
   const pathname = usePathname() ?? "/";
@@ -20,20 +52,12 @@ export function DashboardNavTabs() {
             const href = buildDashboardNavTabHref(item.href, searchParams);
             return (
               <li key={item.href} className="shrink-0 snap-start">
-                <Link
+                <NavTabLink
                   href={href}
-                  className={`relative inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-[13px] transition-colors ${
-                    active
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {item.label}
-                  {item.comingSoon ? <ComingSoonBadge /> : null}
-                  {active ? (
-                    <span className="absolute inset-x-3 -bottom-px h-px bg-foreground" />
-                  ) : null}
-                </Link>
+                  active={active}
+                  label={item.label}
+                  comingSoon={item.comingSoon}
+                />
               </li>
             );
           })}

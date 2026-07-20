@@ -1,0 +1,311 @@
+/**
+ * Postgres-backed alert webhook delivery queue (claim / lease), mirroring brief-generation-job.
+ */
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { AlertWebhookDeliveryStatus } from "@prisma/client";
+import {
+  resolveAlertWebhookWorkerLeaseMs,
+  WEBHOOK_MAX_ATTEMPTS,
+  WEBHOOK_RETRY_DELAY_MS,
+} from "./alert-webhook-dispatch.js";
+
+export type AlertWebhookDeliveryJobRow = {
+  id: string;
+  webhookId: string;
+  projectId: string;
+  alertEventId: string | null;
+  dedupeKey: string;
+  attempt: number;
+  status: AlertWebhookDeliveryStatus;
+  httpStatus: number | null;
+  error: string | null;
+  leaseOwner: string | null;
+  leaseExpiresAt: Date | null;
+  nextAttemptAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Claim result; `attemptChargedOnClaim` is false when reclaiming an expired PROCESSING lease. */
+export type AlertWebhookDeliveryClaim = AlertWebhookDeliveryJobRow & {
+  attemptChargedOnClaim: boolean;
+};
+
+type DeliveryDbRow = {
+  id: string;
+  webhook_id: string;
+  project_id: string;
+  alert_event_id: string | null;
+  dedupe_key: string;
+  attempt: number;
+  status: AlertWebhookDeliveryStatus;
+  http_status: number | null;
+  error: string | null;
+  lease_owner: string | null;
+  lease_expires_at: Date | null;
+  next_attempt_at: Date;
+  created_at: Date;
+  updated_at: Date;
+};
+
+function mapDelivery(row: DeliveryDbRow): AlertWebhookDeliveryJobRow {
+  return {
+    id: row.id,
+    webhookId: row.webhook_id,
+    projectId: row.project_id,
+    alertEventId: row.alert_event_id,
+    dedupeKey: row.dedupe_key,
+    attempt: row.attempt,
+    status: row.status,
+    httpStatus: row.http_status,
+    error: row.error,
+    leaseOwner: row.lease_owner,
+    leaseExpiresAt: row.lease_expires_at,
+    nextAttemptAt: row.next_attempt_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Terminalize expired sendTestWebhook rows that never reached SUCCESS/FAILED
+ * (e.g. API process died mid-POST). Never re-POSTs — claim SQL excludes
+ * `webhook:test:%` so these would otherwise stay "Sending" forever.
+ */
+export async function abandonExpiredTestWebhookDeliveries(
+  prisma: PrismaClient,
+  input: { now: Date }
+): Promise<number> {
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+      dedupe_key: { startsWith: "webhook:test:" },
+      OR: [
+        { lease_expires_at: { lt: input.now } },
+        { lease_expires_at: null },
+      ],
+    },
+    data: {
+      status: AlertWebhookDeliveryStatus.FAILED,
+      error: "Test delivery abandoned (interrupted before finalize)",
+      lease_owner: null,
+      lease_expires_at: null,
+    },
+  });
+  return result.count;
+}
+
+export async function claimNextAlertWebhookDelivery(
+  prisma: PrismaClient,
+  input: { workerId: string; now: Date; env?: NodeJS.ProcessEnv }
+): Promise<AlertWebhookDeliveryClaim | null> {
+  const leaseMs = resolveAlertWebhookWorkerLeaseMs(input.env);
+  const leaseExpiresAt = new Date(input.now.getTime() + leaseMs);
+
+  return prisma.$transaction(async (tx) => {
+    // Never reclaim sendTestWebhook rows (PROCESSING + lease, alert_event_id null,
+    // dedupe webhook:test:…). Those are single-shot; reclaim would duplicate POSTs
+    // or send a generic alert.fired payload. Expired tests are abandoned separately.
+    const rows = await tx.$queryRaw<DeliveryDbRow[]>(Prisma.sql`
+      SELECT *
+      FROM "AlertWebhookDelivery"
+      WHERE "status" IN ('PENDING', 'FAILED', 'PROCESSING')
+        AND "next_attempt_at" <= ${input.now}
+        AND ("lease_expires_at" IS NULL OR "lease_expires_at" < ${input.now})
+        AND "dedupe_key" NOT LIKE 'webhook:test:%'
+      ORDER BY "next_attempt_at" ASC, "created_at" ASC
+      LIMIT 1
+      FOR UPDATE SKIP LOCKED
+    `);
+
+    const candidate = rows[0];
+    if (!candidate) return null;
+
+    // Reclaiming an expired PROCESSING lease must not burn retry budget — the prior
+    // worker may never have completed an outbound POST.
+    const attemptChargedOnClaim =
+      candidate.status !== AlertWebhookDeliveryStatus.PROCESSING;
+
+    const updated = await tx.alertWebhookDelivery.update({
+      where: { id: candidate.id },
+      data: {
+        status: AlertWebhookDeliveryStatus.PROCESSING,
+        lease_owner: input.workerId,
+        lease_expires_at: leaseExpiresAt,
+        ...(attemptChargedOnClaim ? { attempt: { increment: 1 } } : {}),
+        error: null,
+        http_status: null,
+      },
+    });
+
+    return { ...mapDelivery(updated), attemptChargedOnClaim };
+  });
+}
+
+export async function renewAlertWebhookDeliveryLease(
+  prisma: PrismaClient,
+  input: { deliveryId: string; workerId: string; now: Date; env?: NodeJS.ProcessEnv }
+): Promise<boolean> {
+  const leaseExpiresAt = new Date(
+    input.now.getTime() + resolveAlertWebhookWorkerLeaseMs(input.env)
+  );
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      id: input.deliveryId,
+      lease_owner: input.workerId,
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+    },
+    data: { lease_expires_at: leaseExpiresAt },
+  });
+  return result.count > 0;
+}
+
+export async function completeAlertWebhookDelivery(
+  prisma: PrismaClient,
+  input: {
+    deliveryId: string;
+    workerId: string;
+    httpStatus: number;
+  }
+): Promise<boolean> {
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      id: input.deliveryId,
+      lease_owner: input.workerId,
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+    },
+    data: {
+      status: AlertWebhookDeliveryStatus.SUCCESS,
+      http_status: input.httpStatus,
+      error: null,
+      lease_owner: null,
+      lease_expires_at: null,
+    },
+  });
+  return result.count > 0;
+}
+
+/** Retries for post-POST SUCCESS finalize (scoped updateMany + force-by-id). */
+const WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS = 3;
+
+/**
+ * After a successful HTTP POST, finalize SUCCESS even if the worker lost its lease.
+ * Prefer PROCESSING-scoped updateMany; on miss/transient error, force SUCCESS by id
+ * so the row cannot stay reclaimable PROCESSING and duplicate the POST.
+ */
+export async function finalizeAlertWebhookDeliverySuccess(
+  prisma: PrismaClient,
+  input: { deliveryId: string; httpStatus: number }
+): Promise<boolean> {
+  const data = {
+    status: AlertWebhookDeliveryStatus.SUCCESS,
+    http_status: input.httpStatus,
+    error: null,
+    lease_owner: null,
+    lease_expires_at: null,
+  };
+
+  for (let attempt = 0; attempt < WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS; attempt++) {
+    try {
+      const result = await prisma.alertWebhookDelivery.updateMany({
+        where: {
+          id: input.deliveryId,
+          status: AlertWebhookDeliveryStatus.PROCESSING,
+        },
+        data,
+      });
+      if (result.count > 0) return true;
+      break; // not PROCESSING (or gone) — fall through to force-by-id
+    } catch {
+      // Transient DB error — retry scoped update before forcing by id.
+    }
+  }
+
+  // Last resort: id-only SUCCESS. Idempotent if already SUCCESS; prevents reclaim
+  // if still PROCESSING (or any other status after a successful HTTP delivery).
+  for (let attempt = 0; attempt < WEBHOOK_FINALIZE_SUCCESS_ATTEMPTS; attempt++) {
+    try {
+      await prisma.alertWebhookDelivery.update({
+        where: { id: input.deliveryId },
+        data,
+      });
+      return true;
+    } catch {
+      // Transient DB error or missing row — retry, then give up.
+    }
+  }
+  return false;
+}
+
+/**
+ * Drop a PROCESSING claim without counting it as a delivery failure (e.g. lease
+ * lost before POST). Undoes the claim attempt increment (when charged) and retries
+ * immediately.
+ */
+export async function releaseAlertWebhookDeliveryClaim(
+  prisma: PrismaClient,
+  input: {
+    deliveryId: string;
+    workerId: string;
+    error: string;
+    now: Date;
+    /** When false (PROCESSING reclaim), leave attempt unchanged. Default true. */
+    undoAttemptIncrement?: boolean;
+  }
+): Promise<boolean> {
+  const undoAttempt = input.undoAttemptIncrement !== false;
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      id: input.deliveryId,
+      lease_owner: input.workerId,
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+    },
+    data: {
+      status: AlertWebhookDeliveryStatus.FAILED,
+      http_status: null,
+      error: input.error.slice(0, 400),
+      lease_owner: null,
+      lease_expires_at: null,
+      next_attempt_at: input.now,
+      ...(undoAttempt ? { attempt: { decrement: 1 } } : {}),
+    },
+  });
+  return result.count > 0;
+}
+
+export async function failAlertWebhookDeliveryAttempt(
+  prisma: PrismaClient,
+  input: {
+    deliveryId: string;
+    workerId: string;
+    attempt: number;
+    httpStatus: number | null;
+    error: string;
+    now: Date;
+  }
+): Promise<"FAILED" | "DEAD" | null> {
+  const isDead = input.attempt >= WEBHOOK_MAX_ATTEMPTS;
+  const nextAttemptAt = isDead
+    ? input.now
+    : new Date(input.now.getTime() + WEBHOOK_RETRY_DELAY_MS);
+
+  const result = await prisma.alertWebhookDelivery.updateMany({
+    where: {
+      id: input.deliveryId,
+      lease_owner: input.workerId,
+      status: AlertWebhookDeliveryStatus.PROCESSING,
+    },
+    data: {
+      status: isDead
+        ? AlertWebhookDeliveryStatus.DEAD
+        : AlertWebhookDeliveryStatus.FAILED,
+      http_status: input.httpStatus,
+      error: input.error.slice(0, 400),
+      lease_owner: null,
+      lease_expires_at: null,
+      next_attempt_at: nextAttemptAt,
+    },
+  });
+  if (result.count === 0) return null;
+  return isDead ? "DEAD" : "FAILED";
+}

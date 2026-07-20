@@ -14,6 +14,7 @@ import { StackTraceView } from "@/app/components/dashboard/StackTraceView";
 import { MiniSparkline, type SparklinePoint } from "@/app/components/dashboard/MiniSparkline";
 import { ErrorResolveButton } from "../ErrorResolveButton";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
+import { parseDashboardApiResourceId } from "@/lib/dashboard-api-url";
 import { buildDashboardScopedListHref } from "@/lib/overview-scope-url";
 
 type Occurrence = {
@@ -53,7 +54,7 @@ type ErrorGroup = {
 };
 
 async function getErrorGroup(
-  id: string,
+  rawId: string,
   scope: {
     app?: string;
     environment?: string;
@@ -63,8 +64,11 @@ async function getErrorGroup(
     from?: string;
     to?: string;
     metricsUntil?: string;
+    metricsSince?: string;
   }
 ): Promise<ErrorGroup | null> {
+  const id = parseDashboardApiResourceId(rawId);
+  if (!id) return null;
   const qs = new URLSearchParams();
   if (scope.app) qs.set("app", scope.app);
   if (scope.environment) qs.set("environment", scope.environment);
@@ -73,6 +77,7 @@ async function getErrorGroup(
   if (scope.range) qs.set("range", scope.range);
   if (scope.from) qs.set("from", scope.from);
   if (scope.to) qs.set("to", scope.to);
+  if (scope.metricsSince) qs.set("metricsSince", scope.metricsSince);
   if (scope.metricsUntil) qs.set("metricsUntil", scope.metricsUntil);
   const q = qs.toString();
   const res = await dashboardApiFetch(`/api/errors/${id}${q ? `?${q}` : ""}`);
@@ -98,6 +103,7 @@ export default async function ErrorDetailPage({
     from?: string;
     to?: string;
     metricsUntil?: string;
+    metricsSince?: string;
   }>;
 }) {
   const { id } = await params;
@@ -110,6 +116,7 @@ export default async function ErrorDetailPage({
   const from = sp.from?.trim() || undefined;
   const to = sp.to?.trim() || undefined;
   const metricsUntil = sp.metricsUntil?.trim() || undefined;
+  const metricsSince = sp.metricsSince?.trim() || undefined;
   const listHref = buildDashboardScopedListHref("/dashboard/errors", {
     app,
     environment,
@@ -131,6 +138,7 @@ export default async function ErrorDetailPage({
       from,
       to,
       metricsUntil,
+      metricsSince,
     });
   } catch (e) {
     return (

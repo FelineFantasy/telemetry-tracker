@@ -9,5 +9,9 @@ apps/dashboard/.next
 apps/dashboard/tsconfig.tsbuildinfo
 apps/api/tsconfig.tsbuildinfo
 dist
+!packages/telemetry-core/dist/
+!packages/telemetry-core/dist/**
+!packages/telemetry-next/dist/
+!packages/telemetry-next/dist/**
 apps/api/node_modules
 .pulse-beacon-studio-ref

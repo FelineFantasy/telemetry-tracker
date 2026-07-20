@@ -1,5 +1,6 @@
 export type NotificationCategory = "issues" | "billing" | "team" | "alerts";
 export type NotificationChannel = "inapp" | "email";
+export type NotificationDigest = "off" | "daily" | "weekly";
 
 export type NotificationPreferences = {
   channels: Record<NotificationChannel, boolean>;
@@ -13,6 +14,10 @@ export type NotificationPreferences = {
     endHour: number;
     timezone: string;
   };
+  /** ISO timestamp; mute non-critical notifications until then. */
+  mutedUntil: string | null;
+  /** Stored for future digest delivery; not sent yet. */
+  digest: NotificationDigest;
 };
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
@@ -29,6 +34,8 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     endHour: 7,
     timezone: "UTC",
   },
+  mutedUntil: null,
+  digest: "off",
 };
 
 export function parseNotificationPreferences(raw: unknown): NotificationPreferences {
@@ -81,6 +88,24 @@ export function parseNotificationPreferences(raw: unknown): NotificationPreferen
     return DEFAULT_NOTIFICATION_PREFERENCES;
   }
 
+  let mutedUntil: string | null = null;
+  if (o.mutedUntil === null || o.mutedUntil === undefined) {
+    mutedUntil = null;
+  } else if (typeof o.mutedUntil === "string") {
+    const t = Date.parse(o.mutedUntil);
+    mutedUntil = Number.isFinite(t) ? new Date(t).toISOString() : null;
+  } else {
+    return DEFAULT_NOTIFICATION_PREFERENCES;
+  }
+
+  const digestRaw = o.digest;
+  const digest: NotificationDigest =
+    digestRaw === "daily" || digestRaw === "weekly" || digestRaw === "off"
+      ? digestRaw
+      : digestRaw === undefined
+        ? DEFAULT_NOTIFICATION_PREFERENCES.digest
+        : DEFAULT_NOTIFICATION_PREFERENCES.digest;
+
   return {
     channels: { inapp: ch.inapp, email: ch.email },
     routing: { issues, billing, team, alerts: alerts ?? DEFAULT_NOTIFICATION_PREFERENCES.routing.alerts },
@@ -90,6 +115,8 @@ export function parseNotificationPreferences(raw: unknown): NotificationPreferen
       endHour: qh.endHour,
       timezone: qh.timezone,
     },
+    mutedUntil,
+    digest,
   };
 }
 
@@ -106,4 +133,8 @@ export function preferencesEqual(
   b: NotificationPreferences
 ): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function muteUntilHoursFromNow(hours: number, now = new Date()): string {
+  return new Date(now.getTime() + hours * 60 * 60 * 1000).toISOString();
 }

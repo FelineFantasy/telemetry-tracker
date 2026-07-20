@@ -2,6 +2,27 @@
  * Optional transactional email. When `RESEND_API_KEY` and `TELEMETRY_EMAIL_FROM` are set,
  * sends via Resend API. Otherwise logs in non-production and no-ops in production.
  */
+import {
+  emailBrandLogoAttachment,
+  htmlNeedsBrandLogoAttachment,
+} from "./email-brand-logo.js";
+
+export type TransactionalEmailAttachment = {
+  /** Base64-encoded file contents (Resend `content`). */
+  content: string;
+  filename: string;
+  /** Inline CID referenced as `cid:<id>` in HTML. */
+  content_id?: string;
+  content_type?: string;
+  /** Remote URL alternative to `content` (Resend fetches at send time). */
+  path?: string;
+};
+
+/** Strip CR/LF before logging (CodeQL js/log-injection: replace /\n|\r/g with ""). */
+function sanitizeForLog(value: string): string {
+  return value.replace(/\n|\r/g, "").slice(0, 500);
+}
+
 export function isTransactionalEmailConfigured(): boolean {
   return Boolean(
     process.env.RESEND_API_KEY?.trim() && process.env.TELEMETRY_EMAIL_FROM?.trim()
@@ -13,10 +34,20 @@ export async function sendTransactionalEmail(opts: {
   subject: string;
   html: string;
   replyTo?: string;
+  /** Extra Resend attachments; brand logo CID is added automatically when HTML needs it. */
+  attachments?: TransactionalEmailAttachment[];
 }): Promise<{ sent: boolean; devLogged?: boolean; status?: number; error?: string }> {
   if (!isTransactionalEmailConfigured()) {
     if (process.env.NODE_ENV !== "production") {
-      console.info("[email:dev]", opts.to, opts.subject, opts.html.slice(0, 200));
+      const to = Array.isArray(opts.to)
+        ? opts.to.map(sanitizeForLog).join(", ")
+        : sanitizeForLog(opts.to);
+      console.info(
+        "[email:dev]",
+        to,
+        sanitizeForLog(opts.subject),
+        sanitizeForLog(opts.html.slice(0, 200))
+      );
       return { sent: false, devLogged: true };
     }
     return { sent: false };
@@ -24,6 +55,15 @@ export async function sendTransactionalEmail(opts: {
 
   const apiKey = process.env.RESEND_API_KEY!.trim();
   const from = process.env.TELEMETRY_EMAIL_FROM!.trim();
+
+  const attachments: TransactionalEmailAttachment[] = [...(opts.attachments ?? [])];
+  const brandLogo = emailBrandLogoAttachment();
+  if (
+    htmlNeedsBrandLogoAttachment(opts.html) &&
+    !attachments.some((a) => a.content_id === brandLogo.content_id)
+  ) {
+    attachments.push(brandLogo);
+  }
 
   let res: Response;
   try {
@@ -39,6 +79,7 @@ export async function sendTransactionalEmail(opts: {
         subject: opts.subject,
         html: opts.html,
         ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
+        ...(attachments.length > 0 ? { attachments } : {}),
       }),
     });
   } catch (err) {

@@ -46,7 +46,7 @@ export function TopNavAppSwitcher({
 }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
-  const { push, replace, isPending } = useDashboardNavigation();
+  const { push, replaceSilent, isPending } = useDashboardNavigation();
   const pathForLinks = dashboardPathForAppFilter(pathname);
 
   const rawApp = searchParams.get("app") ?? "";
@@ -64,8 +64,8 @@ export function TopNavAppSwitcher({
   useEffect(() => {
     if (apps.length === 0) return;
     if (rawApp === "" || apps.includes(rawApp)) return;
-    replace(buildDashboardHrefWithApp(pathForLinks, null, searchParams));
-  }, [apps, pathForLinks, rawApp, replace, searchParams]);
+    replaceSilent(buildDashboardHrefWithApp(pathForLinks, null, searchParams));
+  }, [apps, pathForLinks, rawApp, replaceSilent, searchParams]);
 
   useEffect(() => {
     setPrefs(getAppPickerPrefs(projectId));

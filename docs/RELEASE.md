@@ -39,18 +39,18 @@ Feature and fix PRs merge into **`develop`**. Branch protection (Settings → Br
 |------|-----------|
 | PR required | Branch protection — no direct pushes to `develop` |
 | CI must pass | Required status check: `build` ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) |
-| Bugbot | Required status check: `bugbot-review` — requires `Cursor Bugbot` only for @unjica PRs; see [CONTRIBUTING.md](../CONTRIBUTING.md#ai-code-review-bugbot) |
+| Bugbot | Required status check: `bugbot-review` — **temporarily no-op** (`BUGBOT_REVIEW_ENABLED=false`); see [CONTRIBUTING.md](../CONTRIBUTING.md#ai-code-review-bugbot) |
 | Branch up to date | Require branches to be up to date before merging |
 | Human approvals | **0** — GitHub cannot require “approval only when author ≠ maintainer”; use `maintainer-review` check instead |
 | Maintainer gate | Required status check: `maintainer-review` — passes automatically when PR author is @unjica; otherwise requires your APPROVED review |
 
-**GitHub settings (required):** On the `develop` rule, set **Required approvals to 0** and add **`maintainer-review`** and **`bugbot-review`** to required status checks (with `build`). Do **not** require `Cursor Bugbot` directly — fork PRs often never receive that app check.
+**GitHub settings (required):** On the `develop` rule, set **Required approvals to 0** and add **`maintainer-review`** and **`bugbot-review`** to required status checks (with `build`). Do **not** require `Cursor Bugbot` directly — fork PRs often never receive that app check. Keep `bugbot-review` required while paused so the check still runs as success.
 
-**Your own PRs to `develop`:** `maintainer-review` passes automatically; `bugbot-review` waits for green `Cursor Bugbot`.
+**Your own PRs to `develop`:** `maintainer-review` passes automatically; `bugbot-review` currently passes without waiting for Cursor Bugbot (re-enable via `BUGBOT_REVIEW_ENABLED=true`).
 
 **Adding status checks:** GitHub lists checks only after they have run at least once on a PR. Open or update a PR, wait for `build`, `bugbot-review`, and `maintainer-review` to finish, then edit the `develop` rule if a check is missing.
 
-Bugbot findings default to a **`neutral`** check conclusion — they comment but do not block merge unless **fail on unresolved issues** is enabled in the Cursor Bugbot dashboard.
+Bugbot findings default to a **`neutral`** check conclusion — they comment but do not block merge unless **fail on unresolved issues** is enabled in the Cursor Bugbot dashboard. Pause the GitHub App in the [Cursor dashboard](https://www.cursor.com/dashboard/bugbot) if you want to stop PR comments while the gate is disabled.
 
 ### `main` merge gate
 
@@ -81,6 +81,15 @@ Releases are **milestone-driven**:
 
 **Hotfixes** on production: branch from **`main`**, fix, merge to **`main`**, tag a **patch** version, then merge **`main` → `develop`** so branches stay aligned. Assign PRs and release PRs to a milestone per [Milestones vs hotfixes](#milestones-vs-hotfixes-audit-trail).
 
+### Process notes (merge hygiene & milestones)
+
+- **Do not merge release PRs** (`develop` → `main`, or hotfix → `main`) until **all required checks are green** (`build`, and on `develop` also `bugbot-review` / `maintainer-review` as configured).
+- **Stacked / multi-PR features:** the final integration PR that lands the feature on `develop` must run the **full API + dashboard** test suites (not a subset). Prefer one green CI pass on that integration PR before release promotion.
+- **Assign feature PRs to a milestone** whenever possible (active product line or patch-line milestone) so shipped work stays auditable.
+- **Prefer one production smoke-test pass** (health, migrations, critical paths for the milestone — see [Post-deploy verification](#post-deploy-verification) and `scripts/smoke-production.sh` / notification channel checks) **before closing a milestone**.
+- **Taxonomy:** **milestones** = release lines (e.g. `v1.14.x — Notifications`); **parent issues** = long-lived vision/roadmap; **child issues** = implementation that ships inside a milestone. Closing a milestone does **not** require closing the parent vision issue — parents **should stay open** as living roadmap even after children merge.
+  - Example: Notifications parent [#492](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/492) and Alert Rules parent [#493](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/493); children (#225, #508, #532–#535, …) ship under their milestones while the parent remains the scope source of truth.
+
 ---
 
 ## Milestones vs hotfixes (audit trail)
@@ -97,7 +106,7 @@ For **audit trail**, PATCH and docs hotfixes **should** still:
 
 If the patch-line milestone is **closed**, you may still assign merged PRs to it retroactively, or open a new patch-line milestone if you prefer a clean bucket for the next patches.
 
-Product update emails remain policy-driven ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md)); docs-only PATCH releases usually **skip** subscriber email.
+Product update emails remain policy-driven ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md)); they send on **line close** of a completed minor (whole `vX.Y.*`), not when opening the next milestone’s first `.0`. Docs-only PATCH releases usually **skip** subscriber email.
 
 ---
 
@@ -118,7 +127,7 @@ App releases use **`vX.Y.Z`**:
 | **Y** | **MINOR** | Features, backward-compatible migrations, dashboard UX (typical milestone release) |
 | **Z** | **PATCH** | Bug fixes and hotfixes on `main` |
 
-Product update emails (see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#when-to-send-maintainer-policy)) send on **X** or **Y** increases; **Z**-only hotfixes do not.
+Product update emails (see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#when-to-send-maintainer-policy)) send when **closing** a completed minor line (last intended `vX.Y.z` before the next milestone), summarizing all `vX.Y.*` since the previous product email — **not** when tagging the first `.0` of a new line. Mid-line **Z**-only hotfixes stay skip.
 
 Always document **migrations**, **new env vars**, and **breaking changes** in CHANGELOG and the GitHub Release notes.
 
@@ -132,15 +141,16 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
 - [ ] [CHANGELOG.md](../CHANGELOG.md) `[Unreleased]` section complete
 - [ ] CI green on `develop` (`pnpm lint`, `pnpm test`, `pnpm -r run build`)
 - [ ] Self-host upgrade notes ready (migrations, env vars)
-- [ ] If this is a **MINOR** (Y) or **MAJOR** (X) release: confirm `CHANGELOG.md` is ready and plan to run [production migrations](#3-database-migrations-production) **before** pushing the tag — [product update email](./MARKETING-EMAIL.md#automated-send-minor--major-tags) sends automatically when the tag is pushed
+- [ ] If this closes a milestone / is the **last intended release** of `vX.Y.*`: confirm `CHANGELOG.md` covers the whole line and plan to run [production migrations](#3-database-migrations-production) **before** pushing the tag — then **close the `vX.Y.x — …` GitHub milestone** after the final tag so the [product update email](./MARKETING-EMAIL.md#line-close-send-preferred) auto-sends (tag push alone does **not** email)
+- [ ] If this **opens** a new minor (`vX.Y.0`) while the previous line was already emailed (or will be emailed on its final tag): no product email for the new line yet
 
 ### On `main` after promotion
 
 1. **Finalize CHANGELOG** — rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`. Prefer doing this in the **`develop` → `main`** release PR so `develop` and `main` stay aligned; if you commit on `main` after promotion, you **must** sync `develop` in step 9.
 2. **Deploy** — Railway rebuilds `main` automatically when the release PR merges; see [Deploy runbook](#deploy-runbook-railway).
-3. **Production DB** — run [migrations](#3-database-migrations-production) **before tagging** on MINOR (Y) / MAJOR (X) releases. The release email workflow reads production Postgres but does not migrate (use the public `DATABASE_URL` in GitHub secrets — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#automated-send-minor--major-tags)).
+3. **Production DB** — run [migrations](#3-database-migrations-production) **before tagging** on MINOR (Y) / MAJOR (X) releases (and before a line-close product email). The release email workflow reads production Postgres but does not migrate (use the public `DATABASE_URL` in GitHub secrets — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#line-close-send-preferred)).
 4. **Post-deploy** — [verification](#post-deploy-verification).
-5. **Tag** — after deploy and migrations are green (tag push triggers the product update email workflow for MINOR/MAJOR — **X** or **Y** bump, not Z-only hotfixes). **Push the tag only after the release PR is merged to `main`** so `CHANGELOG.md` contains the version section when the email workflow runs (an early tag push can fail once, then succeed on retag):
+5. **Tag** — after deploy and migrations are green. Tag push starts the release-email workflow but **does not** send for opening `.0` or mid-line patches — product email auto-sends when you **close** the `vX.Y.x` milestone after the final tag ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md#line-close-send-preferred)). **Push the tag only after the release PR is merged to `main`** so `CHANGELOG.md` contains the version section when any email workflow runs (an early tag push can fail once, then succeed on retag):
    ```bash
    git checkout main && git pull origin main
    git tag -a v1.1.0 -m "Telemetry Tracker v1.1.0"
@@ -158,7 +168,7 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
    ```
    See the template for section guidance and a filled v1.1.0 example. Do not duplicate the entire CHANGELOG — keep the release body scannable for deployers.
 7. **SDK** — if ingest/SDK contract changed, bump `packages/*/package.json` and `pnpm publish:packages`.
-8. **Product update email** — **MINOR** (Y) and **MAJOR** (X) tags trigger the [Release product email](../.github/workflows/release-email.yml) workflow automatically (Z-only patch/hotfix tags skipped). Ensure repository secrets are set ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md#automated-send-minor--major-tags)). After the workflow completes, note send date and recipient count in the GitHub Release. For notable PATCH (Z) releases or backfill, send manually with `--force` — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#manual-send-override--backfill).
+8. **Product update email** — when this tag is the **last intended release** of a minor line, **close the `vX.Y.x — …` GitHub milestone** after the tag exists. That triggers [Release product email](../.github/workflows/release-email.yml) with derived `version` / `previous_version` and **`line_close=true`** (whole **`vX.Y.*`** line; ledger key **`X.Y`**). Opening a new `vX.Y.0` and mid-line patches do **not** send. If the line was already emailed, the ledger skips duplicates. Manual dispatch (`dry_run` / retry) remains available ([MARKETING-EMAIL.md](./MARKETING-EMAIL.md#line-close-send-preferred)). After the send completes, note date and recipient count in the GitHub Release. For exceptional single-version PATCH backfill, use `--force` — see [MARKETING-EMAIL.md](./MARKETING-EMAIL.md#manual-send-cli--backfill).
 9. **Sync `develop`** — merge **`main` into `develop`** and push after every release (milestone promotion or hotfix). Required whenever `main` has commits not on `develop` — including squash merges, merge commits from the release PR, and any post-promotion edits on `main`:
    ```bash
    git checkout develop && git pull origin develop
@@ -170,14 +180,16 @@ Always document **migrations**, **new env vars**, and **breaking changes** in CH
 
 ## Deploy runbook (Railway)
 
-Production uses **three Railway services** (+ optional Cron):
+Production uses **three Railway services** (+ optional workers/cron):
 
 | Service | Root directory | Builder |
 |---------|----------------|---------|
 | PostgreSQL | — | Railway Postgres |
 | API | `apps/api` | Railpack (not Dockerfile) |
 | Dashboard | repo root (empty) | Dockerfile |
-| Retention cron (optional) | `apps/api` | Cron → `pnpm exec tsx src/jobs/run-retention.ts` |
+| Retention cron (optional) | `apps/api` | Cron → `node dist/jobs/run-retention.js` |
+| Alert rules evaluator cron (optional) | `apps/api` | Cron → `node dist/jobs/run-alert-rules-evaluator.js` |
+| Alert webhook worker (optional) | `apps/api` | Always-on → `node dist/jobs/run-alert-webhook-worker.js` |
 
 ### 1. Trigger deploy
 
@@ -250,6 +262,28 @@ node dist/jobs/run-retention.js
 
 Same `DATABASE_URL` as the API. See [RAILWAY.md](./RAILWAY.md#retention-cron).
 
+### 6. Alert rules evaluator cron
+
+If CUSTOM Alert Rules use schedule-oriented conditions (`HEARTBEAT`, `NO_EVENTS`, `SESSION_DROP`, `QUOTA_PERCENT`, scheduled `ERROR_RATE`), add a Railway cron (manual wiring — not auto-provisioned):
+
+```bash
+node dist/jobs/run-alert-rules-evaluator.js
+```
+
+Default schedule `*/5 * * * *` (match `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES`). Same `DATABASE_URL` as the API. Do **not** repurpose or alter any `brief-worker` service. See [RAILWAY.md](./RAILWAY.md#alert-rules-evaluator-cron) and [ALERT-RULES.md](./ALERT-RULES.md).
+
+### 7. Alert webhook worker
+
+If alert webhooks are enabled, keep a continuous worker running (not cron):
+
+```bash
+node dist/jobs/run-alert-webhook-worker.js
+```
+
+Same `DATABASE_URL` as the API. Confirm logs show `"status":"idle"` (or processing)
+JSON. See [RAILWAY.md](./RAILWAY.md#alert-webhook-worker) and
+[ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md).
+
 ---
 
 ## Post-deploy verification
@@ -313,7 +347,7 @@ First production-ready self-hosted release. Full changelog: [CHANGELOG.md#100---
 **Known limitations:**
 
 - Per-project ingest RPS is in-memory (single API process)
-- No built-in error spike alerts
+- Project alert webhooks for spike/quota — see [ALERT-WEBHOOKS.md](./ALERT-WEBHOOKS.md)
 - Open sessions without `ended_at` are not pruned by retention until closed
 
 **Live reference deployment:** `telemetry-tracker.com` (dashboard) / `api.telemetry-tracker.com` (API). Legacy: `telemetry-api.tacko.io`, `telemetry-tracker.tacko.io`.

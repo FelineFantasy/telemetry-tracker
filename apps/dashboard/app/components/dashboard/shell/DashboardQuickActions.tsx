@@ -18,8 +18,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ComingSoonBadge } from "@/app/components/dashboard/coming-soon-ui";
-import { DashboardPopover } from "./DashboardPopover";
 import { ORGANIZATION_SETTINGS_NEW_PROJECT_URL } from "@/app/components/OrganizationSettingsNewProjectParam";
+import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
+import { DashboardPopover } from "./DashboardPopover";
 
 type Action = {
   id: string;
@@ -36,7 +37,7 @@ const ACTIONS: Action[] = [
   { id: "dashboard", label: "Create dashboard", icon: LayoutDashboard, comingSoon: true },
   { id: "alert", label: "Create alert", icon: Bell, href: "/dashboard/alerts" },
   { id: "flag", label: "Create feature flag", icon: Flag, comingSoon: true },
-  { id: "release", label: "Track release", icon: GitBranch, comingSoon: true },
+  { id: "release", label: "Track release", icon: GitBranch, href: "/dashboard/releases" },
   { id: "export", label: "Export report", icon: BarChart3, comingSoon: true },
 ];
 
@@ -78,15 +79,13 @@ export function DashboardQuickActions() {
                 <ComingSoonBadge />
               </button>
             ) : (
-              <Link
+              <QuickActionLink
                 key={a.id}
                 href={a.href!}
-                onClick={close}
-                className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface"
-              >
-                <ActionIcon icon={a.icon} />
-                <span className="flex-1">{a.label}</span>
-              </Link>
+                label={a.label}
+                icon={a.icon}
+                onNavigate={close}
+              />
             )
           )}
           <div className="my-1 h-px bg-border" />
@@ -116,6 +115,29 @@ export function DashboardQuickActions() {
         </div>
       )}
     </DashboardPopover>
+  );
+}
+
+function QuickActionLink({
+  href,
+  label,
+  icon,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  icon: typeof Plus;
+  onNavigate: () => void;
+}) {
+  const linkProps = useDashboardNavLinkProps(href, { onNavigate });
+  return (
+    <Link
+      {...linkProps}
+      className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface"
+    >
+      <ActionIcon icon={icon} />
+      <span className="flex-1">{label}</span>
+    </Link>
   );
 }
 

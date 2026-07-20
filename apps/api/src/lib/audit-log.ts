@@ -9,6 +9,12 @@ export const AUDIT_ACTIONS = {
   PROFILE_UPDATE: "profile.update",
   PROFILE_AVATAR_UPLOAD: "profile.avatar.upload",
   PROFILE_AVATAR_REMOVE: "profile.avatar.remove",
+  /** Project PII scrub settings changed (deny-keys / session email flag). */
+  PROJECT_PII_SCRUB_UPDATE: "project.pii_scrub.update",
+  /** Project display name and/or slug changed. */
+  PROJECT_UPDATE: "project.update",
+  /** Organization (workspace) display name changed. */
+  ORGANIZATION_UPDATE: "organization.update",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -103,6 +109,41 @@ export async function recordUserAuditEvents(
         action,
         target: trimmedTarget,
       })),
+    });
+  } catch {
+    // Audit logging must not break primary flows.
+  }
+}
+
+/**
+ * Record an audit event for a single organization (project/settings changes).
+ * Failures are swallowed so primary flows are not blocked.
+ */
+export async function recordOrganizationAuditEvent(
+  db: PrismaClient,
+  organizationId: string,
+  actorUserId: string,
+  action: AuditAction,
+  target: string
+): Promise<void> {
+  const trimmedTarget = target.trim().slice(0, 512);
+  if (!trimmedTarget || !organizationId) return;
+
+  try {
+    const actor = await db.user.findUnique({
+      where: { id: actorUserId },
+      select: { email: true },
+    });
+    if (!actor) return;
+
+    await db.organizationAuditEvent.create({
+      data: {
+        organization_id: organizationId,
+        actor_user_id: actorUserId,
+        actor_email: actor.email,
+        action,
+        target: trimmedTarget,
+      },
     });
   } catch {
     // Audit logging must not break primary flows.

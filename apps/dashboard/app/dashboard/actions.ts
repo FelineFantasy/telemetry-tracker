@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/lib/api-url";
 import { preferenceCookiesAllowedFromCookies, preferenceCookiesDeniedMessage } from "@/lib/cookie-consent-server";
 import { dashboardApiFetch, type DashboardApiFetchOptions } from "@/lib/dashboard-api";
+import { parseDashboardApiResourceId } from "@/lib/dashboard-api-url";
 import { getDashboardWorkspaceForRequest } from "@/lib/dashboard-workspace-request";
 import {
   fetchDashboardOrganizationsPayload,
@@ -26,6 +27,11 @@ import {
   parseProjectAlertSettings,
   type ProjectAlertSettings,
 } from "@/lib/alert-settings";
+import type { AlertRuleCondition, AlertRuleRow } from "@/lib/alert-rules";
+import {
+  normalizeProjectPiiScrubSettings,
+  type ProjectPiiScrubSettings,
+} from "@/lib/pii-scrub-settings";
 import {
   fetchAuthSessions,
   type FetchAuthSessionsResult,
@@ -276,6 +282,43 @@ export async function setDashboardOrganizationId(
   return { ok: true };
 }
 
+export async function renameOrganizationAction(
+  organizationId: string,
+  name: string
+): Promise<
+  | { ok: true; organization: { id: string; name: string } }
+  | { ok: false; error: string }
+> {
+  const oid = organizationId.trim().toLowerCase();
+  const trimmed = name.trim().slice(0, 120);
+  if (!/^[0-9a-f-]{36}$/.test(oid)) {
+    return { ok: false, error: "Invalid organization id" };
+  }
+  if (!trimmed) {
+    return { ok: false, error: "name cannot be empty" };
+  }
+  const res = await dashboardApiFetch(`/api/meta/organizations/${oid}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: trimmed }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    let message = t.slice(0, 400) || res.statusText;
+    try {
+      const parsed = JSON.parse(t) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      /* keep text */
+    }
+    return { ok: false, error: message };
+  }
+  const data = (await res.json()) as { id: string; name: string };
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/settings/organization");
+  return { ok: true, organization: { id: data.id, name: data.name } };
+}
+
 export async function createOrganizationAction(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -466,6 +509,60 @@ export async function createFirstDashboardApiKey(): Promise<CreateApiKeyResult> 
   return createDashboardApiKey(null, formData);
 }
 
+export async function renameProjectAction(
+  projectId: string,
+  patch: { name?: string; slug?: string }
+): Promise<
+  | { ok: true; project: { id: string; name: string; slug: string } }
+  | { ok: false; error: string }
+> {
+  const id = projectId.trim().toLowerCase();
+  if (!/^[0-9a-f-]{36}$/.test(id)) {
+    return { ok: false, error: "Invalid project id" };
+  }
+  const body: { name?: string; slug?: string } = {};
+  if (typeof patch.name === "string") {
+    const name = patch.name.trim().slice(0, 120);
+    if (!name) return { ok: false, error: "name cannot be empty" };
+    body.name = name;
+  }
+  if (typeof patch.slug === "string") {
+    const slug = patch.slug.trim().slice(0, 120);
+    if (!slug) return { ok: false, error: "slug cannot be empty" };
+    body.slug = slug;
+  }
+  if (body.name === undefined && body.slug === undefined) {
+    return { ok: false, error: "name or slug is required" };
+  }
+  const res = await dashboardApiFetch(`/api/meta/projects/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    let message = t.slice(0, 400) || res.statusText;
+    try {
+      const parsed = JSON.parse(t) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      /* keep text */
+    }
+    return { ok: false, error: message };
+  }
+  const data = (await res.json()) as {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/settings/organization");
+  return {
+    ok: true,
+    project: { id: data.id, name: data.name, slug: data.slug },
+  };
+}
+
 export async function archiveProjectAction(
   projectId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -566,7 +663,11 @@ export async function setErrorResolvedAction(
   errorGroupId: string,
   resolved: boolean
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const res = await dashboardApiFetch(`/api/errors/${errorGroupId}`, {
+  const id = parseDashboardApiResourceId(errorGroupId);
+  if (!id) {
+    return { ok: false, error: "Invalid error group id" };
+  }
+  const res = await dashboardApiFetch(`/api/errors/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resolved }),
@@ -575,7 +676,7 @@ export async function setErrorResolvedAction(
     const t = await res.text();
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
-  revalidatePath(`/dashboard/errors/${errorGroupId}`);
+  revalidatePath(`/dashboard/errors/${encodeURIComponent(id)}`);
   revalidatePath("/dashboard/errors");
   return { ok: true };
 }
@@ -703,18 +804,22 @@ export async function markNotificationsReadAction(
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/notifications");
   return { ok: true };
 }
 
-export async function markAllNotificationsReadAction(): Promise<
-  { ok: true } | { ok: false; error: string }
-> {
+export async function markAllNotificationsReadAction(options?: {
+  scope?: "project" | "organization";
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const res = await dashboardApiFetch(
     "/api/meta/notifications/read",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ all: true }),
+      body: JSON.stringify({
+        all: true,
+        ...(options?.scope === "organization" ? { scope: "organization" } : {}),
+      }),
     },
     await notificationApiFetchOptions()
   );
@@ -723,6 +828,7 @@ export async function markAllNotificationsReadAction(): Promise<
     return { ok: false, error: t.slice(0, 400) || res.statusText };
   }
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/notifications");
   return { ok: true };
 }
 
@@ -746,6 +852,233 @@ export async function saveProjectAlertSettingsAction(
     revalidatePath("/dashboard/alerts");
     revalidatePath("/dashboard", "layout");
     return { ok: true, settings: parseProjectAlertSettings(data.settings) };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export type AlertRuleActionRow = AlertRuleRow;
+
+export async function createProjectAlertRuleAction(input: {
+  name: string;
+  enabled?: boolean;
+  conditions: AlertRuleCondition[];
+  destinationIds: string[];
+  cooldownMinutes?: number;
+}): Promise<{ ok: true; rule: AlertRuleActionRow } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch("/api/project/alert-rules", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { rule?: AlertRuleActionRow };
+    if (!data.rule) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return { ok: true, rule: data.rule };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function updateProjectAlertRuleAction(
+  ruleId: string,
+  patch: Partial<{
+    name: string;
+    enabled: boolean;
+    conditions: AlertRuleCondition[];
+    destinationIds: string[];
+    cooldownMinutes: number;
+  }>
+): Promise<{ ok: true; rule: AlertRuleActionRow } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/alert-rules/${encodeURIComponent(ruleId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { rule?: AlertRuleActionRow };
+    if (!data.rule) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return { ok: true, rule: data.rule };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function deleteProjectAlertRuleAction(
+  ruleId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/alert-rules/${encodeURIComponent(ruleId)}`,
+    { method: "DELETE" }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  revalidatePath("/dashboard/alerts");
+  return { ok: true };
+}
+
+export type ProjectWebhookActionRow = {
+  id: string;
+  urlMasked: string;
+  label: string | null;
+  provider: "GENERIC" | "SLACK" | "DISCORD" | "MICROSOFT_TEAMS" | "TELEGRAM";
+  config: { chatId?: string } | null;
+  enabled: boolean;
+  hasSigningSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function createProjectWebhookAction(input: {
+  url: string;
+  label?: string;
+  withSigningSecret?: boolean;
+  provider?: ProjectWebhookActionRow["provider"];
+  config?: { chatId?: string };
+}): Promise<
+  | { ok: true; webhook: ProjectWebhookActionRow; signingSecret: string | null }
+  | { ok: false; error: string }
+> {
+  const res = await dashboardApiFetch("/api/project/webhooks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: input.url,
+      label: input.label ?? null,
+      provider: input.provider ?? "GENERIC",
+      config: input.config ?? undefined,
+      withSigningSecret: input.withSigningSecret,
+    }),
+  });
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as {
+      webhook?: ProjectWebhookActionRow;
+      signingSecret?: string | null;
+    };
+    if (!data.webhook) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return {
+      ok: true,
+      webhook: data.webhook,
+      signingSecret: data.signingSecret ?? null,
+    };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function updateProjectWebhookAction(
+  webhookId: string,
+  patch: { enabled?: boolean; label?: string | null }
+): Promise<{ ok: true; webhook: ProjectWebhookActionRow } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/webhooks/${encodeURIComponent(webhookId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { webhook?: ProjectWebhookActionRow };
+    if (!data.webhook) {
+      return { ok: false, error: "Invalid response from server" };
+    }
+    revalidatePath("/dashboard/alerts");
+    return { ok: true, webhook: data.webhook };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function deleteProjectWebhookAction(
+  webhookId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/webhooks/${encodeURIComponent(webhookId)}`,
+    { method: "DELETE" }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  revalidatePath("/dashboard/alerts");
+  return { ok: true };
+}
+
+export async function testProjectWebhookAction(
+  webhookId: string
+): Promise<{ ok: true; httpStatus: number } | { ok: false; error: string }> {
+  const res = await dashboardApiFetch(
+    `/api/project/webhooks/${encodeURIComponent(webhookId)}/test`,
+    { method: "POST" }
+  );
+  if (!res.ok) {
+    return { ok: false, error: await readApiError(res) };
+  }
+  try {
+    const data = (await res.json()) as { httpStatus?: number };
+    return {
+      ok: true,
+      httpStatus: typeof data.httpStatus === "number" ? data.httpStatus : 200,
+    };
+  } catch {
+    return { ok: false, error: "Invalid response from server" };
+  }
+}
+
+export async function saveProjectPiiScrubSettingsAction(
+  settings: Partial<ProjectPiiScrubSettings>
+): Promise<
+  | { ok: true; settings: ProjectPiiScrubSettings }
+  | { ok: false; error: string }
+> {
+  if (
+    settings.denyKeys === undefined &&
+    settings.scrubSessionUserEmail === undefined
+  ) {
+    return { ok: false, error: "No PII scrub settings changes to save" };
+  }
+  const res = await dashboardApiFetch("/api/project/pii-scrub-settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    return { ok: false, error: t.slice(0, 400) || res.statusText };
+  }
+  try {
+    const data = (await res.json()) as { settings?: ProjectPiiScrubSettings };
+    revalidatePath("/dashboard/alerts");
+    revalidatePath("/dashboard/settings/audit");
+    return {
+      ok: true,
+      settings: normalizeProjectPiiScrubSettings(data.settings),
+    };
   } catch {
     return { ok: false, error: "Invalid response from server" };
   }

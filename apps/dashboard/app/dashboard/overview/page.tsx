@@ -31,12 +31,17 @@ import {
   OverviewRecentSessionsPanel,
   OverviewTopErrorsPanel,
 } from "@/app/components/dashboard/overview/OverviewBreakdownGrid";
-import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
+import {
+  OverviewPerformanceCard,
+  OverviewPerformanceCardSkeleton,
+} from "@/app/components/dashboard/overview/OverviewPerformanceCard";
+import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
 import { buildOverviewWorkspaceStats } from "@/lib/overview-workspace-stats";
 import {
   parseOverviewCompare,
+  isRollingCompareParam,
   resolveScopedQueryValue,
   compareLabelFor,
   buildErrorGroupDetailHref,
@@ -51,6 +56,7 @@ import {
   isUnselectedTimeRange,
   effectiveIngestRateDurationMs,
   appendListTimeRangeToParams,
+  resolveMetricsUntilIso,
 } from "@/lib/time-range";
 import { firstQueryValue } from "@/lib/search-params";
 import { coalesceOverviewRequest } from "@/lib/api-inflight";
@@ -91,7 +97,9 @@ async function getOverview(
     topEventsSort: string;
     topEventsOrder: string;
   },
-  scope: OverviewRequestScope
+  scope: OverviewRequestScope,
+  metricsUntil?: string,
+  compareBounds?: { compareFrom?: string; compareTo?: string }
 ) {
   const params = new URLSearchParams();
   appendListTimeRangeToParams(params, parsedRange, timeFromTo.from, timeFromTo.to);
@@ -99,7 +107,10 @@ async function getOverview(
   if (environment) params.set("environment", environment);
   if (platform) params.set("platform", platform);
   if (release) params.set("release", release);
-  if (compare === "week-ago") params.set("compare", "week-ago");
+  if (compare && compare !== "previous") params.set("compare", compare);
+  if (compareBounds?.compareFrom) params.set("compareFrom", compareBounds.compareFrom);
+  if (compareBounds?.compareTo) params.set("compareTo", compareBounds.compareTo);
+  if (metricsUntil) params.set("metricsUntil", metricsUntil);
   params.set("errorsPage", String(list.errorsPage));
   params.set("eventsPage", String(list.eventsPage));
   params.set("listPageSize", String(list.listPageSize));
@@ -167,11 +178,14 @@ function buildOverviewParamsRecord(
     "range",
     "from",
     "to",
+    "metricsUntil",
     "app",
     "environment",
     "platform",
     "release",
     "compare",
+    "compareFrom",
+    "compareTo",
     "errorsPage",
     "eventsPage",
     "listPageSize",
@@ -193,7 +207,13 @@ function buildOverviewListScope(
   environment: string | null,
   platform: string | null,
   release: string | null,
-  timeQuery: { range?: string; from?: string; to?: string }
+  timeQuery: { range?: string; from?: string; to?: string },
+  metricsUntil?: string | null,
+  compare?: {
+    compare?: string | null;
+    compareFrom?: string | null;
+    compareTo?: string | null;
+  }
 ): DashboardListScope {
   return {
     app,
@@ -203,6 +223,12 @@ function buildOverviewListScope(
     range: timeQuery.range ?? null,
     from: timeQuery.from ?? null,
     to: timeQuery.to ?? null,
+    ...(metricsUntil ? { metricsUntil } : {}),
+    ...(compare?.compare && compare.compare !== "previous"
+      ? { compare: compare.compare }
+      : {}),
+    ...(compare?.compareFrom ? { compareFrom: compare.compareFrom } : {}),
+    ...(compare?.compareTo ? { compareTo: compare.compareTo } : {}),
   };
 }
 
@@ -227,11 +253,14 @@ export default async function OverviewPage({
     range?: string | string[];
     from?: string | string[];
     to?: string | string[];
+    metricsUntil?: string | string[];
     app?: string | string[];
     environment?: string | string[];
     platform?: string | string[];
     release?: string | string[];
     compare?: string | string[];
+    compareFrom?: string | string[];
+    compareTo?: string | string[];
     errorsPage?: string | string[];
     eventsPage?: string | string[];
     listPageSize?: string | string[];
@@ -247,7 +276,7 @@ export default async function OverviewPage({
     from: firstQueryValue(params.from),
     to: firstQueryValue(params.to),
   };
-  const currentOverviewParams = buildOverviewParamsRecord(params);
+  let currentOverviewParams = buildOverviewParamsRecord(params);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(
     OVERVIEW_PATH,
     currentOverviewParams
@@ -264,11 +293,33 @@ export default async function OverviewPage({
     );
   }
   const parsedRange = timeParse.range;
+  const pageMetricsUntil = isUnselectedTimeRange(parsedRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(params.metricsUntil))
+    : undefined;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    OVERVIEW_PATH,
+    currentOverviewParams,
+    parsedRange.key,
+    pageMetricsUntil
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  // Align client nav with the API: set anchor for open-ended ranges, clear stale ones.
+  if (pageMetricsUntil) {
+    currentOverviewParams = {
+      ...currentOverviewParams,
+      metricsUntil: pageMetricsUntil,
+    };
+  } else if (currentOverviewParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentOverviewParams;
+    currentOverviewParams = withoutMetricsUntil;
+  }
   const rawApp = firstQueryValue(params.app)?.trim() || null;
   const rawEnvironment = firstQueryValue(params.environment)?.trim() || null;
   const rawPlatform = firstQueryValue(params.platform)?.trim() || null;
   const rawRelease = firstQueryValue(params.release)?.trim() || null;
   const compare = parseOverviewCompare(firstQueryValue(params.compare));
+  const compareFrom = firstQueryValue(params.compareFrom) ?? undefined;
+  const compareTo = firstQueryValue(params.compareTo) ?? undefined;
   const errorsPage = parsePageParam(firstQueryValue(params.errorsPage));
   const eventsPage = parsePageParam(firstQueryValue(params.eventsPage));
   const listPageSize = parseOverviewListPageSize(params.listPageSize);
@@ -300,7 +351,9 @@ export default async function OverviewPage({
           rawRelease ?? undefined,
           compare,
           listParams,
-          cookieScope
+          cookieScope,
+          pageMetricsUntil,
+          { compareFrom, compareTo }
         ).catch((e) => ({ error: e } as const))
       : Promise.resolve({ error: new Error("No project selected") } as const);
 
@@ -343,7 +396,9 @@ export default async function OverviewPage({
         rawRelease ?? undefined,
         compare,
         listParams,
-        resolvedScope
+        resolvedScope,
+        pageMetricsUntil,
+        { compareFrom, compareTo }
       ).catch((e) => ({ error: e } as const));
     } else {
       overviewResult = { error: new Error("No project selected") } as const;
@@ -396,7 +451,9 @@ export default async function OverviewPage({
     environment,
     platform,
     release,
-    timeQuery
+    timeQuery,
+    pageMetricsUntil,
+    { compare, compareFrom, compareTo }
   );
 
   const workspaceStats = buildOverviewWorkspaceStats(
@@ -421,12 +478,46 @@ export default async function OverviewPage({
     kpiSparklines: overviewResult.kpiSparklines ?? emptySparklines(),
   };
 
+  // Metrics-aligned panels (KPI top errors) use the exact Overview metrics window
+  // for open-ended ranges and calendar/custom compare. Paginated list rows keep
+  // the page list range unless the range is open-ended (list last_seen ≠ KPIs).
+  const metricsIssueDetailScope =
+    overviewData.metricsSince &&
+    (overviewData.metricsUntil || pageMetricsUntil) &&
+    (isUnselectedTimeRange(parsedRange.key) || !isRollingCompareParam(compare))
+      ? {
+          ...listScope,
+          metricsSince: overviewData.metricsSince,
+          metricsUntil: overviewData.metricsUntil || pageMetricsUntil,
+        }
+      : listScope;
+  const listIssueDetailScope = isUnselectedTimeRange(parsedRange.key)
+    ? metricsIssueDetailScope
+    : listScope;
+
+  // Always drive the Performance card from Overview's resolved KPI window so
+  // calendar/custom compare and rolling presets (e.g. 7d) stay aligned with KPIs.
+  const performanceMetricsSince = overviewData.metricsSince ?? null;
+  const performanceMetricsUntil =
+    overviewData.metricsUntil || pageMetricsUntil || null;
+
   const displayRangeLabel = overviewData.rangeLabel ?? parsedRange.label;
   const errorsDelta = overviewData.errorsLast24h - overviewData.errorsPrevious;
   const eventsDelta = overviewData.eventsLast24h - overviewData.eventsPrevious;
-  const compareLabel = compareLabelFor(compare, displayRangeLabel);
-  const errDeltaFmt = formatOverviewDeltaLine(errorsDelta, "errors", compareLabel);
-  const evDeltaFmt = formatOverviewDeltaLine(eventsDelta, "events", compareLabel);
+  const compareLabel =
+    overviewData.compareLabel ?? compareLabelFor(compare, displayRangeLabel);
+  const errDeltaFmt = formatOverviewDeltaLine(
+    overviewData.errorsLast24h,
+    overviewData.errorsPrevious,
+    "errors",
+    compareLabel
+  );
+  const evDeltaFmt = formatOverviewDeltaLine(
+    overviewData.eventsLast24h,
+    overviewData.eventsPrevious,
+    "events",
+    compareLabel
+  );
 
   const health: OverviewHealth =
     overviewData.health ?? {
@@ -516,6 +607,7 @@ export default async function OverviewPage({
           workspaceTelemetry={workspaceTelemetry}
           sparklines={overviewData.kpiSparklines ?? emptySparklines()}
           requestMetrics={overviewData.requestMetrics}
+          compareLabel={compareLabel}
         />
       </Suspense>
 
@@ -532,7 +624,7 @@ export default async function OverviewPage({
         <OverviewTopErrorsPanel
           groups={(overviewData.metricsTopErrorGroups ?? []).map((group) => ({
             ...group,
-            href: buildErrorGroupDetailHref(group.id, listScope),
+            href: buildErrorGroupDetailHref(group.id, metricsIssueDetailScope),
           }))}
           rangeLabel={displayRangeLabel}
           errorsHref={buildDashboardScopedListHref("/dashboard/errors", listScope)}
@@ -542,6 +634,16 @@ export default async function OverviewPage({
           rangeLabel={displayRangeLabel}
           sessionsHref={buildDashboardScopedListHref("/dashboard/sessions", listScope)}
         />
+        <div className="lg:col-start-2">
+          <Suspense fallback={<OverviewPerformanceCardSkeleton />}>
+            <OverviewPerformanceCard
+              listScope={listScope}
+              rangeLabel={displayRangeLabel}
+              metricsSince={performanceMetricsSince}
+              metricsUntil={performanceMetricsUntil}
+            />
+          </Suspense>
+        </div>
       </section>
 
       <OverviewExtraCharts
@@ -612,7 +714,7 @@ export default async function OverviewPage({
               }) => (
                 <OverviewListItem
                   key={g.id}
-                  href={buildErrorGroupDetailHref(g.id, listScope)}
+                  href={buildErrorGroupDetailHref(g.id, listIssueDetailScope)}
                   title={g.message}
                   titleClassName="font-medium text-destructive"
                   badges={<Badge>{g.app}</Badge>}

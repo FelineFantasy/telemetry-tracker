@@ -2,12 +2,10 @@ import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { ErrorsClientListSection } from "@/app/components/dashboard/ErrorsClientListSection";
 import { ErrorsSummaryMetrics, type ErrorsPageSummary } from "@/app/components/dashboard/ErrorsSummaryMetrics";
-import {
-  ErrorsAnalyticsPanels,
-  type ErrorsAnalyticsData,
-} from "@/app/components/dashboard/ErrorsAnalyticsPanels";
-import { mergeListQuery, redirectHrefIfMissingTimeRange } from "@/lib/list-filters-url";
-import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault } from "@/lib/time-range";
+import { DeferredErrorsAnalytics } from "@/app/components/dashboard/DeferredErrorsAnalytics";
+import { CompareModeControl } from "@/app/components/dashboard/CompareModeControl";
+import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
+import { appendListTimeRangeToParams, appendTrendTimeRangeToParams, isUnselectedTimeRange, parseListTimeRangeOrDefault, parseTrendTimeRangeOrDefault, resolveMetricsUntilIso } from "@/lib/time-range";
 import { AnalyticsListShell } from "@/app/components/dashboard/analytics-ui";
 import { ErrorState } from "@/app/components/ErrorState";
 import {
@@ -17,7 +15,7 @@ import {
   resolveApiListTotal,
 } from "@/lib/pagination";
 import { firstQueryValue } from "@/lib/search-params";
-import { resolveScopedQueryValue } from "@/lib/overview-scope-url";
+import { parseOverviewCompare, resolveScopedQueryValue } from "@/lib/overview-scope-url";
 import { dashboardApiFetch } from "@/lib/dashboard-api";
 
 const ERRORS_PATH = "/dashboard/errors";
@@ -64,12 +62,6 @@ async function getErrorsSummary(search: URLSearchParams): Promise<ErrorsPageSumm
   return res.json();
 }
 
-async function getErrorsAnalytics(search: URLSearchParams): Promise<ErrorsAnalyticsData | null> {
-  const res = await dashboardApiFetch(`/api/errors/analytics?${search.toString()}`);
-  if (!res.ok) return null;
-  return res.json();
-}
-
 async function getFilterOptions(app?: string) {
   const p = new URLSearchParams();
   if (app) p.set("app", app);
@@ -101,6 +93,7 @@ function buildErrorsParamsRecord(sp: {
   range?: string | string[];
   from?: string | string[];
   to?: string | string[];
+  metricsUntil?: string | string[];
   environment?: string | string[];
   platform?: string | string[];
   release?: string | string[];
@@ -111,6 +104,9 @@ function buildErrorsParamsRecord(sp: {
   trendWindow?: string | string[];
   trendFrom?: string | string[];
   trendTo?: string | string[];
+  compare?: string | string[];
+  compareFrom?: string | string[];
+  compareTo?: string | string[];
 }): Record<string, string> {
   const keys = [
     "app",
@@ -120,6 +116,7 @@ function buildErrorsParamsRecord(sp: {
     "range",
     "from",
     "to",
+    "metricsUntil",
     "environment",
     "platform",
     "release",
@@ -130,6 +127,9 @@ function buildErrorsParamsRecord(sp: {
     "trendWindow",
     "trendFrom",
     "trendTo",
+    "compare",
+    "compareFrom",
+    "compareTo",
   ] as const;
   const out: Record<string, string> = {};
   for (const k of keys) {
@@ -160,11 +160,14 @@ export default async function ErrorsListPage({
     trendWindow?: string | string[];
     trendFrom?: string | string[];
     trendTo?: string | string[];
+    metricsUntil?: string | string[];
+    compare?: string | string[];
+    compareFrom?: string | string[];
+    compareTo?: string | string[];
   }>;
 }) {
   const sp = await searchParams;
-  const pageAnchor = new Date();
-  const currentParams = buildErrorsParamsRecord(sp);
+  let currentParams = buildErrorsParamsRecord(sp);
   const defaultTimeHref = redirectHrefIfMissingTimeRange(ERRORS_PATH, currentParams);
   if (defaultTimeHref) redirect(defaultTimeHref);
   const appFilter = firstQueryValue(sp.app) ?? "";
@@ -187,6 +190,23 @@ export default async function ErrorsListPage({
     },
     "all"
   );
+
+  const pageAnchorIso = isUnselectedTimeRange(timeRange.key)
+    ? resolveMetricsUntilIso(firstQueryValue(sp.metricsUntil))
+    : null;
+  const metricsUntilHref = redirectHrefForMetricsUntil(
+    ERRORS_PATH,
+    currentParams,
+    timeRange.key,
+    pageAnchorIso
+  );
+  if (metricsUntilHref) redirect(metricsUntilHref);
+  if (pageAnchorIso) {
+    currentParams = { ...currentParams, metricsUntil: pageAnchorIso };
+  } else if (currentParams.metricsUntil) {
+    const { metricsUntil: _stale, ...withoutMetricsUntil } = currentParams;
+    currentParams = withoutMetricsUntil;
+  }
 
   const apiQuery = new URLSearchParams();
   if (appFilter) apiQuery.set("app", appFilter);
@@ -215,9 +235,12 @@ export default async function ErrorsListPage({
   if (status) apiQuery.set("status", status);
   if (sort) apiQuery.set("sort", sort);
   if (order) apiQuery.set("order", order);
-  if (isUnselectedTimeRange(timeRange.key)) {
-    apiQuery.set("metricsUntil", pageAnchor.toISOString());
+  if (pageAnchorIso) {
+    apiQuery.set("metricsUntil", pageAnchorIso);
   }
+  const compare = parseOverviewCompare(firstQueryValue(sp.compare));
+  const compareFrom = firstQueryValue(sp.compareFrom);
+  const compareTo = firstQueryValue(sp.compareTo);
 
   const summaryQuery = new URLSearchParams(apiQuery);
   summaryQuery.delete("page");
@@ -227,6 +250,9 @@ export default async function ErrorsListPage({
   summaryQuery.delete("trendWindow");
   summaryQuery.delete("trendFrom");
   summaryQuery.delete("trendTo");
+  if (compare !== "previous") summaryQuery.set("compare", compare);
+  if (compareFrom) summaryQuery.set("compareFrom", compareFrom);
+  if (compareTo) summaryQuery.set("compareTo", compareTo);
 
   let initialListData: {
     items: ErrorGroupRow[];
@@ -235,7 +261,6 @@ export default async function ErrorsListPage({
     pageSize: number;
   };
   let summary: ErrorsPageSummary | null = null;
-  let analytics: ErrorsAnalyticsData | null = null;
   let filterOptions: {
     environments: string[];
     platforms: string[];
@@ -243,11 +268,10 @@ export default async function ErrorsListPage({
   } | null = null;
 
   try {
-    const [opts, data, summaryData, analyticsData] = await Promise.all([
+    const [opts, data, summaryData] = await Promise.all([
       getFilterOptions(appFilter || undefined),
       getErrors(apiQuery),
       getErrorsSummary(summaryQuery),
-      getErrorsAnalytics(summaryQuery),
     ]);
     filterOptions = opts;
     initialListData = {
@@ -257,7 +281,6 @@ export default async function ErrorsListPage({
       pageSize: data.pageSize ?? pageSize,
     };
     summary = summaryData;
-    analytics = analyticsData;
   } catch (e) {
     return (
       <>
@@ -304,9 +327,8 @@ export default async function ErrorsListPage({
       />
 
       <AnalyticsListShell>
+        <CompareModeControl path={ERRORS_PATH} currentParams={currentParams} />
         {summary ? <ErrorsSummaryMetrics summary={summary} /> : null}
-
-        {analytics ? <ErrorsAnalyticsPanels analytics={analytics} /> : null}
 
         <ErrorsClientListSection
           path={ERRORS_PATH}
@@ -333,6 +355,8 @@ export default async function ErrorsListPage({
           platforms={options.platforms}
           releases={options.releases}
         />
+
+        <DeferredErrorsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );

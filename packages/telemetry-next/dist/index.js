@@ -1,13 +1,20 @@
 "use client";
 import { Fragment as _Fragment, jsx as _jsx } from "react/jsx-runtime";
 import React from "react";
-import { init as coreInit, identify, trackEvent as coreTrackEvent, trackError as coreTrackError, screen as coreScreen, getSessionId, endSession, } from "@telemetry-tracker/core";
+import { init as coreInit, shutdown as coreShutdown, identify, trackEvent as coreTrackEvent, trackError as coreTrackError, screen as coreScreen, getSessionId, endSession, } from "@telemetry-tracker/core";
 let initialized = false;
 export function init(config) {
     coreInit(config);
     initialized = true;
     if (typeof window !== "undefined") {
         window.__telemetry_initialized = true;
+    }
+}
+export function shutdown() {
+    coreShutdown();
+    initialized = false;
+    if (typeof window !== "undefined") {
+        window.__telemetry_initialized = false;
     }
 }
 export { identify, coreTrackEvent as trackEvent, coreScreen as screen, getSessionId, endSession, };
@@ -42,14 +49,18 @@ export class TelemetryErrorBoundary extends React.Component {
     }
 }
 export function TelemetryProvider({ config, children, }) {
-    React.useEffect(() => {
+    // Layout effect so init/session exist before child useEffects (e.g. useTrackPage).
+    React.useLayoutEffect(() => {
         init(config);
+        return () => {
+            shutdown();
+        };
     }, [config.ingestUrl, config.app]);
     return _jsx(_Fragment, { children: children });
 }
 export function useTrackPage(pathname) {
     React.useEffect(() => {
-        if (typeof window === "undefined")
+        if (typeof window === "undefined" || !initialized)
             return;
         coreScreen(pathname || "/");
     }, [pathname]);

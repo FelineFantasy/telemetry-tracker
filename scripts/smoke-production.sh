@@ -185,6 +185,7 @@ fi
 PORTAL=$(curl -sS -X POST "$API/api/meta/organizations/$ORG_ID/billing/portal" \
   -H 'Content-Type: application/json' \
   -H "$(auth_header)" \
+  -d '{}' \
   -w '\n%{http_code}')
 PO_BODY=$(echo "$PORTAL" | sed '$d')
 PO_CODE=$(echo "$PORTAL" | tail -1)

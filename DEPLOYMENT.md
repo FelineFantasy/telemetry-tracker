@@ -35,6 +35,9 @@ Copy `apps/api/.env.example` and `apps/dashboard/.env.example` for local dev.
 | `TELEMETRY_API_VERSION` | Optional override for `/health` `version`; normally set automatically at build from [CHANGELOG.md](../CHANGELOG.md) |
 | `TELEMETRY_ALLOW_REGISTRATION` | `true` for open signups; omit or `false` for invite-only after bootstrap — see [docs/REGISTRATION-POLICY.md](docs/REGISTRATION-POLICY.md) |
 | `SENTRY_DSN` | Optional uncaught-error reporting |
+| `TELEMETRY_INGEST_PII_SCRUB` | Ingest PII scrubbing — **enabled when unset**. Self-host override: set `false` / `off` to store payloads as sent. See [docs/PII-SCRUBBING.md](docs/PII-SCRUBBING.md) |
+| `TELEMETRY_INGEST_PII_SCRUB_MAX_DEPTH` | Max JSON nesting depth for property/context scrubbing (default `8`) |
+| `TELEMETRY_INGEST_PII_SCRUB_MAX_NODES` | Max JSON nodes visited per payload (default `500`) |
 
 ### API — never in production
 
@@ -106,6 +109,8 @@ This repo does **not** ship a single Docker Compose stack for all three producti
 
 **Retention:** schedule the retention job nightly so old telemetry is pruned — see [docs/RAILWAY.md](docs/RAILWAY.md#retention-cron) or run `node dist/jobs/run-retention.js` from `apps/api` on your scheduler.
 
+**Alert rules evaluator (optional):** for `HEARTBEAT` / `NO_EVENTS` / `SESSION_DROP` / `QUOTA_PERCENT` (and scheduled `ERROR_RATE`) conditions, schedule `node dist/jobs/run-alert-rules-evaluator.js` every 5 minutes — see [docs/RAILWAY.md](docs/RAILWAY.md#alert-rules-evaluator-cron) and [docs/ALERT-RULES.md](docs/ALERT-RULES.md).
+
 **Source maps in CI:** upload `.map` files after each release with the [upload-source-maps GitHub Action](.github/actions/upload-source-maps). Set `base_api_url` to your public API URL (`API_URL` on the dashboard). Details: [docs/source-maps.md](docs/source-maps.md#github-action-workflow-example).
 
 ---
@@ -134,9 +139,10 @@ For a full register → ingest → billing flow, use `scripts/smoke-production.s
 
 | Doc | Contents |
 |-----|----------|
-| [docs/RAILWAY.md](docs/RAILWAY.md) | Railway services, env, cron, troubleshooting |
+| [docs/RAILWAY.md](docs/RAILWAY.md) | Railway services, env, cron (retention + alert-rules-evaluator), alert-webhook-worker, troubleshooting |
 | [docs/BILLING.md](docs/BILLING.md) | Stripe + Resend (optional) |
 | [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) | Go-live checklist |
 | [docs/RELEASE.md](docs/RELEASE.md) | Tags, GitHub Releases, deploy runbook |
+| [docs/ALERT-RULES.md](docs/ALERT-RULES.md) | Alert Rules conditions, SYSTEM built-ins, evaluator cron |
 | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) | Plans, ingest auth, rate limits |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview for contributors |

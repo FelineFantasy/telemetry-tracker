@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Loader2, Search } from "lucide-react";
 import { DashboardPopover } from "@/app/components/dashboard/shell/DashboardPopover";
 import { NavPickerTrigger } from "@/app/components/dashboard/shell/shell-primitives";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { inputFieldClassName, searchInputClassName } from "@/lib/input-classes";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import { cn } from "@/lib/utils";
 import {
   TIME_RANGE_PRESETS,
@@ -54,8 +54,7 @@ export function TimeRangePicker({
   compact = false,
   align = "left",
 }: Props) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { push, isPending } = useDashboardNavigation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [customInput, setCustomInput] = useState("");
   const [showAbsolute, setShowAbsolute] = useState(false);
@@ -66,28 +65,34 @@ export function TimeRangePicker({
 
   const navigate = useCallback(
     (updates: Record<string, string | null>) => {
-      startTransition(() => {
-        router.push(
-          mergeListQuery(path, currentParams, {
-            ...updates,
-            page: null,
-            errorsPage: null,
-            eventsPage: null,
-          })
-        );
-      });
+      push(
+        mergeListQuery(path, currentParams, {
+          ...updates,
+          page: null,
+          errorsPage: null,
+          eventsPage: null,
+          routesPage: null,
+          pagesPage: null,
+        })
+      );
     },
-    [currentParams, path, router]
+    [currentParams, path, push]
   );
 
   const applyPreset = useCallback(
     (key: string) => {
-      navigate({ [rangeKey]: key, [fromKey]: null, [toKey]: null });
+      navigate({
+        [rangeKey]: key,
+        [fromKey]: null,
+        [toKey]: null,
+        metricsUntil: null,
+      });
     },
     [fromKey, navigate, rangeKey, toKey]
   );
 
   const clearDateFilter = useCallback(() => {
+    // Keep metricsUntil — still an open-ended window.
     navigate({ [rangeKey]: "none", [fromKey]: null, [toKey]: null });
   }, [fromKey, navigate, rangeKey, toKey]);
 
@@ -95,7 +100,12 @@ export function TimeRangePicker({
     (raw: string) => {
       const token = tryParseCustomRelativeInput(raw);
       if (!token) return false;
-      navigate({ [rangeKey]: token, [fromKey]: null, [toKey]: null });
+      navigate({
+        [rangeKey]: token,
+        [fromKey]: null,
+        [toKey]: null,
+        metricsUntil: null,
+      });
       return true;
     },
     [fromKey, navigate, rangeKey, toKey]
@@ -107,6 +117,7 @@ export function TimeRangePicker({
       [rangeKey]: null,
       [fromKey]: fromDate,
       [toKey]: toDate,
+      metricsUntil: null,
     });
   }, [fromDate, fromKey, navigate, rangeKey, toDate, toKey]);
 

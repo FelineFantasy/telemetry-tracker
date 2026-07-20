@@ -39,6 +39,10 @@ Recent production bugs lived here — review cross-file carefully:
 
 5. **Alert href**: Persist or derive correct in-app links (`alertEventHref`, `AlertEvent.href`) — error spikes → `/dashboard/errors` or specific group; quota → `/dashboard/settings/billing`.
 
+6. **Alert webhooks**: Outbound `ProjectWebhook` URLs must be HTTPS-only; list APIs must not leak full URLs or signing secrets; delivery log list must mask URLs the same way; `fireProjectAlert` must still succeed if webhook delivery fails (enqueue PENDING rows; worker handles POST/retry). Delivery must DNS-resolve and pin-connect to validated IPs (no rebinding TOCTOU). Delivery must re-resolve DNS and block private/loopback targets (not hostname-string checks alone). Test webhook failures must not be logged as `DEAD`. Test webhooks must persist the delivery row before the outbound POST and always finalize to `SUCCESS`/`FAILED` (retry + last-resort FAILED — never leave `PROCESSING`, since the worker will not reclaim `webhook:test:%`). Worker claim must exclude `webhook:test:%` dedupe keys so expired test PROCESSING leases are never reclaimed for a second POST or a generic payload. Worker must not POST when `alert_event_id` is null. Worker must renew the claim lease before POST; lease duration must be at least the HTTPS POST timeout; after a successful POST, finalize `SUCCESS` even if the lease-scoped complete misses (retry + last-resort force SUCCESS by id — never leave reclaimable `PROCESSING` after HTTP success). `MAX_PROJECT_WEBHOOKS` must be enforced atomically (not check-then-insert). Optional `destinations.webhookIds` on fire must not enqueue unrelated project webhooks; `destinations.email: false` must skip email.
+
+7. **Alert rules (#493 / #534)**: Custom `AlertRule` rows are project-scoped (soft-delete); `conditions[]` (AND) + opaque `destinationIds` (not provider enums); webhook uuids in destination ids must belong to the project; rules only call `fireProjectAlert` (Notifications owns delivery); ingest path + scheduled evaluator coexist without removing built-in spike/quota hooks; unknown condition types are skipped (do not fail AND; do not crash); rules with no supported conditions must not fire; cooldown uses atomic `last_fired_at` claims on both paths (not wall-clock buckets alone); scheduled sweep skips soft-deleted projects/orgs; unparsable/empty `conditions` must still list in the Alerts UI; `ERROR_COUNT` environment scope must match trimmed `ErrorOccurrence.environment` from ingest; schedule cadence is `ALERT_RULES_SCHEDULE_INTERVAL_MINUTES` only.
+
 ### Plan enforcement and ingest
 
 - Rejecting ingest at quota cap must still trigger quota exceeded notification paths when appropriate.
@@ -58,8 +62,11 @@ Recent production bugs lived here — review cross-file carefully:
 - Formatting-only changes that pass `pnpm lint`.
 - Marketing copy and README unless factually wrong about security or deployment.
 - Missing tests for trivial renames or comment-only edits.
+- **Global Search vs Issues list all-time membership**: `GET /api/search` intentionally applies route-built metrics windows (`sessionStartedAt` / `eventCreatedAt` / `errorOccurrenceRange`) to all entity groups when nav range is open-ended or all-time. Do not flag time-only issue `last_seen` bounds from `errorOccurrenceRange` as over-filtering versus `/dashboard/errors`, which only applies `last_seen` when the list range itself has explicit bounds.
 
 ## Pre-merge expectations
+
+> **GitHub `bugbot-review` is temporarily paused** (`BUGBOT_REVIEW_ENABLED=false`). Local `/review-bugbot` remains optional. Re-enable: set the flag to `"true"` in [`.github/workflows/bugbot-review.yml`](../.github/workflows/bugbot-review.yml).
 
 Contributors should run locally before opening PRs:
 

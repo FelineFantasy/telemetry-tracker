@@ -76,6 +76,27 @@ describe("sendTransactionalEmail", () => {
     logSpy.mockRestore();
   });
 
+  it("strips CR/LF from dev-logged email fields", async () => {
+    delete process.env.RESEND_API_KEY;
+    delete process.env.TELEMETRY_EMAIL_FROM;
+    process.env.NODE_ENV = "development";
+    const logSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await sendTransactionalEmail({
+      to: "user@example.com\r\n[INFO] forged",
+      subject: "Sub\nject",
+      html: "<p>Hello\r\nWorld</p>",
+    });
+
+    expect(logSpy).toHaveBeenCalledWith(
+      "[email:dev]",
+      "user@example.com[INFO] forged",
+      "Subject",
+      "<p>HelloWorld</p>"
+    );
+    logSpy.mockRestore();
+  });
+
   it("no-ops silently in production when not configured", async () => {
     delete process.env.RESEND_API_KEY;
     delete process.env.TELEMETRY_EMAIL_FROM;
@@ -119,9 +140,35 @@ describe("sendTransactionalEmail", () => {
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
       from: string;
       reply_to?: string;
+      attachments?: unknown;
     };
     expect(body.from).toBe("Telemetry <noreply@example.com>");
     expect(body.reply_to).toBe("support@example.com");
+    expect(body.attachments).toBeUndefined();
+  });
+
+  it("attaches brand logo CID when HTML references cid:tt-brand-logo", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.TELEMETRY_EMAIL_FROM = "Telemetry <noreply@example.com>";
+    fetchMock.mockResolvedValue({
+      ok: true,
+      text: async () => "",
+    });
+
+    const result = await sendTransactionalEmail({
+      to: "user@example.com",
+      subject: "Release",
+      html: '<img src="cid:tt-brand-logo" alt="Telemetry Tracker" />',
+    });
+
+    expect(result).toEqual({ sent: true });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      attachments: Array<{ content_id: string; filename: string; content_type: string }>;
+    };
+    expect(body.attachments).toHaveLength(1);
+    expect(body.attachments[0]?.content_id).toBe("tt-brand-logo");
+    expect(body.attachments[0]?.filename).toBe("email-logo.png");
+    expect(body.attachments[0]?.content_type).toBe("image/png");
   });
 
   it("returns Resend error details on failure", async () => {

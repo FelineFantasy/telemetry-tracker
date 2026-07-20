@@ -52,6 +52,9 @@
 | Errors | ✅ |
 | Events | ✅ |
 | Sessions | ✅ |
+| Performance / Web Vitals | ✅ |
+| Releases | ✅ |
+| Global search | ✅ |
 | Organizations | ✅ |
 | Projects | ✅ |
 | API keys | ✅ |
@@ -61,7 +64,8 @@
 | Self-hosted | ✅ |
 | Hosted cloud ([telemetry-tracker.com](https://telemetry-tracker.com)) | ✅ |
 | Paid plans (Free / Pro / Business, EUR via Stripe) | ✅ |
-| Alerting | ✅ |
+| Alerting (notifications & channels) | ✅ |
+| Alert rules (conditions & destinations) | ✅ |
 | Source maps | ✅ |
 
 Self-host setup: [DEPLOYMENT.md](DEPLOYMENT.md)
@@ -203,13 +207,12 @@ Shipped capabilities are in **[Features](#features)** above. What follows is **p
 | **Exploring** | Labeled *Coming soon* in the product; timing and scope TBD |
 
 <details>
-<summary><strong>Planned & exploring</strong> (11 areas — Observability, Platform, Account)</summary>
+<summary><strong>Planned & exploring</strong> (9 areas — Observability, Platform, Account)</summary>
 
 ### Observability
 
 | Area | Status |
 |------|--------|
-| [Performance / Web Vitals](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/99) | Planned |
 | Traces | Exploring |
 | Logs | Exploring |
 
@@ -218,7 +221,6 @@ Shipped capabilities are in **[Features](#features)** above. What follows is **p
 | Area | Status |
 |------|--------|
 | Custom dashboards | Planned |
-| Releases | Exploring |
 | Feature flags | Exploring |
 | Export reports | Exploring |
 
@@ -254,14 +256,19 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues 
 | Topic | Doc |
 |-------|-----|
 | Architecture overview | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Product roadmap milestones | [docs/ROADMAP.md](docs/ROADMAP.md) |
+| Alert rules | [docs/ALERT-RULES.md](docs/ALERT-RULES.md) |
+| Alert webhooks / delivery | [docs/ALERT-WEBHOOKS.md](docs/ALERT-WEBHOOKS.md) |
 | Deploy (overview) | [DEPLOYMENT.md](DEPLOYMENT.md) |
 | Railway setup & troubleshooting | [docs/RAILWAY.md](docs/RAILWAY.md) |
 | Stripe & Resend (optional) | [docs/BILLING.md](docs/BILLING.md) |
+| Product update emails | [docs/MARKETING-EMAIL.md](docs/MARKETING-EMAIL.md) |
 | Production checklist | [docs/PRODUCTION-READINESS.md](docs/PRODUCTION-READINESS.md) |
 | Releases & deploy runbook | [docs/RELEASE.md](docs/RELEASE.md) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
 | RBAC & org model | [docs/RBAC.md](docs/RBAC.md) |
 | Plans & ingest auth | [docs/ENTITLEMENTS.md](docs/ENTITLEMENTS.md) |
+| Ingest PII scrubbing | [docs/PII-SCRUBBING.md](docs/PII-SCRUBBING.md) |
 | SDK guides | [docs/sdk-core.md](docs/sdk-core.md), [docs/sdk-next.md](docs/sdk-next.md), [docs/sdk-node.md](docs/sdk-node.md), [docs/sdk-nestjs.md](docs/sdk-nestjs.md), [docs/sdk-vue.md](docs/sdk-vue.md), [docs/sdk-nuxt.md](docs/sdk-nuxt.md), [docs/sdk-react-native.md](docs/sdk-react-native.md) |
 | Source maps | [docs/source-maps.md](docs/source-maps.md) |
 

@@ -11,7 +11,12 @@ import { getProjectNavSummaries } from "../lib/project-nav-summary.js";
 import { loadNavScopeForProject, loadWorkspaceMetaForUser } from "../lib/workspace-meta.js";
 import { buildDashboardBootstrap } from "../lib/dashboard-bootstrap.js";
 import { buildDashboardSessionContext } from "../lib/dashboard-session-context.js";
-import { buildDashboardNotifications } from "../lib/dashboard-notifications.js";
+import {
+  applyNotificationFeedFilters,
+  buildDashboardNotifications,
+  buildOrganizationDashboardNotifications,
+  parseNotificationTypeFilter,
+} from "../lib/dashboard-notifications.js";
 import {
   parseNotificationPreferences,
   validateNotificationPreferencesPatch,
@@ -54,10 +59,16 @@ import {
 } from "../lib/source-map-upload-auth.js";
 import { avatarUrlFromUser } from "../lib/user-avatar.js";
 import {
+  AUDIT_ACTIONS,
   listOrganizationAuditEvents,
   parseAuditLogQuery,
+  recordOrganizationAuditEvent,
 } from "../lib/audit-log.js";
 import { listOrganizationIntegrations } from "../lib/organization-integrations.js";
+import {
+  ensureUniqueProjectSlug,
+  slugifyProjectName,
+} from "../lib/project-slug.js";
 
 const DEFAULT_ORG_ID =
   process.env.TELEMETRY_ORGANIZATION_ID?.trim() ||
@@ -67,52 +78,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const INVITE_DAYS = 7;
-
-function slugifyProjectName(name: string): string {
-  const s = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
-  return s || "project";
-}
-
-const MAX_SLUG_LEN = 64;
-/** Max stem length so `${stem}-${n}` fits in MAX_SLUG_LEN without truncating the counter into identical slugs. */
-const SLUG_STEM_MAX = 52;
-
-/**
- * Allocate a unique `slug` per org. Long `base` values are truncated to `SLUG_STEM_MAX` before appending
- * `-1`, `-2`, … so `.slice(0, 64)` cannot repeat the same string forever (see slug collision bug).
- */
-async function ensureUniqueSlug(orgId: string, base: string): Promise<string> {
-  const stem =
-    (base.length <= SLUG_STEM_MAX ? base : base.slice(0, SLUG_STEM_MAX)).replace(
-      /-+$/g,
-    "") || "project";
-  let n = 0;
-  while (n < 1_000_000) {
-    const slug =
-      n === 0 ? stem : `${stem}-${n}`.slice(0, MAX_SLUG_LEN);
-    // `@@unique([organization_id, slug])` applies to soft-deleted rows too — must not reuse.
-    const clash = await prisma.project.findFirst({
-      where: { organization_id: orgId, slug },
-      select: { id: true },
-    });
-    if (!clash) return slug;
-    n += 1;
-  }
-  for (let attempt = 0; attempt < 32; attempt++) {
-    const suffix = randomBytes(5).toString("hex");
-    const slug = `${stem}-${suffix}`.slice(0, MAX_SLUG_LEN);
-    const clash = await prisma.project.findFirst({
-      where: { organization_id: orgId, slug },
-      select: { id: true },
-    });
-    if (!clash) return slug;
-  }
-  throw new Error("Could not allocate unique project slug");
-}
 
 function parseOrgRole(raw: unknown): OrgRole | null {
   if (raw === "OWNER" || raw === "EDITOR" || raw === "VIEWER") return raw;
@@ -162,6 +127,53 @@ export async function projectDashboardRoutes(
     });
     return reply.status(201).send({ id: org.id, name: org.name });
   });
+
+  app.patch<{ Params: { orgId: string } }>(
+    "/meta/organizations/:orgId",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const orgId = request.params.orgId.trim();
+      if (!UUID_RE.test(orgId)) {
+        return reply.status(400).send({ error: "Invalid organization id" });
+      }
+      const existing = await prisma.organization.findFirst({
+        where: { id: orgId, deleted_at: null },
+        select: { id: true, name: true },
+      });
+      if (!existing) {
+        return reply.status(404).send({ error: "Organization not found" });
+      }
+      const role = await getMembershipRoleForOrganization(session.userId, orgId);
+      if (!canArchiveOrganization(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+      const body = (request.body ?? {}) as { name?: string };
+      if (typeof body.name !== "string") {
+        return reply.status(400).send({ error: "name is required" });
+      }
+      const name = body.name.trim().slice(0, 120);
+      if (!name) {
+        return reply.status(400).send({ error: "name cannot be empty" });
+      }
+      if (name === existing.name) {
+        return reply.send({ id: existing.id, name: existing.name });
+      }
+      const updated = await prisma.organization.update({
+        where: { id: orgId },
+        data: { name },
+        select: { id: true, name: true },
+      });
+      void recordOrganizationAuditEvent(
+        prisma,
+        orgId,
+        session.userId,
+        AUDIT_ACTIONS.ORGANIZATION_UPDATE,
+        `organization:${updated.id} name=${updated.name}`
+      );
+      return reply.send({ id: updated.id, name: updated.name });
+    }
+  );
 
   app.get("/meta/dashboard-bootstrap", async (request, reply) => {
     const session = await getSessionUser(request);
@@ -334,7 +346,7 @@ export async function projectDashboardRoutes(
       typeof body.slug === "string" && body.slug.trim() !== ""
         ? slugifyProjectName(body.slug.trim())
         : slugifyProjectName(name);
-    const slug = await ensureUniqueSlug(orgId, slugBase);
+    const slug = await ensureUniqueProjectSlug(prisma, orgId, slugBase);
 
     const created = await createProjectWithPlanLimitCheck(prisma, orgId, { name, slug });
     if (!created.ok) {
@@ -353,6 +365,139 @@ export async function projectDashboardRoutes(
       organizationId: project.organization_id,
     });
   });
+
+  app.patch<{ Params: { projectId: string } }>(
+    "/meta/projects/:projectId",
+    async (request, reply) => {
+      const session = await requireSessionUser(request, reply);
+      if (!session) return;
+      const projectId = request.params.projectId.trim();
+      if (!UUID_RE.test(projectId)) {
+        return reply.status(400).send({ error: "Invalid project id" });
+      }
+      const existing = await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          deleted_at: null,
+          organization: { deleted_at: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          organization_id: true,
+        },
+      });
+      if (!existing) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+      const role = await getMembershipRoleForOrganization(
+        session.userId,
+        existing.organization_id
+      );
+      if (!canCreateProject(role)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+
+      const body = (request.body ?? {}) as { name?: string; slug?: string };
+      const nameProvided = typeof body.name === "string";
+      const slugProvided = typeof body.slug === "string";
+      if (!nameProvided && !slugProvided) {
+        return reply
+          .status(400)
+          .send({ error: "name or slug is required" });
+      }
+
+      let nextName = existing.name;
+      if (nameProvided) {
+        const trimmed = body.name!.trim().slice(0, 120);
+        if (!trimmed) {
+          return reply.status(400).send({ error: "name cannot be empty" });
+        }
+        nextName = trimmed;
+      }
+
+      let nextSlug = existing.slug;
+      if (slugProvided) {
+        const raw = body.slug!.trim();
+        if (!raw) {
+          return reply.status(400).send({ error: "slug cannot be empty" });
+        }
+        const desired = slugifyProjectName(raw);
+        if (desired !== existing.slug) {
+          const clash = await prisma.project.findFirst({
+            where: {
+              organization_id: existing.organization_id,
+              slug: desired,
+              id: { not: projectId },
+            },
+            select: { id: true },
+          });
+          if (clash) {
+            return reply
+              .status(409)
+              .send({ error: "slug already in use in this organization" });
+          }
+          nextSlug = desired;
+        }
+      }
+
+      if (nextName === existing.name && nextSlug === existing.slug) {
+        return reply.send({
+          id: existing.id,
+          name: existing.name,
+          slug: existing.slug,
+          organizationId: existing.organization_id,
+        });
+      }
+
+      let updated: {
+        id: string;
+        name: string;
+        slug: string;
+        organization_id: string;
+      };
+      try {
+        updated = await prisma.project.update({
+          where: { id: projectId },
+          data: { name: nextName, slug: nextSlug },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            organization_id: true,
+          },
+        });
+      } catch (e: unknown) {
+        if (
+          typeof e === "object" &&
+          e !== null &&
+          "code" in e &&
+          (e as { code: string }).code === "P2002"
+        ) {
+          return reply
+            .status(409)
+            .send({ error: "slug already in use in this organization" });
+        }
+        throw e;
+      }
+
+      void recordOrganizationAuditEvent(
+        prisma,
+        existing.organization_id,
+        session.userId,
+        AUDIT_ACTIONS.PROJECT_UPDATE,
+        `project:${updated.id} name=${updated.name} slug=${updated.slug}`
+      );
+
+      return reply.send({
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        organizationId: updated.organization_id,
+      });
+    }
+  );
 
   app.post<{ Params: { orgId: string } }>(
     "/meta/organizations/:orgId/archive",
@@ -687,6 +832,20 @@ export async function projectDashboardRoutes(
     if (sessionContext === null) {
       return reply.status(403).send({ error: "Forbidden" });
     }
+    const query = request.query as {
+      scope?: unknown;
+      type?: unknown;
+      projectId?: unknown;
+      unread?: unknown;
+    };
+    const scope = query.scope === "organization" ? "organization" : "project";
+    const typeFilter = parseNotificationTypeFilter(query.type);
+    const filterProjectId =
+      typeof query.projectId === "string" && /^[0-9a-f-]{36}$/i.test(query.projectId.trim())
+        ? query.projectId.trim().toLowerCase()
+        : null;
+    const unreadOnly = query.unread === "1" || query.unread === "true";
+
     const user = await prisma.user.findUnique({
       where: { id: session.userId },
       select: { email: true, notification_preferences: true },
@@ -702,28 +861,88 @@ export async function projectDashboardRoutes(
     if (headerOrg && organizationIds.includes(headerOrg)) {
       organizationIds = [headerOrg];
     }
-    const items = await buildDashboardNotifications(
-      prisma,
-      projectId,
-      sessionContext,
-      preferences,
-      user
-        ? {
-            userId: session.userId,
-            userEmail: user.email,
-            organizationIds,
-          }
-        : undefined
-    );
-    const withRead = await attachNotificationReadState(prisma, session.userId, items);
-    return reply.send({ items: withRead });
+    const buildContext = user
+      ? {
+          userId: session.userId,
+          userEmail: user.email,
+          organizationIds,
+        }
+      : undefined;
+
+    const workspace = await loadWorkspaceMetaForUser(prisma, session.userId, headerOrg);
+    const orgProjects = workspace.projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
+
+    if (filterProjectId) {
+      const allowed = new Set(orgProjects.map((p) => p.id.toLowerCase()));
+      if (!allowed.has(filterProjectId)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+    }
+
+    // When filtering by project, scope the DB queries to that project before
+    // take/caps so quieter projects are not crowded out by a global org cap.
+    const projectsForOrgFeed =
+      scope === "organization" && filterProjectId
+        ? orgProjects.filter((p) => p.id.toLowerCase() === filterProjectId)
+        : orgProjects;
+
+    let items =
+      scope === "organization"
+        ? await buildOrganizationDashboardNotifications(
+            prisma,
+            projectsForOrgFeed,
+            projectId,
+            sessionContext,
+            preferences,
+            buildContext,
+            { mode: "center" }
+          )
+        : await buildDashboardNotifications(
+            prisma,
+            projectId,
+            sessionContext,
+            preferences,
+            buildContext,
+            {
+              mode: "bell",
+              projectMeta: projectId
+                ? orgProjects.find((p) => p.id === projectId) ?? {
+                    id: projectId,
+                    name: "Project",
+                  }
+                : null,
+            }
+          );
+
+    items = applyNotificationFeedFilters(items, {
+      types: typeFilter,
+      projectId: filterProjectId,
+    });
+
+    let withRead = await attachNotificationReadState(prisma, session.userId, items);
+    if (unreadOnly) {
+      withRead = withRead.filter((item) => item.unread);
+    }
+
+    return reply.send({
+      items: withRead,
+      projects: orgProjects,
+      scope,
+    });
   });
 
   app.post("/meta/notifications/read", async (request, reply) => {
     const session = await requireSessionUser(request, reply);
     if (!session) return;
 
-    const body = (request.body ?? {}) as { ids?: unknown; all?: unknown };
+    const body = (request.body ?? {}) as {
+      ids?: unknown;
+      all?: unknown;
+      scope?: unknown;
+    };
     const sessionContext = await buildDashboardSessionContext(prisma, session, request);
     if (sessionContext === null) {
       return reply.status(403).send({ error: "Forbidden" });
@@ -744,20 +963,39 @@ export async function projectDashboardRoutes(
       if (headerOrg && organizationIds.includes(headerOrg)) {
         organizationIds = [headerOrg];
       }
-      const items = await buildDashboardNotifications(
-        prisma,
-        sessionContext.projectId || null,
-        sessionContext,
-        preferences,
-        user
-          ? {
-              userId: session.userId,
-              userEmail: user.email,
-              organizationIds,
-            }
-          : undefined,
-        { forReadPersistence: true }
-      );
+      const buildContext = user
+        ? {
+            userId: session.userId,
+            userEmail: user.email,
+            organizationIds,
+          }
+        : undefined;
+      const scope = body.scope === "organization" ? "organization" : "project";
+      const workspace = await loadWorkspaceMetaForUser(prisma, session.userId, headerOrg);
+      const orgProjects = workspace.projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+      }));
+      const projectId = sessionContext.projectId || null;
+      const items =
+        scope === "organization"
+          ? await buildOrganizationDashboardNotifications(
+              prisma,
+              orgProjects,
+              projectId,
+              sessionContext,
+              preferences,
+              buildContext,
+              { mode: "center", forReadPersistence: true }
+            )
+          : await buildDashboardNotifications(
+              prisma,
+              projectId,
+              sessionContext,
+              preferences,
+              buildContext,
+              { forReadPersistence: true }
+            );
       await markNotificationsRead(
         prisma,
         session.userId,
@@ -794,7 +1032,12 @@ export async function projectDashboardRoutes(
     const session = await requireSessionUser(request, reply);
     if (!session) return;
 
-    const parsed = validateNotificationPreferencesPatch(request.body);
+    const existing = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { notification_preferences: true },
+    });
+    const previous = parseNotificationPreferences(existing?.notification_preferences);
+    const parsed = validateNotificationPreferencesPatch(request.body, previous);
     if (!parsed.ok) {
       return reply.status(400).send({ error: parsed.error });
     }
@@ -1019,17 +1262,79 @@ export async function projectDashboardRoutes(
     if (!canCreateApiKey(projRole)) {
       return reply.status(403).send({ error: "Forbidden" });
     }
+    const { loadProjectAlertSettings } = await import("../lib/error-spike-alert.js");
     const { validateProjectAlertSettingsPatch } = await import(
       "../lib/project-alert-settings.js"
     );
-    const validated = validateProjectAlertSettingsPatch(request.body);
+    const { saveProjectAlertSettings } = await import(
+      "../lib/builtin-alert-rules.js"
+    );
+    const previous = await loadProjectAlertSettings(prisma, projectId);
+    const validated = validateProjectAlertSettingsPatch(request.body, previous);
+    if (!validated.ok) {
+      return reply.status(400).send({ error: validated.error });
+    }
+    // Dual-write: alert_settings JSON + SYSTEM AlertRule rows (#535).
+    await saveProjectAlertSettings(prisma, projectId, validated.settings);
+    return reply.send({ settings: validated.settings });
+  });
+
+  app.get("/project/pii-scrub-settings", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const row = await prisma.project.findFirst({
+      where: { id: projectId, deleted_at: null },
+      select: { pii_scrub_settings: true },
+    });
+    const { parseProjectPiiScrubSettings } = await import(
+      "../lib/project-pii-scrub-settings.js"
+    );
+    return reply.send({
+      settings: parseProjectPiiScrubSettings(row?.pii_scrub_settings ?? null),
+    });
+  });
+
+  app.patch("/project/pii-scrub-settings", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const {
+      parseProjectPiiScrubSettings,
+      validateProjectPiiScrubSettingsPatch,
+      formatPiiScrubSettingsAuditTarget,
+    } = await import("../lib/project-pii-scrub-settings.js");
+    const existingRow = await prisma.project.findFirst({
+      where: { id: projectId, deleted_at: null },
+      select: { pii_scrub_settings: true, organization_id: true },
+    });
+    if (!existingRow) {
+      return reply.status(404).send({ error: "Project not found" });
+    }
+    const previous = parseProjectPiiScrubSettings(existingRow.pii_scrub_settings);
+    const validated = validateProjectPiiScrubSettingsPatch(request.body, previous);
     if (!validated.ok) {
       return reply.status(400).send({ error: validated.error });
     }
     await prisma.project.update({
       where: { id: projectId },
-      data: { alert_settings: validated.settings as object },
+      data: { pii_scrub_settings: validated.settings as object },
     });
+    const { clearProjectPiiScrubSettingsCache } = await import(
+      "../lib/project-pii-scrub-cache.js"
+    );
+    clearProjectPiiScrubSettingsCache(projectId);
+    void recordOrganizationAuditEvent(
+      prisma,
+      existingRow.organization_id,
+      session.userId,
+      AUDIT_ACTIONS.PROJECT_PII_SCRUB_UPDATE,
+      formatPiiScrubSettingsAuditTarget(projectId, validated.settings)
+    );
     return reply.send({ settings: validated.settings });
   });
 
@@ -1053,6 +1358,211 @@ export async function projectDashboardRoutes(
         firedAt: e.fired_at.toISOString(),
       })),
     });
+  });
+
+  app.get("/project/alert-rules", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const { listAlertRules } = await import("../lib/alert-rules.js");
+    const rules = await listAlertRules(prisma, projectId);
+    return reply.send({ rules });
+  });
+
+  app.post("/project/alert-rules", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { createAlertRule } = await import("../lib/alert-rules.js");
+    const result = await createAlertRule(prisma, projectId, request.body);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(201).send({ rule: result.rule });
+  });
+
+  app.patch("/project/alert-rules/:ruleId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { ruleId } = request.params as { ruleId: string };
+    const { updateAlertRule } = await import("../lib/alert-rules.js");
+    const result = await updateAlertRule(prisma, projectId, ruleId, request.body);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.send({ rule: result.rule });
+  });
+
+  app.delete("/project/alert-rules/:ruleId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { ruleId } = request.params as { ruleId: string };
+    const { softDeleteAlertRule } = await import("../lib/alert-rules.js");
+    const result = await softDeleteAlertRule(prisma, projectId, ruleId);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(204).send();
+  });
+
+  app.get("/project/webhooks", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const { listProjectWebhooks } = await import("../lib/alert-webhook-dispatch.js");
+    const webhooks = await listProjectWebhooks(prisma, projectId);
+    return reply.send({ webhooks });
+  });
+
+  app.get("/project/webhook-deliveries", async (request, reply) => {
+    const projectId = await resolveReadProjectId(request, reply);
+    if (projectId === null) return;
+    const q = request.query as { limit?: string; webhookId?: string };
+    const limitRaw = typeof q.limit === "string" ? Number(q.limit) : 25;
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(50, Math.max(1, Math.floor(limitRaw)))
+      : 25;
+    const webhookId =
+      typeof q.webhookId === "string" && q.webhookId.trim().length > 0
+        ? q.webhookId.trim()
+        : undefined;
+    const { listAlertWebhookDeliveries } = await import("../lib/alert-webhook-dispatch.js");
+    const deliveries = await listAlertWebhookDeliveries(prisma, projectId, {
+      limit,
+      webhookId,
+    });
+    return reply.send({ deliveries });
+  });
+
+  app.post("/project/webhooks", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const body = (request.body ?? {}) as {
+      url?: unknown;
+      label?: unknown;
+      enabled?: unknown;
+      withSigningSecret?: unknown;
+      provider?: unknown;
+      config?: unknown;
+    };
+    const { createProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await createProjectWebhook(prisma, projectId, {
+      url: typeof body.url === "string" ? body.url : "",
+      label: typeof body.label === "string" ? body.label : null,
+      enabled: typeof body.enabled === "boolean" ? body.enabled : true,
+      withSigningSecret:
+        typeof body.withSigningSecret === "boolean" ? body.withSigningSecret : undefined,
+      provider: body.provider,
+      config: body.config,
+    });
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(201).send({
+      webhook: result.webhook,
+      signingSecret: result.signingSecret,
+    });
+  });
+
+  app.patch("/project/webhooks/:webhookId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { webhookId } = request.params as { webhookId: string };
+    const body = (request.body ?? {}) as {
+      url?: unknown;
+      label?: unknown;
+      enabled?: unknown;
+      rotateSigningSecret?: unknown;
+      clearSigningSecret?: unknown;
+      config?: unknown;
+    };
+    const { updateProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await updateProjectWebhook(prisma, projectId, webhookId, {
+      url: typeof body.url === "string" ? body.url : undefined,
+      label:
+        body.label === null
+          ? null
+          : typeof body.label === "string"
+            ? body.label
+            : undefined,
+      enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
+      rotateSigningSecret: body.rotateSigningSecret === true,
+      clearSigningSecret: body.clearSigningSecret === true,
+      config: body.config,
+    });
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.send({
+      webhook: result.webhook,
+      signingSecret: result.signingSecret,
+    });
+  });
+
+  app.delete("/project/webhooks/:webhookId", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { webhookId } = request.params as { webhookId: string };
+    const { softDeleteProjectWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await softDeleteProjectWebhook(prisma, projectId, webhookId);
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(204).send();
+  });
+
+  app.post("/project/webhooks/:webhookId/test", async (request, reply) => {
+    const session = await requireSessionUser(request, reply);
+    if (!session) return;
+    const projectId = await resolveReadProjectIdWithSession(request, reply, session);
+    if (projectId === null) return;
+    const projRole = await getMembershipRoleForProject(session.userId, projectId);
+    if (!canCreateApiKey(projRole)) {
+      return reply.status(403).send({ error: "Forbidden" });
+    }
+    const { webhookId } = request.params as { webhookId: string };
+    const { sendTestWebhook } = await import("../lib/alert-webhook-dispatch.js");
+    const result = await sendTestWebhook(prisma, projectId, webhookId);
+    if (!result.ok) {
+      return reply.status(result.status).send({
+        error: result.error,
+        httpStatus: result.httpStatus ?? null,
+      });
+    }
+    return reply.send({ ok: true, httpStatus: result.httpStatus });
   });
 
   app.get("/project/api-keys", async (request, reply) => {

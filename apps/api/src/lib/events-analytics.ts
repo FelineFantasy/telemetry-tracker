@@ -4,6 +4,7 @@
 
 import { Prisma, PrismaClient } from "@prisma/client";
 import { escapeLikePattern } from "./list-query.js";
+import { eventFreeTextMatchSql } from "./list-query-helpers.js";
 import type { EventListFilterInput } from "./events-list-query.js";
 import type { ResolvedSummaryWindow } from "./events-page-summary.js";
 import {
@@ -11,6 +12,7 @@ import {
   overviewChartQuerySince,
   type OverviewSeriesBucket,
 } from "./overview-timeseries.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
 
 export const EVENTS_TOP_EVENTS_LIMIT = 5;
@@ -83,11 +85,17 @@ function buildEventAnalyticsFilterSql(f: EventListFilterInput, projectId: string
   if (f.name) parts.push(Prisma.sql`e."name" = ${f.name}`);
   if (f.environment) parts.push(Prisma.sql`e."environment" = ${f.environment}`);
   if (f.platform) parts.push(Prisma.sql`e."platform" = ${f.platform}`);
-  if (f.release) parts.push(Prisma.sql`e."release" = ${f.release}`);
+  if (f.release) parts.push(releaseFilterMatchSql(Prisma.sql`e."release"`, f.release));
   if (f.propertiesContains?.trim()) {
     const pat = `%${escapeLikePattern(f.propertiesContains.trim())}%`;
     parts.push(Prisma.sql`e."properties"::text ILIKE ${pat} ESCAPE '\\'`);
   }
+  const freeText = eventFreeTextMatchSql(
+    f.q,
+    Prisma.sql`e."name"`,
+    Prisma.sql`e."properties"::text`
+  );
+  if (freeText) parts.push(freeText);
   return Prisma.join(parts, " AND ");
 }
 

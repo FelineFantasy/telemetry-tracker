@@ -19,6 +19,7 @@ import {
 } from "./overview-timeseries.js";
 import { resolveCompareWindow } from "./overview-stats.js";
 import { chooseTimeRangeBucket } from "./time-range.js";
+import { releaseFilterMatchSql } from "./release-key.js";
 
 export const WEB_VITAL_EVENT_NAME = "$web_vital";
 
@@ -231,7 +232,7 @@ function performanceEventFilterSql(
   if (f.appId) parts.push(Prisma.sql`e."app" = ${f.appId}`);
   if (f.environment) parts.push(Prisma.sql`e."environment" = ${f.environment}`);
   if (f.platform) parts.push(Prisma.sql`e."platform" = ${f.platform}`);
-  if (f.release) parts.push(Prisma.sql`e."release" = ${f.release}`);
+  if (f.release) parts.push(releaseFilterMatchSql(Prisma.sql`e."release"`, f.release));
   return Prisma.join(parts, " AND ");
 }
 

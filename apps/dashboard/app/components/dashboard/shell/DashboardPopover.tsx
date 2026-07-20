@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import { cn } from "@/lib/utils";
 
 export function DashboardPopover({
@@ -30,6 +31,7 @@ export function DashboardPopover({
   children: (close: () => void) => ReactNode;
   onOpenChange?: (open: boolean) => void;
 }) {
+  const { isPending } = useDashboardNavigation();
   const [open, setOpen] = useState(false);
   const placement: Placement = align === "right" ? "bottom-end" : "bottom-start";
 
@@ -46,12 +48,17 @@ export function DashboardPopover({
   }, []);
 
   const toggle = useCallback(() => {
+    if (isPending) return;
     setOpen((current) => !current);
-  }, []);
+  }, [isPending]);
 
   useEffect(() => {
     onOpenChange?.(open);
   }, [onOpenChange, open]);
+
+  useEffect(() => {
+    if (isPending && open) close();
+  }, [close, isPending, open]);
 
   useEffect(() => {
     if (!open) return;

@@ -21,6 +21,7 @@ import {
 import { logoutAction } from "@/app/auth/actions";
 import type { DashboardUser } from "@/lib/dashboard-user";
 import { toDashboardAvatarUrl } from "@/lib/avatar-url";
+import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 import { DashboardPopover } from "./DashboardPopover";
 import { ShellKbd } from "./DashboardPopover";
 import { ThemeMenuLink } from "./ThemeMenuLink";
@@ -144,19 +145,11 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
                 <MenuLink key={item.href} {...item} onClick={close} />
               ))}
             </MenuGroup>
-            <Link
-              href="/dashboard/settings/profile"
-              onClick={close}
-              className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface"
-            >
-              <Settings className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>All settings</span>
-            </Link>
+            <SettingsEntryLink onNavigate={close} />
             <div className="my-1 h-px bg-border" />
             <form action={logoutAction}>
               <button
                 type="submit"
-                onClick={close}
                 className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-surface"
               >
                 <LogOut className="h-3.5 w-3.5" />
@@ -167,6 +160,21 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
         </div>
       )}
     </DashboardPopover>
+  );
+}
+
+function SettingsEntryLink({ onNavigate }: { onNavigate: () => void }) {
+  const linkProps = useDashboardNavLinkProps("/dashboard/settings/profile", {
+    onNavigate,
+  });
+  return (
+    <Link
+      {...linkProps}
+      className="mx-1.5 mb-1 flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface"
+    >
+      <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+      <span>All settings</span>
+    </Link>
   );
 }
 
@@ -194,10 +202,10 @@ function MenuLink({
   shortcut?: string;
   onClick?: () => void;
 }) {
+  const linkProps = useDashboardNavLinkProps(href, { onNavigate: onClick });
   return (
     <Link
-      href={href}
-      onClick={onClick}
+      {...linkProps}
       className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-surface"
     >
       <Icon className="h-3.5 w-3.5 text-muted-foreground" />

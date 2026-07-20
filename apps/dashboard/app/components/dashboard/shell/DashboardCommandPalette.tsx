@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useDashboardNavigation } from "@/lib/use-dashboard-navigation";
 import {
   useCallback,
   useEffect,
@@ -13,6 +13,7 @@ import {
 import {
   AlertTriangle,
   BarChart3,
+  Bell,
   FolderPlus,
   Key,
   LayoutDashboard,
@@ -66,6 +67,14 @@ const COMMANDS: CommandItem[] = [
     icon: BarChart3,
   },
   {
+    id: "notifications",
+    label: "Notifications",
+    href: "/dashboard/notifications",
+    group: "Navigate",
+    keywords: ["inbox", "bell", "alerts"],
+    icon: Bell,
+  },
+  {
     id: "org",
     label: "Organization settings",
     href: "/dashboard/settings/organization",
@@ -105,7 +114,7 @@ function matchCommand(item: CommandItem, query: string) {
 }
 
 export function DashboardCommandPalette() {
-  const router = useRouter();
+  const { push, isPending } = useDashboardNavigation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -125,13 +134,18 @@ export function DashboardCommandPalette() {
   const run = useCallback(
     (href: string) => {
       close();
-      router.push(href);
+      push(href);
     },
-    [close, router]
+    [close, push]
   );
 
   useEffect(() => {
+    if (isPending && open) close();
+  }, [close, isPending, open]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isPending) return;
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -145,7 +159,7 @@ export function DashboardCommandPalette() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [close, open]);
+  }, [close, isPending, open]);
 
   useEffect(() => {
     if (!open) return;

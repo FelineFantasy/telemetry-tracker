@@ -11,6 +11,7 @@ import { Pagination } from "@/app/components/ui/Pagination";
 import { mergeListQuery } from "@/lib/list-filters-url";
 import { buildErrorGroupDetailHref } from "@/lib/overview-scope-url";
 import type { ParsedTimeRange } from "@/lib/time-range";
+import { isUnselectedTimeRange } from "@/lib/time-range";
 import { resolveApiListTotal } from "@/lib/pagination";
 import { useAnalyticsList } from "@/lib/use-analytics-list";
 
@@ -171,11 +172,15 @@ export function ErrorsClientListSection({
                 environment: environment || null,
                 platform: platform || null,
                 release: release || null,
-                range: urlParams.range || null,
-                from: urlParams.from || null,
-                to: urlParams.to || null,
-                // Align detail with Issues list metrics window for unbounded ranges.
-                metricsUntil: new Date().toISOString(),
+                range: liveUrlParams.range || null,
+                from: liveUrlParams.from || null,
+                to: liveUrlParams.to || null,
+                // Open-ended lists only: prefer URL/live anchor, else list API seed.
+                metricsUntil: isUnselectedTimeRange(timeRange.key)
+                  ? liveUrlParams.metricsUntil ||
+                    listParams.metricsUntil ||
+                    new Date().toISOString()
+                  : null,
               })
             }
           />

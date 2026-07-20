@@ -21,6 +21,7 @@ import {
 } from "@/app/components/dashboard/ListFiltersTimeRangeSection";
 import { ClientListSortRow } from "@/app/components/dashboard/ClientListSortRow";
 import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-range";
+import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 
 export const SESSIONS_SORT_OPTIONS: DashboardSelectOption[] = [
   { value: "duration", label: "Duration" },
@@ -85,7 +86,12 @@ export function SessionsListToolbar({
 }: Props) {
   const fieldIds = useId();
   const rangeSummary = listFiltersRangeSummary(timeRange.key, timeRange.label);
-  const timeHidden = listTimeRangeHiddenFields(timeRange, fromParam, toParam);
+  const timeHidden = listTimeRangeHiddenFields(
+    timeRange,
+    fromParam,
+    toParam,
+    currentParams.metricsUntil
+  );
   const pickerRange = {
     key: timeRange.key,
     label: timeRange.label,
@@ -102,10 +108,7 @@ export function SessionsListToolbar({
     [environments]
   );
   const releaseOptions: DashboardSelectOption[] = useMemo(
-    () => [
-      { value: "", label: "Any" },
-      ...releases.map((e) => ({ value: e, label: e })),
-    ],
+    () => releaseFilterSelectOptions(releases),
     [releases]
   );
   const countryOptions: DashboardSelectOption[] = useMemo(
