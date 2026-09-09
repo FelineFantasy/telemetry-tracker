@@ -17,7 +17,7 @@ const THEMES: {
   desc: string;
   icon: LucideIcon;
 }[] = [
-  { id: "dark", label: "Dark", desc: "Pure black canvas — default", icon: Moon },
+  { id: "dark", label: "Dark", desc: "Charcoal workspace with visible panels — default", icon: Moon },
   { id: "light", label: "Light", desc: "Bright workspace for daytime use", icon: Sun },
   { id: "system", label: "System", desc: "Follow your device appearance", icon: Monitor },
 ];
@@ -57,7 +57,7 @@ export function AppearanceSettingsClient() {
                   className={`rounded-xl border p-4 text-left transition-colors ${
                     selected
                       ? "border-brand bg-brand-soft/30"
-                      : "border-border bg-surface/40 hover:border-border-strong hover:bg-surface/60"
+                      : "border-border bg-surface hover:border-border-strong hover:bg-surface-elevated"
                   } ${!mounted ? "opacity-70" : ""}`}
                 >
                   <div className="flex items-center justify-between gap-2">
