@@ -37,19 +37,11 @@ FROM base AS runner
 
 ENV NODE_ENV=production
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/dashboard/package.json apps/dashboard/package.json
-COPY packages/telemetry-core/package.json packages/telemetry-core/package.json
-COPY packages/telemetry-next/package.json packages/telemetry-next/package.json
-
-# Production install only. The build stage (no NODE_ENV=production) installs
-# devDependencies for `next build` / TypeScript. Do not pass `--prod=false` here
-# or those leak into the runtime image. `NODE_ENV=production` already omits them.
-RUN pnpm install --frozen-lockfile
-
-COPY --from=build /app/apps apps
-COPY --from=build /app/packages packages
-COPY --from=build /app/CHANGELOG.md /app/CHANGELOG.md
+# Copy the built workspace (node_modules compiled with build-essential, plus
+# `.next`). Do not reinstall here: a production-only `pnpm install` in this
+# stage first ran on Railway in v1.17.7 (v1.17.6 skipped the dashboard watch
+# paths) and the deploy failed, leaving telemetry-tracker.com on Cloudflare 502.
+COPY --from=build /app /app
 
 WORKDIR /app/apps/dashboard
 
