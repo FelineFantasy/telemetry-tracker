@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { DocsHomePage } from "@/app/components/docs/DocsHomePage";
 
 export const metadata: Metadata = {
-  title: "Documentation — Telemetry Tracker",
+  title: "Documentation",
   description:
     "Install an SDK, capture your first event, and ship reliable software with Telemetry Tracker. Quickstarts, guides, and ingest reference.",
+  alternates: { canonical: "./" },
   openGraph: {
     title: "Documentation — Telemetry Tracker",
     description:

@@ -5,9 +5,10 @@ import { DocsArticle } from "@/app/components/docs/DocsArticle";
 import { GITHUB_RELEASES_BASE, loadChangelog } from "@/lib/changelog";
 
 export const metadata: Metadata = {
-  title: "Release notes — Docs — Telemetry Tracker",
+  title: "Release notes",
   description:
     "Platform release history for Telemetry Tracker (API + dashboard). See what shipped in each semver version.",
+  alternates: { canonical: "./" },
   openGraph: {
     title: "Release notes — Telemetry Tracker",
     description: "Version history for the Telemetry Tracker platform (API + dashboard).",

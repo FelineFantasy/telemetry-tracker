@@ -4,8 +4,9 @@ import { CodeBlock } from "@/app/components/docs/CodeBlock";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
-  title: "NestJS — Docs — Telemetry Tracker",
+  title: "NestJS",
   description: "Integrate Telemetry Tracker with NestJS APIs",
+  alternates: { canonical: "./" },
 };
 
 export default function DocsNestJsPage() {

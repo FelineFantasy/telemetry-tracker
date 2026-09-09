@@ -4,8 +4,9 @@ import { CodeBlock } from "@/app/components/docs/CodeBlock";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
-  title: "SDK — Docs — Telemetry Tracker",
+  title: "SDK",
   description: "init(), events, identity, and app naming for Telemetry Tracker SDKs",
+  alternates: { canonical: "./" },
 };
 
 const FULL_EXAMPLE = `import { init, trackEvent, trackError, screen, identify } from "@telemetry-tracker/core";

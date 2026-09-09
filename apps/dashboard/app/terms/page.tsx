@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Terms of Service",
   description:
     "The terms that govern your use of Telemetry Tracker — accounts, acceptable use, data, billing, and liability.",
+  alternates: { canonical: "./" },
   openGraph: {
     title: "Terms of Service — Telemetry Tracker",
     description:

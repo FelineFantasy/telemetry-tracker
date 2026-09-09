@@ -3,8 +3,9 @@ import { CodeBlock } from "@/app/components/docs/CodeBlock";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
-  title: "React Native — Docs — Telemetry Tracker",
+  title: "React Native",
   description: "Integrate Telemetry Tracker with React Native",
+  alternates: { canonical: "./" },
 };
 
 export default function DocsReactNativePage() {

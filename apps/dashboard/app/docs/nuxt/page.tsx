@@ -3,8 +3,9 @@ import { CodeBlock } from "@/app/components/docs/CodeBlock";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
-  title: "Nuxt — Docs — Telemetry Tracker",
+  title: "Nuxt",
   description: "Integrate Telemetry Tracker with Nuxt",
+  alternates: { canonical: "./" },
 };
 
 export default function DocsNuxtPage() {
