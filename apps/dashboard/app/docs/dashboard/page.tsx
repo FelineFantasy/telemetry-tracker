@@ -3,9 +3,10 @@ import Link from "next/link";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
-  title: "Dashboard — Docs — Telemetry Tracker",
+  title: "Dashboard",
   description:
     "Overview, errors, events, sessions, performance, releases, search, compare, and alerts in the Telemetry Tracker UI",
+  alternates: { canonical: "./" },
 };
 
 export default function DocsDashboardPage() {

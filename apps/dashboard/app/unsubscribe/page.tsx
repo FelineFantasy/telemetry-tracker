@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { UnsubscribePageContent } from "@/app/components/marketing/unsubscribe/UnsubscribePageContent";
 
 export const metadata: Metadata = {
-  title: "Unsubscribe — Telemetry Tracker",
+  title: "Unsubscribe",
   robots: { index: false, follow: false },
 };
 

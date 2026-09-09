@@ -5,9 +5,10 @@ import { DocsCodeBlock } from "@/app/components/docs/DocsCodeBlock";
 import { HOSTED_API_URL, HOSTED_DASHBOARD_URL } from "@/lib/hosted-cloud";
 
 export const metadata: Metadata = {
-  title: "Hosted cloud — Docs — Telemetry Tracker",
+  title: "Hosted cloud",
   description:
     "Get started on the official Telemetry Tracker cloud at telemetry-tracker.com: register, create a project, install an SDK, and send your first event.",
+  alternates: { canonical: "./" },
   openGraph: {
     title: "Hosted cloud — Telemetry Tracker",
     description:

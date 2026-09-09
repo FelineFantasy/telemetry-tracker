@@ -10,16 +10,14 @@ import { DocsPreview } from "@/app/components/marketing/docs-preview";
 import { Cta } from "@/app/components/marketing/cta";
 import { Footer } from "@/app/components/marketing/footer";
 import { socialPreviewImage } from "@/lib/social-image";
-import { getDashboardSessionId } from "@/lib/dashboard-project";
-import { resolveMetadataBase } from "@/lib/site-url";
+import { metadataBaseOrFallback } from "@/lib/site-url";
 
 const homeTitle = "Telemetry Tracker — Observability for teams that ship";
 const homeDescription =
   "Capture errors, events and sessions with lightweight SDKs. One fast, developer-first observability platform for modern applications.";
 
 export function generateMetadata(): Metadata {
-  const base = resolveMetadataBase() ?? new URL("http://localhost:3000");
-  const origin = base.origin;
+  const origin = metadataBaseOrFallback().origin;
 
   return {
     title: { absolute: homeTitle },
@@ -39,20 +37,18 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default async function LandingPage() {
-  const isAuthenticated = Boolean(await getDashboardSessionId());
-
+export default function LandingPage() {
   return (
     <main id="main-content" className="marketing-main-offset min-h-screen bg-background text-foreground">
-      <Nav isAuthenticated={isAuthenticated} />
-      <Hero isAuthenticated={isAuthenticated} />
+      <Nav />
+      <Hero />
       <SupportedSdks />
       <Features />
       <Sdks />
       <ProductShots />
       <Pricing />
       <DocsPreview />
-      <Cta isAuthenticated={isAuthenticated} />
+      <Cta />
       <Footer />
     </main>
   );
