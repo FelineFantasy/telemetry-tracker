@@ -10,9 +10,20 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/dashboard"],
+        disallow: [
+          "/dashboard",
+          "/login",
+          "/register",
+          "/forgot-password",
+          "/reset-password",
+          "/unsubscribe",
+          "/design-system",
+          "/api/",
+          "/avatar/",
+        ],
       },
     ],
     sitemap: origin ? `${origin}/sitemap.xml` : undefined,
+    host: origin,
   };
 }

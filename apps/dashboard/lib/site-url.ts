@@ -53,6 +53,16 @@ export function resolveMetadataBase(): URL | undefined {
   return undefined;
 }
 
+/** metadataBase with a production hosted-cloud fallback so OG/canonical never bake as localhost. */
+export function metadataBaseOrFallback(): URL {
+  return (
+    resolveMetadataBase() ??
+    (process.env.NODE_ENV === "production"
+      ? new URL("https://telemetry-tracker.com")
+      : new URL("http://localhost:3000"))
+  );
+}
+
 /**
  * Canonical origin for sitemap / robots (no trailing slash).
  * Uses the same sources as metadataBase except the layout’s localhost fallback.

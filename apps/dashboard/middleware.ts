@@ -62,6 +62,15 @@ function redirectLegacyAuthQueryParams(request: NextRequest) {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const host = request.headers.get("host")?.split(":")[0]?.toLowerCase();
+  if (host === "www.telemetry-tracker.com") {
+    const url = request.nextUrl.clone();
+    url.protocol = "https:";
+    url.host = "telemetry-tracker.com";
+    url.port = "";
+    return NextResponse.redirect(url, 301);
+  }
+
   const legacy = redirectLegacyAuthQueryParams(request);
   if (legacy) return legacy;
 

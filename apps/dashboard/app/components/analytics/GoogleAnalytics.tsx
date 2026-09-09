@@ -6,12 +6,13 @@ import { useEffect, useState } from "react";
 import {
   COOKIE_CONSENT_CHANGED_EVENT,
   type CookieConsentChoice,
+  readStoredCookieConsentChoice,
 } from "@/lib/cookie-consent";
 import { isMarketingAnalyticsPath } from "@/lib/google-analytics";
 
 type GoogleAnalyticsProps = {
   measurementId: string | null;
-  serverChoice: CookieConsentChoice | null;
+  serverChoice?: CookieConsentChoice | null;
 };
 
 declare global {
@@ -20,7 +21,7 @@ declare global {
   }
 }
 
-export function GoogleAnalytics({ measurementId, serverChoice }: GoogleAnalyticsProps) {
+export function GoogleAnalytics({ measurementId, serverChoice = null }: GoogleAnalyticsProps) {
   const pathname = usePathname();
   const [consentAccepted, setConsentAccepted] = useState(serverChoice === "accepted");
   const [gtagReady, setGtagReady] = useState(false);
@@ -29,7 +30,8 @@ export function GoogleAnalytics({ measurementId, serverChoice }: GoogleAnalytics
   );
 
   useEffect(() => {
-    setConsentAccepted(serverChoice === "accepted");
+    const initial = serverChoice ?? readStoredCookieConsentChoice();
+    setConsentAccepted(initial === "accepted");
 
     function onConsentChanged(event: Event) {
       const detail = (event as CustomEvent<CookieConsentChoice>).detail;

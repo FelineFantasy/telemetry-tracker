@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
     "How Telemetry Tracker handles personal data when you self-host — written for humans, not lawyers.",
+  alternates: { canonical: "./" },
   openGraph: {
     title: "Privacy Policy — Telemetry Tracker",
     description:

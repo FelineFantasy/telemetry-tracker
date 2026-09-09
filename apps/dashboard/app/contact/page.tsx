@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Contact",
   description:
     "Get in touch with the Telemetry Tracker team. Support, security, business inquiries, and self-hosting questions.",
+  alternates: { canonical: "./" },
   openGraph: {
     title: "Contact — Telemetry Tracker",
     description:

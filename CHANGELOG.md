@@ -13,7 +13,13 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
+- **Marketing structured data** — Organization, SoftwareApplication, and WebSite JSON-LD on every public page
+- **Search Console** — optional `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` for Google site verification
+
 ### Fixed
+
+- **Crawler HTML** — marketing pages are static and the root layout no longer reads cookies, so `<title>`, description, Open Graph, and canonical tags flush in the initial `<head>` instead of after SDK SVG `<title>React</title>` (search engines were effectively seeing an untitled homepage)
+- **Indexability** — dashboard routes send `noindex`; robots.txt also disallows auth, design-system, `/api/`, and `/avatar/`; public docs/legal pages emit per-URL canonicals; `www.telemetry-tracker.com` 301s to the apex when that host reaches the app
 
 ### Changed
 
