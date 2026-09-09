@@ -9,11 +9,11 @@ import {
 } from "./sessions-list-query.js";
 
 describe("parseSessionListSortParam", () => {
-  it("defaults to duration", () => {
+  it("defaults to started_at (newest first with default order)", () => {
     const r = parseSessionListSortParam(undefined);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.sort).toBe("duration");
+    expect(r.sort).toBe("started_at");
   });
 
   it("accepts enriched sort fields", () => {

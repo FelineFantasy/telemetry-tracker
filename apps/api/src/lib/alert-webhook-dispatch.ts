@@ -516,7 +516,7 @@ export async function listProjectWebhooks(
 ): Promise<ProjectWebhookPublic[]> {
   const rows = await prisma.projectWebhook.findMany({
     where: { project_id: projectId, deleted_at: null },
-    orderBy: { created_at: "asc" },
+    orderBy: { created_at: "desc" },
   });
   return rows.map(toProjectWebhookPublic);
 }

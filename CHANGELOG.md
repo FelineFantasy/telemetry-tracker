@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.17.7] - 2026-09-09
+
+### Changed
+
+- **Newest-first lists** — sessions default to start time (newest first); team members, custom alert rules, and webhook destinations list newest-created first; notification bell and center keep newest items first even when sources arrive unsorted ([#638](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/638))
+
+---
+
 ## [1.17.6] - 2026-08-29
 
 ### Fixed

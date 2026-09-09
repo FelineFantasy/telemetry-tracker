@@ -227,7 +227,7 @@ export default async function SessionsPage({
   }
 
   const initialListParams = Object.fromEntries(apiQuery.entries());
-  const effectiveSort = sort ?? "duration";
+  const effectiveSort = sort ?? "started_at";
   const effectiveOrder = order ?? "desc";
   const rangeLabel = timeRange.label;
 
