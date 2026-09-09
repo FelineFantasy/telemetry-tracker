@@ -60,7 +60,7 @@ export function parseSessionListSortParam(
   value: string | undefined
 ): { ok: true; sort: SessionListSort } | { ok: false } {
   if (value === undefined || value.trim() === "") {
-    return { ok: true, sort: "duration" };
+    return { ok: true, sort: "started_at" };
   }
   const v = value.trim();
   if ((SESSION_LIST_SORTS as readonly string[]).includes(v)) {

@@ -450,5 +450,7 @@ export function applyNotificationFeedFilters(
       (item) => item.projectId != null && item.projectId.toLowerCase() === filterId
     );
   }
-  return next;
+  return [...next].sort(
+    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+  );
 }

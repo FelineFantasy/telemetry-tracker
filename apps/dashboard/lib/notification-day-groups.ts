@@ -28,7 +28,19 @@ export function notificationDayLabel(iso: string, now = new Date()): string {
   });
 }
 
-/** Group notifications by calendar day (newest groups first; items already sorted). */
+export function sortNotificationsNewestFirst(
+  items: DashboardNotificationItem[]
+): DashboardNotificationItem[] {
+  return [...items].sort((a, b) => {
+    const aTime = new Date(a.occurredAt).getTime();
+    const bTime = new Date(b.occurredAt).getTime();
+    const aOk = Number.isFinite(aTime) ? aTime : 0;
+    const bOk = Number.isFinite(bTime) ? bTime : 0;
+    return bOk - aOk;
+  });
+}
+
+/** Group notifications by calendar day (newest groups and items first). */
 export function groupNotificationsByDay(
   items: DashboardNotificationItem[],
   now = new Date()
@@ -36,7 +48,7 @@ export function groupNotificationsByDay(
   const groups: NotificationDayGroup[] = [];
   const indexByKey = new Map<string, number>();
 
-  for (const item of items) {
+  for (const item of sortNotificationsNewestFirst(items)) {
     const occurred = new Date(item.occurredAt);
     const day = Number.isNaN(occurred.getTime())
       ? "invalid"

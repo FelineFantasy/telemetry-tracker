@@ -12,6 +12,7 @@ import { NotificationTypeIcon } from "@/app/components/dashboard/NotificationTyp
 import { DashboardPopover } from "./DashboardPopover";
 import type { DashboardNotificationItem } from "@/lib/dashboard-notifications";
 import { formatRelativeTime } from "@/lib/format-time";
+import { sortNotificationsNewestFirst } from "@/lib/notification-day-groups";
 import { useDashboardNavLinkProps } from "@/lib/use-dashboard-navigation";
 
 type Props = {
@@ -66,7 +67,7 @@ export function DashboardNotifications({ initialItems }: Props) {
 
   const viewItems = useMemo(
     () =>
-      items.map((item) => ({
+      sortNotificationsNewestFirst(items).map((item) => ({
         ...item,
         timeLabel: formatRelativeTime(item.occurredAt),
       })),
