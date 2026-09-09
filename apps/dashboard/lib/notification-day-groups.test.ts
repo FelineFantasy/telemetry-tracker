@@ -44,4 +44,19 @@ describe("groupNotificationsByDay", () => {
     expect(groups[1]!.label).toBe("Yesterday");
     expect(groups[1]!.items.map((i) => i.id)).toEqual(["c"]);
   });
+
+  it("sorts groups and items newest-first even when input is oldest-first", () => {
+    const now = new Date(2026, 6, 17, 15, 0, 0);
+    const groups = groupNotificationsByDay(
+      [
+        item("old-day", new Date(2026, 6, 16, 8, 0, 0).toISOString()),
+        item("older-today", new Date(2026, 6, 17, 8, 0, 0).toISOString()),
+        item("newest-today", new Date(2026, 6, 17, 14, 0, 0).toISOString()),
+      ],
+      now
+    );
+    expect(groups.map((g) => g.label)).toEqual(["Today", "Yesterday"]);
+    expect(groups[0]!.items.map((i) => i.id)).toEqual(["newest-today", "older-today"]);
+    expect(groups[1]!.items.map((i) => i.id)).toEqual(["old-day"]);
+  });
 });

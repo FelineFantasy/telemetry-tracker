@@ -73,6 +73,38 @@ describe("buildDashboardNotifications", () => {
     expect(issue?.href).toBe("/dashboard/errors/eg1");
   });
 
+  it("sorts mixed issue and alert items newest-first by occurredAt", async () => {
+    const prisma = {
+      alertEvent: {
+        findMany: async () => [
+          {
+            rule: "ERROR_SPIKE",
+            title: "Spike",
+            body: "up",
+            href: "/dashboard/errors",
+            dedupe_key: "error-spike:p1:1",
+            fired_at: new Date("2026-07-01T12:00:00.000Z"),
+          },
+        ],
+      },
+      errorGroup: {
+        findMany: async () => [
+          {
+            id: "eg1",
+            message: "older issue",
+            app: "web",
+            environment: "production",
+            occurrences: 2,
+            last_seen: new Date("2026-07-01T08:00:00.000Z"),
+          },
+        ],
+      },
+    } as never;
+
+    const items = await buildDashboardNotifications(prisma, "p1", baseSession);
+    expect(items.map((i) => i.id)).toEqual(["error-spike:p1:1", "issue:eg1"]);
+  });
+
   it("keeps session quota in bell when billing routing is on and alerts routing is off", async () => {
     const prisma = {
       alertEvent: { findMany: async () => [] },

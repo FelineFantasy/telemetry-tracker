@@ -17,6 +17,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
+- **Newest-first lists** — sessions default to start time (newest first); team members, custom alert rules, and webhook destinations list newest-created first; notification bell and center keep newest items first even when sources arrive unsorted
+
 ### Database
 
 ---

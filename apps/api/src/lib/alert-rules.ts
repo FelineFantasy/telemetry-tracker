@@ -427,7 +427,7 @@ export async function listAlertRules(
   // SYSTEM built-in rows are managed via alert-settings — exclude from custom CRUD list.
   const rows = await prisma.alertRule.findMany({
     where: { project_id: projectId, deleted_at: null, source: "CUSTOM" },
-    orderBy: { created_at: "asc" },
+    orderBy: { created_at: "desc" },
   });
   return rows.map(toPublic);
 }

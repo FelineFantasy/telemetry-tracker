@@ -82,6 +82,24 @@ describe("applyNotificationFeedFilters", () => {
     ).toEqual(["issue:1"]);
   });
 
+  it("returns matching items newest-first by occurredAt", () => {
+    const mixed: DashboardNotificationItem[] = [
+      {
+        ...sampleItems[0],
+        id: "older",
+        occurredAt: "2026-07-01T09:00:00.000Z",
+      },
+      {
+        ...sampleItems[0],
+        id: "newer",
+        occurredAt: "2026-07-01T12:00:00.000Z",
+      },
+    ];
+    expect(
+      applyNotificationFeedFilters(mixed, { types: ["issue"] }).map((i) => i.id)
+    ).toEqual(["newer", "older"]);
+  });
+
   it("matches projectId case-insensitively", () => {
     const mixedCase: DashboardNotificationItem[] = [
       {

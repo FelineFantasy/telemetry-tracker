@@ -1230,7 +1230,7 @@ export async function projectDashboardRoutes(
         created_at: true,
         user: { select: { id: true, email: true, display_name: true, avatar_key: true, avatar_updated_at: true } },
       },
-      orderBy: { created_at: "asc" },
+      orderBy: { created_at: "desc" },
     });
     return reply.send({
       organizationId: orgId,

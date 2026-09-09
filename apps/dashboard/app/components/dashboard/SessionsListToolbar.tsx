@@ -24,11 +24,11 @@ import { listTimeRangeHiddenFields, type ParsedTimeRange } from "@/lib/time-rang
 import { releaseFilterSelectOptions } from "@/lib/overview-scope-url";
 
 export const SESSIONS_SORT_OPTIONS: DashboardSelectOption[] = [
+  { value: "started_at", label: "Started" },
+  { value: "ended_at", label: "Ended" },
   { value: "duration", label: "Duration" },
   { value: "events", label: "Events" },
   { value: "pages", label: "Pages" },
-  { value: "started_at", label: "Started" },
-  { value: "ended_at", label: "Ended" },
   { value: "status", label: "Status" },
   { value: "session_id", label: "Session ID" },
   { value: "app", label: "App" },
@@ -150,7 +150,7 @@ export function SessionsListToolbar({
         ) : null}
         {onSortApply ? (
           <>
-            <input type="hidden" name="sort" value={sort || "duration"} />
+            <input type="hidden" name="sort" value={sort || "started_at"} />
             <input type="hidden" name="order" value={order || "desc"} />
           </>
         ) : null}
@@ -218,7 +218,7 @@ export function SessionsListToolbar({
 
         {onSortApply ? (
           <ClientListSortRow
-            sort={sort || "duration"}
+            sort={sort || "started_at"}
             order={order}
             sortOptions={SESSIONS_SORT_OPTIONS}
             onApply={onSortApply}
@@ -230,7 +230,7 @@ export function SessionsListToolbar({
               <FilterLabel id={id("sort-l")}>Sort by</FilterLabel>
               <DashboardCustomSelect
                 name="sort"
-                value={sort || "duration"}
+                value={sort || "started_at"}
                 options={SESSIONS_SORT_OPTIONS}
                 triggerId={id("sort-t")}
                 listLabelledBy={id("sort-l")}
