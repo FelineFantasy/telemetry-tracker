@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Pulse-beacon design tokens — pure black canvas, near-white type, blue brand accent.
+ * Pulse-beacon design tokens — dark charcoal canvas, near-white type, blue brand accent.
  * shadcn semantic colors map to CSS variables in globals.css.
  */
 const config: Config = {

@@ -15,6 +15,9 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Fixed
 
+- **Dashboard navigation** — changing sections no longer paints a full-screen black overlay (looked like a full page reload); a thin top progress bar stays instead
+- **Dark theme contrast** — dark palette uses charcoal surfaces and stronger borders so panels, tables, and muted text stay readable
+
 ### Changed
 
 ### Database

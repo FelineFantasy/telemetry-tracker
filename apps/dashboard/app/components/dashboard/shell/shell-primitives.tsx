@@ -36,7 +36,7 @@ export function ShellCard({
   children: ReactNode;
 }) {
   return (
-    <div className={`rounded-xl border border-border bg-surface/40 ${className ?? ""}`}>
+    <div className={`rounded-xl border border-border bg-surface ${className ?? ""}`}>
       {children}
     </div>
   );

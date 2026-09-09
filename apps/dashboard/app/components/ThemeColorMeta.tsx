@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 const THEME_COLORS = {
   light: "#fafafa",
-  dark: "#0a0a0a",
+  dark: "#1e222b",
 } as const;
 
 export function ThemeColorMeta() {
