@@ -27,10 +27,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const origin = siteOriginForSeo();
   if (!origin) return [];
 
-  const now = new Date();
   return PUBLIC_PATHS.map((path) => ({
     url: `${origin}${path === "" ? "/" : path}`,
-    lastModified: now,
     changeFrequency: path === "" ? ("weekly" as const) : ("monthly" as const),
     priority: path === "" ? 1 : path === "/docs" ? 0.9 : 0.75,
   }));

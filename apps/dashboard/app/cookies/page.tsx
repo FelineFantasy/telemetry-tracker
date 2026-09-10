@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Cookie Policy",
   description:
     "How Telemetry Tracker uses cookies and similar storage technologies, and how to control them.",
+  alternates: { canonical: "./" },
   openGraph: {
     title: "Cookie Policy — Telemetry Tracker",
     description: "A plain-English summary of the cookies and storage Telemetry Tracker uses.",

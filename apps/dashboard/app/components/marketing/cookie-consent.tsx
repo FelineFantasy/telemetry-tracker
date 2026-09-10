@@ -5,10 +5,8 @@ import { useEffect, useState, useTransition } from "react";
 import { restoreCookieConsentAction, syncCookieConsentAction } from "@/app/cookie-consent/actions";
 import {
   COOKIE_CONSENT_CHANGED_EVENT,
-  COOKIE_CONSENT_STORAGE_KEY,
-  cookieConsentDocumentCookie,
-  isCookieConsentChoice,
   type CookieConsentChoice,
+  readStoredCookieConsentChoice,
 } from "@/lib/cookie-consent";
 import { syncClientCookieConsentStorage } from "@/lib/cookie-consent-client";
 
@@ -17,10 +15,10 @@ function notifyConsentChanged(choice: CookieConsentChoice) {
 }
 
 type CookieConsentProps = {
-  serverChoice: CookieConsentChoice | null;
+  serverChoice?: CookieConsentChoice | null;
 };
 
-export function CookieConsent({ serverChoice }: CookieConsentProps) {
+export function CookieConsent({ serverChoice = null }: CookieConsentProps) {
   const [choice, setChoice] = useState<CookieConsentChoice | null>(serverChoice);
   const [expanded, setExpanded] = useState(serverChoice == null);
   const [ready, setReady] = useState(false);
@@ -28,19 +26,15 @@ export function CookieConsent({ serverChoice }: CookieConsentProps) {
 
   useEffect(() => {
     try {
-      if (serverChoice) {
-        syncClientCookieConsentStorage(serverChoice);
-        setChoice(serverChoice);
+      const stored = serverChoice ?? readStoredCookieConsentChoice();
+      if (stored) {
+        syncClientCookieConsentStorage(stored);
+        if (!serverChoice) {
+          void restoreCookieConsentAction(stored);
+        }
+        setChoice(stored);
         setExpanded(false);
-        return;
-      }
-      const localValue = localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
-      if (isCookieConsentChoice(localValue)) {
-        document.cookie = cookieConsentDocumentCookie(localValue);
-        void restoreCookieConsentAction(localValue);
-        setChoice(localValue);
-        setExpanded(false);
-        notifyConsentChanged(localValue);
+        notifyConsentChanged(stored);
       } else {
         setExpanded(true);
       }

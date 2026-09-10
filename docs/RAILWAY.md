@@ -59,11 +59,11 @@ Optional: Resend, Stripe, registration flags — [BILLING.md](./BILLING.md) and 
 |---------|--------|
 | Root Directory | **empty** (repo root — not `apps/dashboard`) |
 | Builder | **Dockerfile**, path `Dockerfile` |
-| Watch Paths (optional) | `apps/dashboard/**` |
+| Watch Paths (optional) | `Dockerfile` **and** `apps/dashboard/**` (Dockerfile-only changes are skipped if the service watches `apps/dashboard/**` alone) |
 
 **Env:** `API_URL` = public API URL; `NEXT_PUBLIC_SITE_URL` = public dashboard URL (recommended). Optional: `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` (same value) for error monitoring — see [MONITORING.md](./MONITORING.md#sentry-optional). Optional dogfood: `NEXT_PUBLIC_TELEMETRY_INGEST_URL`, `NEXT_PUBLIC_TELEMETRY_API_KEY`, and optionally `NEXT_PUBLIC_TELEMETRY_APP` — see [MONITORING.md](./MONITORING.md#product-telemetry-dogfood-optional).
 
-If the build fails with `Unsupported URL Type "workspace:"`, Railway is using npm/Nixpacks instead of Docker — clear Root Directory to repo root and set Builder to Dockerfile on **this service only**.
+Attach **www.telemetry-tracker.com** as a custom domain on the same dashboard service (CNAME to Railway), then the app 301s `www` → apex. Without that Railway binding, `www` hits the project fallback 404 and search engines will not consolidate the host.
 
 ---
 
@@ -263,6 +263,16 @@ The API service is using the **dashboard Dockerfile** or a repo-root Docker sett
 Root Directory is `apps/dashboard` and npm cannot resolve pnpm workspaces.
 
 **Fix:** Dashboard → **Root Directory** = **empty** (repo root) → **Builder** = **Dockerfile** → redeploy.
+
+### Dashboard: Cloudflare 502 after a Railway deploy
+
+GitHub commit status `telemetry-tracker - dasboard` (service name typo) is **Deployment failed**, while API/workers may still be green. The previous replica is gone, so `https://telemetry-tracker.com` returns Cloudflare **502**.
+
+1. Open the failed dashboard deployment and read **Build / Deploy logs** (this repo cannot see Railway logs).
+2. Fastest restore: dashboard service → **Deployments** → last **Success** → **Redeploy**.
+3. Then **Redeploy** the current `main` commit (or merge a PATCH that retriggers the service) once the image is fixed.
+
+A production-only runtime `pnpm install` in the dashboard Dockerfile is unsafe on this service: the runner stage has no `build-essential`, and dashboard watch paths can skip Dockerfile-only commits. Copy the built `/app` workspace into the runtime image instead.
 
 ### API: 502 / connection refused
 

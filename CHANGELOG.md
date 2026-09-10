@@ -21,6 +21,30 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.17.9] - 2026-09-09
+
+### Added
+
+- **Marketing structured data** — Organization, SoftwareApplication, and WebSite JSON-LD on every public page ([#645](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/645))
+- **Search Console** — optional `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` for Google site verification ([#645](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/645))
+
+### Fixed
+
+- **Crawler HTML** — marketing pages are static and the root layout no longer reads cookies, so `<title>`, description, Open Graph, and canonical tags flush in the initial `<head>` instead of after SDK SVG `<title>React</title>` (search engines were effectively seeing an untitled homepage) ([#645](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/645))
+- **Indexability** — dashboard routes send `noindex`; robots.txt also disallows auth, design-system, `/api/`, and `/avatar/`; public docs/legal pages emit per-URL canonicals; `www.telemetry-tracker.com` 301s to the apex when that host reaches the app ([#645](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/645))
+
+---
+
+## [1.17.8] - 2026-09-09
+
+### Fixed
+
+- **Dashboard production deploy** — runtime image copies the build workspace instead of a second production-only `pnpm install` (that reinstall first ran on Railway in v1.17.7 after v1.17.6 skipped dashboard watch paths, and the failed deploy left the hosted dashboard on 502)
+- **Dashboard navigation** — changing sections no longer paints a full-screen black overlay (looked like a full page reload); a thin top progress bar stays instead ([#641](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/641))
+- **Dark theme contrast** — dark palette uses charcoal surfaces and stronger borders so panels, tables, and muted text stay readable ([#641](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/641))
+
+---
+
 ## [1.17.7] - 2026-09-09
 
 ### Changed

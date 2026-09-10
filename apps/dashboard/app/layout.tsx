@@ -3,16 +3,16 @@ import { Suspense } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { CookieConsent } from "@/app/components/marketing/cookie-consent";
+import { MarketingJsonLd } from "@/app/components/marketing/MarketingJsonLd";
 import { GoogleAnalytics } from "@/app/components/analytics/GoogleAnalytics";
 import { ProductTelemetry } from "@/app/components/analytics/ProductTelemetry";
 import { ThemeColorMeta } from "@/app/components/ThemeColorMeta";
 import { ThemeProvider } from "@/app/components/ThemeProvider";
 import { NavigationProgress } from "@/app/components/ui/NavigationProgress";
 import { ToasterProvider } from "@/app/components/ToasterProvider";
-import { getCookieConsentChoiceFromCookies } from "@/lib/cookie-consent-server";
 import { getGoogleAnalyticsMeasurementId } from "@/lib/google-analytics";
 import { socialPreviewImage } from "@/lib/social-image";
-import { resolveMetadataBase } from "@/lib/site-url";
+import { metadataBaseOrFallback } from "@/lib/site-url";
 import "./globals.css";
 import "./filter-day-picker.css";
 
@@ -21,7 +21,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fafafa" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: dark)", color: "#1e222b" },
   ],
 };
 
@@ -30,7 +30,8 @@ const defaultTitle =
 const defaultDescription =
   "Capture errors, events and sessions with lightweight SDKs. One fast, developer-first observability platform for modern applications.";
 
-const metadataBase = resolveMetadataBase() ?? new URL("http://localhost:3000");
+const metadataBase = metadataBaseOrFallback();
+const googleVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim();
 
 export const metadata: Metadata = {
   metadataBase,
@@ -41,14 +42,15 @@ export const metadata: Metadata = {
   description: defaultDescription,
   applicationName: "Telemetry Tracker",
   keywords: [
-    "self-hosted telemetry",
     "error tracking",
     "session monitoring",
     "product analytics",
+    "observability",
     "Next.js",
     "open source",
     "SDK",
   ],
+  robots: { index: true, follow: true },
   manifest: "/site.webmanifest",
   icons: {
     icon: [
@@ -74,20 +76,21 @@ export const metadata: Metadata = {
     description: defaultDescription,
     images: [socialPreviewImage.url],
   },
+  ...(googleVerification ? { verification: { google: googleVerification } } : {}),
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const serverChoice = await getCookieConsentChoiceFromCookies();
   const measurementId = getGoogleAnalyticsMeasurementId();
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ThemeProvider>
           <ThemeColorMeta />
+          <MarketingJsonLd />
           <a href="#main-content" className="skip-link">
             Skip to main content
           </a>
@@ -97,8 +100,8 @@ export default async function RootLayout({
           </Suspense>
           {children}
           <ProductTelemetry />
-          <GoogleAnalytics measurementId={measurementId} serverChoice={serverChoice} />
-          <CookieConsent serverChoice={serverChoice} />
+          <GoogleAnalytics measurementId={measurementId} />
+          <CookieConsent />
         </ThemeProvider>
       </body>
     </html>

@@ -4,8 +4,9 @@ import { CodeBlock } from "@/app/components/docs/CodeBlock";
 import { DocsArticle } from "@/app/components/docs/DocsArticle";
 
 export const metadata: Metadata = {
-  title: "Vue — Docs — Telemetry Tracker",
+  title: "Vue",
   description: "Integrate Telemetry Tracker with Vue 3 and vue-router",
+  alternates: { canonical: "./" },
 };
 
 export default function DocsVuePage() {

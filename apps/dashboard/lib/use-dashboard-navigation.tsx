@@ -13,7 +13,6 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { useBodyScrollLock } from "@/lib/body-scroll-lock";
 
 export type DashboardNavigationScope = {
   organizationId: string | null;
@@ -23,10 +22,10 @@ export type DashboardNavigationScope = {
 type DashboardNavigationValue = {
   push: (href: string) => void;
   replace: (href: string) => void;
-  /** URL cleanup that must not show the full-screen overlay (e.g. invalid query sanitization). */
+  /** URL cleanup that must not show the navigation progress bar (e.g. invalid query sanitization). */
   replaceSilent: (href: string) => void;
   /**
-   * Scope cookie change: replace URL and refresh RSC tree while keeping the overlay up.
+   * Scope cookie change: replace URL and refresh RSC tree while keeping the progress bar up.
    * Pass the expected post-switch scope so we can wait for the shell ack (or hold through
    * refresh when `revalidatePath` already updated the nav).
    */
@@ -34,7 +33,7 @@ type DashboardNavigationValue = {
     href: string,
     expect: DashboardNavigationScope
   ) => Promise<void>;
-  /** Wrap async scope switches (org/project) so the overlay stays up through the server action. */
+  /** Wrap async scope switches (org/project) so the progress bar stays up through the server action. */
   runPending: (fn: () => Promise<void>) => Promise<void>;
   /** Report server-rendered org/project ids after they change. */
   markScopeRendered: (scope: DashboardNavigationScope) => void;
@@ -43,27 +42,22 @@ type DashboardNavigationValue = {
 
 const DashboardNavigationContext = createContext<DashboardNavigationValue | null>(null);
 
-function DashboardNavigationOverlay({ active }: { active: boolean }) {
-  useBodyScrollLock(active);
+function DashboardNavigationProgress({ active }: { active: boolean }) {
   if (!active) return null;
   return (
     <div
-      className="fixed inset-0 z-[10050] flex items-center justify-center bg-background/55 backdrop-blur-md backdrop-saturate-150 supports-[backdrop-filter]:bg-background/40 motion-reduce:backdrop-blur-none motion-reduce:bg-background/80"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[10050] h-0.5 overflow-hidden bg-border"
+      role="progressbar"
+      aria-label="Loading page"
       aria-busy="true"
-      aria-live="polite"
-      role="status"
     >
-      <span className="sr-only">Loading…</span>
-      <div
-        className="h-10 w-10 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground motion-reduce:animate-none motion-reduce:opacity-80"
-        aria-hidden
-      />
+      <div className="navigation-progress-bar h-full bg-brand" />
     </div>
   );
 }
 
-/** Soft page navigations — keep overlay visible at least this long so fast RSC doesn't skip a paint. */
-const NAV_MIN_HOLD_MS = 280;
+/** Soft page navigations — keep the top progress bar visible at least this long so fast RSC still paints it. */
+const NAV_MIN_HOLD_MS = 120;
 /** Nav already matches via revalidatePath — hold long enough for page RSC refresh. */
 const REFRESH_ALREADY_MATCHED_HOLD_MS = 800;
 const REFRESH_ALREADY_MATCHED_AFTER_TRANSITION_MS = 400;
@@ -254,19 +248,13 @@ export function DashboardNavigationProvider({ children }: { children: ReactNode 
 
   return (
     <DashboardNavigationContext.Provider value={value}>
-      <div
-        inert={isPending ? true : undefined}
-        aria-hidden={isPending ? true : undefined}
-        className={isPending ? "pointer-events-none" : undefined}
-      >
-        {children}
-      </div>
-      <DashboardNavigationOverlay active={isPending} />
+      {children}
+      <DashboardNavigationProgress active={isPending} />
     </DashboardNavigationContext.Provider>
   );
 }
 
-/** Shared dashboard router helpers + pending flag for the full-screen navigation overlay. */
+/** Shared dashboard router helpers + pending flag for the top navigation progress bar. */
 export function useDashboardNavigation(): DashboardNavigationValue {
   const ctx = useContext(DashboardNavigationContext);
   if (!ctx) {
@@ -298,7 +286,7 @@ export function DashboardNavigationScopeAck({
   return null;
 }
 
-/** Soft-navigate internal dashboard links so the full-screen overlay engages. */
+/** Soft-navigate internal dashboard links so the top progress bar can track pending. */
 export function useDashboardNavLinkProps(
   href: string,
   options?: { onNavigate?: () => void }
