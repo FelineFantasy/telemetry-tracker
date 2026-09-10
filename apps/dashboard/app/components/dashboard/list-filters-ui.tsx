@@ -12,7 +12,7 @@ import { filterInputClassName } from "@/lib/input-classes";
 
 export function FilterSection({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="relative mb-4 last:mb-0">
+    <div className="relative mb-2 last:mb-0">
       <span className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
@@ -22,11 +22,11 @@ export function FilterSection({ label, children }: { label: string; children: Re
 }
 
 export function FilterForm({ className, ...props }: FormHTMLAttributes<HTMLFormElement>) {
-  return <form {...props} className={cn("flex flex-col gap-4", className)} />;
+  return <form {...props} className={cn("flex flex-col gap-2", className)} />;
 }
 
 export function FilterRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("flex flex-wrap items-end gap-3", className)}>{children}</div>;
+  return <div className={cn("flex flex-wrap items-end gap-2", className)}>{children}</div>;
 }
 
 export function FilterField({

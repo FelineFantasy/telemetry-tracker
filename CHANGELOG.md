@@ -17,6 +17,8 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
+- **Dashboard density** — desktop sidebar shell, compact KPI cards, tighter overview/issues/events/performance layouts, and denser filters so the live dashboard matches the README product screenshots without changing telemetry APIs or calculations.
+
 ### Database
 
 ---

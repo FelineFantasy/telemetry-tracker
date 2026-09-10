@@ -235,7 +235,7 @@ export default async function EventsPage({
         title="Events"
         context={
           contextParts.length > 0
-            ? contextParts.join(" · ")
+            ? `Product and analytics events grouped by name. ${contextParts.join(" · ")}`
             : "Product and analytics events grouped by name."
         }
       />
@@ -243,6 +243,8 @@ export default async function EventsPage({
       <AnalyticsListShell>
         <CompareModeControl path={EVENTS_PATH} currentParams={currentParams} />
         {summary ? <EventsSummaryMetrics summary={summary} /> : null}
+
+        <DeferredEventsAnalytics queryString={summaryQuery.toString()} />
 
         <EventsClientListSection
           path={EVENTS_PATH}
@@ -267,8 +269,6 @@ export default async function EventsPage({
           platforms={filterOptions.platforms}
           releases={filterOptions.releases}
         />
-
-        <DeferredEventsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );

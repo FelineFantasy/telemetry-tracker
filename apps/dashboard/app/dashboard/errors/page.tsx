@@ -321,14 +321,16 @@ export default async function ErrorsListPage({
         title="Issues"
         context={
           appFilter
-            ? `${timeRange.label} · App: ${appFilter}`
-            : `${timeRange.label} · Grouped errors with status, frequency, and stack traces.`
+            ? `Track, group and resolve errors in your applications. ${timeRange.label} · App: ${appFilter}`
+            : "Track, group and resolve errors in your applications."
         }
       />
 
       <AnalyticsListShell>
         <CompareModeControl path={ERRORS_PATH} currentParams={currentParams} />
         {summary ? <ErrorsSummaryMetrics summary={summary} /> : null}
+
+        <DeferredErrorsAnalytics queryString={summaryQuery.toString()} />
 
         <ErrorsClientListSection
           path={ERRORS_PATH}
@@ -355,8 +357,6 @@ export default async function ErrorsListPage({
           platforms={options.platforms}
           releases={options.releases}
         />
-
-        <DeferredErrorsAnalytics queryString={summaryQuery.toString()} />
       </AnalyticsListShell>
     </>
   );

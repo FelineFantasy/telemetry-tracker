@@ -86,19 +86,30 @@ function UserAvatarBadge({
   );
 }
 
-export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
+export function DashboardUserMenu({
+  user,
+  variant = "header",
+}: {
+  user: DashboardUser | null;
+  variant?: "header" | "sidebar";
+}) {
   const name = user?.displayName?.trim() || user?.email || "Account";
+  const isSidebar = variant === "sidebar";
 
   return (
     <DashboardPopover
-      align="right"
+      align={isSidebar ? "left" : "right"}
       width="w-72"
       trigger={(toggle, open) => (
         <button
           type="button"
           onClick={toggle}
           aria-expanded={open}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-surface/60 p-1 pr-2 text-xs text-foreground hover:bg-surface"
+          className={
+            isSidebar
+              ? "flex w-full items-center gap-2 rounded-lg px-1 py-1 text-left text-xs text-foreground hover:bg-muted/70"
+              : "flex items-center gap-1.5 rounded-full border border-border bg-surface/60 p-1 pr-2 text-xs text-foreground hover:bg-surface"
+          }
         >
           {user ? (
             <UserAvatarBadge user={user} className="h-6 w-6 text-[10px]" />
@@ -107,7 +118,15 @@ export function DashboardUserMenu({ user }: { user: DashboardUser | null }) {
               ?
             </span>
           )}
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          {isSidebar ? (
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium text-foreground">{name}</span>
+              {user?.email ? (
+                <span className="block truncate text-[11px] text-muted-foreground">{user.email}</span>
+              ) : null}
+            </span>
+          ) : null}
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
         </button>
       )}
     >

@@ -19,9 +19,11 @@ import { NavPickerTrigger } from "./shell-primitives";
 export function TopNavOrgSwitcher({
   organizations,
   currentOrganizationId,
+  triggerClassName,
 }: {
   organizations: OrgOption[];
   currentOrganizationId: string | null;
+  triggerClassName?: string;
 }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
@@ -49,6 +51,7 @@ export function TopNavOrgSwitcher({
           disabled={pending}
           aria-expanded={open}
           aria-label="Organization"
+          className={triggerClassName}
         >
           <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-brand text-[10px] font-semibold text-primary-foreground">
             {displayName.charAt(0).toUpperCase()}

@@ -27,26 +27,22 @@ export function OverviewAppHealth({ health }: { health: OverviewHealth }) {
     health.errorRateDeltaPct <= 0 ? "text-success" : "text-destructive";
 
   return (
-    <DashboardPanel className="mb-6 p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            App health
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${statusColor}`}>
-              <span className="relative flex h-2 w-2">
-                <span className={`absolute inset-0 animate-pulse-dot rounded-full opacity-40 ${dotColor}`} />
-                <span className={`relative h-2 w-2 rounded-full ${dotColor}`} />
-              </span>
-              {health.statusLabel}
-            </span>
-            <span className="text-sm text-muted-foreground">{health.subtitle}</span>
-          </div>
-        </div>
+    <DashboardPanel className="mb-4 px-4 py-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          App health
+        </p>
+        <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${statusColor}`}>
+          <span className="relative flex h-2 w-2">
+            <span className={`absolute inset-0 animate-pulse-dot rounded-full opacity-40 ${dotColor}`} />
+            <span className={`relative h-2 w-2 rounded-full ${dotColor}`} />
+          </span>
+          {health.statusLabel}
+        </span>
+        <span className="text-[13px] text-muted-foreground">{health.subtitle}</span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <HealthMetric
           label="Telemetry success"
           title="SDK events as a percentage of total ingest (events + errors) in the selected period."
@@ -102,15 +98,15 @@ function HealthMetric({
   help?: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background/40 px-4 py-3">
+    <div>
       <div className="flex items-center gap-1.5">
-        <p className="text-[12px] text-muted-foreground" title={title}>
+        <p className="text-[11px] text-muted-foreground" title={title}>
           {label}
         </p>
         {help ? <MetricHelp label={label}>{help}</MetricHelp> : null}
       </div>
-      <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight">{value}</p>
-      <p className={`mt-0.5 text-[12px] ${detailClassName}`}>{detail}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums tracking-tight">{value}</p>
+      <p className={`text-[11px] ${detailClassName}`}>{detail}</p>
     </div>
   );
 }

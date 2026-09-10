@@ -1,16 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import {
-  AnalyticsPanel,
-  MetricDelta,
-} from "@/app/components/dashboard/analytics-ui";
-import {
-  MiniSparkline,
-  type SparklinePoint,
-} from "@/app/components/dashboard/MiniSparkline";
 import { MetricHelp } from "@/app/components/dashboard/MetricHelp";
-import type { ReactNode } from "react";
+import { MetricCard, MetricCardGrid } from "@/app/components/dashboard/MetricCard";
 import {
   formatCompact,
   formatPct,
@@ -50,70 +42,6 @@ function formatApdex(score: number): string {
   return formatPct(score * 100, 1);
 }
 
-function MetricCell({
-  label,
-  value,
-  current,
-  previous,
-  invertDelta,
-  deltaMode = "relative",
-  sparkline,
-  sparklineLabel,
-  sparklineColor,
-  compareText,
-  title,
-  help,
-}: {
-  label: string;
-  value: string;
-  current: number;
-  previous: number | null;
-  invertDelta?: boolean;
-  deltaMode?: "relative" | "pp";
-  sparkline?: SparklinePoint[];
-  sparklineLabel?: string;
-  sparklineColor?: string;
-  compareText: string;
-  title?: string;
-  help?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-2 px-4 py-3 sm:px-5 sm:py-4">
-      <div>
-        <div className="flex items-center gap-1.5">
-          <p
-            className="text-[11px] uppercase tracking-wider text-muted-foreground"
-            title={title}
-          >
-            {label}
-          </p>
-          {help ? <MetricHelp label={label}>{help}</MetricHelp> : null}
-        </div>
-        <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight sm:text-xl">{value}</p>
-        {previous == null ? (
-          <p className="mt-1 text-[11px] text-muted-foreground">— {compareText}</p>
-        ) : (
-          <MetricDelta
-            current={current}
-            previous={previous}
-            invert={invertDelta}
-            mode={deltaMode}
-            compareText={compareText}
-          />
-        )}
-      </div>
-      {sparkline && sparklineLabel ? (
-        <MiniSparkline
-          data={sparkline}
-          color={sparklineColor}
-          className="h-10 w-full sm:h-8"
-          ariaLabel={sparklineLabel}
-        />
-      ) : null}
-    </div>
-  );
-}
-
 function OrgStat({
   label,
   value,
@@ -124,10 +52,10 @@ function OrgStat({
   detail: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface/30 px-4 py-3">
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      <p className="mt-0.5 text-[12px] text-muted-foreground">{detail}</p>
+    <div className="rounded-xl border border-border/70 bg-surface/30 px-3 py-2.5">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-base font-semibold tabular-nums">{value}</p>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">{detail}</p>
     </div>
   );
 }
@@ -156,20 +84,16 @@ export function OverviewKeyMetrics({
 
   const latencyMetrics =
     requestMetrics?.available === true ? requestMetrics : undefined;
-  const latencyAvailable = latencyMetrics !== undefined;
-  const primaryCols = latencyAvailable
-    ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
-    : "sm:grid-cols-2 lg:grid-cols-4";
+  const gridClass = latencyMetrics
+    ? "lg:grid-cols-3 xl:grid-cols-6"
+    : "lg:grid-cols-4 xl:grid-cols-4";
 
   return (
-    <section className="mb-6">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium">Key metrics</h2>
-          <p className="text-[12px] text-muted-foreground">
-            {rangeLabel} · {compareLabel}
-          </p>
-        </div>
+    <section className="mb-5">
+      <div className="mb-2.5 flex flex-wrap items-end justify-between gap-2">
+        <p className="text-[12px] text-muted-foreground">
+          {rangeLabel} · {compareLabel}
+        </p>
         <Link
           href="/dashboard/events"
           className="text-[13px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
@@ -178,108 +102,107 @@ export function OverviewKeyMetrics({
         </Link>
       </div>
 
-      <AnalyticsPanel aria-label="Overview key metrics">
-        <div className={`grid grid-cols-1 divide-y divide-border ${primaryCols} lg:divide-x lg:divide-y-0`}>
-          <MetricCell
-            label="Events"
-            title="Count of SDK events ingested in the selected time range."
-            help={
-              <>
-                Custom events and automatic SDK events. Filtered by app and environment when set.
-                The ▲/▼ percentage is the change versus {compareLabel}.
-              </>
-            }
-            value={formatCompact(eventsCount)}
-            current={eventsCount}
-            previous={eventsPrevious}
-            sparkline={sparklines.events}
-            sparklineLabel="Events over time"
-            sparklineColor="var(--chart-event, #60a5fa)"
-            compareText={compareLabel}
-          />
-          <MetricCell
-            label="Errors"
-            title="Count of error occurrences ingested in the selected time range."
-            help={
-              <>
-                Each row is one captured exception or error report. The delta compares to{" "}
-                {compareLabel}; down is good.
-              </>
-            }
-            value={formatCompact(errorsCount)}
-            current={errorsCount}
-            previous={errorsPrevious}
-            invertDelta
-            sparkline={sparklines.errors}
-            sparklineLabel="Errors over time"
-            sparklineColor="var(--chart-error, #f87171)"
-            compareText={compareLabel}
-          />
-          <MetricCell
-            label="Sessions"
-            title="Count of user visits (session start markers) that began in the selected period."
-            help={
-              <>
-                A session is one browser or app visit from SDK init until tab close or navigation
-                away. Not the same as active users.
-              </>
-            }
-            value={formatCompact(sessionsCount)}
-            current={sessionsCount}
-            previous={sessionsPrevious}
-            sparkline={sparklines.sessions}
-            sparklineLabel="Sessions over time"
-            sparklineColor="var(--chart-session, #34d399)"
-            compareText={compareLabel}
-          />
-          <MetricCell
-            label="Active users"
-            title="Distinct users with at least one event in the selected period."
-            help={
-              <>
-                Counts unique identities using user_id when present, otherwise anonymous_id. Based
-                on events, not session rows. Compared to {compareLabel}.
-              </>
-            }
-            value={formatCompact(activeUsers)}
-            current={activeUsers}
-            previous={activeUsersPrevious}
-            compareText={compareLabel}
-          />
-          {latencyMetrics ? (
-            <>
-              <MetricCell
-                label="Avg response"
-                value={formatDurationMs(latencyMetrics.avgResponseMs)}
-                current={latencyMetrics.avgResponseMs}
-                previous={latencyMetrics.avgResponseMsPrevious}
-                invertDelta
-                sparkline={latencyMetrics.sparklines.avgResponseMs}
-                sparklineLabel="Average response time over time"
-                sparklineColor="var(--chart-performance, #a78bfa)"
-                compareText={compareLabel}
-              />
-              <MetricCell
-                label="Apdex"
-                value={formatApdex(latencyMetrics.apdex)}
-                current={latencyMetrics.apdex * 100}
-                previous={
-                  latencyMetrics.apdexPrevious == null
-                    ? null
-                    : latencyMetrics.apdexPrevious * 100
-                }
-                deltaMode="pp"
-                sparkline={latencyMetrics.sparklines.apdexPct}
-                sparklineLabel="Apdex score over time"
-                sparklineColor="var(--chart-performance, #a78bfa)"
-                compareText={compareLabel}
-              />
-            </>
-          ) : null}
-        </div>
-      </AnalyticsPanel>
+      <MetricCardGrid className={gridClass}>
+        <MetricCard
+          label="Errors"
+          title="Count of error occurrences ingested in the selected time range."
+          help={
+            <MetricHelp label="Errors">
+              Each row is one captured exception or error report. The delta compares to{" "}
+              {compareLabel}; down is good.
+            </MetricHelp>
+          }
+          value={formatCompact(errorsCount)}
+          current={errorsCount}
+          previous={errorsPrevious}
+          invertDelta
+          sparkline={sparklines.errors}
+          sparklineLabel="Errors over time"
+          compareText={compareLabel}
+          accent="error"
+        />
+        <MetricCard
+          label="Events"
+          title="Count of SDK events ingested in the selected time range."
+          help={
+            <MetricHelp label="Events">
+              Custom events and automatic SDK events. Filtered by app and environment when set.
+              The ▲/▼ percentage is the change versus {compareLabel}.
+            </MetricHelp>
+          }
+          value={formatCompact(eventsCount)}
+          current={eventsCount}
+          previous={eventsPrevious}
+          sparkline={sparklines.events}
+          sparklineLabel="Events over time"
+          compareText={compareLabel}
+          accent="event"
+        />
+        <MetricCard
+          label="Sessions"
+          title="Count of user visits (session start markers) that began in the selected period."
+          help={
+            <MetricHelp label="Sessions">
+              A session is one browser or app visit from SDK init until tab close or navigation
+              away. Not the same as active users.
+            </MetricHelp>
+          }
+          value={formatCompact(sessionsCount)}
+          current={sessionsCount}
+          previous={sessionsPrevious}
+          sparkline={sparklines.sessions}
+          sparklineLabel="Sessions over time"
+          compareText={compareLabel}
+          accent="session"
+        />
+        <MetricCard
+          label="Active users"
+          title="Distinct users with at least one event in the selected period."
+          help={
+            <MetricHelp label="Active users">
+              Counts unique identities using user_id when present, otherwise anonymous_id. Based
+              on events, not session rows. Compared to {compareLabel}.
+            </MetricHelp>
+          }
+          value={formatCompact(activeUsers)}
+          current={activeUsers}
+          previous={activeUsersPrevious}
+          compareText={compareLabel}
+          accent="neutral"
+        />
+        {latencyMetrics ? (
+          <>
+            <MetricCard
+              label="Avg response"
+              value={formatDurationMs(latencyMetrics.avgResponseMs)}
+              current={latencyMetrics.avgResponseMs}
+              previous={latencyMetrics.avgResponseMsPrevious}
+              invertDelta
+              sparkline={latencyMetrics.sparklines.avgResponseMs}
+              sparklineLabel="Average response time over time"
+              compareText={compareLabel}
+              accent="warning"
+            />
+            <MetricCard
+              label="Apdex"
+              value={formatApdex(latencyMetrics.apdex)}
+              current={latencyMetrics.apdex * 100}
+              previous={
+                latencyMetrics.apdexPrevious == null
+                  ? null
+                  : latencyMetrics.apdexPrevious * 100
+              }
+              deltaMode="pp"
+              sparkline={latencyMetrics.sparklines.apdexPct}
+              sparklineLabel="Apdex score over time"
+              compareText={compareLabel}
+              accent="warning"
+            />
+          </>
+        ) : null}
+      </MetricCardGrid>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <OrgStat
           label="Projects"
           value={String(workspaceStats.projects.count)}
@@ -293,7 +216,7 @@ export function OverviewKeyMetrics({
         <OrgStat
           label="Ingest requests"
           value={formatCompact(workspaceTelemetry.ingestRequests)}
-          detail={`${rangeLabel} · rate ${formatRatePerSec(ingestRate)}`}
+          detail={`${rangeLabel} · ${formatRatePerSec(ingestRate)}`}
         />
         <OrgStat
           label="SDK events"

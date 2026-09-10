@@ -1,12 +1,18 @@
 export const COMING_SOON_LABEL = "Coming soon";
 
-export function ComingSoonBadge({ className = "" }: { className?: string }) {
+export function ComingSoonBadge({
+  className = "",
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   return (
     <span
       className={`inline-flex shrink-0 items-center rounded border border-border px-1.5 py-px text-[9px] font-medium leading-none text-muted-foreground ${className}`}
       aria-label={COMING_SOON_LABEL}
     >
-      {COMING_SOON_LABEL}
+      {compact ? "Soon" : COMING_SOON_LABEL}
     </span>
   );
 }

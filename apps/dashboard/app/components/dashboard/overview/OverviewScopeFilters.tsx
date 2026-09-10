@@ -66,7 +66,7 @@ export function OverviewScopeFilters({
   const releaseTriggerId = `ov-rel-t-${uid}`;
 
   return (
-    <FilterRow className="mb-6">
+    <FilterRow className="mb-4">
       <FilterField>
         <FilterLabel id={platformLabelId}>Platform</FilterLabel>
         <DashboardCustomSelect
