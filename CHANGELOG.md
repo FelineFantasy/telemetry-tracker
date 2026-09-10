@@ -13,16 +13,28 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Added
 
-- **Acquisition guides** — public landing pages for Sentry alternative, self-hosted error tracking, and Next.js / React / Node.js / React Native setup, using the same SDK snippets as the docs
-
 ### Fixed
 
 ### Changed
 
-- **Homepage positioning** — H1 and metadata now lead with free error tracking for side projects (no credit card, open source, self-hostable)
-- **SoftwareApplication JSON-LD** — offer currency is EUR to match hosted pricing
-
 ### Database
+
+---
+
+## [1.17.10] - 2026-09-10
+
+### Added
+
+- **Acquisition guides** — public landing pages for Sentry alternative, self-hosted error tracking, and Next.js / React / Node.js / React Native setup, using the same SDK snippets as the docs ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
+
+### Changed
+
+- **Homepage positioning** — H1 and metadata now lead with free error tracking for side projects (no credit card, open source, self-hostable) ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
+- **SoftwareApplication JSON-LD** — offer currency is EUR to match hosted pricing ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
+
+### Fixed
+
+- **Open Graph titles** — docs and other public pages inherit their document title instead of the homepage slogan ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
 
 ---
 
