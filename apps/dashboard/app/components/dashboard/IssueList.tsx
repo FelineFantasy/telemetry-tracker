@@ -48,7 +48,6 @@ export function IssueListItem({
         href={href}
         className="block px-4 py-2.5 transition-colors hover:bg-surface/60"
       >
-      >
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{app}</Badge>
           {environment ? <Badge>{environment}</Badge> : null}

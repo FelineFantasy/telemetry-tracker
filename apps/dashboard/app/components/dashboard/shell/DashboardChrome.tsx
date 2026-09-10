@@ -1,24 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useBodyScrollLock } from "@/lib/body-scroll-lock";
 import { DashboardNavigationScopeAck } from "@/lib/use-dashboard-navigation";
 import type { DashboardUser } from "@/lib/dashboard-user";
 import { DashboardMobileMenuButton, DashboardSidebar } from "./DashboardSidebar";
 import { DashboardTopNavActions } from "./DashboardTopNavActions";
-import { DashboardNotificationsLoader } from "./DashboardNotificationsLoader";
-
-function NotificationsFallback() {
-  return (
-    <div
-      className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground"
-      aria-hidden
-    >
-      <span className="h-4 w-4 animate-pulse rounded bg-muted" />
-    </div>
-  );
-}
 
 export function DashboardChrome({
   currentOrganizationId,
@@ -27,6 +15,7 @@ export function DashboardChrome({
   commandPaletteEnabled,
   sidebarWorkspace,
   headerScope,
+  notificationsSlot,
 }: {
   currentOrganizationId: string | null;
   currentProjectId: string;
@@ -34,6 +23,7 @@ export function DashboardChrome({
   commandPaletteEnabled: boolean;
   sidebarWorkspace: ReactNode;
   headerScope: ReactNode;
+  notificationsSlot: ReactNode;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -67,11 +57,7 @@ export function DashboardChrome({
             user={user}
             commandPaletteEnabled={commandPaletteEnabled}
             showUserMenu={false}
-            notificationsSlot={
-              <Suspense fallback={<NotificationsFallback />}>
-                <DashboardNotificationsLoader />
-              </Suspense>
-            }
+            notificationsSlot={notificationsSlot}
           />
         </div>
       </header>
