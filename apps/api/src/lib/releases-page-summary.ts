@@ -319,31 +319,49 @@ export async function fetchReleasesPageSummary(
   const errorReleaseKey = normalizeReleaseKeySql(Prisma.sql`eo."release"`);
   const identity = sessionUserIdentityExpr("s");
 
+  // One scan per table: all-time first/last seen plus windowed KPI counts.
+  // Historical-only releases (0 window KPIs) remain in `keys` via the unbounded GROUP BY.
   const rows = await prisma.$queryRaw<AggRow[]>(Prisma.sql`
-    WITH event_hist AS (
+    WITH event_agg AS (
       SELECT
         ${eventReleaseKey} AS release_key,
         MIN(e."created_at") AS first_seen,
-        MAX(e."created_at") AS last_seen
+        MAX(e."created_at") AS last_seen,
+        COUNT(*) FILTER (
+          WHERE e."created_at" >= ${window.since}
+            AND e."created_at" <= ${window.until}
+        )::bigint AS events
       FROM "Event" e
       WHERE ${eventScope}
       GROUP BY 1
     ),
-    error_hist AS (
+    error_agg AS (
       SELECT
         ${errorReleaseKey} AS release_key,
         MIN(eo."created_at") AS first_seen,
-        MAX(eo."created_at") AS last_seen
+        MAX(eo."created_at") AS last_seen,
+        COUNT(*) FILTER (
+          WHERE eo."created_at" >= ${window.since}
+            AND eo."created_at" <= ${window.until}
+        )::bigint AS errors
       FROM "ErrorOccurrence" eo
       INNER JOIN "ErrorGroup" eg ON eg."id" = eo."error_group_id"
       WHERE ${errorScope}
       GROUP BY 1
     ),
-    session_hist AS (
+    session_agg AS (
       SELECT
         ${sessionReleaseKey} AS release_key,
         MIN(s."started_at") AS first_seen,
-        MAX(s."started_at") AS last_seen
+        MAX(s."started_at") AS last_seen,
+        COUNT(*) FILTER (
+          WHERE s."started_at" >= ${window.since}
+            AND s."started_at" <= ${window.until}
+        )::bigint AS sessions,
+        COUNT(DISTINCT ${identity}) FILTER (
+          WHERE s."started_at" >= ${window.since}
+            AND s."started_at" <= ${window.until}
+        )::bigint AS active_users
       FROM "Session" s
       WHERE ${sessionScope}
       GROUP BY 1
@@ -354,54 +372,16 @@ export async function fetchReleasesPageSummary(
         MIN(first_seen) AS first_seen,
         MAX(last_seen) AS last_seen
       FROM (
-        SELECT release_key, first_seen, last_seen FROM event_hist
+        SELECT release_key, first_seen, last_seen FROM event_agg
         UNION ALL
-        SELECT release_key, first_seen, last_seen FROM error_hist
+        SELECT release_key, first_seen, last_seen FROM error_agg
         UNION ALL
-        SELECT release_key, first_seen, last_seen FROM session_hist
+        SELECT release_key, first_seen, last_seen FROM session_agg
       ) h
       GROUP BY release_key
     ),
-    event_kpis AS (
-      SELECT
-        ${eventReleaseKey} AS release_key,
-        COUNT(*)::bigint AS events
-      FROM "Event" e
-      WHERE ${eventScope}
-        AND e."created_at" >= ${window.since}
-        AND e."created_at" <= ${window.until}
-      GROUP BY 1
-    ),
-    error_kpis AS (
-      SELECT
-        ${errorReleaseKey} AS release_key,
-        COUNT(*)::bigint AS errors
-      FROM "ErrorOccurrence" eo
-      INNER JOIN "ErrorGroup" eg ON eg."id" = eo."error_group_id"
-      WHERE ${errorScope}
-        AND eo."created_at" >= ${window.since}
-        AND eo."created_at" <= ${window.until}
-      GROUP BY 1
-    ),
-    session_kpis AS (
-      SELECT
-        ${sessionReleaseKey} AS release_key,
-        COUNT(*)::bigint AS sessions,
-        COUNT(DISTINCT ${identity})::bigint AS active_users
-      FROM "Session" s
-      WHERE ${sessionScope}
-        AND s."started_at" >= ${window.since}
-        AND s."started_at" <= ${window.until}
-      GROUP BY 1
-    ),
     keys AS (
       SELECT release_key FROM historical
-      UNION
-      SELECT release_key FROM event_kpis
-      UNION
-      SELECT release_key FROM error_kpis
-      UNION
-      SELECT release_key FROM session_kpis
     )
     SELECT
       k.release_key,
@@ -413,9 +393,9 @@ export async function fetchReleasesPageSummary(
       COALESCE(er.errors, 0)::bigint AS errors
     FROM keys k
     LEFT JOIN historical h ON h.release_key IS NOT DISTINCT FROM k.release_key
-    LEFT JOIN event_kpis ev ON ev.release_key IS NOT DISTINCT FROM k.release_key
-    LEFT JOIN error_kpis er ON er.release_key IS NOT DISTINCT FROM k.release_key
-    LEFT JOIN session_kpis sk ON sk.release_key IS NOT DISTINCT FROM k.release_key
+    LEFT JOIN event_agg ev ON ev.release_key IS NOT DISTINCT FROM k.release_key
+    LEFT JOIN error_agg er ON er.release_key IS NOT DISTINCT FROM k.release_key
+    LEFT JOIN session_agg sk ON sk.release_key IS NOT DISTINCT FROM k.release_key
   `);
 
   const totalSessions = rows.reduce((sum, r) => sum + Number(r.sessions), 0);

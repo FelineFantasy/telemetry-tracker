@@ -183,17 +183,47 @@ export function sessionHasNoProjectErrorsSql(
   )`;
 }
 
-function userDeviceLinksCteSql(
+/**
+ * User↔device links for identities that appear in `[seedSince, seedUntil]`.
+ * First-seen still uses all-time filtered sessions for those identities.
+ * Two-hop expansion: window ids → user_ids via historical pairs → all devices of those users.
+ * @internal Exported for unit tests.
+ */
+export function userDeviceLinksCteSql(
   projectId: string,
-  f: SessionListFilterInput
+  f: SessionListFilterInput,
+  seedSince: Date,
+  seedUntil: Date
 ): Prisma.Sql {
   const filters = sessionFilterSql(projectId, f, undefined, sessionHasEventScope(f));
   return Prisma.sql`
+    window_identities AS (
+      SELECT DISTINCT
+        NULLIF(TRIM(s."user_id"), '') AS user_id,
+        NULLIF(TRIM(s."anonymous_id"), '') AS anonymous_id
+      FROM "Session" s
+      WHERE ${filters}
+        AND s."started_at" >= ${seedSince}
+        AND s."started_at" <= ${seedUntil}
+    ),
+    discovered_users AS (
+      SELECT user_id FROM window_identities WHERE user_id IS NOT NULL
+      UNION
+      SELECT NULLIF(TRIM(s."user_id"), '')
+      FROM "Session" s
+      WHERE ${filters}
+        AND NULLIF(TRIM(s."user_id"), '') IS NOT NULL
+        AND NULLIF(TRIM(s."anonymous_id"), '') IN (
+          SELECT wi.anonymous_id FROM window_identities wi WHERE wi.anonymous_id IS NOT NULL
+        )
+    ),
     user_device_links AS (
       SELECT DISTINCT
         NULLIF(TRIM(s."user_id"), '') AS user_id,
         NULLIF(TRIM(s."anonymous_id"), '') AS anonymous_id
       FROM "Session" s
+      INNER JOIN discovered_users d
+        ON NULLIF(TRIM(s."user_id"), '') = d.user_id
       WHERE ${filters}
         AND NULLIF(TRIM(s."user_id"), '') IS NOT NULL
     )`;
@@ -282,14 +312,31 @@ export async function fetchIdentityFirstSeenAt(
 
 function sessionSummaryEventLateralSql(sessionAlias = "s"): Prisma.Sql {
   const s = Prisma.raw(`"${sessionAlias}"`);
+  // Bounce only needs to know whether the session has exactly one event.
+  // Cap the count at 2 so 24h summaries do not materialize every event row.
   return Prisma.sql`LEFT JOIN LATERAL (
     SELECT
-      COUNT(*)::int AS event_count,
-      MAX(e."created_at") AS last_event_at
-    FROM "Event" e
-    WHERE e."project_id" = ${s}."project_id"
-      AND e."session_id" = ${s}."session_id"
-      AND e."app" = ${s}."app"
+      (
+        SELECT COUNT(*)::int
+        FROM (
+          SELECT 1
+          FROM "Event" e
+          WHERE e."project_id" = ${s}."project_id"
+            AND e."session_id" = ${s}."session_id"
+            AND e."app" = ${s}."app"
+          LIMIT 2
+        ) bounce_events
+      ) AS event_count,
+      CASE
+        WHEN ${s}."ended_at" IS NOT NULL THEN NULL
+        ELSE (
+          SELECT MAX(e."created_at")
+          FROM "Event" e
+          WHERE e."project_id" = ${s}."project_id"
+            AND e."session_id" = ${s}."session_id"
+            AND e."app" = ${s}."app"
+        )
+      END AS last_event_at
   ) ev ON TRUE`;
 }
 
@@ -565,7 +612,7 @@ async function fetchSessionSummaryScalars(
   );
 
   const rows = await prisma.$queryRaw<[SummaryRow]>(Prisma.sql`
-    WITH ${userDeviceLinksCteSql(projectId, f)}
+    WITH ${userDeviceLinksCteSql(projectId, f, queryLowerBound, until)}
     SELECT
       COUNT(*) FILTER (
         WHERE ${currentWindow}
@@ -689,7 +736,7 @@ async function fetchUserCohortCounts(
   );
 
   const rows = await prisma.$queryRaw<[UserCohortRow]>(Prisma.sql`
-    WITH ${userDeviceLinksCteSql(projectId, f)},
+    WITH ${userDeviceLinksCteSql(projectId, f, queryLowerBound, until)},
     identified_first_seen AS (
       SELECT
         udl.user_id AS identity,
@@ -707,12 +754,13 @@ async function fetchUserCohortCounts(
       WHERE ${filters}
       GROUP BY udl.user_id
     ),
-    anonymous_first_seen AS (
-      SELECT
-        NULLIF(TRIM(s."anonymous_id"), '') AS identity,
-        MIN(s."started_at") AS first_seen_at
+    window_unlinked_anons AS (
+      SELECT DISTINCT
+        NULLIF(TRIM(s."anonymous_id"), '') AS identity
       FROM "Session" s
       WHERE ${filters}
+        AND s."started_at" >= ${queryLowerBound}
+        AND s."started_at" <= ${until}
         AND NULLIF(TRIM(COALESCE(s."user_id", '')), '') IS NULL
         AND NULLIF(TRIM(s."anonymous_id"), '') IS NOT NULL
         AND NOT EXISTS (
@@ -725,6 +773,17 @@ async function fetchUserCohortCounts(
           FROM identified_first_seen ifs
           WHERE ifs.identity = NULLIF(TRIM(s."anonymous_id"), '')
         )
+    ),
+    anonymous_first_seen AS (
+      SELECT
+        NULLIF(TRIM(s."anonymous_id"), '') AS identity,
+        MIN(s."started_at") AS first_seen_at
+      FROM "Session" s
+      INNER JOIN window_unlinked_anons w
+        ON NULLIF(TRIM(s."anonymous_id"), '') = w.identity
+      WHERE ${filters}
+        AND NULLIF(TRIM(COALESCE(s."user_id", '')), '') IS NULL
+        AND NULLIF(TRIM(s."anonymous_id"), '') IS NOT NULL
       GROUP BY 1
     ),
     project_identity AS (
@@ -808,7 +867,7 @@ async function fetchSessionSummarySparklines(
   const noErrors = sessionHasNoProjectErrorsSql(projectId, "s");
 
   const rows = await prisma.$queryRaw<SparklineBucketRow[]>(Prisma.sql`
-    WITH ${userDeviceLinksCteSql(projectId, f)}
+    WITH ${userDeviceLinksCteSql(projectId, f, chartSince, until)}
     SELECT
       (date_trunc(${trunc}, s."started_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS bucket,
       COUNT(*)::bigint AS total_sessions,
@@ -826,11 +885,18 @@ async function fetchSessionSummarySparklines(
       )::bigint AS crash_free_sessions
     FROM "Session" s
     LEFT JOIN LATERAL (
-      SELECT COUNT(*)::int AS event_count
-      FROM "Event" e
-      WHERE e."project_id" = s."project_id"
-        AND e."session_id" = s."session_id"
-        AND e."app" = s."app"
+      SELECT
+        (
+          SELECT COUNT(*)::int
+          FROM (
+            SELECT 1
+            FROM "Event" e
+            WHERE e."project_id" = s."project_id"
+              AND e."session_id" = s."session_id"
+              AND e."app" = s."app"
+            LIMIT 2
+          ) bounce_events
+        ) AS event_count
     ) ev ON TRUE
     WHERE ${filters}
       AND s."started_at" >= ${chartSince}

@@ -440,6 +440,10 @@ export async function apiRoutes(
         : {}),
     };
 
+    const eventListMatchesMetricsWindow =
+      eventListSince.getTime() === effectiveMetrics.gte.getTime() &&
+      eventListUntil.getTime() === effectiveMetrics.lte.getTime();
+
     const [
       errorCounts,
       eventStats,
@@ -462,7 +466,9 @@ export async function apiRoutes(
       useScopedErrorList
         ? countOverviewErrorGroupsInWindow(prisma, scopedErrorListScope)
         : prisma.errorGroup.count({ where: errorGroupWhere }),
-      prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
+      eventListMatchesMetricsWindow
+        ? Promise.resolve(null)
+        : prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
         SELECT COUNT(DISTINCT e."name")::bigint AS c
         FROM "Event" e
         WHERE ${eventListWhereSql}
@@ -575,7 +581,9 @@ export async function apiRoutes(
     const errorsPrevious = errorCounts.previous;
     const eventsCount = eventStats.eventsCount;
     const eventsPrevious = eventStats.eventsPrevious;
-    const eventsListTotalCount = Number(eventsListTotal[0]?.c ?? 0);
+    const eventsListTotalCount = eventsListTotal
+      ? Number(eventsListTotal[0]?.c ?? 0)
+      : eventStats.distinctEventNames;
     const workspaceTelemetry = buildWorkspaceTelemetry(
       eventsCount,
       errorsCount,
