@@ -137,6 +137,36 @@ function sessionStartedBoundsSql(gte: Date, lte: Date): Prisma.Sql {
   return Prisma.sql`s."started_at" >= ${gte} AND s."started_at" <= ${lte}`;
 }
 
+function lastEventAtLateralSql(): Prisma.Sql {
+  return Prisma.sql`LEFT JOIN LATERAL (
+    SELECT MAX(e."created_at") AS last_event_at
+    FROM "Event" e
+    WHERE e."project_id" = s."project_id"
+      AND e."session_id" = s."session_id"
+      AND e."app" = s."app"
+  ) ev ON TRUE`;
+}
+
+function orderBySessionColumnSql(sort: SessionListSort, order: SessionListOrder): Prisma.Sql {
+  const dir = order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  const nulls = order === "asc" ? Prisma.sql`NULLS FIRST` : Prisma.sql`NULLS LAST`;
+  switch (sort) {
+    case "ended_at":
+      return Prisma.sql`ORDER BY s."ended_at" ${dir} ${nulls}, s."started_at" DESC`;
+    case "session_id":
+      return Prisma.sql`ORDER BY s."session_id" ${dir} ${nulls}, s."started_at" DESC`;
+    case "app":
+      return Prisma.sql`ORDER BY s."app" ${dir} ${nulls}, s."started_at" DESC`;
+    case "platform":
+      return Prisma.sql`ORDER BY s."platform" ${dir} ${nulls}, s."started_at" DESC`;
+    case "user_id":
+      return Prisma.sql`ORDER BY s."user_id" ${dir} ${nulls}, s."started_at" DESC`;
+    case "started_at":
+    default:
+      return Prisma.sql`ORDER BY s."started_at" ${dir} ${nulls}`;
+  }
+}
+
 function orderByEnrichedSql(sort: SessionListSort, order: SessionListOrder): Prisma.Sql {
   const dir = order === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
   const nulls = order === "asc" ? Prisma.sql`NULLS FIRST` : Prisma.sql`NULLS LAST`;
@@ -189,7 +219,7 @@ function mapEnrichedRow(r: Record<string, unknown>): SessionListRow {
   };
 }
 
-function enrichedSelectSql(projectId: string): Prisma.Sql {
+function enrichedSelectSql(projectId: string, fromRelation: Prisma.Sql = Prisma.sql`"Session"`): Prisma.Sql {
   return Prisma.sql`
     SELECT
       s."id",
@@ -211,10 +241,15 @@ function enrichedSelectSql(projectId: string): Prisma.Sql {
       COALESCE(ev.event_count, 0)::int AS event_count,
       COALESCE(ev.page_count, 0)::int AS page_count,
       ${statusExpr(projectId)} AS status
-    FROM "Session" s
+    FROM ${fromRelation} s
     ${sessionEventStatsLateralSql()}
   `;
 }
+
+export type ListSessionsEnrichedOptions = {
+  /** When false, skip COUNT(*) and max-duration scans (Overview recent-session strip). Default true. */
+  includeTotals?: boolean;
+};
 
 export async function listSessionsEnriched(
   prisma: PrismaClient,
@@ -224,37 +259,61 @@ export async function listSessionsEnriched(
   sort: SessionListSort,
   order: SessionListOrder,
   skip: number,
-  take: number
+  take: number,
+  opts?: ListSessionsEnrichedOptions
 ): Promise<{ total: number; rows: SessionListRow[]; maxDurationSec: number }> {
   const filters = sessionFilterSql(projectId, f, startedAt);
   const bounds = sessionStartedBoundsSql(startedAt.gte, startedAt.lte);
-  const orderSql = orderByEnrichedSql(sort, order);
+  const includeTotals = opts?.includeTotals !== false;
+  const pageThenEnrich = !isSessionAggregateSort(sort);
+
+  const countPromise = includeTotals
+    ? prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS c
+        FROM "Session" s
+        WHERE ${filters}
+          AND ${bounds}
+      `)
+    : Promise.resolve([{ c: 0n }] as [{ c: bigint }]);
+
+  const maxDurationPromise = includeTotals
+    ? prisma.$queryRaw<[{ max_duration_sec: number | null }]>(Prisma.sql`
+        SELECT MAX(${durationSecExpr()}) AS max_duration_sec
+        FROM "Session" s
+        ${lastEventAtLateralSql()}
+        WHERE ${filters}
+          AND ${bounds}
+      `)
+    : Promise.resolve([{ max_duration_sec: null }] as [{ max_duration_sec: number | null }]);
+
+  const dataPromise = pageThenEnrich
+    ? prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        WITH page AS (
+          SELECT s.*
+          FROM "Session" s
+          WHERE ${filters}
+            AND ${bounds}
+          ${orderBySessionColumnSql(sort, order)}
+          LIMIT ${take} OFFSET ${skip}
+        )
+        ${enrichedSelectSql(projectId, Prisma.sql`page`)}
+        ${orderBySessionColumnSql(sort, order)}
+      `)
+    : prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        WITH enriched AS (
+          ${enrichedSelectSql(projectId)}
+          WHERE ${filters}
+            AND ${bounds}
+        )
+        SELECT * FROM enriched e
+        ${orderByEnrichedSql(sort, order)}
+        LIMIT ${take} OFFSET ${skip}
+      `);
 
   const [countRows, maxDurationRows, dataRows] = await Promise.all([
-    prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`
-      SELECT COUNT(*)::bigint AS c
-      FROM "Session" s
-      WHERE ${filters}
-        AND ${bounds}
-    `),
-    prisma.$queryRaw<[{ max_duration_sec: number | null }]>(Prisma.sql`
-      WITH enriched AS (
-        ${enrichedSelectSql(projectId)}
-        WHERE ${filters}
-          AND ${bounds}
-      )
-      SELECT MAX(e.duration_sec) AS max_duration_sec FROM enriched e
-    `),
-    prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
-      WITH enriched AS (
-        ${enrichedSelectSql(projectId)}
-        WHERE ${filters}
-          AND ${bounds}
-      )
-      SELECT * FROM enriched e
-      ${orderSql}
-      LIMIT ${take} OFFSET ${skip}
-    `),
+    countPromise,
+    maxDurationPromise,
+    dataPromise,
   ]);
 
   const total = Number(countRows[0]?.c ?? 0);

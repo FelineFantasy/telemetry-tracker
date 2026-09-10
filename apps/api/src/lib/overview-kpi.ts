@@ -502,7 +502,8 @@ export async function listOverviewRecentSessions(
     "started_at",
     "desc",
     0,
-    limit
+    limit,
+    { includeTotals: false }
   );
 
   return rows.map((row) => {
