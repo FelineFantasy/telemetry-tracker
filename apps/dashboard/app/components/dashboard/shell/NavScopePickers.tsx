@@ -17,6 +17,7 @@ export function NavScopePickers({
   apps,
   projectNavSummaries,
   appNavSummaries,
+  variant = "header",
 }: {
   organizations: OrgOption[];
   currentOrganizationId: string | null;
@@ -26,19 +27,29 @@ export function NavScopePickers({
   apps: string[];
   projectNavSummaries: Record<string, ProjectNavSummary>;
   appNavSummaries: Record<string, AppNavSummary>;
+  variant?: "sidebar" | "header";
 }) {
+  if (variant === "sidebar") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <TopNavOrgSwitcher
+          organizations={organizations}
+          currentOrganizationId={currentOrganizationId}
+          triggerClassName="w-full max-w-none"
+        />
+        <TopNavProjectSwitcher
+          projects={projects}
+          currentOrganizationId={currentOrganizationId}
+          currentProjectId={currentProjectId}
+          projectNavSummaries={projectNavSummaries}
+          triggerClassName="w-full max-w-none"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-max items-center gap-1.5 sm:w-auto sm:min-w-0 [&_button]:shrink-0 sm:[&_button]:shrink">
-      <TopNavOrgSwitcher
-        organizations={organizations}
-        currentOrganizationId={currentOrganizationId}
-      />
-      <TopNavProjectSwitcher
-        projects={projects}
-        currentOrganizationId={currentOrganizationId}
-        currentProjectId={currentProjectId}
-        projectNavSummaries={projectNavSummaries}
-      />
       <TopNavAppSwitcher
         apps={apps}
         projectId={currentProjectId}

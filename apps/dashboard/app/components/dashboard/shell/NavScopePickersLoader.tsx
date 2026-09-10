@@ -10,6 +10,7 @@ export async function NavScopePickersLoader({
   currentProjectId,
   environments,
   apps,
+  variant = "header",
 }: {
   organizations: OrgOption[];
   currentOrganizationId: string | null;
@@ -17,6 +18,7 @@ export async function NavScopePickersLoader({
   currentProjectId: string;
   environments: string[];
   apps: string[];
+  variant?: "sidebar" | "header";
 }) {
   const [projectNavSummaries, appNavSummaries] = await Promise.all([
     fetchProjectNavSummariesForLayout(currentOrganizationId),
@@ -35,6 +37,7 @@ export async function NavScopePickersLoader({
       apps={apps}
       projectNavSummaries={projectNavSummaries}
       appNavSummaries={appNavSummaries}
+      variant={variant}
     />
   );
 }

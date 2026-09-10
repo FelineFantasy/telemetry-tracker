@@ -49,7 +49,7 @@ export function EventsVolumeChart({
   const tooltipStyle = chartTooltipStyle(colors);
 
   return (
-    <AnalyticsPanel className="p-4 sm:p-5" aria-label="Events over time">
+    <AnalyticsPanel className="px-4 py-3.5" aria-label="Events over time">
       <AnalyticsPanelHeader
         title="Events over time"
         description={`Event volume (${rangeLabel.toLowerCase()}, UTC buckets)`}

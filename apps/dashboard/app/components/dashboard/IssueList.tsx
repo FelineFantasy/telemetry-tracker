@@ -46,22 +46,22 @@ export function IssueListItem({
     <li>
       <Link
         href={href}
-        className="block px-4 py-3.5 transition-colors hover:bg-surface/60 sm:px-5"
+        className="block px-4 py-2.5 transition-colors hover:bg-surface/60"
       >
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{app}</Badge>
           {environment ? <Badge>{environment}</Badge> : null}
           {resolved ? <ResolvedBadge /> : null}
         </div>
-        <p className="mt-2 line-clamp-2 break-all text-[14px] font-medium text-destructive">
+        <p className="mt-1 line-clamp-1 break-all text-[14px] font-medium text-destructive">
           {message}
         </p>
         {topStack ? (
-          <pre className="mt-2 max-h-20 overflow-hidden break-all font-mono text-[11px] leading-relaxed text-muted-foreground">
+          <pre className="mt-1 max-h-10 overflow-hidden break-all font-mono text-[11px] leading-relaxed text-muted-foreground">
             {topStack}
           </pre>
         ) : null}
-        <p className="mt-2 break-words font-mono text-[11px] text-muted-foreground">{meta}</p>
+        <p className="mt-1 break-words font-mono text-[11px] text-muted-foreground">{meta}</p>
       </Link>
     </li>
   );
@@ -84,13 +84,13 @@ export function OverviewListItem({
     <li>
       <Link
         href={href}
-        className="block px-4 py-3 transition-colors hover:bg-surface/60 sm:px-5"
+        className="block px-4 py-2.5 transition-colors hover:bg-surface/60"
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             {badges ? <div className="flex flex-wrap items-center gap-2">{badges}</div> : null}
-            <p className={`mt-1 line-clamp-2 break-all text-[13px] ${titleClassName}`}>{title}</p>
-            <div className="mt-1 break-words text-[12px] text-muted-foreground">{meta}</div>
+            <p className={`mt-0.5 line-clamp-1 break-all text-[13px] ${titleClassName}`}>{title}</p>
+            <div className="mt-0.5 break-words text-[12px] text-muted-foreground">{meta}</div>
           </div>
         </div>
       </Link>

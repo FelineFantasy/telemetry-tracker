@@ -557,19 +557,21 @@ export default async function OverviewPage({
       <OverviewGreeting
         user={user}
         actions={
-          <TimeRangePicker
-            path={OVERVIEW_PATH}
-            currentParams={currentOverviewParams}
-            includeAll
-            align="right"
-            range={{
-              key: parsedRange.key,
-              label: displayRangeLabel,
-              shortLabel: parsedRange.shortLabel,
-              gte: overviewData.since,
-              lte: overviewData.until ?? parsedRange.lte.toISOString(),
-            }}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <TimeRangePicker
+              path={OVERVIEW_PATH}
+              currentParams={currentOverviewParams}
+              includeAll
+              align="right"
+              range={{
+                key: parsedRange.key,
+                label: displayRangeLabel,
+                shortLabel: parsedRange.shortLabel,
+                gte: overviewData.since,
+                lte: overviewData.until ?? parsedRange.lte.toISOString(),
+              }}
+            />
+          </div>
         }
       />
 
@@ -585,7 +587,6 @@ export default async function OverviewPage({
       />
 
       <OverviewAppHealth health={health} />
-      <OverviewActiveIncidents issues={activeIssues} />
 
       <Suspense fallback={null}>
         <OverviewMetricsSection
@@ -611,16 +612,10 @@ export default async function OverviewPage({
         />
       </Suspense>
 
-      <DashboardSection
-        kicker="Volume"
-        title="Telemetry over time"
-        description={`Errors, events, and sessions in ${displayRangeLabel.toLowerCase()}`}
-        className="mb-8"
-      >
-        <OverviewTrendsChart series={overviewData.series} rangeLabel={displayRangeLabel} />
-      </DashboardSection>
-
-      <section className="mb-8 grid gap-4 lg:grid-cols-2">
+      <section className="mb-5 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <OverviewTrendsChart series={overviewData.series} rangeLabel={displayRangeLabel} />
+        </div>
         <OverviewTopErrorsPanel
           groups={(overviewData.metricsTopErrorGroups ?? []).map((group) => ({
             ...group,
@@ -629,21 +624,26 @@ export default async function OverviewPage({
           rangeLabel={displayRangeLabel}
           errorsHref={buildDashboardScopedListHref("/dashboard/errors", listScope)}
         />
+      </section>
+
+      <section className="mb-5 grid gap-4 lg:grid-cols-2">
+        <OverviewActiveIncidents issues={activeIssues} />
         <OverviewRecentSessionsPanel
           sessions={overviewData.recentSessions ?? []}
           rangeLabel={displayRangeLabel}
           sessionsHref={buildDashboardScopedListHref("/dashboard/sessions", listScope)}
         />
-        <div className="lg:col-start-2">
-          <Suspense fallback={<OverviewPerformanceCardSkeleton />}>
-            <OverviewPerformanceCard
-              listScope={listScope}
-              rangeLabel={displayRangeLabel}
-              metricsSince={performanceMetricsSince}
-              metricsUntil={performanceMetricsUntil}
-            />
-          </Suspense>
-        </div>
+      </section>
+
+      <section className="mb-5">
+        <Suspense fallback={<OverviewPerformanceCardSkeleton />}>
+          <OverviewPerformanceCard
+            listScope={listScope}
+            rangeLabel={displayRangeLabel}
+            metricsSince={performanceMetricsSince}
+            metricsUntil={performanceMetricsUntil}
+          />
+        </Suspense>
       </section>
 
       <OverviewExtraCharts
@@ -656,7 +656,7 @@ export default async function OverviewPage({
         kicker="Live telemetry"
         title="Trends & breakdown"
         description={`Project-scoped data from your telemetry API · ${contextParts.join(" · ")}`}
-        className="mb-8"
+        className="mb-6"
       >
         <OverviewSortControls
           path={OVERVIEW_PATH}
@@ -667,7 +667,7 @@ export default async function OverviewPage({
           topEventsOrder={topEventsOrder}
         />
 
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <OverviewTopBars
             title="Top errors (this page)"
             subtitle="Occurrences in the current table page — compare at a glance"
@@ -689,7 +689,7 @@ export default async function OverviewPage({
         kicker="Errors"
         title="Exception & crash signals"
         description="Error occurrences grouped by fingerprint. Higher counts usually mean more user impact."
-        className="mb-10"
+        className="mb-6"
       >
         <StatCard
           label={`Total error occurrences · ${displayRangeLabel}`}

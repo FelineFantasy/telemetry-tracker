@@ -25,35 +25,31 @@ export function FiltersSortPanel({
   ) : null;
 
   return (
-    <section
-      className="mb-6 overflow-visible rounded-xl border border-border bg-surface/40"
-      aria-label="Filters and sort"
-    >
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 border-b border-border px-4 py-3 sm:hidden"
-        aria-expanded={mobileOpen}
-        aria-controls={bodyId}
-        onClick={() => setMobileOpen((open) => !open)}
-      >
-        <span className="text-sm font-medium">Filters &amp; sort</span>
-        <span className="flex items-center gap-2">
-          {rangeChip}
+    <section className="mb-4" aria-label="Filters and sort">
+      <div className="mb-2 flex items-center justify-between gap-2 sm:hidden">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[13px] font-medium"
+          aria-expanded={mobileOpen}
+          aria-controls={bodyId}
+          onClick={() => setMobileOpen((open) => !open)}
+        >
+          Filters
           <ChevronDown
             className={cn(
               "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
               mobileOpen && "rotate-180"
             )}
           />
-        </span>
-      </button>
-
-      <div className="hidden flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3 sm:flex">
-        <h2 className="text-sm font-medium">Filters &amp; sort</h2>
+        </button>
         {rangeChip}
       </div>
 
-      <div id={bodyId} className={cn("p-4", !mobileOpen && "hidden sm:block")}>
+      {rangeChip ? (
+        <div className="mb-2 hidden sm:flex sm:justify-end">{rangeChip}</div>
+      ) : null}
+
+      <div id={bodyId} className={cn(!mobileOpen && "hidden sm:block")}>
         {children}
       </div>
     </section>
