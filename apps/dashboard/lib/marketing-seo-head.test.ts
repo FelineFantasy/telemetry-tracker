@@ -10,6 +10,8 @@ describe("marketing SEO head flushing", () => {
     expect(src).not.toMatch(/getCookieConsentChoiceFromCookies/);
     expect(src).not.toMatch(/await cookies\(/);
     expect(src).toMatch(/export default function RootLayout/);
+    expect(src).not.toMatch(/openGraph:\s*\{[^}]*title:/s);
+    expect(src).not.toMatch(/twitter:\s*\{[^}]*title:/s);
   });
 
   it("homepage is a static server page with no session cookie read", () => {
@@ -17,5 +19,6 @@ describe("marketing SEO head flushing", () => {
     expect(src).toMatch(/export default function LandingPage/);
     expect(src).not.toMatch(/getDashboardSessionId/);
     expect(src).not.toMatch(/cookies\(/);
+    expect(src).toContain("Free Error Tracking for Side Projects");
   });
 });
