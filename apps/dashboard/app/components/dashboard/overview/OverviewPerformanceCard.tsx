@@ -1,11 +1,14 @@
+"use client";
+
 import {
   AnalyticsPanel,
   AnalyticsPanelHeader,
   AnalyticsViewAllLink,
 } from "@/app/components/dashboard/analytics-ui";
 import { Badge } from "@/app/components/Badge";
-import { fetchPerformanceSummary } from "@/lib/performance-summary";
 import { buildDashboardScopedListHref, type DashboardListScope } from "@/lib/overview-scope-url";
+import { useDeferredAnalytics } from "@/lib/use-deferred-analytics";
+import type { PerformancePageSummary } from "@/lib/performance-summary";
 import {
   buildOverviewPerformanceSummaryQuery,
   hasOverviewWebVitals,
@@ -169,8 +172,8 @@ export function OverviewPerformanceCardSkeleton() {
   );
 }
 
-/** Async Overview card: Web Vitals snapshot via `GET /api/performance/summary` (#197). */
-export async function OverviewPerformanceCard({
+/** Overview card: Web Vitals snapshot via `GET /api/performance/summary` after first paint (#197). */
+export function OverviewPerformanceCard({
   listScope,
   rangeLabel,
   metricsSince,
@@ -192,9 +195,14 @@ export async function OverviewPerformanceCard({
     "/dashboard/performance",
     performanceScope
   );
-  const summary = await fetchPerformanceSummary(
-    buildOverviewPerformanceSummaryQuery(performanceScope)
+  const { data: summary, loading } = useDeferredAnalytics<PerformancePageSummary>(
+    "/api/performance/summary",
+    buildOverviewPerformanceSummaryQuery(performanceScope).toString()
   );
+
+  if (loading) {
+    return <OverviewPerformanceCardSkeleton />;
+  }
 
   if (summary == null) {
     return (
