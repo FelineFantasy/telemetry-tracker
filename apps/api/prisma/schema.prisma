@@ -477,6 +477,12 @@ model Event {
   @@index([project_id, created_at])
   @@index([project_id, app])
   @@index([project_id, environment])
+  /// $request / $web_vital filters, GROUP BY name, DISTINCT ON (name) last-seen.
+  @@index([project_id, name, created_at(sort: Desc)])
+  /// Session LATERAL event stats + effective-release latest-event fallback.
+  @@index([project_id, session_id, app, created_at(sort: Desc)])
+  /// Release Health Event grouping / release-scoped time windows (raw column).
+  @@index([project_id, release, created_at])
 }
 
 model ErrorGroup {
@@ -524,6 +530,8 @@ model ErrorOccurrence {
   @@index([error_group_id, platform])
   @@index([error_group_id, release])
   @@index([error_group_id, environment])
+  /// Crash-free session NOT EXISTS (session_id lookup; not covered by error_group_id indexes).
+  @@index([session_id])
 }
 
 model Session {
@@ -550,6 +558,10 @@ model Session {
   @@index([project_id, country])
   @@index([project_id, environment])
   @@index([project_id, release])
+  /// Cohort first-seen / user-device link expansion by identified user.
+  @@index([project_id, user_id, started_at])
+  /// Cohort first-seen / user-device link expansion by anonymous device.
+  @@index([project_id, anonymous_id, started_at])
 }
 
 /// Release / product-update mailing list (marketing site subscribe + registration opt-in).

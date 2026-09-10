@@ -11,6 +11,7 @@ import {
   resolveSessionsSummaryWindow,
   sessionFilterSql,
   sessionWindowWithEventScope,
+  userDeviceLinksCteSql,
 } from "./sessions-page-summary.js";
 import { UNKNOWN_RELEASE_KEY } from "./release-key.js";
 
@@ -416,5 +417,27 @@ describe("identityFirstSeenWhereSql", () => {
     expect(text).toContain('"project_id"');
     expect(text).toContain('"anonymous_id"');
     expect(text).not.toContain('"user_id"');
+  });
+});
+
+describe("userDeviceLinksCteSql", () => {
+  it("seeds identities from the requested window then expands users all-time", () => {
+    const since = new Date("2026-06-01T00:00:00.000Z");
+    const until = new Date("2026-06-08T00:00:00.000Z");
+    const sql = userDeviceLinksCteSql(
+      "proj-1",
+      { range: { gte: since, lte: until } },
+      since,
+      until
+    );
+    const text = prismaSqlText(sql);
+    expect(text).toContain("window_identities AS");
+    expect(text).toContain("discovered_users AS");
+    expect(text).toContain("user_device_links AS");
+    expect(text).toContain('"started_at" >=');
+    expect(text).toContain('"started_at" <=');
+    const values = (sql as unknown as { values: unknown[] }).values;
+    expect(values).toContain(since);
+    expect(values).toContain(until);
   });
 });

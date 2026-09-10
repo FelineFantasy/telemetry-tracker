@@ -44,6 +44,8 @@ describe("isSessionAggregateSort", () => {
     expect(isSessionAggregateSort("pages")).toBe(true);
     expect(isSessionAggregateSort("status")).toBe(true);
     expect(isSessionAggregateSort("started_at")).toBe(false);
+    expect(isSessionAggregateSort("ended_at")).toBe(false);
+    expect(isSessionAggregateSort("app")).toBe(false);
   });
 });
 
