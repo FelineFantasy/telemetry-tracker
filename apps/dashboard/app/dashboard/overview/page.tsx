@@ -31,10 +31,7 @@ import {
   OverviewRecentSessionsPanel,
   OverviewTopErrorsPanel,
 } from "@/app/components/dashboard/overview/OverviewBreakdownGrid";
-import {
-  OverviewPerformanceCard,
-  OverviewPerformanceCardSkeleton,
-} from "@/app/components/dashboard/overview/OverviewPerformanceCard";
+import { OverviewPerformanceCard } from "@/app/components/dashboard/overview/OverviewPerformanceCard";
 import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
@@ -357,11 +354,12 @@ export default async function OverviewPage({
         ).catch((e) => ({ error: e } as const))
       : Promise.resolve({ error: new Error("No project selected") } as const);
 
-  const [user, workspace, bootstrap, overviewEarly] = await Promise.all([
+  const [user, workspace, bootstrap, overviewEarly, filterOptionsEarly] = await Promise.all([
     getDashboardUser(),
     getDashboardWorkspaceForRequest(),
     fetchDashboardBootstrap(),
     overviewEarlyPromise,
+    getFilterOptions(rawApp ?? undefined),
   ]);
   const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
 
@@ -434,7 +432,9 @@ export default async function OverviewPage({
   const filterOptions =
     effectiveProjectId === ""
       ? { platforms: [] as string[], releases: [] as string[] }
-      : await getFilterOptions(app ?? undefined);
+      : app === rawApp
+        ? filterOptionsEarly
+        : await getFilterOptions(app ?? undefined);
 
   const platform = resolveScopedQueryValue(rawPlatform, filterOptions.platforms);
   if (rawPlatform !== platform) {
@@ -636,14 +636,12 @@ export default async function OverviewPage({
       </section>
 
       <section className="mb-5">
-        <Suspense fallback={<OverviewPerformanceCardSkeleton />}>
-          <OverviewPerformanceCard
-            listScope={listScope}
-            rangeLabel={displayRangeLabel}
-            metricsSince={performanceMetricsSince}
-            metricsUntil={performanceMetricsUntil}
-          />
-        </Suspense>
+        <OverviewPerformanceCard
+          listScope={listScope}
+          rangeLabel={displayRangeLabel}
+          metricsSince={performanceMetricsSince}
+          metricsUntil={performanceMetricsUntil}
+        />
       </section>
 
       <OverviewExtraCharts

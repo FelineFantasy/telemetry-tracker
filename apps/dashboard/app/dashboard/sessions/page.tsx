@@ -1,11 +1,7 @@
 import { PageTitle } from "@/app/components/PageTitle";
 import { redirect } from "next/navigation";
 import { SessionsClientListSection } from "@/app/components/dashboard/SessionsClientListSection";
-import {
-  SessionsSummaryMetrics,
-  type SessionsPageSummary,
-} from "@/app/components/dashboard/SessionsSummaryMetrics";
-import { SessionsUserCohortMetrics } from "@/app/components/dashboard/SessionsUserCohortMetrics";
+import { DeferredSessionsKpis } from "@/app/components/dashboard/DeferredSessionsKpis";
 import { type SessionsTableRow } from "@/app/components/dashboard/SessionsTable";
 import { redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import {
@@ -42,12 +38,6 @@ async function getSessions(search: URLSearchParams) {
     pageSize: number;
     max_duration_sec?: number;
   }>;
-}
-
-async function getSessionsSummary(search: URLSearchParams): Promise<SessionsPageSummary | null> {
-  const res = await dashboardApiFetch(`/api/sessions/summary?${search.toString()}`);
-  if (!res.ok) return null;
-  return res.json();
 }
 
 async function getFilterOptions(app?: string) {
@@ -194,16 +184,14 @@ export default async function SessionsPage({
     pageSize: number;
     max_duration_sec: number;
   };
-  let summary: SessionsPageSummary | null = null;
   let platforms: string[] = [];
   let environments: string[] = [];
   let releases: string[] = [];
   let countries: string[] = [];
   try {
-    const [data, opts, summaryData] = await Promise.all([
+    const [data, opts] = await Promise.all([
       getSessions(apiQuery),
       getFilterOptions(appFilter || undefined),
-      getSessionsSummary(summaryQuery),
     ]);
     initialListData = {
       items: data.items ?? [],
@@ -216,7 +204,6 @@ export default async function SessionsPage({
     environments = opts.environments;
     releases = opts.releases;
     countries = opts.countries;
-    summary = summaryData;
   } catch (e) {
     return (
       <>
@@ -244,8 +231,7 @@ export default async function SessionsPage({
 
       <AnalyticsListShell>
         <CompareModeControl path={SESSIONS_PATH} currentParams={currentParams} />
-        {summary ? <SessionsSummaryMetrics summary={summary} /> : null}
-        {summary ? <SessionsUserCohortMetrics summary={summary} /> : null}
+        <DeferredSessionsKpis queryString={summaryQuery.toString()} />
 
         <SessionsClientListSection
           path={SESSIONS_PATH}

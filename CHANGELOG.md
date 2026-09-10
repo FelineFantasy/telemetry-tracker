@@ -21,6 +21,14 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.17.12] - 2026-09-10
+
+### Fixed
+
+- **Dashboard page load** — Sessions KPI summary (`/api/sessions/summary`) no longer blocks list HTML; Overview’s performance card fetches after first paint instead of holding the document open; Releases shows a loading skeleton while the summary query runs ([#654](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/654))
+
+---
+
 ## [1.17.11] - 2026-09-10
 
 ### Changed
