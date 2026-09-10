@@ -17,11 +17,19 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
-- **Dashboard API query performance** — summary endpoints (`GET /api/overview`, `/api/releases/summary`, `/api/sessions/summary`, `/api/sessions`) now use window-bounded identity scans, SQL `COUNT FILTER` aggregation, page-then-enrich session lists, and skip duplicate distinct-event counts when the list window matches the metrics window. Response shapes and metric formulas are unchanged.
+### Database
+
+---
+
+## [1.17.13] - 2026-09-10
+
+### Changed
+
+- **Dashboard API query performance** — summary endpoints (`GET /api/overview`, `/api/releases/summary`, `/api/sessions/summary`, `/api/sessions`) now use window-bounded identity scans, SQL `COUNT FILTER` aggregation, page-then-enrich session lists, and skip duplicate distinct-event counts when the list window matches the metrics window. Response shapes and metric formulas are unchanged ([#657](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/657))
 
 ### Database
 
-- **Dashboard query indexes** — composite indexes on `Event (project_id, name, created_at)`, `Event (project_id, session_id, app, created_at)`, `Event (project_id, release, created_at)`, `ErrorOccurrence (session_id)`, and `Session (project_id, user_id|anonymous_id, started_at)`, plus expression indexes on normalized `TRIM(release)` for Release Health grouping (`20260910220000_dashboard_query_perf_indexes`)
+- **Dashboard query indexes** — composite indexes on `Event (project_id, name, created_at)`, `Event (project_id, session_id, app, created_at)`, `Event (project_id, release, created_at)`, `ErrorOccurrence (session_id)`, and `Session (project_id, user_id|anonymous_id, started_at)`, plus expression indexes on normalized `TRIM(release)` for Release Health grouping (`20260910220000_dashboard_query_perf_indexes`) ([#657](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/657))
 
 ---
 
