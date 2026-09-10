@@ -17,9 +17,19 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ### Changed
 
-- **Dashboard density** — desktop sidebar shell, compact KPI cards, tighter overview/issues/events/performance layouts, and denser filters so the live dashboard matches the README product screenshots without changing telemetry APIs or calculations.
-
 ### Database
+
+---
+
+## [1.17.11] - 2026-09-10
+
+### Changed
+
+- **Dashboard density** — desktop sidebar shell replaces the old horizontal dashboard tabs, with compact KPI cards, tighter overview/issues/events/performance layouts, and denser filters so the live dashboard matches the README product screenshots without changing telemetry APIs or calculations ([#650](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/650))
+
+### Fixed
+
+- **Notifications loader** — keep the dashboard notifications loader on the server so the new chrome shell stays a client component without pulling RSC-only code into the client bundle ([#650](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/650))
 
 ---
 
