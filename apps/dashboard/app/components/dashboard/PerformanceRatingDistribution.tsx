@@ -24,9 +24,9 @@ function RatingBar({ vital }: { vital: WebVitalMetricSummary }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div
-        className="flex h-3 w-full overflow-hidden rounded-full bg-muted/40"
+        className="flex h-2 w-full overflow-hidden rounded-full bg-muted/40"
         role="img"
         aria-label={`${VITAL_LABELS[vital.metric]} rating distribution: ${rating.goodPct.toFixed(0)}% good, ${rating.needsImprovementPct.toFixed(0)}% needs improvement, ${rating.poorPct.toFixed(0)}% poor`}
       >
@@ -84,11 +84,11 @@ export function PerformanceRatingDistribution({
         title="Rating distribution"
         description={`Good / Needs improvement / Poor share (${rangeLabel.toLowerCase()})`}
       />
-      <div className="divide-y divide-border">
+      <div className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
         {VITAL_ORDER.map((key) => {
           const vital = summary.webVitals.vitals[key];
           return (
-            <div key={key} className="px-4 py-4 sm:px-5">
+            <div key={key} className="bg-card px-4 py-3">
               <p className="mb-2 text-[12px] font-medium">{VITAL_LABELS[key]}</p>
               <RatingBar vital={vital} />
             </div>

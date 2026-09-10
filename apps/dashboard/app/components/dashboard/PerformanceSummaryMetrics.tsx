@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  AnalyticsPanel,
-  MetricDelta,
-} from "@/app/components/dashboard/analytics-ui";
-import {
-  MiniSparkline,
-  type SparklinePoint,
-} from "@/app/components/dashboard/MiniSparkline";
+import { MetricCard, MetricCardGrid } from "@/app/components/dashboard/MetricCard";
 import { formatPct } from "@/lib/overview-format";
 import type {
   PerformancePageSummary,
@@ -39,61 +32,11 @@ function formatApdex(score: number): string {
   return formatPct(score * 100, 1);
 }
 
-function toSparkline(series: { t: string; value: number | null }[]): SparklinePoint[] {
+function toSparkline(series: { t: string; value: number | null }[]) {
   return series.map((point) => ({ t: point.t, count: point.value }));
 }
 
-function MetricCell({
-  label,
-  value,
-  current,
-  previous,
-  invertDelta,
-  deltaMode = "relative",
-  sparkline,
-  sparklineLabel,
-  compareText,
-}: {
-  label: string;
-  value: string;
-  current: number;
-  previous: number | null;
-  invertDelta?: boolean;
-  deltaMode?: "relative" | "pp";
-  sparkline?: SparklinePoint[];
-  sparklineLabel?: string;
-  compareText: string;
-}) {
-  return (
-    <div className="flex flex-col gap-2 px-4 py-3 sm:px-5 sm:py-4">
-      <div>
-        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
-        <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight sm:text-xl">{value}</p>
-        {previous == null ? (
-          <p className="mt-1 text-[11px] text-muted-foreground">— {compareText}</p>
-        ) : (
-          <MetricDelta
-            current={current}
-            previous={previous}
-            invert={invertDelta}
-            mode={deltaMode}
-            compareText={compareText}
-          />
-        )}
-      </div>
-      {sparkline && sparklineLabel ? (
-        <MiniSparkline
-          data={sparkline}
-          color="var(--chart-performance, #a78bfa)"
-          className="h-10 w-full sm:h-8 lg:max-w-[140px]"
-          ariaLabel={sparklineLabel}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function RequestLatencyMetrics({
+function RequestLatencyCards({
   latency,
   compareText,
 }: {
@@ -102,7 +45,7 @@ function RequestLatencyMetrics({
 }) {
   return (
     <>
-      <MetricCell
+      <MetricCard
         label="Avg response"
         value={formatDurationMs(latency.avgMs)}
         current={latency.avgMs}
@@ -111,18 +54,18 @@ function RequestLatencyMetrics({
         sparkline={toSparkline(latency.series.avgMs)}
         sparklineLabel="Average response time over time"
         compareText={compareText}
+        accent="warning"
       />
-      <MetricCell
+      <MetricCard
         label="Apdex"
         value={formatApdex(latency.apdex)}
         current={latency.apdex * 100}
-        previous={
-          latency.apdexPrevious == null ? null : latency.apdexPrevious * 100
-        }
+        previous={latency.apdexPrevious == null ? null : latency.apdexPrevious * 100}
         deltaMode="pp"
         sparkline={toSparkline(latency.series.apdexPct)}
         sparklineLabel="Apdex score over time"
         compareText={compareText}
+        accent="warning"
       />
     </>
   );
@@ -138,26 +81,24 @@ export function PerformanceSummaryMetrics({ summary }: { summary: PerformancePag
   const totalCols = vitalCount + extraCount;
   const gridCols =
     totalCols >= 6
-      ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      ? "lg:grid-cols-3 xl:grid-cols-6"
       : totalCols === 4
-        ? "sm:grid-cols-2 lg:grid-cols-4"
+        ? "lg:grid-cols-4 xl:grid-cols-4"
         : totalCols === 2
-          ? "sm:grid-cols-2"
-          : "sm:grid-cols-2 lg:grid-cols-4";
+          ? "xl:grid-cols-2"
+          : "lg:grid-cols-4 xl:grid-cols-4";
 
   return (
-    <AnalyticsPanel aria-label="Performance summary metrics">
-      <div className="border-b border-border px-4 py-2 sm:px-5">
-        <p className="text-[12px] text-muted-foreground">
-          {summary.window.label} · {summary.window.compareLabel}
-        </p>
-      </div>
-      <div className={`grid grid-cols-1 divide-y divide-border ${gridCols} lg:divide-x lg:divide-y-0`}>
+    <section aria-label="Performance summary metrics">
+      <p className="mb-2.5 text-[12px] text-muted-foreground">
+        {summary.window.label} · {summary.window.compareLabel}
+      </p>
+      <MetricCardGrid className={gridCols}>
         {showVitals
           ? VITAL_ORDER.map((key) => {
               const vital = summary.webVitals.vitals[key];
               return (
-                <MetricCell
+                <MetricCard
                   key={key}
                   label={VITAL_LABELS[key]}
                   value={formatVitalValue(key, vital.p75)}
@@ -167,14 +108,15 @@ export function PerformanceSummaryMetrics({ summary }: { summary: PerformancePag
                   sparkline={toSparkline(vital.series)}
                   sparklineLabel={`${VITAL_LABELS[key]} p75 over time`}
                   compareText={compareText}
+                  accent="warning"
                 />
               );
             })
           : null}
         {latency ? (
-          <RequestLatencyMetrics latency={latency} compareText={compareText} />
+          <RequestLatencyCards latency={latency} compareText={compareText} />
         ) : null}
-      </div>
-    </AnalyticsPanel>
+      </MetricCardGrid>
+    </section>
   );
 }

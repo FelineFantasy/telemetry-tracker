@@ -2,12 +2,32 @@ import { NavScopePickersSkeleton } from "./NavScopePickersSkeleton";
 
 export function DashboardTopNavFallback() {
   return (
-    <header className="sticky top-0 z-40 w-full max-w-[100vw] overflow-x-clip border-b border-border bg-background/80 backdrop-blur-xl">
-      <div className="relative z-50 mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-2 sm:px-6 lg:px-8">
-        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:contents">
-          <div className="h-7 w-7 shrink-0 animate-pulse rounded-lg bg-surface sm:order-1 sm:w-28" />
-          <div className="relative z-[60] flex shrink-0 gap-1 sm:order-3">
-            {Array.from({ length: 4 }).map((_, i) => (
+    <>
+      <aside
+        className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border/70 bg-background lg:flex lg:flex-col"
+        aria-hidden
+      >
+        <div className="px-3 pt-3 pb-2">
+          <div className="h-7 w-40 animate-pulse rounded-md bg-muted" />
+        </div>
+        <div className="space-y-1.5 px-3 pb-3">
+          <div className="h-9 w-full animate-pulse rounded-md bg-muted" />
+          <div className="h-9 w-full animate-pulse rounded-md bg-muted" />
+        </div>
+        <div className="space-y-1 px-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-8 w-full animate-pulse rounded-md bg-muted/70" />
+          ))}
+        </div>
+      </aside>
+      <header className="sticky top-0 z-40 w-full max-w-[100vw] overflow-x-clip border-b border-border/70 bg-background/85 backdrop-blur-xl lg:pl-60">
+        <div className="flex h-12 items-center gap-2 px-3 sm:px-6">
+          <div className="h-8 w-8 animate-pulse rounded-md bg-muted lg:hidden" />
+          <div className="min-w-0 flex-1">
+            <NavScopePickersSkeleton />
+          </div>
+          <div className="flex shrink-0 gap-1">
+            {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
                 className="h-8 w-8 animate-pulse rounded-md border border-border bg-surface"
@@ -15,17 +35,7 @@ export function DashboardTopNavFallback() {
             ))}
           </div>
         </div>
-        <div className="min-w-0 w-full overflow-x-auto overscroll-x-contain px-0 scrollbar-hide sm:order-2 sm:w-auto sm:overflow-visible">
-          <NavScopePickersSkeleton />
-        </div>
-      </div>
-      <div className="relative z-10 mx-auto w-full min-w-0 max-w-7xl overflow-hidden border-t border-border/60 px-4 py-2 sm:px-6 lg:px-8">
-        <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-7 w-16 shrink-0 animate-pulse rounded-md bg-surface" />
-          ))}
-        </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }

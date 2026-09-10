@@ -72,7 +72,7 @@ export function ErrorsStackedChart({
   const tooltipStyle = chartTooltipStyle(colors);
 
   return (
-    <AnalyticsPanel className="p-4 sm:p-5" aria-label="Errors by type over time">
+    <AnalyticsPanel className="px-4 py-3.5" aria-label="Errors by type over time">
       <AnalyticsPanelHeader
         title="Errors by type"
         description={`Stacked occurrence volume (${rangeLabel.toLowerCase()}, UTC buckets)`}

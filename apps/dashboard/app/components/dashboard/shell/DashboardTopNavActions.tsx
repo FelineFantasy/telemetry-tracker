@@ -14,11 +14,13 @@ export function DashboardTopNavActions({
   commandPaletteEnabled,
   notificationsSlot,
   className,
+  showUserMenu = true,
 }: {
   user: DashboardUser | null;
   commandPaletteEnabled: boolean;
   notificationsSlot: ReactNode;
   className?: string;
+  showUserMenu?: boolean;
 }) {
   return (
     <div className={cn("flex shrink-0 items-center gap-1", className)}>
@@ -34,7 +36,7 @@ export function DashboardTopNavActions({
       >
         <BookOpen className="h-4 w-4" />
       </Link>
-      <DashboardUserMenu user={user} />
+      {showUserMenu ? <DashboardUserMenu user={user} /> : null}
     </div>
   );
 }

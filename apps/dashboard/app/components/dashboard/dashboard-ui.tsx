@@ -20,10 +20,10 @@ export function StatCard({
         ? "text-destructive"
         : "text-muted-foreground";
   return (
-    <AnalyticsPanel className="p-5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{value}</p>
-      {delta ? <p className={`mt-2 text-sm ${deltaClass}`}>{delta}</p> : null}
+    <AnalyticsPanel className="px-4 py-3.5">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+      {delta ? <p className={`mt-1 text-[12px] ${deltaClass}`}>{delta}</p> : null}
     </AnalyticsPanel>
   );
 }
@@ -42,15 +42,15 @@ export function DashboardSection({
   className?: string;
 }) {
   return (
-    <section className={`space-y-4 ${className}`}>
+    <section className={`space-y-3 ${className}`}>
       <header>
         {kicker ? (
           <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
             {kicker}
           </p>
         ) : null}
-        <h2 className={`text-lg font-medium tracking-tight ${kicker ? "mt-1" : ""}`}>{title}</h2>
-        {description ? <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p> : null}
+        <h2 className={`text-base font-medium tracking-tight ${kicker ? "mt-0.5" : ""}`}>{title}</h2>
+        {description ? <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">{description}</p> : null}
       </header>
       {children}
     </section>

@@ -6,10 +6,10 @@ import { describe, expect, it } from "vitest";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("dark theme tokens", () => {
-  it("uses charcoal surfaces instead of a near-black canvas", () => {
+  it("uses a dark navy canvas with charcoal cards, not near-black 0.04", () => {
     const css = readFileSync(join(root, "app/globals.css"), "utf8");
     expect(css).not.toContain("--background: oklch(0.04 0 0)");
-    expect(css).toContain("--background: oklch(0.18 0.014 260)");
+    expect(css).toContain("--background: oklch(0.14 0.018 260)");
     expect(css).toContain("--border: oklch(1 0 0 / 18%)");
   });
 });

@@ -48,18 +48,18 @@ export function OverviewTrendsChart({ series, rangeLabel }: Props) {
   const hasSessions = (series.sessions?.length ?? 0) > 0;
 
   return (
-    <AnalyticsPanel className="overview-trends p-4 sm:p-5" aria-label="Volume trends">
+    <AnalyticsPanel className="overview-trends px-4 py-3.5 sm:px-4" aria-label="Volume trends">
       <AnalyticsPanelHeader
-        title="Telemetry volume"
-        description={`Errors, events, and sessions (${rangeLabel.toLowerCase()}, UTC buckets)`}
-        className="border-0 px-0 pt-0"
+        title="Events Over Time"
+        description={rangeLabel}
+        className="border-0 px-0 pt-0 pb-2"
       />
       <div
-        className="overview-trends__chart w-full min-h-[300px]"
+        className="overview-trends__chart w-full min-h-[280px]"
         role="img"
         aria-label={summary}
       >
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
             <defs>
               <linearGradient id="overview-events-fill" x1="0" y1="0" x2="0" y2="1">

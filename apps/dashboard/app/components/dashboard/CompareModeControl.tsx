@@ -47,7 +47,7 @@ export function CompareModeControl({
   }
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3">
+    <div className="mb-3 flex flex-wrap items-center gap-3">
       <label className="inline-flex items-center gap-2 text-[12px] text-muted-foreground">
         <span className="shrink-0">Compare</span>
         <select
