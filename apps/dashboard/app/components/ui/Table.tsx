@@ -9,7 +9,7 @@ const tableClass = cn(
   "[&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-[11px] [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground",
   "[&_tbody_tr]:border-b [&_tbody_tr]:border-border last:[&_tbody_tr]:border-0",
   "[&_tbody_tr:hover]:bg-surface/40",
-  "[&_td]:px-3 [&_td]:py-2.5 [&_td]:align-top"
+  "[&_td]:px-3 [&_td]:py-2 [&_td]:align-middle"
 );
 
 export function TableWrap({

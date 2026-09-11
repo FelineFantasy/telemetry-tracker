@@ -31,10 +31,7 @@ import {
   OverviewRecentSessionsPanel,
   OverviewTopErrorsPanel,
 } from "@/app/components/dashboard/overview/OverviewBreakdownGrid";
-import {
-  OverviewPerformanceCard,
-  OverviewPerformanceCardSkeleton,
-} from "@/app/components/dashboard/overview/OverviewPerformanceCard";
+import { OverviewPerformanceCard } from "@/app/components/dashboard/overview/OverviewPerformanceCard";
 import { mergeListQuery, redirectHrefIfMissingTimeRange, redirectHrefForMetricsUntil } from "@/lib/list-filters-url";
 import { parseOverviewListPageSize, parsePageParam } from "@/lib/pagination";
 import type { OverviewApiResponse, OverviewHealth, OverviewKpiSparklines, OverviewWorkspaceTelemetry } from "@/lib/overview-api";
@@ -357,11 +354,12 @@ export default async function OverviewPage({
         ).catch((e) => ({ error: e } as const))
       : Promise.resolve({ error: new Error("No project selected") } as const);
 
-  const [user, workspace, bootstrap, overviewEarly] = await Promise.all([
+  const [user, workspace, bootstrap, overviewEarly, filterOptionsEarly] = await Promise.all([
     getDashboardUser(),
     getDashboardWorkspaceForRequest(),
     fetchDashboardBootstrap(),
     overviewEarlyPromise,
+    getFilterOptions(rawApp ?? undefined),
   ]);
   const { organizations, projects, resolvedOrgId, effectiveProjectId } = workspace;
 
@@ -434,7 +432,9 @@ export default async function OverviewPage({
   const filterOptions =
     effectiveProjectId === ""
       ? { platforms: [] as string[], releases: [] as string[] }
-      : await getFilterOptions(app ?? undefined);
+      : app === rawApp
+        ? filterOptionsEarly
+        : await getFilterOptions(app ?? undefined);
 
   const platform = resolveScopedQueryValue(rawPlatform, filterOptions.platforms);
   if (rawPlatform !== platform) {
@@ -557,19 +557,21 @@ export default async function OverviewPage({
       <OverviewGreeting
         user={user}
         actions={
-          <TimeRangePicker
-            path={OVERVIEW_PATH}
-            currentParams={currentOverviewParams}
-            includeAll
-            align="right"
-            range={{
-              key: parsedRange.key,
-              label: displayRangeLabel,
-              shortLabel: parsedRange.shortLabel,
-              gte: overviewData.since,
-              lte: overviewData.until ?? parsedRange.lte.toISOString(),
-            }}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <TimeRangePicker
+              path={OVERVIEW_PATH}
+              currentParams={currentOverviewParams}
+              includeAll
+              align="right"
+              range={{
+                key: parsedRange.key,
+                label: displayRangeLabel,
+                shortLabel: parsedRange.shortLabel,
+                gte: overviewData.since,
+                lte: overviewData.until ?? parsedRange.lte.toISOString(),
+              }}
+            />
+          </div>
         }
       />
 
@@ -585,7 +587,6 @@ export default async function OverviewPage({
       />
 
       <OverviewAppHealth health={health} />
-      <OverviewActiveIncidents issues={activeIssues} />
 
       <Suspense fallback={null}>
         <OverviewMetricsSection
@@ -611,16 +612,10 @@ export default async function OverviewPage({
         />
       </Suspense>
 
-      <DashboardSection
-        kicker="Volume"
-        title="Telemetry over time"
-        description={`Errors, events, and sessions in ${displayRangeLabel.toLowerCase()}`}
-        className="mb-8"
-      >
-        <OverviewTrendsChart series={overviewData.series} rangeLabel={displayRangeLabel} />
-      </DashboardSection>
-
-      <section className="mb-8 grid gap-4 lg:grid-cols-2">
+      <section className="mb-5 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <OverviewTrendsChart series={overviewData.series} rangeLabel={displayRangeLabel} />
+        </div>
         <OverviewTopErrorsPanel
           groups={(overviewData.metricsTopErrorGroups ?? []).map((group) => ({
             ...group,
@@ -629,21 +624,24 @@ export default async function OverviewPage({
           rangeLabel={displayRangeLabel}
           errorsHref={buildDashboardScopedListHref("/dashboard/errors", listScope)}
         />
+      </section>
+
+      <section className="mb-5 grid gap-4 lg:grid-cols-2">
+        <OverviewActiveIncidents issues={activeIssues} />
         <OverviewRecentSessionsPanel
           sessions={overviewData.recentSessions ?? []}
           rangeLabel={displayRangeLabel}
           sessionsHref={buildDashboardScopedListHref("/dashboard/sessions", listScope)}
         />
-        <div className="lg:col-start-2">
-          <Suspense fallback={<OverviewPerformanceCardSkeleton />}>
-            <OverviewPerformanceCard
-              listScope={listScope}
-              rangeLabel={displayRangeLabel}
-              metricsSince={performanceMetricsSince}
-              metricsUntil={performanceMetricsUntil}
-            />
-          </Suspense>
-        </div>
+      </section>
+
+      <section className="mb-5">
+        <OverviewPerformanceCard
+          listScope={listScope}
+          rangeLabel={displayRangeLabel}
+          metricsSince={performanceMetricsSince}
+          metricsUntil={performanceMetricsUntil}
+        />
       </section>
 
       <OverviewExtraCharts
@@ -656,7 +654,7 @@ export default async function OverviewPage({
         kicker="Live telemetry"
         title="Trends & breakdown"
         description={`Project-scoped data from your telemetry API · ${contextParts.join(" · ")}`}
-        className="mb-8"
+        className="mb-6"
       >
         <OverviewSortControls
           path={OVERVIEW_PATH}
@@ -667,7 +665,7 @@ export default async function OverviewPage({
           topEventsOrder={topEventsOrder}
         />
 
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <OverviewTopBars
             title="Top errors (this page)"
             subtitle="Occurrences in the current table page — compare at a glance"
@@ -689,7 +687,7 @@ export default async function OverviewPage({
         kicker="Errors"
         title="Exception & crash signals"
         description="Error occurrences grouped by fingerprint. Higher counts usually mean more user impact."
-        className="mb-10"
+        className="mb-6"
       >
         <StatCard
           label={`Total error occurrences · ${displayRangeLabel}`}

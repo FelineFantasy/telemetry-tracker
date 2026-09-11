@@ -1,11 +1,14 @@
+"use client";
+
 import {
   AnalyticsPanel,
   AnalyticsPanelHeader,
   AnalyticsViewAllLink,
 } from "@/app/components/dashboard/analytics-ui";
 import { Badge } from "@/app/components/Badge";
-import { fetchPerformanceSummary } from "@/lib/performance-summary";
 import { buildDashboardScopedListHref, type DashboardListScope } from "@/lib/overview-scope-url";
+import { useDeferredAnalytics } from "@/lib/use-deferred-analytics";
+import type { PerformancePageSummary } from "@/lib/performance-summary";
 import {
   buildOverviewPerformanceSummaryQuery,
   hasOverviewWebVitals,
@@ -19,56 +22,56 @@ function VitalRatingBar({ row }: { row: OverviewVitalRow }) {
   const { ratingDistribution: rating, label } = row;
   if (rating.total <= 0) {
     return (
-      <p className="text-[12px] text-muted-foreground">No samples in this period</p>
+      <p className="text-[11px] text-muted-foreground">No samples</p>
     );
   }
 
   return (
-    <div className="space-y-1.5">
-      <div
-        className="flex h-2 w-full overflow-hidden rounded-full bg-muted/40"
-        role="img"
-        aria-label={`${label} rating distribution: ${rating.goodPct.toFixed(0)}% good, ${rating.needsImprovementPct.toFixed(0)}% needs improvement, ${rating.poorPct.toFixed(0)}% poor`}
-      >
-        {rating.goodPct > 0 ? (
-          <div
-            className="h-full bg-success"
-            style={{ width: `${rating.goodPct}%` }}
-            title={`Good ${rating.goodPct.toFixed(1)}%`}
-          />
-        ) : null}
-        {rating.needsImprovementPct > 0 ? (
-          <div
-            className="h-full bg-warning"
-            style={{ width: `${rating.needsImprovementPct}%` }}
-            title={`Needs improvement ${rating.needsImprovementPct.toFixed(1)}%`}
-          />
-        ) : null}
-        {rating.poorPct > 0 ? (
-          <div
-            className="h-full bg-destructive"
-            style={{ width: `${rating.poorPct}%` }}
-            title={`Poor ${rating.poorPct.toFixed(1)}%`}
-          />
-        ) : null}
-      </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-        <span>
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-success align-middle" aria-hidden />{" "}
-          Good {rating.goodPct.toFixed(0)}%
-        </span>
-        <span>
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-warning align-middle" aria-hidden />{" "}
-          Needs improvement {rating.needsImprovementPct.toFixed(0)}%
-        </span>
-        <span>
-          <span
-            className="inline-block h-1.5 w-1.5 rounded-full bg-destructive align-middle"
-            aria-hidden
-          />{" "}
-          Poor {rating.poorPct.toFixed(0)}%
-        </span>
-      </div>
+    <div
+      className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted/40"
+      role="img"
+      aria-label={`${label} rating distribution: ${rating.goodPct.toFixed(0)}% good, ${rating.needsImprovementPct.toFixed(0)}% needs improvement, ${rating.poorPct.toFixed(0)}% poor`}
+    >
+      {rating.goodPct > 0 ? (
+        <div
+          className="h-full bg-success"
+          style={{ width: `${rating.goodPct}%` }}
+          title={`Good ${rating.goodPct.toFixed(1)}%`}
+        />
+      ) : null}
+      {rating.needsImprovementPct > 0 ? (
+        <div
+          className="h-full bg-warning"
+          style={{ width: `${rating.needsImprovementPct}%` }}
+          title={`Needs improvement ${rating.needsImprovementPct.toFixed(1)}%`}
+        />
+      ) : null}
+      {rating.poorPct > 0 ? (
+        <div
+          className="h-full bg-destructive"
+          style={{ width: `${rating.poorPct}%` }}
+          title={`Poor ${rating.poorPct.toFixed(1)}%`}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function VitalsLegend() {
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5 border-t border-border/70 px-4 py-2 text-[11px] text-muted-foreground">
+      <span>
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-success align-middle" aria-hidden />{" "}
+        Good
+      </span>
+      <span>
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-warning align-middle" aria-hidden />{" "}
+        Needs improvement
+      </span>
+      <span>
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-destructive align-middle" aria-hidden />{" "}
+        Poor
+      </span>
     </div>
   );
 }
@@ -96,36 +99,51 @@ function OverviewPerformancePanel({
         }
       />
       {loadError ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground">
           Couldn’t load Web Vitals for this scope. Try refreshing, or open the full Performance
           report.
         </p>
       ) : empty ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground sm:px-5">
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground">
           No Web Vitals yet for this scope. Instrument your browser SDK to capture LCP, INP, CLS,
           and TTFB.
         </p>
       ) : (
-        <div className="divide-y divide-border">
-          {rows.map((row) => (
-            <div key={row.metric} className="px-4 py-3.5 sm:px-5">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[12px] font-medium">{row.label}</p>
-                  <p className="mt-0.5 text-lg font-semibold tabular-nums tracking-tight">
+        <>
+          <div className="grid grid-cols-2 xl:grid-cols-4">
+            {rows.map((row) => (
+              <div key={row.metric} className="px-4 py-3">
+                <div className="mb-2">
+                  <p className="text-[11px] font-medium text-muted-foreground">{row.label}</p>
+                  <p className="mt-0.5 text-xl font-semibold tabular-nums tracking-tight">
                     {row.valueDisplay ?? "—"}
                   </p>
+                  {row.ratingLabel && row.badgeTone ? (
+                    <span className="mt-1 inline-flex items-center gap-1.5 text-[11px]">
+                      <span
+                        className={
+                          row.badgeTone === "success"
+                            ? "h-1.5 w-1.5 rounded-full bg-success"
+                            : row.badgeTone === "warning"
+                              ? "h-1.5 w-1.5 rounded-full bg-warning"
+                              : "h-1.5 w-1.5 rounded-full bg-destructive"
+                        }
+                        aria-hidden
+                      />
+                      <Badge variant={row.badgeTone}>{row.ratingLabel}</Badge>
+                    </span>
+                  ) : (
+                    <span className="mt-1 block text-[11px] text-muted-foreground">
+                      Insufficient data
+                    </span>
+                  )}
                 </div>
-                {row.ratingLabel && row.badgeTone ? (
-                  <Badge variant={row.badgeTone}>{row.ratingLabel}</Badge>
-                ) : (
-                  <span className="text-[11px] text-muted-foreground">Insufficient data</span>
-                )}
+                <VitalRatingBar row={row} />
               </div>
-              <VitalRatingBar row={row} />
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <VitalsLegend />
+        </>
       )}
     </AnalyticsPanel>
   );
@@ -154,8 +172,8 @@ export function OverviewPerformanceCardSkeleton() {
   );
 }
 
-/** Async Overview card: Web Vitals snapshot via `GET /api/performance/summary` (#197). */
-export async function OverviewPerformanceCard({
+/** Overview card: Web Vitals snapshot via `GET /api/performance/summary` after first paint (#197). */
+export function OverviewPerformanceCard({
   listScope,
   rangeLabel,
   metricsSince,
@@ -177,9 +195,14 @@ export async function OverviewPerformanceCard({
     "/dashboard/performance",
     performanceScope
   );
-  const summary = await fetchPerformanceSummary(
-    buildOverviewPerformanceSummaryQuery(performanceScope)
+  const { data: summary, loading } = useDeferredAnalytics<PerformancePageSummary>(
+    "/api/performance/summary",
+    buildOverviewPerformanceSummaryQuery(performanceScope).toString()
   );
+
+  if (loading) {
+    return <OverviewPerformanceCardSkeleton />;
+  }
 
   if (summary == null) {
     return (

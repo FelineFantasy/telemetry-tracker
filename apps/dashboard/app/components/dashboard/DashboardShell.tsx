@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { DashboardCapabilitiesProvider } from "./DashboardCapabilitiesContext";
-import { DashboardCapabilitiesSetterContext } from "./shell/DashboardCapabilitiesSetterContext";
+import { useDashboardCapabilities } from "./DashboardCapabilitiesContext";
 import { DashboardKeyboardShortcuts } from "./shell/DashboardKeyboardShortcuts";
 import type { DashboardSessionContext } from "@/lib/dashboard-capabilities";
 
@@ -18,14 +17,8 @@ function formatPeriodEnd(iso: string | null): string | null {
   }
 }
 
-export function DashboardShell({
-  children,
-  capabilitiesLoader,
-}: {
-  children: React.ReactNode;
-  capabilitiesLoader: React.ReactNode;
-}) {
-  const [capabilities, setCapabilities] = useState<DashboardSessionContext | null>(null);
+export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const capabilities = useDashboardCapabilities();
   const billingToastShownRef = useRef(false);
 
   useEffect(() => {
@@ -49,21 +42,21 @@ export function DashboardShell({
   }, [capabilities]);
 
   return (
-    <DashboardCapabilitiesSetterContext.Provider value={setCapabilities}>
+    <>
       <DashboardKeyboardShortcuts />
-      <main className="mx-auto w-full min-w-0 max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="main-content">
-        {capabilitiesLoader}
-        <DashboardCapabilitiesProvider value={capabilities}>
-          {capabilities?.billingHealth?.billingAlertVariant ? (
-            <BillingAlert capabilities={capabilities} />
-          ) : null}
-          {capabilities?.usageQuota?.nearQuota ? (
-            <QuotaBanner capabilities={capabilities} />
-          ) : null}
-          {children}
-        </DashboardCapabilitiesProvider>
+      <main
+        className="w-full min-w-0 px-4 py-5 sm:px-6 lg:pl-[16.5rem] lg:pr-6"
+        id="main-content"
+      >
+        {capabilities?.billingHealth?.billingAlertVariant ? (
+          <BillingAlert capabilities={capabilities} />
+        ) : null}
+        {capabilities?.usageQuota?.nearQuota ? (
+          <QuotaBanner capabilities={capabilities} />
+        ) : null}
+        {children}
       </main>
-    </DashboardCapabilitiesSetterContext.Provider>
+    </>
   );
 }
 

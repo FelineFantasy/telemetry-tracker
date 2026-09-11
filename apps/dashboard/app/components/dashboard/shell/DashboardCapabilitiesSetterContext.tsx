@@ -12,7 +12,7 @@ export const DashboardCapabilitiesSetterContext = createContext<SetDashboardCapa
 export function useDashboardCapabilitiesSetter(): SetDashboardCapabilities {
   const setter = useContext(DashboardCapabilitiesSetterContext);
   if (!setter) {
-    throw new Error("useDashboardCapabilitiesSetter must be used within DashboardShell");
+    throw new Error("useDashboardCapabilitiesSetter must be used within DashboardCapabilitiesRoot");
   }
   return setter;
 }

@@ -40,7 +40,7 @@ export function ErrorsTopTypesPanel({
           {rows.map((row) => (
             <li
               key={row.type}
-              className="flex items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5"
+              className="flex items-center gap-3 px-4 py-2 sm:gap-4"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -51,14 +51,14 @@ export function ErrorsTopTypesPanel({
                   />
                   <p className="truncate text-[13px] font-medium">{row.type}</p>
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   {formatCompact(row.count)} occurrences · {formatPct(row.sharePct, 1)}
                 </p>
               </div>
               <MiniSparkline
                 data={row.sparkline}
                 color={ERROR_TYPE_CHART_COLORS[row.type]}
-                className="h-9 w-28 shrink-0"
+                className="h-8 w-24 shrink-0"
                 ariaLabel={`${row.type} trend`}
               />
             </li>

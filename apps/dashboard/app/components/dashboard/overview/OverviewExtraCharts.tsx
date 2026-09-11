@@ -100,7 +100,7 @@ export function OverviewExtraCharts({
   const tooltipStyle = chartTooltipStyle(colors);
 
   return (
-    <section className="mb-8">
+    <section className="mb-5">
       <div className="mb-3">
         <h2 className="text-sm font-medium">Signals</h2>
         <p className="text-[12px] text-muted-foreground">Derived from project telemetry in this range</p>

@@ -40,16 +40,16 @@ export function EventsAnalyticsPanels({ analytics }: { analytics: EventsAnalytic
   const chartRangeLabel = volumeChartRangeLabel(analytics);
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+    <div className="space-y-4">
       <EventsVolumeChart
         data={analytics.volume}
         bucket={analytics.bucket}
         rangeLabel={chartRangeLabel}
       />
-      <div className="grid gap-4">
+      <section className="grid gap-4 lg:grid-cols-2">
         <EventsTopEventsPanel rows={analytics.topEvents} rangeLabel={analytics.window.label} />
         <EventsPlatformDonut slices={analytics.platforms} rangeLabel={analytics.window.label} />
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

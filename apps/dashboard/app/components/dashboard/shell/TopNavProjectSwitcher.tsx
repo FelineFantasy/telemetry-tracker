@@ -39,11 +39,13 @@ export function TopNavProjectSwitcher({
   currentOrganizationId,
   currentProjectId,
   projectNavSummaries,
+  triggerClassName,
 }: {
   projects: ProjectOption[];
   currentOrganizationId: string | null;
   currentProjectId: string;
   projectNavSummaries: Record<string, ProjectNavSummary>;
+  triggerClassName?: string;
 }) {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
@@ -151,6 +153,7 @@ export function TopNavProjectSwitcher({
           disabled={pending}
           aria-expanded={isOpen}
           aria-label="Project"
+          className={triggerClassName}
         >
           <ProjectStatusDot status={currentSummary.status} />
           <span className="truncate">{displayName}</span>

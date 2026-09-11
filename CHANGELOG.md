@@ -21,6 +21,55 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.17.13] - 2026-09-10
+
+### Changed
+
+- **Dashboard API query performance** — summary endpoints (`GET /api/overview`, `/api/releases/summary`, `/api/sessions/summary`, `/api/sessions`) now use window-bounded identity scans, SQL `COUNT FILTER` aggregation, page-then-enrich session lists, and skip duplicate distinct-event counts when the list window matches the metrics window. Response shapes and metric formulas are unchanged ([#657](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/657))
+
+### Database
+
+- **Dashboard query indexes** — composite indexes on `Event (project_id, name, created_at)`, `Event (project_id, session_id, app, created_at)`, `Event (project_id, release, created_at)`, `ErrorOccurrence (session_id)`, and `Session (project_id, user_id|anonymous_id, started_at)`, plus expression indexes on normalized `TRIM(release)` for Release Health grouping (`20260910220000_dashboard_query_perf_indexes`) ([#657](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/657))
+
+---
+
+## [1.17.12] - 2026-09-10
+
+### Fixed
+
+- **Dashboard page load** — Sessions KPI summary (`/api/sessions/summary`) no longer blocks list HTML; Overview’s performance card fetches after first paint instead of holding the document open; Releases shows a loading skeleton while the summary query runs ([#654](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/654))
+
+---
+
+## [1.17.11] - 2026-09-10
+
+### Changed
+
+- **Dashboard density** — desktop sidebar shell replaces the old horizontal dashboard tabs, with compact KPI cards, tighter overview/issues/events/performance layouts, and denser filters so the live dashboard matches the README product screenshots without changing telemetry APIs or calculations ([#650](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/650))
+
+### Fixed
+
+- **Notifications loader** — keep the dashboard notifications loader on the server so the new chrome shell stays a client component without pulling RSC-only code into the client bundle ([#650](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/650))
+
+---
+
+## [1.17.10] - 2026-09-10
+
+### Added
+
+- **Acquisition guides** — public landing pages for Sentry alternative, self-hosted error tracking, and Next.js / React / Node.js / React Native setup, using the same SDK snippets as the docs ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
+
+### Changed
+
+- **Homepage positioning** — H1 and metadata now lead with free error tracking for side projects (no credit card, open source, self-hostable) ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
+- **SoftwareApplication JSON-LD** — offer currency is EUR to match hosted pricing ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
+
+### Fixed
+
+- **Open Graph titles** — docs and other public pages inherit their document title instead of the homepage slogan ([#648](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/648))
+
+---
+
 ## [1.17.9] - 2026-09-09
 
 ### Added
