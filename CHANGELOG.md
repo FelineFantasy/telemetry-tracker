@@ -21,6 +21,28 @@ Contributors: add user-facing changes under **[Unreleased]** in your PR to `deve
 
 ---
 
+## [1.17.25] - 2026-09-27
+
+### Added
+
+- **`@telemetry-tracker/core` 1.5.0** — publish `ingestError()` so fatal Node handlers can await ingest before exit (Refs [#711](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/711); [#722](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/722))
+- **`@telemetry-tracker/node` 1.4.0** — depends on core `^1.5.0`; flush-then-exit for `uncaughtException` / `unhandledRejection` (opt out of rejection exit via `exitOnUnhandledRejection: false`); middleware times response finish and calls `next()` once (Refs [#711](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/711), [#719](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/719), [#720](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/720), [#632](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/632); [#722](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/722))
+- **`@telemetry-tracker/vite-plugin` 1.1.0** — publish `sourceMappingURL`-based `bundle_url` resolution (Refs [#718](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/718); [#722](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/722))
+
+### Security
+
+- **Post-login redirects (TT-017)** — `next` on `/login` (and legacy `signIn=1` flows) is validated against the app origin so protocol-relative, backslash, control-character, and absolute external values fall back to `/dashboard/overview`. Legitimate paths with query strings (e.g. `/dashboard/errors?range=7d`) are preserved ([#699](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/699))
+
+### Fixed
+
+- **Source-map GitHub Action docs (TT-021)** — `/docs/source-maps` and `docs/source-maps.md` pin `upload-source-maps` to commit `8d00f9d…` (`v1.17.24`) instead of `@main`, and warn that tags before `v1.17.18` must not be used (Refs [#721](https://github.com/Telemetry-Tracker/telemetry-tracker/issues/721); [#723](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/723))
+
+### Changed
+
+- **SDK publish** — `pnpm publish:packages` requires a clean tagged `origin/main` checkout with per-package version tags pushed, stamps `gitHead`, blocks direct folder publishes / `workspace:*`, aborts if core fails before dependents, and runs publish-guard tests in CI ([#722](https://github.com/Telemetry-Tracker/telemetry-tracker/pull/722))
+
+---
+
 ## [1.17.24] - 2026-09-26
 
 ### Fixed
